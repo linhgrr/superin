@@ -1,0 +1,274 @@
+/* Shin SuperApp — Design Tokens (Tailwind v4 via @theme) */
+
+@import "tailwindcss";
+
+@theme {
+  /* Colors */
+  --color-primary: oklch(0.65 0.21 280);
+  --color-primary-foreground: oklch(0.98 0 0);
+  --color-success: oklch(0.72 0.19 145);
+  --color-warning: oklch(0.75 0.18 85);
+  --color-danger: oklch(0.63 0.24 25);
+  --color-background: oklch(0.14 0.01 265);
+  --color-foreground: oklch(0.95 0.01 265);
+  --color-surface: oklch(0.18 0.01 265);
+  --color-surface-elevated: oklch(0.22 0.01 265);
+  --color-border: oklch(0.28 0.02 265);
+  --color-muted: oklch(0.55 0.02 265);
+  --color-ring: oklch(0.65 0.21 280);
+
+  /* Fonts */
+  --font-sans: "Open Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-heading: "Poppins", ui-sans-serif, system-ui, sans-serif;
+}
+
+/* ─── Base Styles ─────────────────────────────────────────────────────────── */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Dashboard Grid ──────────────────────────────────────────────────────── */
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 240px 1fr 360px;
+  height: 100vh;
+  overflow: hidden;
+}
+
+@media (max-width: 1024px) {
+  .dashboard-grid {
+    grid-template-columns: 64px 1fr 300px;
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+  .dashboard-grid .sidebar,
+  .dashboard-grid aside:last-child {
+    display: none;
+  }
+}
+
+/* ─── Sidebar ────────────────────────────────────────────────────────────── */
+
+.sidebar {
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+  overflow-y: auto;
+}
+
+.app-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  color: var(--color-muted);
+  text-decoration: none;
+  font-size: 0.875rem;
+  transition: background 0.15s, color 0.15s;
+  cursor: pointer;
+}
+
+.app-item:hover {
+  background: var(--color-surface-elevated);
+  color: var(--color-foreground);
+}
+
+.app-item.active {
+  background: oklch(0.65 0.21 280 / 0.12);
+  color: var(--color-primary);
+}
+
+/* ─── Widget Grid ────────────────────────────────────────────────────────── */
+
+.widget-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 1rem;
+}
+
+.widget-small      { grid-column: span 4; }
+.widget-medium     { grid-column: span 6; }
+.widget-large      { grid-column: span 8; }
+.widget-full-width { grid-column: span 12; }
+
+@media (max-width: 768px) {
+  .widget-small,
+  .widget-medium,
+  .widget-large,
+  .widget-full-width {
+    grid-column: span 12;
+  }
+}
+
+/* ─── Widget Card ────────────────────────────────────────────────────────── */
+
+.widget-card {
+  background: oklch(0.18 0.01 265 / 0.8);
+  border: 1px solid var(--color-border);
+  border-radius: 0.75rem;
+  padding: 1rem;
+  backdrop-filter: blur(8px);
+  height: 100%;
+}
+
+/* ─── Typography ─────────────────────────────────────────────────────────── */
+
+.stat-value {
+  font-family: var(--font-heading);
+  font-size: 1.875rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.025em;
+}
+
+.amount-positive { color: var(--color-success); }
+.amount-negative { color: var(--color-danger); }
+
+.section-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+/* ─── Forms ──────────────────────────────────────────────────────────────── */
+
+input,
+textarea,
+select {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  color: var(--color-foreground);
+  padding: 0.5rem 0.75rem;
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  width: 100%;
+  transition: border-color 0.15s;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px oklch(0.65 0.21 280 / 0.2);
+}
+
+/* ─── Buttons ────────────────────────────────────────────────────────────── */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+  border: none;
+  text-decoration: none;
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  color: var(--color-primary-foreground);
+}
+
+.btn-primary:hover {
+  opacity: 0.9;
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--color-muted);
+}
+
+.btn-ghost:hover {
+  background: var(--color-surface-elevated);
+  color: var(--color-foreground);
+}
+
+/* ─── Tables ──────────────────────────────────────────────────────────────── */
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  text-align: left;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.875rem;
+}
+
+tr:last-child td {
+  border-bottom: none;
+}
+
+/* ─── Scrollbar ──────────────────────────────────────────────────────────── */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-muted);
+}
+
+/* ─── Assistant-UI Dark Mode ───────────────────────────────────────────── */
+
+.chat-thread,
+[data-aui-theme="dark"] {
+  --aui-background: oklch(0.14 0.01 265);
+  --aui-surface: oklch(0.18 0.01 265);
+  --aui-border: oklch(0.28 0.02 265);
+  --aui-text: oklch(0.95 0.01 265);
+  --aui-muted: oklch(0.55 0.02 265);
+  --aui-primary: oklch(0.65 0.21 280);
+  --aui-success: oklch(0.72 0.19 145);
+  --aui-danger: oklch(0.63 0.24 25);
+}

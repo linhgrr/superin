@@ -1,0 +1,24 @@
+repos:
+  - repo: local
+    hooks:
+      - id: codegen
+        name: Generate TypeScript types from Pydantic schemas
+        entry: python scripts/codegen.py
+        language: system
+        files: backend/shared/
+        pass_filenames: false
+
+      - id: lint-python
+        name: Lint Python
+        entry: ruff check
+        language: system
+        files: backend/
+        pass_filenames: true
+
+      - id: typecheck-python
+        name: Type-check Python
+        entry: mypy
+        language: system
+        files: backend/
+        pass_filenames: true
+        args: ["--ignore-missing-imports"]

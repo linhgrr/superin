@@ -1,0 +1,3 @@
+#!/bin/sh
+# Pre-commit hook — run linting and type checks
+npx --no -- lint-staged

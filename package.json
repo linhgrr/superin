@@ -1,0 +1,31 @@
+{
+  "name": "shin-superin",
+  "version": "2.1.0",
+  "private": true,
+  "description": "Shin SuperApp — plug-and-play SuperApp platform",
+  "scripts": {
+    "commit": "cz",
+    "lint:frontend": "cd frontend && npm run lint",
+    "typecheck:frontend": "cd frontend && npm run typecheck",
+    "build:frontend": "cd frontend && npm run build",
+    "codegen": "python scripts/codegen.py",
+    "test:backend": "cd backend && python -m pytest",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:backend": "cd backend && uvicorn core.main:app --reload"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.6.0",
+    "@commitlint/config-conventional": "^19.6.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.3.0"
+  },
+  "lint-staged": {
+    "**/*.{ts,tsx}": [
+      "eslint --fix",
+      "tsc --noEmit"
+    ],
+    "**/*.py": [
+      "ruff check --fix"
+    ]
+  }
+}

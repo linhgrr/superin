@@ -1,0 +1,52 @@
+[project]
+name = "shin-superin"
+version = "2.1.0"
+description = "Shin SuperApp — plug-and-play SuperApp platform"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.34.0",
+    "pydantic>=2.10.0",
+    "pydantic-settings>=2.7.0",
+    "python-jose[cryptography]>=3.3.0",
+    "passlib[bcrypt]>=1.7.4",
+    "python-multipart>=0.0.20",
+    "motor>=3.6.0",
+    "beanie>=1.29.0",
+    "langgraph>=0.4.0",
+    "langchain-core>=0.3.0",
+    "langchain-openai>=0.3.0",
+    "sse-starlette>=2.2.0",
+    "assistant-stream>=0.2.0",
+    "python-dotenv>=1.0.0",
+    "httpx>=0.28.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.25.0",
+    "httpx>=0.28.0",
+    "ruff>=0.9.0",
+    "mypy>=1.14.0",
+]
+
+[project.scripts]
+superin = "core.main:app"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_ignores = true

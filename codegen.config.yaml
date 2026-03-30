@@ -1,0 +1,7 @@
+generate:
+  target: typescript
+  output: frontend/src/types/generated/
+  input: backend/shared/schemas.py
+
+watch:
+  - backend/shared/
