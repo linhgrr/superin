@@ -96,9 +96,7 @@ function WidgetCard({
 }) {
   return (
     <div className={`widget-${widget.size}`}>
-      <div className="widget-card">
-        <WidgetContent appId={appId} widgetId={widgetId} widget={widget} />
-      </div>
+      <WidgetContent appId={appId} widgetId={widgetId} widget={widget} />
     </div>
   );
 }
@@ -263,7 +261,6 @@ function DashboardInner({
                 <SortableWidgetCard
                   key={widgetId}
                   widgetId={widgetId}
-                  isEditMode={isEditMode}
                   onRemove={handleRemove}
                 >
                   <WidgetContent appId={appId} widgetId={widgetId} widget={widget} />
