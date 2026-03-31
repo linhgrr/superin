@@ -233,6 +233,18 @@ async def uninstall_app(
 # Route at /preferences/{app_id} to avoid conflict with plugin routes
 # at /api/apps/{app_id}/... which take priority in FastAPI routing.
 
+def _pref_to_schema(p: WidgetPreference) -> WidgetPreferenceSchema:
+    return WidgetPreferenceSchema(
+        id=str(p.id),
+        user_id=str(p.user_id),
+        widget_id=p.widget_id,
+        app_id=p.app_id,
+        enabled=p.enabled,
+        position=p.position,
+        config=p.config,
+    )
+
+
 @router.get("/preferences")
 async def get_all_preferences(
     user_id: str = Depends(get_current_user),
@@ -241,18 +253,7 @@ async def get_all_preferences(
     prefs = await WidgetPreference.find(
         WidgetPreference.user_id == PydanticObjectId(user_id),
     ).to_list()
-    return [
-        WidgetPreferenceSchema(
-            id=str(p.id),
-            user_id=str(p.user_id),
-            widget_id=p.widget_id,
-            app_id=p.app_id,
-            enabled=p.enabled,
-            position=p.position,
-            config=p.config,
-        )
-        for p in prefs
-    ]
+    return [_pref_to_schema(p) for p in prefs]
 
 
 @router.get("/preferences/{app_id}")
@@ -265,18 +266,7 @@ async def get_preferences(
         WidgetPreference.user_id == PydanticObjectId(user_id),
         WidgetPreference.app_id == app_id,
     ).to_list()
-    return [
-        WidgetPreferenceSchema(
-            id=str(p.id),
-            user_id=str(p.user_id),
-            widget_id=p.widget_id,
-            app_id=p.app_id,
-            enabled=p.enabled,
-            position=p.position,
-            config=p.config,
-        )
-        for p in prefs
-    ]
+    return [_pref_to_schema(p) for p in prefs]
 
 
 @router.put("/preferences/{app_id}")
