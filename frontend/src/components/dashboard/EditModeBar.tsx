@@ -19,13 +19,13 @@ import type { PreferenceUpdate } from "@/types/generated/api";
 // ─── Props ───────────────────────────────────────────────────────────────────
 
 export interface EditModeBarProps {
-  /** IDs of all currently installed apps — used to route preference updates. */
-  installedAppIds: string[];
+  /** IDs of all installed apps — used to route preference updates. */
+  installedAppIds: ReadonlySet<string>;
 
   /** Called when the user clicks "Add Widget". */
   onAddWidget: () => void;
 
-  /** Called after a successful save (after discardChanges runs). */
+  /** Called after a successful save. */
   onSaveSuccess: () => void;
 }
 
@@ -46,19 +46,14 @@ export default function EditModeBar({
 }: EditModeBarProps) {
   const { pendingChanges, discardChanges } = useDashboardEdit();
 
-  // Don't render anything when not in edit mode.
-  // (Parent already guards this, but this is a defensive no-op.)
   if (!pendingChanges.size) return null;
 
-  // ── Save ───────────────────────────────────────────────────────────────────
-
   async function handleSave() {
-    // Group updates by appId so we can call updatePreferences once per app.
     const byApp = new Map<string, PreferenceUpdate[]>();
 
     for (const [widgetId, change] of pendingChanges) {
       const appId = appIdFrom(widgetId);
-      if (!installedAppIds.includes(appId)) continue;
+      if (!installedAppIds.has(appId)) continue;
 
       const update: PreferenceUpdate = {
         widget_id: widgetId,
@@ -71,21 +66,12 @@ export default function EditModeBar({
       byApp.set(appId, list);
     }
 
-    // Fire all requests concurrently; let errors propagate naturally.
     await Promise.all(
-      Array.from(byApp.entries()).map(([appId, updates]) =>
-        updatePreferences(appId, updates)
-      )
+      [...byApp].map(([appId, updates]) => updatePreferences(appId, updates))
     );
 
     discardChanges();
     onSaveSuccess();
-  }
-
-  // ── Cancel ─────────────────────────────────────────────────────────────────
-
-  function handleCancel() {
-    discardChanges();
   }
 
   // ── Render ──────────────────────────────────────────────────────────────────
@@ -120,7 +106,7 @@ export default function EditModeBar({
         <button
           type="button"
           className="btn btn-ghost btn-sm"
-          onClick={handleCancel}
+          onClick={discardChanges}
           aria-label="Cancel and discard changes"
         >
           <X size={14} />
