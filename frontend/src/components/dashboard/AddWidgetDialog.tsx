@@ -24,15 +24,12 @@ export interface AddWidgetDialogProps {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function getSizeLabel(size: string): string {
-  switch (size) {
-    case "small":      return "Small";
-    case "medium":     return "Medium";
-    case "large":      return "Large";
-    case "full-width": return "Full Width";
-    default:           return size;
-  }
-}
+const SIZE_LABELS: Record<string, string> = {
+  small: "Small",
+  medium: "Medium",
+  large: "Large",
+  "full-width": "Full Width",
+};
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -80,7 +77,7 @@ export default function AddWidgetDialog({
 
           <div className="dialog-body">
             {catalog.length === 0 ? (
-              <p className="empty-message">No apps installed</p>
+              <p className="dialog-empty-message">No apps installed</p>
             ) : (
               catalog.map((app) => (
                 <button
@@ -89,23 +86,22 @@ export default function AddWidgetDialog({
                   className="app-option-btn"
                   onClick={() => setSelectedApp(app)}
                 >
-                  {/* App icon — rendered as colored emoji/text block */}
                   <div
-                    className="app-option-icon"
-                    style={{ background: app.color + "22", color: app.color }}
+                    className="dialog-icon-badge"
+                    style={{ "--icon-bg": app.color + "22", "--icon-color": app.color } as React.CSSProperties}
                   >
                     {app.icon}
                   </div>
 
-                  <div className="app-option-info">
-                    <div className="app-option-name">{app.name}</div>
+                  <div className="option-info">
+                    <div className="option-name">{app.name}</div>
                     <div className="app-option-count">
                       {app.widgets.length}{" "}
                       {app.widgets.length === 1 ? "widget" : "widgets"}
                     </div>
                   </div>
 
-                  <LayoutGrid size={16} style={{ color: "var(--color-muted)", flexShrink: 0 }} />
+                  <LayoutGrid size={16} className="dialog-option-chevron" />
                 </button>
               ))
             )}
@@ -117,7 +113,7 @@ export default function AddWidgetDialog({
 
   // ── Step 2: widget list ───────────────────────────────────────────────────
 
-  const widgets = selectedApp.widgets || [];
+  const widgets = selectedApp.widgets;
 
   return (
     <div className="dialog-backdrop" onClick={onClose}>
@@ -133,8 +129,7 @@ export default function AddWidgetDialog({
         <div className="dialog-header">
           <button
             type="button"
-            className="btn btn-ghost"
-            style={{ padding: "0.25rem 0.5rem" }}
+            className="btn btn-ghost dialog-back-btn"
             onClick={() => setSelectedApp(null)}
             aria-label="Back to app list"
           >
@@ -145,7 +140,7 @@ export default function AddWidgetDialog({
 
         <div className="dialog-body">
           {widgets.length === 0 ? (
-            <p className="empty-message">No widgets available</p>
+            <p className="dialog-empty-message">No widgets available</p>
           ) : (
             widgets.map((widget) => (
               <button
@@ -161,13 +156,13 @@ export default function AddWidgetDialog({
                   <LayoutGrid size={16} />
                 </div>
 
-                <div className="widget-option-info">
-                  <div className="widget-option-name">{widget.name}</div>
+                <div className="option-info">
+                  <div className="option-name">{widget.name}</div>
                   <div className="widget-option-desc">{widget.description}</div>
                 </div>
 
                 <span className="widget-size-badge">
-                  {getSizeLabel(widget.size)}
+                  {SIZE_LABELS[widget.size] ?? widget.size}
                 </span>
               </button>
             ))

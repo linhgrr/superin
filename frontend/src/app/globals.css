@@ -389,6 +389,42 @@ tr:last-child td {
   backdrop-filter: blur(4px);
 }
 
+/* Used by Step 1 app icons: background-color comes from JS as --icon-bg var */
+.dialog-icon-badge {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.625rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  flex-shrink: 0;
+  background: var(--icon-bg, var(--color-surface-elevated));
+  color: var(--icon-color, var(--color-muted));
+}
+
+/* Step 2 icon — static surface-elevated bg, no CSS var needed */
+.widget-option-icon {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-surface-elevated);
+  color: var(--color-muted);
+  flex-shrink: 0;
+}
+
+.dialog-option-chevron {
+  color: var(--color-muted);
+  flex-shrink: 0;
+}
+
+.dialog-back-btn {
+  padding: 0.25rem 0.5rem;
+}
+
 .dialog-panel {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -425,8 +461,8 @@ tr:last-child td {
   padding: 0.75rem;
 }
 
-/* Step 1 — app list */
-.app-option-btn {
+/* ── Shared option-row base ──────────────────────────────────────────────── */
+.option-btn {
   display: flex;
   align-items: center;
   gap: 0.875rem;
@@ -439,33 +475,27 @@ tr:last-child td {
   text-align: left;
   color: var(--color-foreground);
   font-family: var(--font-sans);
-  font-size: 0.9rem;
+  font-size: 0.875rem;
   transition: background 0.15s, border-color 0.15s;
 }
 
-.app-option-btn:hover {
+.option-btn:hover {
   background: var(--color-surface-elevated);
   border-color: var(--color-border);
 }
 
-.app-option-icon {
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 0.625rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.25rem;
-  flex-shrink: 0;
-}
-
-.app-option-info {
+.option-info {
   flex: 1;
   min-width: 0;
 }
 
-.app-option-name {
+.option-name {
   font-weight: 600;
+  margin-bottom: 0.2rem;
+}
+
+/* ── Step 1 — app list ──────────────────────────────────────────────────── */
+.app-option-btn {
   font-size: 0.9rem;
 }
 
@@ -474,49 +504,10 @@ tr:last-child td {
   color: var(--color-muted);
 }
 
-/* Step 2 — widget list */
+/* ── Step 2 — widget list ──────────────────────────────────────────────── */
 .widget-option-btn {
-  display: flex;
   align-items: flex-start;
-  gap: 0.75rem;
-  width: 100%;
   padding: 0.875rem 1rem;
-  border-radius: 0.625rem;
-  border: 1px solid transparent;
-  background: transparent;
-  cursor: pointer;
-  text-align: left;
-  color: var(--color-foreground);
-  font-family: var(--font-sans);
-  font-size: 0.875rem;
-  transition: background 0.15s, border-color 0.15s;
-}
-
-.widget-option-btn:hover {
-  background: var(--color-surface-elevated);
-  border-color: var(--color-border);
-}
-
-.widget-option-icon {
-  width: 2rem;
-  height: 2rem;
-  border-radius: 0.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--color-surface-elevated);
-  color: var(--color-muted);
-  flex-shrink: 0;
-}
-
-.widget-option-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.widget-option-name {
-  font-weight: 600;
-  margin-bottom: 0.2rem;
 }
 
 .widget-option-desc {
@@ -537,7 +528,7 @@ tr:last-child td {
   color: var(--color-primary);
 }
 
-.empty-message {
+.dialog-empty-message {
   text-align: center;
   padding: 2.5rem 1rem;
   color: var(--color-muted);
