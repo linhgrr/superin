@@ -11,6 +11,7 @@ from collections.abc import AsyncGenerator
 from typing import Any
 
 from beanie import PydanticObjectId
+from fastapi.encoders import jsonable_encoder
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_core.tools import BaseTool, tool
 from langgraph.prebuilt import create_react_agent
@@ -162,11 +163,17 @@ class RootAgent:
                         if isinstance(p, dict) and p.get("type") == "text":
                             text_parts.append(p.get("text", ""))
                         elif isinstance(p, dict) and p.get("type") in ("tool-call", "tool_call"):
+                            raw_arguments = (
+                                p.get("args")
+                                or p.get("arguments")
+                                or p.get("input")
+                                or {}
+                            )
                             tool_calls.append({
                                 "id": p.get("toolCallId") or p.get("id"),
                                 "function": {
                                     "name": p.get("toolName") or p.get("name"),
-                                    "arguments": p.get("args") or p.get("arguments")
+                                    "arguments": raw_arguments,
                                 }
                             })
                     content_str = " ".join(text_parts)
@@ -180,15 +187,22 @@ class RootAgent:
                     lc_tool_calls = []
                     for tc in tool_calls:
                         fn = tc.get("function", {})
-                        args_str = fn.get("arguments", "{}")
+                        args_str = (
+                            fn.get("arguments")
+                            or tc.get("args")
+                            or tc.get("input")
+                            or {}
+                        )
 
                         if isinstance(args_str, str):
                             try:
                                 args = json.loads(args_str)
                             except Exception:
                                 args = {}
-                        else:
+                        elif isinstance(args_str, dict):
                             args = args_str
+                        else:
+                            args = {}
 
                         lc_tool_calls.append({
                             "name": fn.get("name") or tc.get("toolName") or tc.get("name"),
@@ -201,8 +215,15 @@ class RootAgent:
                     if isinstance(content, list):
                         for p in content:
                             if isinstance(p, dict) and p.get("type") in ("tool-result", "tool_result"):
+                                output = p.get("output")
+                                result_value = p.get("result")
+                                if result_value is None and isinstance(output, dict):
+                                    result_value = output.get("value")
+
                                 langchain_messages.append(ToolMessage(
-                                    content=str(p.get("result", "")),
+                                    content=json.dumps(result_value, ensure_ascii=False)
+                                    if isinstance(result_value, (dict, list))
+                                    else str(result_value or ""),
                                     tool_call_id=p.get("toolCallId", ""),
                                     name=p.get("toolName", ""),
                                     id=msg_id
@@ -243,13 +264,13 @@ class RootAgent:
                         "type": "tool_call",
                         "toolName": event.get("name", "unknown"),
                         "toolCallId": event.get("run_id", ""),
-                        "args": inp if isinstance(inp, dict) else {},
+                        "args": jsonable_encoder(inp) if isinstance(inp, dict) else {},
                     }
                 elif event_type == "on_tool_end":
                     yield {
                         "type": "tool_result",
                         "toolCallId": event.get("run_id", ""),
-                        "result": data.get("output", {}),
+                        "result": jsonable_encoder(data.get("output", {})),
                     }
 
             # ── Persist to MongoDB (fire-and-forget, don't block the stream end) ─

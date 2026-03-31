@@ -19,7 +19,6 @@ import { useDataStreamRuntime } from "@assistant-ui/react-data-stream";
 import { getCatalog } from "@/api/catalog";
 import { getAccessToken } from "@/api/client";
 import { API_BASE_URL } from "@/config";
-import { myTools } from "@/lib/assistant-tools";
 import type { AppCatalogEntry } from "@/types/generated/api";
 
 interface AppCatalogContextValue {
@@ -41,11 +40,6 @@ function ChatRuntimeProvider({ children }: { children: ReactNode }) {
     api: `${API_BASE_URL}/api/chat/stream`,
     // "data-stream" matches the assistant-stream protocol used by the backend
     protocol: "data-stream",
-    body: {
-      // tool schemas — assistant-stream's toToolsJSONSchema serializes these
-      // for the backend LLM; no execute: needed (server-side execution)
-      tools: myTools,
-    },
     credentials: "include",
     headers: () => {
       const token = getAccessToken();
