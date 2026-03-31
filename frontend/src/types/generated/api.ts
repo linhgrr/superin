@@ -571,6 +571,8 @@ export interface components {
              * @default []
              */
             screenshots: string[];
+            /** Widgets */
+            widgets?: components["schemas"]["WidgetManifestSchema"][];
         };
         /** AppInstallRequest */
         AppInstallRequest: {
@@ -581,6 +583,46 @@ export interface components {
         AppUninstallRequest: {
             /** App Id */
             app_id: string;
+        };
+        /**
+         * ConfigFieldSchema
+         * @description A configuration field for a widget.
+         */
+        ConfigFieldSchema: {
+            /**
+             * Name
+             * @description Field key, camelCase
+             */
+            name: string;
+            /** Label */
+            label: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "text" | "number" | "select" | "multi-select" | "date" | "boolean";
+            /**
+             * Required
+             * @default false
+             */
+            required: boolean;
+            /** Default */
+            default?: unknown | null;
+            /** Options */
+            options?: components["schemas"]["SelectOption"][];
+            /**
+             * Options Source
+             * @description Widget resolver ID for dynamic options, e.g. 'finance.wallets'
+             */
+            options_source?: string | null;
+            /** Placeholder */
+            placeholder?: string | null;
+            /** Min */
+            min?: number | null;
+            /** Max */
+            max?: number | null;
+            /** Step */
+            step?: number | null;
         };
         /** CreateCategoryRequest */
         CreateCategoryRequest: {
@@ -691,6 +733,13 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** SelectOption */
+        SelectOption: {
+            /** Label */
+            label: string;
+            /** Value */
+            value: string;
+        };
         /** TokenResponse */
         TokenResponse: {
             /** Access Token */
@@ -760,6 +809,39 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /**
+         * WidgetManifestSchema
+         * @description A single widget definition — referenced in AppManifestSchema.widgets.
+         */
+        WidgetManifestSchema: {
+            /**
+             * Id
+             * @description Unique widget ID, format '{app_id}.{widget_name}', e.g. 'finance.total-balance'
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string;
+            /**
+             * Icon
+             * @description Lucide icon name
+             */
+            icon: string;
+            /**
+             * Size
+             * @default standard
+             * @enum {string}
+             */
+            size: "compact" | "standard" | "wide" | "tall" | "full";
+            /** Config Fields */
+            config_fields?: components["schemas"]["ConfigFieldSchema"][];
+            /**
+             * Requires Auth
+             * @default true
+             */
+            requires_auth: boolean;
         };
         /**
          * WidgetPreferenceSchema

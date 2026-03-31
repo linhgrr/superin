@@ -1628,6 +1628,13 @@
             "type": "array",
             "title": "Screenshots",
             "default": []
+          },
+          "widgets": {
+            "items": {
+              "$ref": "#/components/schemas/WidgetManifestSchema"
+            },
+            "type": "array",
+            "title": "Widgets"
           }
         },
         "type": "object",
@@ -1669,6 +1676,116 @@
           "app_id"
         ],
         "title": "AppUninstallRequest"
+      },
+      "ConfigFieldSchema": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Field key, camelCase"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "text",
+              "number",
+              "select",
+              "multi-select",
+              "date",
+              "boolean"
+            ],
+            "title": "Type"
+          },
+          "required": {
+            "type": "boolean",
+            "title": "Required",
+            "default": false
+          },
+          "default": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/SelectOption"
+            },
+            "type": "array",
+            "title": "Options"
+          },
+          "options_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Options Source",
+            "description": "Widget resolver ID for dynamic options, e.g. 'finance.wallets'"
+          },
+          "placeholder": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Placeholder"
+          },
+          "min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min"
+          },
+          "max": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max"
+          },
+          "step": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "label",
+          "type"
+        ],
+        "title": "ConfigFieldSchema",
+        "description": "A configuration field for a widget."
       },
       "CreateCategoryRequest": {
         "properties": {
@@ -1928,6 +2045,24 @@
         ],
         "title": "RegisterRequest"
       },
+      "SelectOption": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "value"
+        ],
+        "title": "SelectOption"
+      },
       "TokenResponse": {
         "properties": {
           "access_token": {
@@ -2174,6 +2309,61 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "WidgetManifestSchema": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Unique widget ID, format '{app_id}.{widget_name}', e.g. 'finance.total-balance'"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "icon": {
+            "type": "string",
+            "title": "Icon",
+            "description": "Lucide icon name"
+          },
+          "size": {
+            "type": "string",
+            "enum": [
+              "compact",
+              "standard",
+              "wide",
+              "tall",
+              "full"
+            ],
+            "title": "Size",
+            "default": "standard"
+          },
+          "config_fields": {
+            "items": {
+              "$ref": "#/components/schemas/ConfigFieldSchema"
+            },
+            "type": "array",
+            "title": "Config Fields"
+          },
+          "requires_auth": {
+            "type": "boolean",
+            "title": "Requires Auth",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "description",
+          "icon"
+        ],
+        "title": "WidgetManifestSchema",
+        "description": "A single widget definition \u2014 referenced in AppManifestSchema.widgets."
       },
       "WidgetPreferenceSchema": {
         "properties": {

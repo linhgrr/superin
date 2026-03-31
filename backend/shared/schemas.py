@@ -175,6 +175,7 @@ class AppCatalogEntry(BaseModel):
     is_installed: bool = False
     tags: list[str] = []
     screenshots: list[str] = []
+    widgets: list[WidgetManifestSchema] = Field(default_factory=list)
 
 
 class AppInstallRequest(BaseModel):

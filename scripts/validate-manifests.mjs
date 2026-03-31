@@ -39,13 +39,23 @@ function loadFrontendManifests() {
 }
 
 function loadBackendManifests() {
-  const result = spawnSync("python", ["scripts/export_backend_manifests.py"], {
+  const isLinhdzActive = process.env.CONDA_DEFAULT_ENV === "linhdz";
+  const command = isLinhdzActive ? "python" : "conda";
+  const args = isLinhdzActive
+    ? ["scripts/export_backend_manifests.py"]
+    : ["run", "-n", "linhdz", "python", "scripts/export_backend_manifests.py"];
+
+  const result = spawnSync(command, args, {
     cwd: repoRoot,
     encoding: "utf8",
   });
 
   if (result.status !== 0) {
-    fail(result.stderr.trim() || "could not export backend manifests");
+    fail(
+      result.stderr.trim() ||
+        result.stdout.trim() ||
+        "could not export backend manifests"
+    );
   }
 
   return JSON.parse(result.stdout);
