@@ -22,6 +22,9 @@ export interface EditModeBarProps {
   /** IDs of all installed apps — used to route preference updates. */
   installedAppIds: ReadonlySet<string>;
 
+  /** Whether the dashboard is currently in edit mode. */
+  isEditMode: boolean;
+
   /** Called when the user clicks "Add Widget". */
   onAddWidget: () => void;
 
@@ -41,12 +44,13 @@ function appIdFrom(widgetId: string): string {
 
 export default function EditModeBar({
   installedAppIds,
+  isEditMode,
   onAddWidget,
   onSaveSuccess,
 }: EditModeBarProps) {
   const { pendingChanges, discardChanges } = useDashboardEdit();
 
-  if (!pendingChanges.size) return null;
+  if (!isEditMode) return null;
 
   async function handleSave() {
     const byApp = new Map<string, PreferenceUpdate[]>();
@@ -87,6 +91,7 @@ export default function EditModeBar({
           type="button"
           className="btn btn-primary btn-sm"
           onClick={handleSave}
+          disabled={!pendingChanges.size}
           aria-label="Save changes"
         >
           <Check size={14} />

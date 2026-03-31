@@ -242,13 +242,12 @@ function DashboardInner({
   return (
     <>
       {/* Edit mode toolbar */}
-      {isEditMode && (
-        <EditModeBar
-          installedAppIds={installedAppIds}
-          onAddWidget={() => setAddDialogOpen(true)}
-          onSaveSuccess={handleSaveSuccess}
-        />
-      )}
+      <EditModeBar
+        installedAppIds={installedAppIds}
+        isEditMode={isEditMode}
+        onAddWidget={() => setAddDialogOpen(true)}
+        onSaveSuccess={handleSaveSuccess}
+      />
 
       {/* Widget grid */}
       <div className="widget-grid" data-edit-mode={isEditMode} data-dragging={isDragging}>
