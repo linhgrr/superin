@@ -1,0 +1,19 @@
+# Git worktrees
+.worktrees/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ruff_cache/
+.coverage
+*.egg-info/
+dist/
+build/
+
+# Node
+node_modules/
+.env
+.env.local
+dist/
