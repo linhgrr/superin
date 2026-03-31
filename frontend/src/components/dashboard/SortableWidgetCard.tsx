@@ -7,9 +7,7 @@
  *
  * Usage:
  *   <SortableWidgetCard
- *     appId="finance"
  *     widgetId="finance.total-balance"
- *     widget={widget}
  *     isEditMode={isEditMode}
  *     onRemove={handleRemove}
  *   >
@@ -20,14 +18,11 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, X } from "lucide-react";
-import type { AppCatalogEntry } from "@/types/generated/api";
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
 export interface SortableWidgetCardProps {
-  appId: string;
   widgetId: string;
-  widget: AppCatalogEntry["widgets"][number];
   isEditMode: boolean;
   onRemove: (widgetId: string) => void;
   children: React.ReactNode;
