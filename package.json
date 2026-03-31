@@ -2,14 +2,17 @@
   "name": "shin-superin",
   "version": "2.1.0",
   "private": true,
-  "description": "Shin SuperApp — plug-and-play SuperApp platform",
+  "description": "Shin Superin — plug-and-play Superin platform",
   "scripts": {
     "commit": "cz",
     "lint:frontend": "cd frontend && npm run lint",
     "typecheck:frontend": "cd frontend && npm run typecheck",
     "build:frontend": "cd frontend && npm run build",
     "codegen": "python scripts/codegen.py",
+    "validate:manifests": "node scripts/validate-manifests.mjs",
     "test:backend": "cd backend && python -m pytest",
+    "dev": "npm run validate:manifests && npm run dev:concurrent",
+    "dev:concurrent": "node scripts/dev-concurrent.mjs",
     "dev:frontend": "cd frontend && npm run dev",
     "dev:backend": "cd backend && uvicorn core.main:app --reload"
   },

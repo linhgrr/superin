@@ -1,16 +1,27 @@
 /**
- * AddWidgetDialog — 2-step widget picker.
+ * AddWidgetDialog — 2-step widget manager.
  *
  * Step 1: pick an installed app
- * Step 2: pick a widget from that app → calls `onAdd(widgetId)`
+ * Step 2: show or hide widgets from that app
  *
  * Props:
  *   catalog     — AppCatalogEntry[]  (already filtered for is_installed)
- *   onAdd       — (widgetId: string) => void
+ *   onToggleWidget — toggle widget visibility
  *   onClose     — () => void
  */
 
-import { ArrowLeft, LayoutGrid } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowLeftRight,
+  Calendar,
+  CheckSquare,
+  Eye,
+  EyeOff,
+  LayoutGrid,
+  Loader2,
+  PieChart,
+  Wallet,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { AppCatalogEntry } from "@/types/generated/api";
 
@@ -18,29 +29,59 @@ import type { AppCatalogEntry } from "@/types/generated/api";
 
 export interface AddWidgetDialogProps {
   catalog: AppCatalogEntry[];
-  onAdd: (widgetId: string) => void;
+  enabledWidgetIds: ReadonlySet<string>;
+  busyWidgetId?: string | null;
+  onToggleWidget: (widgetId: string, enabled: boolean) => Promise<void> | void;
   onClose: () => void;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const SIZE_LABELS: Record<string, string> = {
-  small: "Small",
-  medium: "Medium",
-  large: "Large",
-  "full-width": "Full Width",
+  compact: "Compact",
+  standard: "Standard",
+  wide: "Wide",
+  tall: "Tall",
+  full: "Full Width",
 };
+
+const ICON_COMPONENTS = {
+  ArrowLeftRight,
+  Calendar,
+  CheckSquare,
+  PieChart,
+  Wallet,
+} as const;
+
+function IconGlyph({
+  iconName,
+  fallback,
+  size = 18,
+}: {
+  iconName?: string | null;
+  fallback: string;
+  size?: number;
+}) {
+  if (iconName) {
+    const LucideIcon = ICON_COMPONENTS[iconName as keyof typeof ICON_COMPONENTS];
+    if (LucideIcon) {
+      return <LucideIcon size={size} strokeWidth={2} />;
+    }
+  }
+
+  return <span>{fallback.slice(0, 2).toUpperCase()}</span>;
+}
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function AddWidgetDialog({
   catalog,
-  onAdd,
+  enabledWidgetIds,
+  busyWidgetId = null,
+  onToggleWidget,
   onClose,
 }: AddWidgetDialogProps) {
-  const [selectedApp, setSelectedApp] = useState<
-    AppCatalogEntry | null
-  >(null);
+  const [selectedApp, setSelectedApp] = useState<AppCatalogEntry | null>(null);
 
   // Close on Escape
   useEffect(() => {
@@ -56,6 +97,10 @@ export default function AddWidgetDialog({
   useEffect(() => {
     panelRef.current?.focus();
   }, []);
+
+  const selectedAppVisibleCount = selectedApp
+    ? selectedApp.widgets.filter((widget) => enabledWidgetIds.has(widget.id)).length
+    : 0;
 
   // ── Step 1: app list ──────────────────────────────────────────────────────
 
@@ -83,21 +128,21 @@ export default function AddWidgetDialog({
                 <button
                   key={app.id}
                   type="button"
-                  className="app-option-btn"
+                  className="option-btn app-option-btn"
                   onClick={() => setSelectedApp(app)}
                 >
                   <div
                     className="dialog-icon-badge"
                     style={{ "--icon-bg": app.color + "22", "--icon-color": app.color } as React.CSSProperties}
                   >
-                    {app.icon}
+                    <IconGlyph iconName={app.icon} fallback={app.name} size={18} />
                   </div>
 
                   <div className="option-info">
                     <div className="option-name">{app.name}</div>
                     <div className="app-option-count">
-                      {app.widgets.length}{" "}
-                      {app.widgets.length === 1 ? "widget" : "widgets"}
+                      {app.widgets.filter((widget) => enabledWidgetIds.has(widget.id)).length}/
+                      {app.widgets.length} visible
                     </div>
                   </div>
 
@@ -135,7 +180,12 @@ export default function AddWidgetDialog({
           >
             <ArrowLeft size={18} />
           </button>
-          <span className="dialog-title">{selectedApp.name}</span>
+          <div className="option-info">
+            <span className="dialog-title">{selectedApp.name}</span>
+            <div className="app-option-count">
+              {selectedAppVisibleCount}/{widgets.length} widgets visible
+            </div>
+          </div>
         </div>
 
         <div className="dialog-body">
@@ -143,17 +193,9 @@ export default function AddWidgetDialog({
             <p className="dialog-empty-message">No widgets available</p>
           ) : (
             widgets.map((widget) => (
-              <button
-                key={widget.id}
-                type="button"
-                className="widget-option-btn"
-                onClick={() => {
-                  onAdd(widget.id);
-                  onClose();
-                }}
-              >
+              <div key={widget.id} className="option-btn widget-option-row">
                 <div className="widget-option-icon">
-                  <LayoutGrid size={16} />
+                  <IconGlyph iconName={widget.icon} fallback={widget.name} size={16} />
                 </div>
 
                 <div className="option-info">
@@ -161,10 +203,45 @@ export default function AddWidgetDialog({
                   <div className="widget-option-desc">{widget.description}</div>
                 </div>
 
-                <span className="widget-size-badge">
-                  {SIZE_LABELS[widget.size] ?? widget.size}
-                </span>
-              </button>
+                <div className="widget-option-meta">
+                  <div className="widget-option-badges">
+                    <span className="widget-size-badge">
+                      {SIZE_LABELS[widget.size] ?? widget.size}
+                    </span>
+                    <span
+                      className={
+                        enabledWidgetIds.has(widget.id)
+                          ? "widget-visibility-badge is-visible"
+                          : "widget-visibility-badge is-hidden"
+                      }
+                    >
+                      {enabledWidgetIds.has(widget.id) ? "Visible" : "Hidden"}
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    className={
+                      enabledWidgetIds.has(widget.id)
+                        ? "btn btn-ghost btn-sm widget-visibility-btn"
+                        : "btn btn-primary btn-sm widget-visibility-btn"
+                    }
+                    disabled={busyWidgetId === widget.id}
+                    onClick={async () => {
+                      await onToggleWidget(widget.id, !enabledWidgetIds.has(widget.id));
+                    }}
+                  >
+                    {busyWidgetId === widget.id ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : enabledWidgetIds.has(widget.id) ? (
+                      <EyeOff size={14} />
+                    ) : (
+                      <Eye size={14} />
+                    )}
+                    {enabledWidgetIds.has(widget.id) ? "Hide" : "Show"}
+                  </button>
+                </div>
+              </div>
             ))
           )}
         </div>

@@ -1,0 +1,8 @@
+{
+  "id": "todo",
+  "name": "To-Do",
+  "widgets": [
+    { "id": "todo.task-list", "size": "standard" },
+    { "id": "todo.today", "size": "compact" }
+  ]
+}

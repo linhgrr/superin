@@ -3,7 +3,8 @@
  */
 
 import { useEffect, useState } from "react";
-import { getTodoSummary } from "@/api/apps/todo";
+import { Check } from "lucide-react";
+import { getTodoSummary } from "./api";
 import type { AppCatalogEntry } from "@/types/generated/api";
 
 interface Props {
@@ -28,7 +29,11 @@ export default function TodoWidget({ widgetId, widget }: Props) {
       .finally(() => setLoading(false));
   }, []);
 
-  if (widgetId === "todo.task-count" || widgetId === "todo.summary") {
+  if (
+    widgetId === "todo.task-list" ||
+    widgetId === "todo.task-count" ||
+    widgetId === "todo.summary"
+  ) {
     return (
       <div>
         <p className="section-label">{widget.name}</p>
@@ -59,14 +64,48 @@ export default function TodoWidget({ widgetId, widget }: Props) {
               color: "var(--color-muted)",
             }}
           >
-            <span style={{ color: "var(--color-success)" }}>
-              ✓ {summary.completed}
+            <span style={{ color: "var(--color-success)", display: "inline-flex", alignItems: "center", gap: "0.25rem" }}>
+              <Check size={12} />
+              {summary.completed}
             </span>
             {summary.due_today > 0 && (
               <span style={{ color: "var(--color-warning)" }}>
                 Due today: {summary.due_today}
               </span>
             )}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (widgetId === "todo.today") {
+    return (
+      <div>
+        <p className="section-label">{widget.name}</p>
+        {loading ? (
+          <div className="stat-value" style={{ color: "var(--color-muted)" }}>—</div>
+        ) : (
+          <div className="stat-value" style={{ color: "var(--color-foreground)" }}>
+            {summary?.due_today ?? 0}
+          </div>
+        )}
+
+        {!loading && summary && (
+          <div
+            style={{
+              marginTop: "0.5rem",
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.25rem",
+              fontSize: "0.75rem",
+              color: "var(--color-muted)",
+            }}
+          >
+            <span>Due today</span>
+            <span style={{ color: "var(--color-danger)" }}>
+              Overdue: {summary.overdue}
+            </span>
           </div>
         )}
       </div>

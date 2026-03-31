@@ -5,8 +5,9 @@
  * Highlights the active app via current URL.
  */
 
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
+import { LayoutDashboard, Store } from "lucide-react";
 import { getCatalog } from "@/api/catalog";
 import type { AppCatalogEntry } from "@/types/generated/api";
 
@@ -38,7 +39,7 @@ function AppIcon({ entry }: { entry: AppCatalogEntry }) {
   );
 }
 
-export default function Sidebar() {
+function Sidebar() {
   const [apps, setApps] = useState<AppCatalogEntry[]>([]);
 
   useEffect(() => {
@@ -92,7 +93,7 @@ export default function Sidebar() {
         to="/dashboard"
         className={({ isActive }) => `app-item${isActive ? " active" : ""}`}
       >
-        <span style={{ fontSize: "1rem" }}>🏠</span>
+        <LayoutDashboard size={16} />
         <span>Dashboard</span>
       </NavLink>
 
@@ -124,10 +125,12 @@ export default function Sidebar() {
           to="/store"
           className={({ isActive }) => `app-item${isActive ? " active" : ""}`}
         >
-          <span style={{ fontSize: "1rem" }}>🛍</span>
+          <Store size={16} />
           <span>App Store</span>
         </NavLink>
       </div>
     </aside>
   );
 }
+
+export default memo(Sidebar);

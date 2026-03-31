@@ -8,14 +8,13 @@ import type {
   CreateTransactionRequest,
   TransferRequest,
 } from "@/types/generated/api";
-import { api, appPath } from "../client";
+import { api } from "@/api/client";
 
 const BASE = "/api/apps/finance";
 
 // Wallets
 export interface WalletRead {
   id: string;
-  user_id: string;
   name: string;
   currency: string;
   balance: number;
@@ -96,8 +95,16 @@ export async function createTransaction(
 }
 
 // POST /api/apps/finance/transfer
-export async function transfer(payload: TransferRequest): Promise<void> {
-  return api.post<void>(`${BASE}/transfer`, payload);
+export interface TransferResponse {
+  from_wallet: WalletRead;
+  to_wallet: WalletRead;
+  amount: number;
+  note: string | null;
+}
+export async function transfer(
+  payload: TransferRequest
+): Promise<TransferResponse> {
+  return api.post<TransferResponse>(`${BASE}/transfer`, payload);
 }
 
 // GET /api/apps/finance/summary — quick stats for dashboard widgets

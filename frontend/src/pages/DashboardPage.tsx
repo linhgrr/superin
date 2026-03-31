@@ -3,41 +3,36 @@
  *
  * Architecture:
  *   DashboardPage
- *   ├── DashboardEditProvider
- *   │   └── DashboardInner
- *   │       ├── DndContext (edit mode only)
- *   │       │   └── SortableContext
- *   │       │       └── SortableWidgetCard[] (edit) | WidgetCard[] (view)
- *   │       ├── EditModeBar (edit mode only)
- *   │       ├── AddWidgetDialog (overlay)
- *   │       └── "✎ Edit Dashboard" button (view mode only)
+ *   └── DashboardInner
+ *       ├── ResponsiveGridLayout (always draggable)
+ *       ├── AddWidgetDialog (overlay for show/hide widget)
+ *       └── "Add Widget" button
  */
 
-import {
-  DndContext,
-  DragEndEvent,
-  KeyboardSensor,
-  PointerSensor,
-  closestCenter,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  arrayMove,
-  sortableKeyboardCoordinates,
-} from "@dnd-kit/sortable";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import ReactGridLayout, { Responsive } from "react-grid-layout";
+type Layout = ReactGridLayout.Layout;
+import "react-grid-layout/css/styles.css";
+import "react-resizable/css/styles.css";
+import { Grid3X3, Plus } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { getFrontendApp } from "@/apps";
 import AddWidgetDialog from "@/components/dashboard/AddWidgetDialog";
-import EditModeBar from "@/components/dashboard/EditModeBar";
-import SortableWidgetCard from "@/components/dashboard/SortableWidgetCard";
-import { DashboardEditProvider, useDashboardEdit } from "@/hooks/useDashboardEdit";
-import { getCatalog, getAllPreferences } from "@/api/catalog";
-import type { AppCatalogEntry, WidgetPreferenceSchema } from "@/types/generated/api";
-import AppShell from "./AppShell";
-import FinanceWidget from "./widgets/FinanceWidget";
-import TodoWidget from "./widgets/TodoWidget";
+import { getAllPreferences, getCatalog, updatePreferences } from "@/api/catalog";
+import { WIDGET_SIZES } from "@/lib/widget-sizes";
+import type {
+  AppCatalogEntry,
+  PreferenceUpdate,
+  WidgetPreferenceSchema,
+} from "@/types/generated/api";
+
+const ResponsiveGridLayout = Responsive;
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const GRID_COLS = { lg: 12, md: 12, sm: 6, xs: 1 };
+const GRID_BREAKPOINTS = { lg: 1200, md: 996, sm: 768, xs: 0 };
+const ROW_HEIGHT = 80;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -48,6 +43,50 @@ interface ResolvedWidget {
   app: AppCatalogEntry;
   widget: AppCatalogEntry["widgets"][number];
   position: number;
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function getSizeConfig(size: string) {
+  return WIDGET_SIZES[size as keyof typeof WIDGET_SIZES] ?? WIDGET_SIZES.standard;
+}
+
+function appIdFrom(widgetId: string) {
+  const dot = widgetId.indexOf(".");
+  return dot === -1 ? widgetId : widgetId.slice(0, dot);
+}
+
+/** Build an RGL Layout item from a resolved widget + its saved config. */
+function buildLayoutItem(
+  rw: ResolvedWidget,
+  pref: WidgetPreferenceSchema | undefined,
+  previousWidgets: ResolvedWidget[],
+): Layout {
+  const config = getSizeConfig(rw.widget.size);
+  const w = config.width;
+  const h = config.rglH;
+
+  // Use saved grid position from pref.config if available
+  const savedX = pref?.config?.gridX as number | undefined;
+  const savedY = pref?.config?.gridY as number | undefined;
+
+  if (savedX !== undefined && savedY !== undefined) {
+    return { i: rw.widgetId, x: savedX, y: savedY, w, h };
+  }
+
+  // Auto-pack fallback: place sequentially in the 12-column grid
+  // Each widget takes `w` columns, so stack them row by row
+  let col = 0;
+  let row = 0;
+  for (const previousWidget of previousWidgets) {
+    const prevConfig = getSizeConfig(previousWidget.widget.size);
+    col += prevConfig.width;
+    if (col >= 12) {
+      col = 0;
+      row += prevConfig.rglH;
+    }
+  }
+  return { i: rw.widgetId, x: col % 12, y: row, w, h };
 }
 
 // ─── WidgetContent ─────────────────────────────────────────────────────────────
@@ -62,12 +101,13 @@ function WidgetContent({
   widgetId: string;
   widget: AppCatalogEntry["widgets"][number];
 }) {
-  if (appId === "finance") {
-    return <FinanceWidget widgetId={widgetId} widget={widget} />;
+  const appDefinition = getFrontendApp(appId);
+
+  if (appDefinition?.DashboardWidget) {
+    const DashboardWidget = appDefinition.DashboardWidget;
+    return <DashboardWidget widgetId={widgetId} widget={widget} />;
   }
-  if (appId === "todo") {
-    return <TodoWidget widgetId={widgetId} widget={widget} />;
-  }
+
   // Fallback for unknown apps
   return (
     <div>
@@ -79,50 +119,30 @@ function WidgetContent({
   );
 }
 
-// ─── WidgetCard ───────────────────────────────────────────────────────────────
-
-/**
- * Non-sortable card used in VIEW mode.
- * Shows widget content only (no drag handle / remove button).
- */
-function WidgetCard({
-  appId,
-  widgetId,
-  widget,
-}: {
-  appId: string;
-  widgetId: string;
-  widget: AppCatalogEntry["widgets"][number];
-}) {
-  return (
-    <div className={`widget-${widget.size}`}>
-      <WidgetContent appId={appId} widgetId={widgetId} widget={widget} />
-    </div>
-  );
-}
-
-// ─── Inner component (uses hooks) ─────────────────────────────────────────────
-
-/**
- * All interactive hooks (`useDashboardEdit`) live here so they are guaranteed
- * to be called inside <DashboardEditProvider>.
- */
 function DashboardInner({
   installedApps,
 }: {
   installedApps: AppCatalogEntry[];
 }) {
-  const {
-    isEditMode,
-    pendingChanges,
-    enterEditMode,
-    toggleWidget,
-    moveWidget,
-  } = useDashboardEdit();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const currentLayoutRef = useRef<Layout[]>([]);
+  const [containerWidth, setContainerWidth] = useState(1200);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [busyWidgetId, setBusyWidgetId] = useState<string | null>(null);
+  const [isPrefsLoaded, setIsPrefsLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setContainerWidth(entry.contentRect.width);
+      }
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
 
   const [prefs, setPrefs] = useState<Map<string, WidgetPreferenceSchema>>(new Map());
-  const [addDialogOpen, setAddDialogOpen] = useState(false);
-
   const installedAppIds = useMemo(
     () => new Set(installedApps.map((a) => a.id)),
     [installedApps]
@@ -130,20 +150,53 @@ function DashboardInner({
 
   // ── Load preferences ────────────────────────────────────────────────────────
 
-  const reloadPrefs = useCallback(async () => {
-    const prefs = await getAllPreferences();
-    const next = new Map<string, WidgetPreferenceSchema>();
-    prefs.forEach((p) => next.set(p.widget_id, p));
-    setPrefs(next);
+  const replacePrefs = useCallback((entries: Iterable<[string, WidgetPreferenceSchema]>) => {
+    setPrefs(new Map(entries));
   }, []);
 
+  const loadPrefs = useCallback(async (showSkeleton = false) => {
+    if (showSkeleton) {
+      setIsPrefsLoaded(false);
+    }
+
+    try {
+      const fetchedPrefs = await getAllPreferences();
+      replacePrefs(fetchedPrefs.map((pref) => [pref.widget_id, pref] as const));
+    } finally {
+      if (showSkeleton) {
+        setIsPrefsLoaded(true);
+      }
+    }
+  }, [replacePrefs]);
+
   useEffect(() => {
-    reloadPrefs();
-  }, [reloadPrefs]);
+    loadPrefs(true);
+  }, [loadPrefs]);
+
+  const isWidgetEnabled = useCallback(
+    (
+      widget: AppCatalogEntry["widgets"][number],
+      pref: WidgetPreferenceSchema | undefined
+    ) => pref?.enabled ?? !widget.requires_auth,
+    []
+  );
+
+  const enabledWidgetIds = useMemo(() => {
+    const next = new Set<string>();
+
+    for (const app of installedApps) {
+      for (const widget of app.widgets) {
+        if (isWidgetEnabled(widget, prefs.get(widget.id))) {
+          next.add(widget.id);
+        }
+      }
+    }
+
+    return next;
+  }, [installedApps, isWidgetEnabled, prefs]);
 
   /**
-   * Returns widgets that should currently be visible:
-   * - enabled in prefs (or pendingChanges enables them), sorted by position.
+   * Returns widgets that should currently be visible, sorted by position.
    */
   const visibleWidgets = useMemo<ResolvedWidget[]>(() => {
     const items: ResolvedWidget[] = [];
@@ -151,148 +204,225 @@ function DashboardInner({
     for (const app of installedApps) {
       for (const widget of app.widgets) {
         const prefsEntry = prefs.get(widget.id);
-        const change = pendingChanges.get(widget.id);
+        if (!isWidgetEnabled(widget, prefsEntry)) continue;
 
-        // Determine if enabled
-        const wasEnabled = prefsEntry?.enabled ?? !widget.requires_auth;
-        const isEnabled = change?.enabled !== undefined ? change.enabled : wasEnabled;
-
-        if (!isEnabled) continue;
-
-        // Determine position from pendingChanges, prefs, or default
-        const position =
-          change?.position !== undefined
-            ? change.position
-            : prefsEntry?.position ?? 0;
-
+        const position = prefsEntry?.position ?? 0;
         items.push({ widgetId: widget.id, appId: app.id, app, widget, position });
       }
     }
 
     return items.sort((a, b) => a.position - b.position);
-  }, [installedApps, prefs, pendingChanges]);
+  }, [installedApps, isWidgetEnabled, prefs]);
 
-  const widgetIds = useMemo(() => visibleWidgets.map((w) => w.widgetId), [visibleWidgets]);
+  // ── Build RGL layout ────────────────────────────────────────────────────────
 
-  // ── Edit mode actions ──────────────────────────────────────────────────────
+  const layout = useMemo<Layout[]>(() => {
+    return visibleWidgets.map((rw, idx) =>
+      buildLayoutItem(rw, prefs.get(rw.widgetId), visibleWidgets.slice(0, idx))
+    );
+  }, [visibleWidgets, prefs]);
 
-  const handleRemove = useCallback(
-    (widgetId: string) => {
-      toggleWidget(widgetId, false);
+  useEffect(() => {
+    currentLayoutRef.current = layout;
+  }, [layout]);
+
+  const applyUpdatesLocally = useCallback((updates: PreferenceUpdate[]) => {
+    setPrefs((prev) => {
+      const next = new Map(prev);
+
+      for (const update of updates) {
+        const widgetId = update.widget_id;
+        const existing = next.get(widgetId);
+
+        next.set(widgetId, {
+          _id: existing?._id ?? null,
+          user_id: existing?.user_id ?? "",
+          widget_id: widgetId,
+          app_id: existing?.app_id ?? appIdFrom(widgetId),
+          enabled: update.enabled ?? existing?.enabled ?? false,
+          position: update.position ?? existing?.position ?? 0,
+          config: update.config ?? existing?.config,
+          size: update.size ?? existing?.size ?? null,
+        });
+      }
+
+      return next;
+    });
+  }, []);
+
+  const persistUpdates = useCallback(
+    async (updates: PreferenceUpdate[]) => {
+      const byApp = new Map<string, PreferenceUpdate[]>();
+
+      for (const update of updates) {
+        const appId = appIdFrom(update.widget_id);
+        if (!installedAppIds.has(appId)) continue;
+
+        const appUpdates = byApp.get(appId) ?? [];
+        appUpdates.push(update);
+        byApp.set(appId, appUpdates);
+      }
+
+      await Promise.all(
+        [...byApp].map(([appId, appUpdates]) => updatePreferences(appId, appUpdates))
+      );
     },
-    [toggleWidget]
+    [installedAppIds]
   );
 
-  const handleAddWidget = useCallback(
-    (widgetId: string) => {
-      // Place at the end of the current list
-      const maxPos = visibleWidgets.reduce((m, w) => Math.max(m, w.position), -1);
-      moveWidget(widgetId, maxPos + 1);
-      toggleWidget(widgetId, true);
+  const getNextWidgetPlacement = useCallback(() => {
+    const source = currentLayoutRef.current.length ? currentLayoutRef.current : layout;
+
+    if (source.length === 0) {
+      return { x: 0, y: 0 };
+    }
+
+    return {
+      x: 0,
+      y: source.reduce((maxY, item) => Math.max(maxY, item.y + item.h), 0),
+    };
+  }, [layout]);
+
+  const handleWidgetVisibilityChange = useCallback(
+    async (widgetId: string, enabled: boolean) => {
+      setBusyWidgetId(widgetId);
+      const previousPrefs = new Map(prefs);
+
+      const existing = prefs.get(widgetId);
+      const nextPlacement = enabled ? getNextWidgetPlacement() : null;
+      const updates: PreferenceUpdate[] = [
+        {
+          widget_id: widgetId,
+          enabled,
+          ...(nextPlacement
+            ? {
+                config: {
+                  ...(existing?.config ?? {}),
+                  gridX: nextPlacement.x,
+                  gridY: nextPlacement.y,
+                },
+              }
+            : {}),
+        },
+      ];
+
+      applyUpdatesLocally(updates);
+
+      try {
+        await persistUpdates(updates);
+      } catch {
+        replacePrefs(previousPrefs);
+      } finally {
+        setBusyWidgetId(null);
+      }
     },
-    [moveWidget, toggleWidget, visibleWidgets]
+    [applyUpdatesLocally, getNextWidgetPlacement, persistUpdates, prefs, replacePrefs]
   );
 
-  const handleSaveSuccess = useCallback(() => {
-    reloadPrefs();
-  }, [reloadPrefs]);
-
-  // ── Drag-drop handlers ─────────────────────────────────────────────────────
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  const handleLayoutChange = useCallback(
+    (currentLayout: Layout[]) => {
+      currentLayoutRef.current = currentLayout;
+    },
+    []
   );
 
-  const handleDragEnd = useCallback(
-    (event: DragEndEvent) => {
-      const { active, over } = event;
-      if (!over || active.id === over.id) return;
+  const handleDragStop = useCallback(
+    async (currentLayout: Layout[]) => {
+      currentLayoutRef.current = currentLayout;
 
-      const oldIndex = widgetIds.indexOf(String(active.id));
-      const newIndex = widgetIds.indexOf(String(over.id));
-      if (oldIndex === -1 || newIndex === -1) return;
+      const updates: PreferenceUpdate[] = currentLayout.map((item) => {
+        const existing = prefs.get(item.i);
 
-      // Reorder all widgets by position after the move
-      const reordered = arrayMove(visibleWidgets, oldIndex, newIndex);
-      reordered.forEach((w, idx) => {
-        if (w.position !== idx) moveWidget(w.widgetId, idx);
+        return {
+          widget_id: item.i,
+          config: {
+            ...(existing?.config ?? {}),
+            gridX: item.x,
+            gridY: item.y,
+          },
+        };
       });
+
+      applyUpdatesLocally(updates);
+
+      try {
+        await persistUpdates(updates);
+      } catch {
+        void loadPrefs(false);
+      }
     },
-    [widgetIds, visibleWidgets, moveWidget]
+    [applyUpdatesLocally, loadPrefs, persistUpdates, prefs]
   );
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
-  return (
-    <>
-      {/* View mode: Edit button top-right */}
-      {!isEditMode && (
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "0.75rem" }}>
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            onClick={enterEditMode}
-            aria-label="Edit dashboard"
-          >
-            ✎ Edit Dashboard
-          </button>
-        </div>
-      )}
-
-      {/* Edit mode toolbar */}
-      <EditModeBar
-        installedAppIds={installedAppIds}
-        isEditMode={isEditMode}
-        onAddWidget={() => setAddDialogOpen(true)}
-        onSaveSuccess={handleSaveSuccess}
-      />
-
-      {/* Widget grid */}
+  if (!isPrefsLoaded) {
+    return (
       <div className="widget-grid">
-        {isEditMode ? (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext items={widgetIds}>
-              {visibleWidgets.map(({ widgetId, appId, widget }) => (
-                <SortableWidgetCard
-                  key={widgetId}
-                  widgetId={widgetId}
-                  widgetSize={widget.size}
-                  onRemove={handleRemove}
-                >
-                  <WidgetContent appId={appId} widgetId={widgetId} widget={widget} />
-                </SortableWidgetCard>
-              ))}
-            </SortableContext>
-          </DndContext>
-        ) : (
-          visibleWidgets.map(({ widgetId, appId, widget }) => (
-            <WidgetCard
-              key={widgetId}
-              appId={appId}
-              widgetId={widgetId}
-              widget={widget}
+        {(["standard", "wide", "standard"] as const).map((size, i) => (
+          <div key={i} className={`widget-size-${size}`}>
+            <div
+              className="widget-card"
+              style={{
+                minHeight: WIDGET_SIZES[size].height === "auto" ? "120px" : WIDGET_SIZES[size].height,
+                background: "var(--color-surface-elevated)",
+                animation: "pulse 1.5s infinite",
+              }}
             />
-          ))
-        )}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div ref={containerRef}>
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "0.75rem" }}>
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm"
+          onClick={() => setIsDialogOpen(true)}
+          aria-label="Add widget"
+        >
+          <Plus size={14} />
+          Add Widget
+        </button>
       </div>
 
-      {/* Add widget dialog */}
-      {addDialogOpen && (
+      <ResponsiveGridLayout
+        className="dashboard-grid-layout"
+        layouts={{ lg: layout }}
+        breakpoints={GRID_BREAKPOINTS}
+        cols={GRID_COLS}
+        rowHeight={ROW_HEIGHT}
+        width={containerWidth}
+        isDraggable
+        isResizable={false}
+        compactType={null}
+        onLayoutChange={handleLayoutChange}
+        onDragStop={handleDragStop}
+        margin={[16, 16]}
+        containerPadding={[0, 0]}
+      >
+        {visibleWidgets.map(({ widgetId, appId, widget }) => (
+          <div key={widgetId} className="rgl-item-view">
+            <div className="widget-card">
+              <WidgetContent appId={appId} widgetId={widgetId} widget={widget} />
+            </div>
+          </div>
+        ))}
+      </ResponsiveGridLayout>
+
+      {isDialogOpen && (
         <AddWidgetDialog
           catalog={installedApps}
-          onAdd={(widgetId) => {
-            handleAddWidget(widgetId);
-            setAddDialogOpen(false);
-          }}
-          onClose={() => setAddDialogOpen(false)}
+          enabledWidgetIds={enabledWidgetIds}
+          busyWidgetId={busyWidgetId}
+          onToggleWidget={handleWidgetVisibilityChange}
+          onClose={() => setIsDialogOpen(false)}
         />
       )}
-    </>
+    </div>
   );
 }
 
@@ -314,28 +444,20 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <AppShell title="Dashboard">
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(12, 1fr)",
-            gap: "1rem",
-          }}
-        >
-          {["small", "medium", "large", "small", "medium", "large"].map((size, i) => (
-            <div key={i} className={`widget-${size}`}>
-              <div
-                className="widget-card"
-                style={{
-                  height: "120px",
-                  background: "var(--color-surface-elevated)",
-                  animation: "pulse 1.5s infinite",
-                }}
-              />
-            </div>
-          ))}
-        </div>
-      </AppShell>
+      <div className="widget-grid">
+        {(["standard", "wide", "standard", "compact", "standard"] as const).map((size, i) => (
+          <div key={i} className={`widget-size-${size}`}>
+            <div
+              className="widget-card"
+              style={{
+                minHeight: WIDGET_SIZES[size].height === "auto" ? "120px" : WIDGET_SIZES[size].height,
+                background: "var(--color-surface-elevated)",
+                animation: "pulse 1.5s infinite",
+              }}
+            />
+          </div>
+        ))}
+      </div>
     );
   }
 
@@ -345,41 +467,33 @@ export default function DashboardPage() {
 
   if (allWidgets.length === 0) {
     return (
-      <AppShell title="Dashboard">
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            height: "60vh",
-            gap: "0.75rem",
-            color: "var(--color-muted)",
-          }}
-        >
-          <span style={{ fontSize: "2rem" }}>🛍</span>
-          <p style={{ fontSize: "1rem", fontWeight: 500, color: "var(--color-foreground)" }}>
-            No apps installed yet
-          </p>
-          <p style={{ fontSize: "0.875rem" }}>
-            Visit the{" "}
-            <a href="/store" style={{ color: "var(--color-primary)" }}>
-              App Store
-            </a>{" "}
-            to get started.
-          </p>
-        </div>
-      </AppShell>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          height: "60vh",
+          gap: "0.75rem",
+          color: "var(--color-muted)",
+        }}
+      >
+        <Grid3X3 size={48} />
+        <p style={{ fontSize: "1rem", fontWeight: 500, color: "var(--color-foreground)" }}>
+          No apps installed yet
+        </p>
+        <p style={{ fontSize: "0.875rem" }}>
+          Visit the{" "}
+          <a href="/store" style={{ color: "var(--color-primary)" }}>
+            App Store
+          </a>{" "}
+          to get started.
+        </p>
+      </div>
     );
   }
 
   // ── Normal render ───────────────────────────────────────────────────────────
 
-  return (
-    <DashboardEditProvider>
-      <AppShell title="Dashboard">
-        <DashboardInner installedApps={catalog} />
-      </AppShell>
-    </DashboardEditProvider>
-  );
+  return <DashboardInner installedApps={catalog} />;
 }

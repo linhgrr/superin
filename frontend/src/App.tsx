@@ -9,12 +9,14 @@
  *   /apps/:appId → AppPage (protected)
  */
 
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
+import { AppProviders } from "@/components/providers/AppProviders";
 import LoginPage from "@/pages/LoginPage";
 import DashboardPage from "@/pages/DashboardPage";
 import StorePage from "@/pages/StorePage";
 import AppPage from "@/pages/AppPage";
+import AppShell from "@/pages/AppShell";
 
 // ─── Protected route wrapper ───────────────────────────────────────────────────
 
@@ -54,12 +56,21 @@ function PublicOnly({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function ShellLayout() {
+  return (
+    <Protected>
+      <AppShell />
+    </Protected>
+  );
+}
+
 // ─── App ───────────────────────────────────────────────────────────────────────
 
 export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        <AppProviders>
         <Routes>
           {/* Public */}
           <Route
@@ -71,31 +82,12 @@ export default function App() {
             }
           />
 
-          {/* Protected */}
-          <Route
-            path="/dashboard"
-            element={
-              <Protected>
-                <DashboardPage />
-              </Protected>
-            }
-          />
-          <Route
-            path="/store"
-            element={
-              <Protected>
-                <StorePage />
-              </Protected>
-            }
-          />
-          <Route
-            path="/apps/:appId"
-            element={
-              <Protected>
-                <AppPage />
-              </Protected>
-            }
-          />
+          {/* Protected shell */}
+          <Route element={<ShellLayout />}>
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/store" element={<StorePage />} />
+            <Route path="/apps/:appId" element={<AppPage />} />
+          </Route>
 
           {/* Default redirect */}
           <Route path="/" element={<Navigate to="/dashboard" />} />
@@ -125,6 +117,7 @@ export default function App() {
             }
           />
         </Routes>
+        </AppProviders>
       </BrowserRouter>
     </AuthProvider>
   );

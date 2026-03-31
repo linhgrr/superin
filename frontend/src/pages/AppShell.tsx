@@ -5,24 +5,46 @@
  * Handles responsive collapse.
  */
 
-import { ReactNode } from "react";
+import { ReactNode, useMemo } from "react";
+import { Outlet, useLocation } from "react-router-dom";
+
 import Sidebar from "./Sidebar";
 import Header from "./Header";
-import ChatPanel from "./ChatPanel";
+import ChatThread from "@/components/chat/ChatThread";
 
 interface AppShellProps {
-  children: ReactNode;
+  children?: ReactNode;
   /** Override page title in the header */
   title?: string;
   /** Show/hide the right chat panel */
   showChat?: boolean;
 }
 
+const PAGE_TITLES: Record<string, string> = {
+  dashboard: "Dashboard",
+  store: "App Store",
+  finance: "Finance",
+  todo: "Todo",
+};
+
 export default function AppShell({
   children,
   title,
   showChat = true,
 }: AppShellProps) {
+  const location = useLocation();
+
+  const resolvedTitle = useMemo(() => {
+    if (title) return title;
+
+    const [, firstSegment, secondSegment] = location.pathname.split("/");
+    if (firstSegment === "apps" && secondSegment) {
+      return PAGE_TITLES[secondSegment] ?? secondSegment;
+    }
+
+    return PAGE_TITLES[firstSegment] ?? "Dashboard";
+  }, [location.pathname, title]);
+
   return (
     <div className="dashboard-grid">
       {/* Left sidebar */}
@@ -37,7 +59,7 @@ export default function AppShell({
           borderRight: "1px solid var(--color-border)",
         }}
       >
-        <Header title={title} />
+        <Header title={resolvedTitle} />
         <main
           style={{
             flex: 1,
@@ -45,12 +67,12 @@ export default function AppShell({
             padding: "1.5rem",
           }}
         >
-          {children}
+          {children ?? <Outlet />}
         </main>
       </div>
 
       {/* Right: Chat panel */}
-      {showChat && <ChatPanel />}
+      {showChat && <ChatThread />}
     </div>
   );
 }

@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { getFinanceSummary } from "@/api/apps/finance";
+import { getFinanceSummary } from "./api";
 import type { AppCatalogEntry } from "@/types/generated/api";
 
 interface Props {

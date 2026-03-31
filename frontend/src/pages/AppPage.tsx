@@ -6,42 +6,35 @@
  */
 
 import { useParams, Navigate } from "react-router-dom";
-import AppShell from "./AppShell";
-import FinanceAppView from "./apps/FinanceAppView";
-import TodoAppView from "./apps/TodoAppView";
-
-const APP_VIEWS: Record<string, React.ComponentType> = {
-  finance: FinanceAppView,
-  todo: TodoAppView,
-};
+import { Construction } from "lucide-react";
+import { getFrontendApp } from "@/apps";
 
 export default function AppPage() {
   const { appId } = useParams<{ appId: string }>();
 
   if (!appId) return <Navigate to="/dashboard" replace />;
 
-  const AppView = APP_VIEWS[appId];
+  const appDefinition = getFrontendApp(appId);
+  const AppView = appDefinition?.AppView;
 
   if (!AppView) {
     return (
-      <AppShell title={appId}>
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            height: "50vh",
-            gap: "0.5rem",
-            color: "var(--color-muted)",
-          }}
-        >
-          <span style={{ fontSize: "2rem" }}>🚧</span>
-          <p>
-            App <strong>"{appId}"</strong> is not yet implemented.
-          </p>
-        </div>
-      </AppShell>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          height: "50vh",
+          gap: "0.5rem",
+          color: "var(--color-muted)",
+        }}
+      >
+        <Construction size={48} style={{ color: "var(--color-muted)" }} />
+        <p>
+          App <strong>"{appId}"</strong> is not yet implemented.
+        </p>
+      </div>
     );
   }
 

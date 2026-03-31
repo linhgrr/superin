@@ -5,7 +5,7 @@
  */
 
 import { useEffect, useState } from "react";
-import AppShell from "../AppShell";
+import { X } from "lucide-react";
 import {
   getWallets,
   getCategories,
@@ -16,7 +16,7 @@ import {
   type WalletRead,
   type CategoryRead,
   type TransactionRead,
-} from "@/api/apps/finance";
+} from "./api";
 import type {
   CreateWalletRequest,
   CreateCategoryRequest,
@@ -69,7 +69,7 @@ function Modal({
         >
           <h2 style={{ margin: 0, fontSize: "1.125rem", fontWeight: 600 }}>{title}</h2>
           <button className="btn btn-ghost" onClick={onClose} style={{ padding: "0.25rem" }}>
-            ✕
+            <X size={16} />
           </button>
         </div>
         {children}
@@ -472,7 +472,7 @@ export default function FinanceAppView() {
   const [tab, setTab] = useState<FinanceTab>("wallets");
 
   return (
-    <AppShell title="Finance">
+    <>
       {/* Tab bar */}
       <div
         style={{
@@ -508,6 +508,6 @@ export default function FinanceAppView() {
       {tab === "wallets" && <WalletsTab />}
       {tab === "transactions" && <TransactionsTab />}
       {tab === "categories" && <CategoriesTab />}
-    </AppShell>
+    </>
   );
 }

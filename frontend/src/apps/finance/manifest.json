@@ -1,0 +1,9 @@
+{
+  "id": "finance",
+  "name": "Finance",
+  "widgets": [
+    { "id": "finance.total-balance", "size": "standard" },
+    { "id": "finance.budget-overview", "size": "wide" },
+    { "id": "finance.recent-transactions", "size": "standard" }
+  ]
+}

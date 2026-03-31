@@ -6,20 +6,19 @@ import type {
   CreateTaskRequest,
   UpdateTaskRequest,
 } from "@/types/generated/api";
-import { api } from "../client";
+import { api } from "@/api/client";
 
 const BASE = "/api/apps/todo";
 
 export interface TaskRead {
   id: string;
-  user_id: string;
   title: string;
   description: string | null;
   due_date: string | null;
   priority: "low" | "medium" | "high";
   status: "pending" | "completed";
   created_at: string;
-  updated_at: string;
+  completed_at: string | null;
 }
 
 // GET /api/apps/todo/tasks

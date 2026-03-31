@@ -3,14 +3,14 @@
  */
 
 import { useEffect, useState } from "react";
-import AppShell from "../AppShell";
+import { Trash2, AlertTriangle } from "lucide-react";
 import {
   getTasks,
   createTask,
   toggleTask,
   deleteTask,
   type TaskRead,
-} from "@/api/apps/todo";
+} from "./api";
 import type {
   CreateTaskRequest,
 } from "@/types/generated/api";
@@ -72,7 +72,7 @@ function TaskRow({ task, onToggle, onDelete }: {
       </td>
       <td style={{ fontSize: "0.8125rem", color: overdue ? "var(--color-danger)" : "var(--color-muted)" }}>
         {task.due_date ? new Date(task.due_date).toLocaleDateString() : "—"}
-        {overdue && " ⚠"}
+        {overdue && <AlertTriangle size={12} style={{ display: "inline", color: "var(--color-danger)" }} />}
       </td>
       <td>
         <button
@@ -81,7 +81,7 @@ function TaskRow({ task, onToggle, onDelete }: {
           style={{ padding: "0.25rem 0.5rem", color: "var(--color-danger)" }}
           title="Delete task"
         >
-          🗑
+          <Trash2 size={14} />
         </button>
       </td>
     </tr>
@@ -219,7 +219,7 @@ export default function TodoAppView() {
   };
 
   return (
-    <AppShell title="Todo">
+    <>
       {/* Summary */}
       <div
         style={{
@@ -314,6 +314,6 @@ export default function TodoAppView() {
           </table>
         </div>
       )}
-    </AppShell>
+    </>
   );
 }

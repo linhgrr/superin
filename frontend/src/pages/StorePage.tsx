@@ -3,17 +3,33 @@
  */
 
 import { useEffect, useState } from "react";
+import {
+  DollarSign,
+  Zap,
+  Heart,
+  Users,
+  Wrench,
+  Package,
+} from "lucide-react";
 import { getCatalog, installApp, uninstallApp } from "@/api/catalog";
 import type { AppCatalogEntry } from "@/types/generated/api";
-import AppShell from "./AppShell";
+
+const CATEGORY_ICONS: Record<string, React.ReactNode> = {
+  finance: <DollarSign size={14} />,
+  productivity: <Zap size={14} />,
+  health: <Heart size={14} />,
+  social: <Users size={14} />,
+  developer: <Wrench size={14} />,
+  other: <Package size={14} />,
+};
 
 const CATEGORY_LABELS: Record<string, string> = {
-  finance: "💰 Finance",
-  productivity: "⚡ Productivity",
-  health: "❤️ Health",
-  social: "👥 Social",
-  developer: "🛠 Developer",
-  other: "📦 Other",
+  finance: "Finance",
+  productivity: "Productivity",
+  health: "Health",
+  social: "Social",
+  developer: "Developer",
+  other: "Other",
 };
 
 export default function StorePage() {
@@ -59,7 +75,7 @@ export default function StorePage() {
     filter === "all" ? catalog : catalog.filter((a) => a.category === filter);
 
   return (
-    <AppShell title="App Store">
+    <>
       {/* Category filter */}
       <div
         style={{
@@ -88,7 +104,12 @@ export default function StorePage() {
               fontSize: "0.8125rem",
             }}
           >
-            {cat === "all" ? "All" : CATEGORY_LABELS[cat] ?? cat}
+            {cat === "all" ? "All" : (
+              <>
+                {CATEGORY_ICONS[cat]}
+                <span style={{ marginLeft: "0.375rem" }}>{CATEGORY_LABELS[cat]}</span>
+              </>
+            )}
           </button>
         ))}
       </div>
@@ -207,6 +228,6 @@ export default function StorePage() {
           ))}
         </div>
       )}
-    </AppShell>
+    </>
   );
 }
