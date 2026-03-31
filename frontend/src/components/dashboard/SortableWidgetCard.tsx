@@ -2,12 +2,14 @@
  * SortableWidgetCard — drag-drop wrapper for dashboard widgets.
  *
  * - Uses `@dnd-kit/sortable` to make each widget reorderable.
- * - Always shows drag handle + remove button (only rendered in edit mode).
+ * - Shows drag handle + remove button in edit mode.
  * - When dragging, the card is marked with the `is-dragging` class.
+ * - Applies `widget-{size}` class so the 12-column grid respects widget size.
  *
  * Usage:
  *   <SortableWidgetCard
  *     widgetId="finance.total-balance"
+ *     widgetSize="medium"
  *     onRemove={handleRemove}
  *   >
  *     <WidgetContent />
@@ -17,11 +19,13 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, X } from "lucide-react";
+import type { WidgetManifestSchema } from "@/types/generated/api";
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
 export interface SortableWidgetCardProps {
   widgetId: string;
+  widgetSize: WidgetManifestSchema["size"];
   onRemove: (widgetId: string) => void;
   children: React.ReactNode;
 }
@@ -30,6 +34,7 @@ export interface SortableWidgetCardProps {
 
 export default function SortableWidgetCard({
   widgetId,
+  widgetSize,
   onRemove,
   children,
 }: SortableWidgetCardProps) {
@@ -42,37 +47,35 @@ export default function SortableWidgetCard({
     isDragging,
   } = useSortable({ id: widgetId });
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
-
   return (
     <div
       ref={setNodeRef}
-      style={style}
-      className={`sortable-widget${isDragging ? " is-dragging" : ""}`}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+      }}
+      className={`sortable-widget widget-${widgetSize}${isDragging ? " is-dragging" : ""}`}
     >
-      {/* Drag handle */}
-      <button
-        type="button"
-        className="drag-handle"
-        aria-label="Drag to reorder widget"
-        {...attributes}
-        {...listeners}
-      >
-        <GripVertical size={16} />
-      </button>
-
-      {/* Remove button */}
-      <button
-        type="button"
-        className="remove-widget-btn"
-        aria-label="Remove widget"
-        onClick={() => onRemove(widgetId)}
-      >
-        <X size={14} />
-      </button>
+      {/* Edit-mode controls: absolutely positioned over the card */}
+      <div className="sortable-widget-controls">
+        <button
+          type="button"
+          className="drag-handle"
+          aria-label="Drag to reorder widget"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical size={14} />
+        </button>
+        <button
+          type="button"
+          className="remove-widget-btn"
+          aria-label="Remove widget"
+          onClick={() => onRemove(widgetId)}
+        >
+          <X size={12} />
+        </button>
+      </div>
 
       {/* Widget content */}
       <div className="widget-card">{children}</div>

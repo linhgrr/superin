@@ -122,7 +122,6 @@ function DashboardInner({
 
   const [prefs, setPrefs] = useState<Map<string, WidgetPreferenceSchema>>(new Map());
   const [addDialogOpen, setAddDialogOpen] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
 
   const installedAppIds = useMemo(
     () => new Set(installedApps.map((a) => a.id)),
@@ -205,13 +204,8 @@ function DashboardInner({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  const handleDragStart = useCallback(() => {
-    setIsDragging(true);
-  }, []);
-
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
-      setIsDragging(false);
       const { active, over } = event;
       if (!over || active.id === over.id) return;
 
@@ -232,6 +226,20 @@ function DashboardInner({
 
   return (
     <>
+      {/* View mode: Edit button top-right */}
+      {!isEditMode && (
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "0.75rem" }}>
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={enterEditMode}
+            aria-label="Edit dashboard"
+          >
+            ✎ Edit Dashboard
+          </button>
+        </div>
+      )}
+
       {/* Edit mode toolbar */}
       <EditModeBar
         installedAppIds={installedAppIds}
@@ -241,12 +249,11 @@ function DashboardInner({
       />
 
       {/* Widget grid */}
-      <div className="widget-grid" data-edit-mode={isEditMode} data-dragging={isDragging}>
+      <div className="widget-grid">
         {isEditMode ? (
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
-            onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
           >
             <SortableContext items={widgetIds}>
@@ -254,6 +261,7 @@ function DashboardInner({
                 <SortableWidgetCard
                   key={widgetId}
                   widgetId={widgetId}
+                  widgetSize={widget.size}
                   onRemove={handleRemove}
                 >
                   <WidgetContent appId={appId} widgetId={widgetId} widget={widget} />
@@ -273,21 +281,7 @@ function DashboardInner({
         )}
       </div>
 
-      {/* "✎ Edit Dashboard" button — view mode only */}
-      {!isEditMode && (
-        <div style={{ display: "flex", justifyContent: "flex-end", padding: "0.5rem 0" }}>
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            onClick={enterEditMode}
-            aria-label="Edit dashboard"
-          >
-            ✎ Edit Dashboard
-          </button>
-        </div>
-      )}
-
-      {/* Add widget dialog — rendered as overlay regardless of edit mode */}
+      {/* Add widget dialog */}
       {addDialogOpen && (
         <AddWidgetDialog
           catalog={installedApps}
@@ -301,6 +295,7 @@ function DashboardInner({
     </>
   );
 }
+
 
 // ─── Page root ────────────────────────────────────────────────────────────────
 
