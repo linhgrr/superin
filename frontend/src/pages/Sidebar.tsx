@@ -1,14 +1,14 @@
 /**
  * Sidebar — installed app icons + nav.
  *
- * Loaded from /api/catalog on mount.
+ * Reads installed apps from shared app catalog state.
  * Highlights the active app via current URL.
  */
 
-import { memo, useEffect, useState } from "react";
+import { memo } from "react";
 import { NavLink } from "react-router-dom";
 import { LayoutDashboard, Store } from "lucide-react";
-import { getCatalog } from "@/api/catalog";
+import { useAppCatalog } from "@/components/providers/AppProviders";
 import type { AppCatalogEntry } from "@/types/generated/api";
 
 const APP_ICON_COLORS: Record<string, string> = {
@@ -40,13 +40,7 @@ function AppIcon({ entry }: { entry: AppCatalogEntry }) {
 }
 
 function Sidebar() {
-  const [apps, setApps] = useState<AppCatalogEntry[]>([]);
-
-  useEffect(() => {
-    getCatalog()
-      .then((catalog) => setApps(catalog.filter((a) => a.is_installed)))
-      .catch(() => {}); // non-critical, sidebar stays empty
-  }, []);
+  const { installedApps } = useAppCatalog();
 
   return (
     <aside className="sidebar">
@@ -98,7 +92,7 @@ function Sidebar() {
       </NavLink>
 
       {/* Installed apps */}
-      {apps.length > 0 && (
+      {installedApps.length > 0 && (
         <div style={{ marginTop: "1rem" }}>
           <p
             className="section-label"
@@ -106,7 +100,7 @@ function Sidebar() {
           >
             Apps
           </p>
-          {apps.map((app) => (
+          {installedApps.map((app) => (
             <NavLink
               key={app.id}
               to={`/apps/${app.id}`}

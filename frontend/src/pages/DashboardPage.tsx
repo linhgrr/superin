@@ -18,7 +18,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { getFrontendApp } from "@/apps";
 import AddWidgetDialog from "@/components/dashboard/AddWidgetDialog";
-import { getAllPreferences, getCatalog, updatePreferences } from "@/api/catalog";
+import { useAppCatalog } from "@/components/providers/AppProviders";
+import { getAllPreferences, updatePreferences } from "@/api/catalog";
 import { WIDGET_SIZES } from "@/lib/widget-sizes";
 import type {
   AppCatalogEntry,
@@ -430,15 +431,7 @@ function DashboardInner({
 // ─── Page root ────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
-  const [catalog, setCatalog] = useState<AppCatalogEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    getCatalog()
-      .then((c) => setCatalog(c.filter((app) => app.is_installed)))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
+  const { installedApps: catalog, isCatalogLoading: loading } = useAppCatalog();
 
   // ── Loading skeleton ───────────────────────────────────────────────────────
 

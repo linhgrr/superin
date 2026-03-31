@@ -2,7 +2,7 @@
  * StorePage — /store — browse and install apps.
  */
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   DollarSign,
   Zap,
@@ -11,7 +11,8 @@ import {
   Wrench,
   Package,
 } from "lucide-react";
-import { getCatalog, installApp, uninstallApp } from "@/api/catalog";
+import { installApp, uninstallApp } from "@/api/catalog";
+import { useAppCatalog } from "@/components/providers/AppProviders";
 import type { AppCatalogEntry } from "@/types/generated/api";
 
 const CATEGORY_ICONS: Record<string, React.ReactNode> = {
@@ -33,34 +34,24 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 export default function StorePage() {
-  const [catalog, setCatalog] = useState<AppCatalogEntry[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { catalog, isCatalogLoading, refreshCatalog, setAppInstalled } = useAppCatalog();
   const [installing, setInstalling] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState("all");
-
-  function load() {
-    getCatalog()
-      .then(setCatalog)
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }
-
-  useEffect(() => {
-    load();
-  }, []);
 
   async function handleToggle(app: AppCatalogEntry) {
     if (installing.has(app.id)) return;
     setInstalling((s) => new Set([...s, app.id]));
+    const nextInstalled = !app.is_installed;
+    setAppInstalled(app.id, nextInstalled);
     try {
       if (app.is_installed) {
         await uninstallApp({ app_id: app.id });
       } else {
         await installApp({ app_id: app.id });
       }
-      load();
     } catch {
-      // Silent fail — keep UI as-is
+      setAppInstalled(app.id, app.is_installed);
+      await refreshCatalog();
     } finally {
       setInstalling((s) => {
         const next = new Set(s);
@@ -115,7 +106,7 @@ export default function StorePage() {
       </div>
 
       {/* App grid */}
-      {loading ? (
+      {isCatalogLoading ? (
         <div
           style={{
             display: "grid",
