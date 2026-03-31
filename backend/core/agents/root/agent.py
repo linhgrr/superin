@@ -243,6 +243,7 @@ class RootAgent:
 
             assistant_buffer = ""
             pending_save: asyncio.Task[None] | None = None
+            active_delegations: set[str] = set()
 
             async for event in graph.astream_events(
                 {"messages": langchain_messages},
@@ -251,27 +252,38 @@ class RootAgent:
             ):
                 event_type = event.get("event", "")
                 data = event.get("data", {})
+                run_id = event.get("run_id", "")
+                tool_name = event.get("name", "unknown")
 
                 if event_type == "on_chat_model_stream":
+                    if active_delegations:
+                        continue
                     chunk = data.get("chunk")
                     content = getattr(chunk, "content", "") or ""
                     if content:
                         assistant_buffer += str(content)
                         yield {"type": "token", "content": str(content)}
                 elif event_type == "on_tool_start":
+                    if active_delegations and run_id not in active_delegations:
+                        continue
                     inp = data.get("input", {})
+                    if tool_name.startswith("ask_"):
+                        active_delegations.add(run_id)
                     yield {
                         "type": "tool_call",
-                        "toolName": event.get("name", "unknown"),
-                        "toolCallId": event.get("run_id", ""),
+                        "toolName": tool_name,
+                        "toolCallId": run_id,
                         "args": jsonable_encoder(inp) if isinstance(inp, dict) else {},
                     }
                 elif event_type == "on_tool_end":
+                    if active_delegations and run_id not in active_delegations:
+                        continue
                     yield {
                         "type": "tool_result",
-                        "toolCallId": event.get("run_id", ""),
+                        "toolCallId": run_id,
                         "result": jsonable_encoder(data.get("output", {})),
                     }
+                    active_delegations.discard(run_id)
 
             # ── Persist to MongoDB (fire-and-forget, don't block the stream end) ─
             pending_save = asyncio.create_task(
