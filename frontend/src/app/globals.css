@@ -1,6 +1,7 @@
-/* Shin SuperApp — Design Tokens (Tailwind v4 via @theme) */
+/* Shin Superin — Design Tokens (Tailwind v4 via @theme) */
 
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 @theme {
   /* Colors */
@@ -271,4 +272,82 @@ tr:last-child td {
   --aui-primary: oklch(0.65 0.21 280);
   --aui-success: oklch(0.72 0.19 145);
   --aui-danger: oklch(0.63 0.24 25);
+}
+
+/* ─── Sortable Widget Card ─────────────────────────────────────────────── */
+
+.sortable-widget {
+  position: relative;
+  height: 100%;
+}
+
+/* Dragging state — fade out */
+.sortable-widget.is-dragging {
+  opacity: 0.5;
+  z-index: 10;
+}
+
+/* Header row: drag handle + remove button, only shown in edit mode */
+.sortable-widget-header {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  position: absolute;
+  top: 0.375rem;
+  right: 0.375rem;
+  z-index: 5;
+}
+
+/* Drag handle — grab cursor, visible on hover */
+.drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 0.375rem;
+  background: transparent;
+  border: none;
+  cursor: grab;
+  color: var(--color-muted);
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.sortable-widget:hover .drag-handle {
+  opacity: 1;
+}
+
+.drag-handle:hover {
+  background: var(--color-surface);
+  color: var(--color-foreground);
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+/* Remove button — visible on hover of the widget card */
+.remove-widget-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 0.375rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--color-muted);
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
+}
+
+.sortable-widget:hover .remove-widget-btn {
+  opacity: 1;
+}
+
+.remove-widget-btn:hover {
+  background: oklch(0.63 0.24 25 / 0.15);
+  color: var(--color-danger);
 }
