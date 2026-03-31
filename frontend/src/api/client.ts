@@ -184,3 +184,12 @@ export function appPath(appId: string, path = "") {
 }
 
 export { REFRESH_COOKIE_NAME };
+
+// ─── App-specific raw fetch (used by plugin bridge) ─────────────────────────
+
+export async function apiFetch<T>(
+  path: string,
+  init: RequestInit = {}
+): Promise<T> {
+  return request<T>(path, init);
+}

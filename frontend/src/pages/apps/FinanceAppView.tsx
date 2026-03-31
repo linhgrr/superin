@@ -245,18 +245,12 @@ function WalletsTab() {
 
 function TransactionsTab() {
   const [txns, setTxns] = useState<TransactionRead[]>([]);
-  const [wallets, setWallets] = useState<WalletRead[]>([]);
-  const [categories, setCategories] = useState<CategoryRead[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(true);
 
   function load() {
-    Promise.all([getTransactions({ limit: 50 }), getWallets(), getCategories()])
-      .then(([txns, wallets, cats]) => {
-        setTxns(txns);
-        setWallets(wallets);
-        setCategories(cats);
-      })
+    getTransactions({ limit: 50 })
+      .then(setTxns)
       .catch(() => {})
       .finally(() => setLoading(false));
   }

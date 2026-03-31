@@ -7,14 +7,12 @@ import AppShell from "../AppShell";
 import {
   getTasks,
   createTask,
-  updateTask,
   toggleTask,
   deleteTask,
   type TaskRead,
 } from "@/api/apps/todo";
 import type {
   CreateTaskRequest,
-  UpdateTaskRequest,
 } from "@/types/generated/api";
 
 const PRIORITY_STYLE: Record<string, { color: string; bg: string }> = {

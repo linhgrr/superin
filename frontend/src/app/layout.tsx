@@ -1,10 +1,4 @@
-import type { Metadata } from "react";
 import "./globals.css";
-
-export const metadata: Metadata = {
-  title: import.meta.env.VITE_APP_NAME || "Shin SuperApp",
-  description: "Plug-and-play SuperApp platform",
-};
 
 export default function RootLayout({
   children,

@@ -9,7 +9,7 @@ import type {
   WidgetPreferenceSchema,
   PreferenceUpdate,
 } from "@/types/generated/api";
-import { api, appPath } from "./client";
+import { api } from "./client";
 
 // GET /api/catalog — all apps with is_installed flag
 export async function getCatalog(): Promise<AppCatalogEntry[]> {
