@@ -42,6 +42,15 @@ class TaskService:
         updated = await self.repo.update(task, status=new_status)
         return _task_to_dict(updated)
 
+    async def complete_task(self, task_id: str, user_id: str) -> dict:
+        task = await self.repo.find_by_id(task_id, user_id)
+        if not task:
+            raise ValueError("Task not found")
+        if task.status == "completed":
+            return _task_to_dict(task)
+        updated = await self.repo.update(task, status="completed")
+        return _task_to_dict(updated)
+
     async def get_summary(self, user_id: str) -> dict:
         from datetime import date
         today = datetime.utcnow()
