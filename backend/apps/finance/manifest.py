@@ -12,7 +12,7 @@ wallet_widget = WidgetManifestSchema(
     name="Total Balance",
     description="Shows total balance across all wallets",
     icon="Wallet",
-    size="medium",
+    size="standard",
     config_fields=[
         ConfigFieldSchema(
             name="accountId",
@@ -29,7 +29,7 @@ budget_widget = WidgetManifestSchema(
     name="Budget Overview",
     description="Monthly spending vs budget by category",
     icon="PieChart",
-    size="large",
+    size="wide",
     config_fields=[],
 )
 
@@ -38,7 +38,7 @@ recent_tx_widget = WidgetManifestSchema(
     name="Recent Transactions",
     description="Last 5 transactions across all wallets",
     icon="ArrowLeftRight",
-    size="medium",
+    size="standard",
     config_fields=[],
 )
 

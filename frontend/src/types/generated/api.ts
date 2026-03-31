@@ -255,8 +255,7 @@ export interface paths {
          * @description POST /api/chat/stream
          *     Body: {
          *         "messages": GenericMessage[],
-         *         "threadId": str | null,  # conversation thread
-         *         "tools": ToolDefinition[], # optional — for LLM tool schemas
+         *         "tools": ToolDefinition[]   # optional JSON Schema — forwarded to LLM
          *     }
          *     Returns: SSE (assistant-stream data stream protocol)
          */
@@ -572,11 +571,6 @@ export interface components {
              * @default []
              */
             screenshots: string[];
-            /**
-             * Widgets
-             * @default []
-             */
-            widgets: components["schemas"]["WidgetManifestSchema"][];
         };
         /** AppInstallRequest */
         AppInstallRequest: {
@@ -588,53 +582,13 @@ export interface components {
             /** App Id */
             app_id: string;
         };
-        /**
-         * ConfigFieldSchema
-         * @description A configuration field for a widget.
-         */
-        ConfigFieldSchema: {
-            /**
-             * Name
-             * @description Field key, camelCase
-             */
-            name: string;
-            /** Label */
-            label: string;
-            /**
-             * Type
-             * @enum {string}
-             */
-            type: "text" | "number" | "select" | "multi-select" | "date" | "boolean";
-            /**
-             * Required
-             * @default false
-             */
-            required: boolean;
-            /** Default */
-            default?: unknown | null;
-            /** Options */
-            options?: components["schemas"]["SelectOption"][];
-            /**
-             * Options Source
-             * @description Widget resolver ID for dynamic options, e.g. 'finance.wallets'
-             */
-            options_source?: string | null;
-            /** Placeholder */
-            placeholder?: string | null;
-            /** Min */
-            min?: number | null;
-            /** Max */
-            max?: number | null;
-            /** Step */
-            step?: number | null;
-        };
         /** CreateCategoryRequest */
         CreateCategoryRequest: {
             /** Name */
             name: string;
             /**
              * Icon
-             * @default Folder
+             * @default Tag
              */
             icon: string;
             /**
@@ -643,10 +597,10 @@ export interface components {
              */
             color: string;
             /**
-             * Order
+             * Budget
              * @default 0
              */
-            order: number;
+            budget: number;
         };
         /** CreateTaskRequest */
         CreateTaskRequest: {
@@ -737,13 +691,6 @@ export interface components {
             /** Name */
             name: string;
         };
-        /** SelectOption */
-        SelectOption: {
-            /** Label */
-            label: string;
-            /** Value */
-            value: string;
-        };
         /** TokenResponse */
         TokenResponse: {
             /** Access Token */
@@ -815,39 +762,6 @@ export interface components {
             type: string;
         };
         /**
-         * WidgetManifestSchema
-         * @description A single widget definition — referenced in AppManifestSchema.widgets.
-         */
-        WidgetManifestSchema: {
-            /**
-             * Id
-             * @description Unique widget ID, format '{app_id}.{widget_name}', e.g. 'finance.total-balance'
-             */
-            id: string;
-            /** Name */
-            name: string;
-            /** Description */
-            description: string;
-            /**
-             * Icon
-             * @description Lucide icon name
-             */
-            icon: string;
-            /**
-             * Size
-             * @default medium
-             * @enum {string}
-             */
-            size: "small" | "medium" | "large" | "full-width";
-            /** Config Fields */
-            config_fields?: components["schemas"]["ConfigFieldSchema"][];
-            /**
-             * Requires Auth
-             * @default true
-             */
-            requires_auth: boolean;
-        };
-        /**
          * WidgetPreferenceSchema
          * @description User-specific widget state stored in DB.
          */
@@ -876,12 +790,12 @@ export interface components {
             };
         };
         /** CreateCategoryRequest */
-        apps__finance__schemas__CreateCategoryRequest: {
+        apps__catalog__CreateCategoryRequest: {
             /** Name */
             name: string;
             /**
              * Icon
-             * @default Tag
+             * @default Folder
              */
             icon: string;
             /**
@@ -890,10 +804,10 @@ export interface components {
              */
             color: string;
             /**
-             * Budget
+             * Order
              * @default 0
              */
-            budget: number;
+            order: number;
         };
     };
     responses: never;
@@ -1070,7 +984,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CreateCategoryRequest"];
+                "application/json": components["schemas"]["apps__catalog__CreateCategoryRequest"];
             };
         };
         responses: {
@@ -1495,7 +1409,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["apps__finance__schemas__CreateCategoryRequest"];
+                "application/json": components["schemas"]["CreateCategoryRequest"];
             };
         };
         responses: {

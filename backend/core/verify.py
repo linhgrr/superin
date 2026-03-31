@@ -5,6 +5,7 @@ warnings → server starts but logs to console.
 """
 
 from core.registry import PLUGIN_REGISTRY
+from shared.enums import VALID_WIDGET_SIZES
 
 
 def verify_plugins() -> tuple[list[str], list[str]]:
@@ -57,11 +58,10 @@ def verify_plugins() -> tuple[list[str], list[str]]:
                 )
 
             # Valid size
-            valid_sizes = {"small", "medium", "large", "full-width"}
-            if w.size not in valid_sizes:
+            if w.size not in VALID_WIDGET_SIZES:
                 errors.append(
                     f"[{app_id}] widget '{w.id}' has invalid size '{w.size}' — "
-                    f"must be one of {valid_sizes}"
+                    f"must be one of {VALID_WIDGET_SIZES}"
                 )
 
             # Config field types
@@ -72,7 +72,7 @@ def verify_plugins() -> tuple[list[str], list[str]]:
                         f"[{app_id}] widget '{w.id}' config field '{field.name}' "
                         f"has invalid type '{field.type}'"
                     )
-                if field.type == "select" and not field.options:
+                if field.type == "select" and not field.options and not field.options_source:
                     warnings.append(
                         f"[{app_id}] widget '{w.id}' select field '{field.name}' "
                         "has no options (consider options_source)"

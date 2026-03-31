@@ -11,7 +11,7 @@ task_list_widget = WidgetManifestSchema(
     name="Task List",
     description="Shows pending tasks grouped by priority",
     icon="CheckSquare",
-    size="medium",
+    size="standard",
     config_fields=[
         ConfigFieldSchema(
             name="filter",
@@ -33,7 +33,7 @@ today_widget = WidgetManifestSchema(
     name="Today's Tasks",
     description="Tasks due today or overdue",
     icon="Calendar",
-    size="small",
+    size="compact",
     config_fields=[],
 )
 

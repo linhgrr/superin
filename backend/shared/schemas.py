@@ -98,7 +98,7 @@ class WidgetManifestSchema(BaseModel):
     name: str
     description: str
     icon: str = Field(description="Lucide icon name")
-    size: WidgetSize = "medium"
+    size: WidgetSize = "standard"
     config_fields: list[ConfigFieldSchema] = Field(default_factory=list)
     requires_auth: bool = True
 

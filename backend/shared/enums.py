@@ -14,10 +14,19 @@ from typing import Literal
 
 # ─── Widget ────────────────────────────────────────────────────────────────────
 
-WidgetSize = Literal["small", "medium", "large", "full-width"]
+WidgetSize = Literal["compact", "standard", "wide", "tall", "full"]
 """Valid widget sizes for WidgetManifestSchema.size."""
 
-WIDGET_SIZES: frozenset[str] = frozenset({"small", "medium", "large", "full-width"})
+WIDGET_SIZES: dict[str, dict[str, int | str]] = {
+    "compact": {"width": 4, "height": "120px"},
+    "standard": {"width": 6, "height": "200px"},
+    "wide": {"width": 8, "height": "200px"},
+    "tall": {"width": 6, "height": "300px"},
+    "full": {"width": 12, "height": "auto"},
+}
+"""Platform widget size presets shared across validation and docs."""
+
+VALID_WIDGET_SIZES: frozenset[str] = frozenset(WIDGET_SIZES.keys())
 """Set of valid widget sizes. Used for validation."""
 
 

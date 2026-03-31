@@ -4,11 +4,15 @@ These are always loaded regardless of which plugins are installed.
 Plugin-specific models live in backend/apps/{app_id}/models.py.
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Literal
 
 from beanie import Document, PydanticObjectId
 from pydantic import Field
+
+
+def utc_now() -> datetime:
+    return datetime.now(UTC)
 
 
 class User(Document):
@@ -17,7 +21,7 @@ class User(Document):
     email: str
     hashed_password: str
     name: str
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utc_now)
     settings: dict = {}
 
     class Settings:
@@ -31,7 +35,7 @@ class UserAppInstallation(Document):
     user_id: PydanticObjectId
     app_id: str
     status: Literal["active", "disabled"] = "active"
-    installed_at: datetime = Field(default_factory=datetime.utcnow)
+    installed_at: datetime = Field(default_factory=utc_now)
 
     class Settings:
         name = "user_app_installations"
@@ -61,5 +65,35 @@ class TokenBlacklist(Document):
     """Revoked JWT tokens (for logout / token invalidation)."""
 
     jti: str  # JWT ID — unique per token
-    revoked_at: datetime = Field(default_factory=datetime.utcnow)
+    revoked_at: datetime = Field(default_factory=utc_now)
     expires_at: datetime
+
+
+class AppCategory(Document):
+    """App store category used to group plugins in the catalog UI."""
+
+    name: str
+    icon: str = "Folder"
+    color: str = "oklch(0.65 0.21 280)"
+    order: int = 0
+
+    class Settings:
+        name = "app_categories"
+        indexes = [[("name", 1)]]
+
+
+class ConversationMessage(Document):
+    """Persisted chat history for the root agent orchestrator."""
+
+    user_id: PydanticObjectId
+    thread_id: str
+    role: Literal["user", "assistant"]
+    content: str
+    created_at: datetime = Field(default_factory=utc_now)
+
+    class Settings:
+        name = "conversation_messages"
+        indexes = [
+            [("user_id", 1), ("thread_id", 1), ("created_at", 1)],
+            [("thread_id", 1), ("created_at", 1)],
+        ]

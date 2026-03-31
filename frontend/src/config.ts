@@ -1,4 +1,4 @@
-"""Frontend-wide constants — single source of truth."""
+/** Frontend-wide constants — single source of truth. */
 
 // ─── Auth / Tokens ──────────────────────────────────────────────────────────
 
@@ -17,10 +17,11 @@ export const API_TIMEOUT_MS = 15_000; // 15 seconds
 // ─── Widget ─────────────────────────────────────────────────────────────────
 
 export const WIDGET_SIZE_COLUMNS: Record<string, number> = {
-  small: 4,
-  medium: 6,
-  large: 8,
-  "full-width": 12,
+  compact: 4,
+  standard: 6,
+  wide: 8,
+  tall: 6,
+  full: 12,
 };
 
 // ─── App ────────────────────────────────────────────────────────────────────

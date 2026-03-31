@@ -1,14 +1,12 @@
 """Beanie MongoDB initialization and connection management."""
 
-from motor.motor_asyncio import AsyncIOMotorClient
-from contextlib import asynccontextmanager
-from typing import AsyncIterator
+from pymongo import AsyncMongoClient
 
 from core.config import settings
 
 # ─── Global client (set during lifespan) ──────────────────────────────────────
 
-_client: AsyncIOMotorClient | None = None
+_client: AsyncMongoClient | None = None
 
 
 async def init_db() -> None:
@@ -18,10 +16,17 @@ async def init_db() -> None:
     Plugin models are appended via get_plugin_models() after discovery.
     """
     global _client
-    _client = AsyncIOMotorClient(settings.mongodb_uri)
+    _client = AsyncMongoClient(settings.mongodb_uri)
 
     # Import here to avoid circular imports
-    from core.models import User, UserAppInstallation, WidgetPreference, TokenBlacklist
+    from core.models import (
+        AppCategory,
+        ConversationMessage,
+        TokenBlacklist,
+        User,
+        UserAppInstallation,
+        WidgetPreference,
+    )
     from core.registry import get_plugin_models
 
     from beanie import init_beanie
@@ -31,8 +36,10 @@ async def init_db() -> None:
         document_models=[
             User,
             UserAppInstallation,
+            AppCategory,
             WidgetPreference,
             TokenBlacklist,
+            ConversationMessage,
             *get_plugin_models(),
         ],
     )
