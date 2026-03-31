@@ -298,8 +298,9 @@ tr:last-child td {
   z-index: 5;
 }
 
-/* Drag handle — grab cursor, visible on hover */
-.drag-handle {
+/* Shared icon-button base: both drag handle and remove button */
+.drag-handle,
+.remove-widget-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -314,39 +315,23 @@ tr:last-child td {
   transition: opacity 0.15s, background 0.15s;
 }
 
-.sortable-widget:hover .drag-handle {
-  opacity: 1;
-}
-
-.drag-handle:hover {
-  background: var(--color-surface);
-  color: var(--color-foreground);
-}
-
-.drag-handle:active {
-  cursor: grabbing;
-}
-
-/* Remove button — visible on hover of the widget card */
-.remove-widget-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.5rem;
-  height: 1.5rem;
-  border-radius: 0.375rem;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  color: var(--color-muted);
-  opacity: 0;
-  transition: opacity 0.15s, background 0.15s, color 0.15s;
-}
-
+/* Reveal on hover of the card (edit mode) */
+.sortable-widget:hover .drag-handle,
 .sortable-widget:hover .remove-widget-btn {
   opacity: 1;
 }
 
+/* Per-button hover states */
+.drag-handle:hover {
+  background: var(--color-surface);
+  color: var(--color-foreground);
+}
+.drag-handle:active {
+  cursor: grabbing;
+}
+.remove-widget-btn {
+  cursor: pointer;
+}
 .remove-widget-btn:hover {
   background: oklch(0.63 0.24 25 / 0.15);
   color: var(--color-danger);
