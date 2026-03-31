@@ -6,13 +6,13 @@ from typing import Literal
 from langchain_core.tools import tool
 
 from apps.todo.service import task_service
-from shared.agent_context import set_user_context, get_user_context
+from shared.agent_context import get_user_context
 
 
 # ─── Tools ────────────────────────────────────────────────────────────────────
 
 @tool
-def todo_add_task(
+async def todo_add_task(
     title: str,
     description: str | None = None,
     due_date: str | None = None,
@@ -21,29 +21,29 @@ def todo_add_task(
     """Add a new task to the to-do list."""
     user_id = get_user_context()
     dt = datetime.fromisoformat(due_date) if due_date else None
-    return task_service.create_task(user_id, title, description, dt, priority)
+    return await task_service.create_task(user_id, title, description, dt, priority)
 
 
 @tool
-def todo_list_tasks(
+async def todo_list_tasks(
     status: Literal["pending", "completed"] = "pending",
     priority: Literal["low", "medium", "high"] | None = None,
     limit: int = 20,
 ) -> list[dict]:
     """List tasks, optionally filtered by status and priority."""
     user_id = get_user_context()
-    return task_service.list_tasks(user_id, status, priority, limit)
+    return await task_service.list_tasks(user_id, status, priority, limit)
 
 
 @tool
-def todo_complete_task(task_id: str) -> dict:
+async def todo_complete_task(task_id: str) -> dict:
     """Mark a task as completed."""
     user_id = get_user_context()
-    return task_service.complete_task(task_id, user_id)
+    return await task_service.complete_task(task_id, user_id)
 
 
 @tool
-def todo_delete_task(task_id: str) -> dict:
+async def todo_delete_task(task_id: str) -> dict:
     """Delete a task permanently."""
     user_id = get_user_context()
-    return task_service.delete_task(task_id, user_id)
+    return await task_service.delete_task(task_id, user_id)

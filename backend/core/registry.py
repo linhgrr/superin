@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, TypedDict
 from fastapi import APIRouter
 
 if TYPE_CHECKING:
-    from langgraph.graph.state import CompiledStateGraph as CompiledGraph
+    from core.agents.base_app import BaseAppAgent
 
 from shared.schemas import AppManifestSchema
 
@@ -18,7 +18,7 @@ class PluginEntry(TypedDict):
     """The shape stored in PLUGIN_REGISTRY after register_plugin()."""
 
     manifest: AppManifestSchema
-    agent: "AgentProtocol"  # type: ignore[name-defined]
+    agent: "BaseAppAgent"
     router: APIRouter
     models: list[type]
 
@@ -33,7 +33,7 @@ _plugin_models: list[type] = []
 
 def register_plugin(
     manifest: AppManifestSchema,
-    agent: "AgentProtocol",  # type: ignore[name-defined]
+    agent: "BaseAppAgent",
     router: APIRouter,
     models: list[type] = [],
 ) -> None:

@@ -3,20 +3,21 @@ RootAgent — top-level LangGraph orchestrator.
 
 Plugin discovery is fully automatic:
   - PLUGIN_REGISTRY is scanned at startup
-  - Each AppAgent is wrapped as a tool: ask_{app_id}(question, thread_id)
-  - LLM decides which app agent to delegate to based on the user's request
+  - Each installed AppAgent is wrapped as a tool: ask_{app_id}(question)
+  - The root runtime injects thread context when delegating to a child agent
+  - LLM decides which installed app agent to delegate to based on the user's request
 
 Hierarchy:
     RootAgent (create_react_agent, top-level)
-        └── Tool: ask_finance   ──→ FinanceAgent (subgraph, own history)
-        └── Tool: ask_todo      ──→ TodoAgent    (subgraph, own history)
-        └── Tool: ask_calendar ──→ CalendarAgent (subgraph, own history)
+        └── Tool: ask_finance   ──→ FinanceAgent (child graph, app-scoped thread)
+        └── Tool: ask_todo      ──→ TodoAgent    (child graph, app-scoped thread)
 
 Message persistence:
   - ConversationMessage (core/models.py) stores full history in MongoDB.
-  - RootAgent loads history from DB on every request → passes to graph.
-  - After streaming completes, new messages are saved back to DB.
-  - Each AppAgent subgraph has its own AsyncMongoDBSaver (in core/db.py).
+  - RootAgent can load history for non-assistant-ui callers.
+  - assistant-ui callers send full message history, so the chat route skips DB reload.
+  - After streaming completes, new user/assistant turns are saved back to DB.
+  - Each child AppAgent maintains app-scoped in-process thread memory via LangGraph checkpointers.
 """
 
 from .agent import RootAgent, root_agent

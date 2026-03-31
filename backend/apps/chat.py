@@ -1,5 +1,7 @@
 """Chat streaming route — SSE via assistant-stream DataStreamResponse."""
 
+import json
+
 from fastapi import APIRouter, Depends, Request
 
 from core.auth import get_current_user
@@ -23,6 +25,7 @@ async def chat_stream(
     """
     body = await request.json()
     messages = body.get("messages", [])
+    thread_id = body.get("threadId") or body.get("thread_id")
     # incoming_tools: JSON Schema tools from frontend — forwarded to LLM, not parsed here
 
     try:
@@ -37,31 +40,39 @@ async def chat_stream(
         )
 
     async def run(controller):
+        tool_calls: dict[str, object] = {}
+
         try:
-            async for event in root_agent.astream(user_id, messages):
+            async for event in root_agent.astream(
+                user_id,
+                messages,
+                thread_id=thread_id,
+                skip_db_load=True,
+            ):
                 event_type = event.get("type")
 
-                if event_type == "text":
+                if event_type in {"text", "token"}:
                     controller.append_text(event["content"])
 
                 elif event_type == "tool_call":
-                    controller.add_tool_call(
+                    tool_call = await controller.add_tool_call(
                         tool_name=event["toolName"],
                         tool_call_id=event["toolCallId"],
-                        args=event.get("args", {}),
                     )
+                    args = event.get("args")
+                    if args:
+                        tool_call.append_args_text(json.dumps(args))
+                    tool_calls[event["toolCallId"]] = tool_call
 
                 elif event_type == "tool_result":
-                    controller.add_tool_result(
-                        tool_call_id=event["toolCallId"],
-                        result=event["result"],
-                    )
-
-                elif event_type == "done":
-                    controller.complete()
+                    tool_call_id = event["toolCallId"]
+                    tool_call = tool_calls.get(tool_call_id)
+                    if tool_call is not None and hasattr(tool_call, "set_response"):
+                        tool_call.set_response(event["result"])
+                    else:
+                        controller.add_tool_result(tool_call_id=tool_call_id, result=event["result"])
 
         except Exception as e:
             controller.add_error(str(e))
-            controller.complete()
 
     return DataStreamResponse(create_run(run, state={"messages": messages}))

@@ -13,12 +13,11 @@ from typing import Any
 from beanie import PydanticObjectId
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_core.tools import BaseTool, tool
-from langgraph.checkpoint.memory import MemorySaver
 from langgraph.prebuilt import create_react_agent
 
 from core.models import ConversationMessage, UserAppInstallation
 from core.registry import PLUGIN_REGISTRY
-from shared.agent_context import set_user_context
+from shared.agent_context import clear_agent_context, set_thread_context, set_user_context
 from shared.llm import get_llm
 
 from .prompts import build_system_prompt
@@ -36,9 +35,6 @@ class RootAgent:
     def __init__(self) -> None:
         self._system_prompt = ""
         self._all_ask_tools: dict[str, BaseTool] = {}
-        # Per-request in-memory checkpointer — graph state is fully
-        # persisted in MongoDB via ConversationMessage (source of truth).
-        self._checkpointer = MemorySaver()
         self._graphs: dict[tuple[str, ...], Any] = {}
 
     def refresh(self) -> None:
@@ -59,8 +55,7 @@ class RootAgent:
         try:
             oid = PydanticObjectId(user_id)
             installations = await UserAppInstallation.find(
-                UserAppInstallation.user_id == oid,
-                UserAppInstallation.status == "active"
+                {"user_id": oid, "status": "active"},
             ).to_list()
             installed_app_ids = {inst.app_id for inst in installations}
         except Exception:
@@ -83,7 +78,7 @@ class RootAgent:
         tool_names = tuple(sorted(t.name for t in tools))
         if tool_names not in self._graphs:
             self._graphs[tool_names] = create_react_agent(
-                model=get_llm(temperature=0.0),
+                model=get_llm(),
                 tools=tools,
                 prompt=self._system_prompt or None,
             )
@@ -92,7 +87,7 @@ class RootAgent:
     async def _load_history(self, thread_id: str) -> list[ConversationMessage]:
         """Load ordered message history from MongoDB for a thread."""
         return await ConversationMessage.find(
-            ConversationMessage.thread_id == thread_id,
+            {"thread_id": thread_id},
         ).sort("created_at").to_list()
 
     async def _save_messages(
@@ -133,141 +128,145 @@ class RootAgent:
         If skip_db_load is True: only uses the incoming messages (frontend
         sends the full history, e.g. when using assistant-ui's Thread runtime).
         """
+        thread = thread_id or f"user:{user_id}"
         set_user_context(user_id)
+        set_thread_context(thread)
 
         tools = await self._get_user_tools(user_id)
         graph = self._get_graph(tools)
-        thread = thread_id or f"user:{user_id}"
 
-        # ── Build message list ───────────────────────────────────────────────
-        langchain_messages: list = []
+        try:
+            # ── Build message list ───────────────────────────────────────────
+            langchain_messages: list = []
 
-        if not skip_db_load:
-            # Load history from DB — for backends that don't send full history
-            history = await self._load_history(thread)
-            for msg in history:
-                if msg.role == "user":
-                    langchain_messages.append(HumanMessage(content=msg.content))
-                else:
-                    langchain_messages.append(AIMessage(content=msg.content))
-
-        user_buffer = ""
-        for msg in messages:
-            role = msg.get("role", "user")
-            content = msg.get("content", "")
-            msg_id = msg.get("id")
-
-            tool_calls = msg.get("tool_calls", [])
-
-            text_parts = []
-            if isinstance(content, list):
-                for p in content:
-                    if isinstance(p, dict) and p.get("type") == "text":
-                        text_parts.append(p.get("text", ""))
-                    elif isinstance(p, dict) and p.get("type") in ("tool-call", "tool_call"):
-                        tool_calls.append({
-                            "id": p.get("toolCallId") or p.get("id"),
-                            "function": {
-                                "name": p.get("toolName") or p.get("name"),
-                                "arguments": p.get("args") or p.get("arguments")
-                            }
-                        })
-                content_str = " ".join(text_parts)
-            else:
-                content_str = str(content)
-
-            if role == "user":
-                langchain_messages.append(HumanMessage(content=content_str, id=msg_id))
-                user_buffer = content_str
-            elif role == "assistant":
-                lc_tool_calls = []
-                for tc in tool_calls:
-                    fn = tc.get("function", {})
-                    args_str = fn.get("arguments", "{}")
-                    
-                    if isinstance(args_str, str):
-                        try:
-                            args = json.loads(args_str)
-                        except Exception:
-                            args = {}
+            if not skip_db_load:
+                # Load history from DB — for backends that don't send full history
+                history = await self._load_history(thread)
+                for msg in history:
+                    if msg.role == "user":
+                        langchain_messages.append(HumanMessage(content=msg.content))
                     else:
-                        args = args_str
+                        langchain_messages.append(AIMessage(content=msg.content))
 
-                    lc_tool_calls.append({
-                        "name": fn.get("name") or tc.get("toolName") or tc.get("name"),
-                        "args": args,
-                        "id": tc.get("id") or tc.get("toolCallId"),
-                        "type": "tool_call",
-                    })
-                langchain_messages.append(AIMessage(content=content_str, tool_calls=lc_tool_calls, id=msg_id))
-            elif role in ("tool", "data"):
+            user_buffer = ""
+            for msg in messages:
+                role = msg.get("role", "user")
+                content = msg.get("content", "")
+                msg_id = msg.get("id")
+
+                tool_calls = msg.get("tool_calls", [])
+
+                text_parts = []
                 if isinstance(content, list):
                     for p in content:
-                        if isinstance(p, dict) and p.get("type") in ("tool-result", "tool_result"):
-                            langchain_messages.append(ToolMessage(
-                                content=str(p.get("result", "")),
-                                tool_call_id=p.get("toolCallId", ""),
-                                name=p.get("toolName", ""),
-                                id=msg_id
-                            ))
+                        if isinstance(p, dict) and p.get("type") == "text":
+                            text_parts.append(p.get("text", ""))
+                        elif isinstance(p, dict) and p.get("type") in ("tool-call", "tool_call"):
+                            tool_calls.append({
+                                "id": p.get("toolCallId") or p.get("id"),
+                                "function": {
+                                    "name": p.get("toolName") or p.get("name"),
+                                    "arguments": p.get("args") or p.get("arguments")
+                                }
+                            })
+                    content_str = " ".join(text_parts)
                 else:
-                    langchain_messages.append(ToolMessage(
-                        content=content_str,
-                        tool_call_id=msg.get("tool_call_id", ""),
-                        id=msg_id
-                    ))
+                    content_str = str(content)
 
-        # ── Run graph ────────────────────────────────────────────────────────
-        config = {
-            "configurable": {"thread_id": thread},
-            "recursion_limit": 50,
-        }
+                if role == "user":
+                    langchain_messages.append(HumanMessage(content=content_str, id=msg_id))
+                    user_buffer = content_str
+                elif role == "assistant":
+                    lc_tool_calls = []
+                    for tc in tool_calls:
+                        fn = tc.get("function", {})
+                        args_str = fn.get("arguments", "{}")
 
-        assistant_buffer = ""
-        pending_save: asyncio.Task[None] | None = None
+                        if isinstance(args_str, str):
+                            try:
+                                args = json.loads(args_str)
+                            except Exception:
+                                args = {}
+                        else:
+                            args = args_str
 
-        async for event in graph.astream_events(
-            {"messages": langchain_messages},
-            config=config,
-            version="v2",
-        ):
-            event_type = event.get("event", "")
-            data = event.get("data", {})
+                        lc_tool_calls.append({
+                            "name": fn.get("name") or tc.get("toolName") or tc.get("name"),
+                            "args": args,
+                            "id": tc.get("id") or tc.get("toolCallId"),
+                            "type": "tool_call",
+                        })
+                    langchain_messages.append(AIMessage(content=content_str, tool_calls=lc_tool_calls, id=msg_id))
+                elif role in ("tool", "data"):
+                    if isinstance(content, list):
+                        for p in content:
+                            if isinstance(p, dict) and p.get("type") in ("tool-result", "tool_result"):
+                                langchain_messages.append(ToolMessage(
+                                    content=str(p.get("result", "")),
+                                    tool_call_id=p.get("toolCallId", ""),
+                                    name=p.get("toolName", ""),
+                                    id=msg_id
+                                ))
+                    else:
+                        langchain_messages.append(ToolMessage(
+                            content=content_str,
+                            tool_call_id=msg.get("tool_call_id", ""),
+                            id=msg_id
+                        ))
 
-            if event_type == "on_chat_model_stream":
-                chunk = data.get("chunk")
-                content = getattr(chunk, "content", "") or ""
-                if content:
-                    assistant_buffer += str(content)
-                    yield {"type": "token", "content": str(content)}
-            elif event_type == "on_tool_start":
-                inp = data.get("input", {})
-                yield {
-                    "type": "tool_call",
-                    "toolName": event.get("name", "unknown"),
-                    "toolCallId": event.get("run_id", ""),
-                    "args": inp if isinstance(inp, dict) else {},
-                }
-            elif event_type == "on_tool_end":
-                yield {
-                    "type": "tool_result",
-                    "toolCallId": event.get("run_id", ""),
-                    "result": data.get("output", {}),
-                }
+            # ── Run graph ────────────────────────────────────────────────────
+            config = {
+                "configurable": {"thread_id": thread},
+                "recursion_limit": 50,
+            }
 
-        # ── Persist to MongoDB (fire-and-forget, don't block the stream end) ─
-        pending_save = asyncio.create_task(
-            self._save_messages(user_id, thread, user_buffer, assistant_buffer)
-        )
+            assistant_buffer = ""
+            pending_save: asyncio.Task[None] | None = None
 
-        yield {"type": "done"}
+            async for event in graph.astream_events(
+                {"messages": langchain_messages},
+                config=config,
+                version="v2",
+            ):
+                event_type = event.get("event", "")
+                data = event.get("data", {})
 
-        # Ensure the DB write completes before the response closes
-        try:
-            await pending_save
-        except Exception:
-            # Log but don't crash — messages were already streamed to the client
-            logging.getLogger(__name__).exception("Failed to persist conversation messages")
+                if event_type == "on_chat_model_stream":
+                    chunk = data.get("chunk")
+                    content = getattr(chunk, "content", "") or ""
+                    if content:
+                        assistant_buffer += str(content)
+                        yield {"type": "token", "content": str(content)}
+                elif event_type == "on_tool_start":
+                    inp = data.get("input", {})
+                    yield {
+                        "type": "tool_call",
+                        "toolName": event.get("name", "unknown"),
+                        "toolCallId": event.get("run_id", ""),
+                        "args": inp if isinstance(inp, dict) else {},
+                    }
+                elif event_type == "on_tool_end":
+                    yield {
+                        "type": "tool_result",
+                        "toolCallId": event.get("run_id", ""),
+                        "result": data.get("output", {}),
+                    }
+
+            # ── Persist to MongoDB (fire-and-forget, don't block the stream end) ─
+            pending_save = asyncio.create_task(
+                self._save_messages(user_id, thread, user_buffer, assistant_buffer)
+            )
+
+            yield {"type": "done"}
+
+            # Ensure the DB write completes before the response closes
+            try:
+                await pending_save
+            except Exception:
+                # Log but don't crash — messages were already streamed to the client
+                logging.getLogger(__name__).exception("Failed to persist conversation messages")
+        finally:
+            clear_agent_context()
 
 # Singleton
 root_agent = RootAgent()
