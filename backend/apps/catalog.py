@@ -1,4 +1,4 @@
-"""App catalog routes — list apps, install/uninstall, widget preferences.
+"""App catalog routes — list apps, install/uninstall, categories.
 
 Core platform routes at prefix /api/catalog (NOT /api/apps to avoid
 conflicting with plugin routes at /api/apps/{app_id}).
@@ -6,21 +6,112 @@ conflicting with plugin routes at /api/apps/{app_id}).
 Plugin-specific data routes live in each plugin's routes.py at /api/apps/{app_id}.
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+
 from beanie import PydanticObjectId
+from beanie.operators import In
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 
 from core.auth import get_current_user, get_current_user_optional
-from core.models import UserAppInstallation, WidgetPreference
+from core.models import AppCategory, UserAppInstallation, WidgetPreference
 from core.registry import list_plugins
 from shared.schemas import (
     AppCatalogEntry,
     AppInstallRequest,
     AppUninstallRequest,
-    WidgetPreferenceSchema,
     PreferenceUpdate,
+    WidgetPreferenceSchema,
 )
 
 router = APIRouter()
+
+
+# ─── Schemas ───────────────────────────────────────────────────────────────────
+
+class CreateCategoryRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=50)
+    icon: str = Field(default="Folder", max_length=30)
+    color: str = Field(default="oklch(0.65 0.21 280)", max_length=50)
+    order: int = Field(default=0)
+
+
+class UpdateCategoryRequest(BaseModel):
+    name: str | None = Field(None, min_length=1, max_length=50)
+    icon: str | None = Field(None, max_length=30)
+    color: str | None = Field(None, max_length=50)
+    order: int | None = None
+
+
+# ─── Categories ────────────────────────────────────────────────────────────────
+
+@router.get("/categories")
+async def list_categories() -> list[dict]:
+    """List all app categories (public)."""
+    cats = await AppCategory.find_all().sort("order").to_list()
+    return [_cat_to_dict(c) for c in cats]
+
+
+@router.post("/categories")
+async def create_category(
+    request: CreateCategoryRequest,
+    user_id: str = Depends(get_current_user),
+) -> dict:
+    """Create a new app category. Requires auth."""
+    existing = await AppCategory.find_one(AppCategory.name == request.name)
+    if existing:
+        raise HTTPException(status_code=409, detail=f"Category '{request.name}' already exists")
+    cat = await AppCategory(
+        name=request.name,
+        icon=request.icon,
+        color=request.color,
+        order=request.order,
+    ).insert()
+    return _cat_to_dict(cat)
+
+
+@router.patch("/categories/{category_id}")
+async def update_category(
+    category_id: str,
+    request: UpdateCategoryRequest,
+    user_id: str = Depends(get_current_user),
+) -> dict:
+    """Update an app category."""
+    cat = await AppCategory.find_one(AppCategory.id == PydanticObjectId(category_id))
+    if not cat:
+        raise HTTPException(status_code=404, detail="Category not found")
+    if request.name is not None:
+        cat.name = request.name
+    if request.icon is not None:
+        cat.icon = request.icon
+    if request.color is not None:
+        cat.color = request.color
+    if request.order is not None:
+        cat.order = request.order
+    await cat.save()
+    return _cat_to_dict(cat)
+
+
+@router.delete("/categories/{category_id}")
+async def delete_category(
+    category_id: str,
+    user_id: str = Depends(get_current_user),
+) -> dict:
+    """Delete an app category."""
+    cat = await AppCategory.find_one(AppCategory.id == PydanticObjectId(category_id))
+    if not cat:
+        raise HTTPException(status_code=404, detail="Category not found")
+    await cat.delete()
+    return {"success": True, "id": category_id}
+
+
+def _cat_to_dict(c: AppCategory) -> dict:
+    return {
+        "id": str(c.id),
+        "name": c.name,
+        "icon": c.icon,
+        "color": c.color,
+        "order": c.order,
+    }
 
 
 # ─── Catalog ──────────────────────────────────────────────────────────────────
@@ -53,6 +144,7 @@ async def list_catalog(
             is_installed=m.id in installed_ids,
             tags=m.tags,
             screenshots=m.screenshots,
+            widgets=m.widgets,
         )
         for m in manifests
     ]
@@ -85,20 +177,29 @@ async def install_app(
             status="active",
         ).insert()
 
-    for widget in plugin["manifest"].widgets:
-        existing_pref = await WidgetPreference.find_one(
-            WidgetPreference.user_id == PydanticObjectId(user_id),
-            WidgetPreference.widget_id == widget.id,
+    # Batch: fetch all existing widget prefs in one query
+    widget_ids = [w.id for w in plugin["manifest"].widgets]
+    existing_prefs = await WidgetPreference.find(
+        WidgetPreference.user_id == PydanticObjectId(user_id),
+        In(WidgetPreference.widget_id, widget_ids),
+    ).to_list()
+    existing_ids = {p.widget_id for p in existing_prefs}
+
+    # Insert only missing ones
+    to_insert = [
+        WidgetPreference(
+            user_id=PydanticObjectId(user_id),
+            widget_id=w.id,
+            app_id=request.app_id,
+            enabled=True,
+            position=0,
+            config={},
         )
-        if not existing_pref:
-            await WidgetPreference(
-                user_id=PydanticObjectId(user_id),
-                widget_id=widget.id,
-                app_id=request.app_id,
-                enabled=True,
-                position=0,
-                config={},
-            ).insert()
+        for w in plugin["manifest"].widgets
+        if w.id not in existing_ids
+    ]
+    if to_insert:
+        await WidgetPreference.insert_many(to_insert)
 
     await plugin["agent"].on_install(user_id)
     return {"status": "installed", "app_id": request.app_id}
@@ -131,6 +232,28 @@ async def uninstall_app(
 # ─── Widget Preferences ────────────────────────────────────────────────────────
 # Route at /preferences/{app_id} to avoid conflict with plugin routes
 # at /api/apps/{app_id}/... which take priority in FastAPI routing.
+
+@router.get("/preferences")
+async def get_all_preferences(
+    user_id: str = Depends(get_current_user),
+) -> list[WidgetPreferenceSchema]:
+    """Get all widget preferences for the authenticated user across all apps."""
+    prefs = await WidgetPreference.find(
+        WidgetPreference.user_id == PydanticObjectId(user_id),
+    ).to_list()
+    return [
+        WidgetPreferenceSchema(
+            id=str(p.id),
+            user_id=str(p.user_id),
+            widget_id=p.widget_id,
+            app_id=p.app_id,
+            enabled=p.enabled,
+            position=p.position,
+            config=p.config,
+        )
+        for p in prefs
+    ]
+
 
 @router.get("/preferences/{app_id}")
 async def get_preferences(

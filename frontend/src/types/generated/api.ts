@@ -89,6 +89,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/catalog/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Categories
+         * @description List all app categories (public).
+         */
+        get: operations["list_categories_api_catalog_categories_get"];
+        put?: never;
+        /**
+         * Create Category
+         * @description Create a new app category. Requires auth.
+         */
+        post: operations["create_category_api_catalog_categories_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/catalog/categories/{category_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Category
+         * @description Delete an app category.
+         */
+        delete: operations["delete_category_api_catalog_categories__category_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Category
+         * @description Update an app category.
+         */
+        patch: operations["update_category_api_catalog_categories__category_id__patch"];
+        trace?: never;
+    };
     "/api/catalog": {
         parameters: {
             query?: never;
@@ -149,6 +197,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/catalog/preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get All Preferences
+         * @description Get all widget preferences for the authenticated user across all apps.
+         */
+        get: operations["get_all_preferences_api_catalog_preferences_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/catalog/preferences/{app_id}": {
         parameters: {
             query?: never;
@@ -187,7 +255,8 @@ export interface paths {
          * @description POST /api/chat/stream
          *     Body: {
          *         "messages": GenericMessage[],
-         *         "tools": ToolDefinition[]   # optional JSON Schema — forwarded to LLM
+         *         "threadId": str | null,  # conversation thread
+         *         "tools": ToolDefinition[], # optional — for LLM tool schemas
          *     }
          *     Returns: SSE (assistant-stream data stream protocol)
          */
@@ -503,6 +572,11 @@ export interface components {
              * @default []
              */
             screenshots: string[];
+            /**
+             * Widgets
+             * @default []
+             */
+            widgets: components["schemas"]["WidgetManifestSchema"][];
         };
         /** AppInstallRequest */
         AppInstallRequest: {
@@ -514,13 +588,53 @@ export interface components {
             /** App Id */
             app_id: string;
         };
+        /**
+         * ConfigFieldSchema
+         * @description A configuration field for a widget.
+         */
+        ConfigFieldSchema: {
+            /**
+             * Name
+             * @description Field key, camelCase
+             */
+            name: string;
+            /** Label */
+            label: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "text" | "number" | "select" | "multi-select" | "date" | "boolean";
+            /**
+             * Required
+             * @default false
+             */
+            required: boolean;
+            /** Default */
+            default?: unknown | null;
+            /** Options */
+            options?: components["schemas"]["SelectOption"][];
+            /**
+             * Options Source
+             * @description Widget resolver ID for dynamic options, e.g. 'finance.wallets'
+             */
+            options_source?: string | null;
+            /** Placeholder */
+            placeholder?: string | null;
+            /** Min */
+            min?: number | null;
+            /** Max */
+            max?: number | null;
+            /** Step */
+            step?: number | null;
+        };
         /** CreateCategoryRequest */
         CreateCategoryRequest: {
             /** Name */
             name: string;
             /**
              * Icon
-             * @default Tag
+             * @default Folder
              */
             icon: string;
             /**
@@ -529,10 +643,10 @@ export interface components {
              */
             color: string;
             /**
-             * Budget
+             * Order
              * @default 0
              */
-            budget: number;
+            order: number;
         };
         /** CreateTaskRequest */
         CreateTaskRequest: {
@@ -623,6 +737,13 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** SelectOption */
+        SelectOption: {
+            /** Label */
+            label: string;
+            /** Value */
+            value: string;
+        };
         /** TokenResponse */
         TokenResponse: {
             /** Access Token */
@@ -647,6 +768,17 @@ export interface components {
             amount: number;
             /** Note */
             note?: string | null;
+        };
+        /** UpdateCategoryRequest */
+        UpdateCategoryRequest: {
+            /** Name */
+            name?: string | null;
+            /** Icon */
+            icon?: string | null;
+            /** Color */
+            color?: string | null;
+            /** Order */
+            order?: number | null;
         };
         /** UpdateTaskRequest */
         UpdateTaskRequest: {
@@ -683,6 +815,39 @@ export interface components {
             type: string;
         };
         /**
+         * WidgetManifestSchema
+         * @description A single widget definition — referenced in AppManifestSchema.widgets.
+         */
+        WidgetManifestSchema: {
+            /**
+             * Id
+             * @description Unique widget ID, format '{app_id}.{widget_name}', e.g. 'finance.total-balance'
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string;
+            /**
+             * Icon
+             * @description Lucide icon name
+             */
+            icon: string;
+            /**
+             * Size
+             * @default medium
+             * @enum {string}
+             */
+            size: "small" | "medium" | "large" | "full-width";
+            /** Config Fields */
+            config_fields?: components["schemas"]["ConfigFieldSchema"][];
+            /**
+             * Requires Auth
+             * @default true
+             */
+            requires_auth: boolean;
+        };
+        /**
          * WidgetPreferenceSchema
          * @description User-specific widget state stored in DB.
          */
@@ -709,6 +874,26 @@ export interface components {
             config?: {
                 [key: string]: unknown;
             };
+        };
+        /** CreateCategoryRequest */
+        apps__finance__schemas__CreateCategoryRequest: {
+            /** Name */
+            name: string;
+            /**
+             * Icon
+             * @default Tag
+             */
+            icon: string;
+            /**
+             * Color
+             * @default oklch(0.65 0.21 280)
+             */
+            color: string;
+            /**
+             * Budget
+             * @default 0
+             */
+            budget: number;
         };
     };
     responses: never;
@@ -854,6 +1039,133 @@ export interface operations {
             };
         };
     };
+    list_categories_api_catalog_categories_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+        };
+    };
+    create_category_api_catalog_categories_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCategoryRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_category_api_catalog_categories__category_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                category_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_category_api_catalog_categories__category_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                category_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCategoryRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_catalog_api_catalog_get: {
         parameters: {
             query?: never;
@@ -940,6 +1252,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_all_preferences_api_catalog_preferences_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WidgetPreferenceSchema"][];
                 };
             };
         };
@@ -1163,7 +1495,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CreateCategoryRequest"];
+                "application/json": components["schemas"]["apps__finance__schemas__CreateCategoryRequest"];
             };
         };
         responses: {

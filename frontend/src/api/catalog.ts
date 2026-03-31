@@ -28,6 +28,11 @@ export async function uninstallApp(
   return api.post<void>("/api/catalog/uninstall", payload);
 }
 
+// GET /api/catalog/preferences — all prefs for current user
+export async function getAllPreferences(): Promise<WidgetPreferenceSchema[]> {
+  return api.get<WidgetPreferenceSchema[]>("/api/catalog/preferences");
+}
+
 // GET /api/catalog/preferences/{appId}
 export async function getPreferences(
   appId: string

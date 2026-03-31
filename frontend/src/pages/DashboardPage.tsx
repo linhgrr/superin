@@ -33,7 +33,7 @@ import AddWidgetDialog from "@/components/dashboard/AddWidgetDialog";
 import EditModeBar from "@/components/dashboard/EditModeBar";
 import SortableWidgetCard from "@/components/dashboard/SortableWidgetCard";
 import { DashboardEditProvider, useDashboardEdit } from "@/hooks/useDashboardEdit";
-import { getCatalog, getPreferences } from "@/api/catalog";
+import { getCatalog, getAllPreferences } from "@/api/catalog";
 import type { AppCatalogEntry, WidgetPreferenceSchema } from "@/types/generated/api";
 import AppShell from "./AppShell";
 import FinanceWidget from "./widgets/FinanceWidget";
@@ -132,18 +132,11 @@ function DashboardInner({
   // ── Load preferences ────────────────────────────────────────────────────────
 
   const reloadPrefs = useCallback(async () => {
-    const results = await Promise.allSettled(
-      installedApps.map((app) => getPreferences(app.id))
-    );
-
+    const prefs = await getAllPreferences();
     const next = new Map<string, WidgetPreferenceSchema>();
-    results.forEach((result) => {
-      if (result.status === "fulfilled") {
-        result.value.forEach((p) => next.set(p.widget_id, p));
-      }
-    });
+    prefs.forEach((p) => next.set(p.widget_id, p));
     setPrefs(next);
-  }, [installedApps]);
+  }, []);
 
   useEffect(() => {
     reloadPrefs();
