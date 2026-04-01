@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
 import { listEvents, type Event } from "../api";
 import { Sun, Sunrise } from "lucide-react";
+import { useUserTimezone } from "@/hooks/useUserTimezone";
 
 export default function DaySummaryWidget() {
   const [todayCount, setTodayCount] = useState(0);
   const [nextEvent, setNextEvent] = useState<Event | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const { formatTime } = useUserTimezone();
 
   useEffect(() => {
     loadEvents();
@@ -36,9 +38,6 @@ export default function DaySummaryWidget() {
       setIsLoading(false);
     }
   }
-
-  const formatTime = (dateStr: string) =>
-    new Date(dateStr).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", justifyContent: "center" }}>

@@ -4,8 +4,10 @@ import { createTransaction, getTransactions, type TransactionRead } from "../../
 import Modal from "../../components/Modal";
 import SimpleForm from "../../components/SimpleForm";
 import { formatCurrency } from "../../lib/formatCurrency";
+import { useUserTimezone } from "@/hooks/useUserTimezone";
 
 export default function TransactionsTab() {
+  const { formatDate } = useUserTimezone();
   const [transactions, setTransactions] = useState<TransactionRead[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -50,7 +52,7 @@ export default function TransactionsTab() {
               {transactions.map((transaction) => (
                 <tr key={transaction.id}>
                   <td style={{ whiteSpace: "nowrap" }}>
-                    {new Date(transaction.date).toLocaleDateString()}
+                    {formatDate(transaction.date, { month: "short", day: "numeric", year: "numeric" })}
                   </td>
                   <td>
                     <span

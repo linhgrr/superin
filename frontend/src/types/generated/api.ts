@@ -89,6 +89,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/me/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Settings
+         * @description Update user settings (timezone, etc.).
+         */
+        patch: operations["update_settings_api_auth_me_settings_patch"];
+        trace?: never;
+    };
     "/api/catalog/categories": {
         parameters: {
             query?: never;
@@ -1301,7 +1321,7 @@ export interface components {
             name: string;
             /**
              * Icon
-             * @default Folder
+             * @default Tag
              */
             icon: string;
             /**
@@ -1310,10 +1330,10 @@ export interface components {
              */
             color: string;
             /**
-             * Order
+             * Budget
              * @default 0
              */
-            order: number;
+            budget: number;
         };
         /** CreateEventRequest */
         CreateEventRequest: {
@@ -1585,6 +1605,19 @@ export interface components {
             reminder_minutes?: number | null;
         };
         /**
+         * UpdateUserSettingsRequest
+         * @description Update user settings like timezone.
+         */
+        UpdateUserSettingsRequest: {
+            /**
+             * Settings
+             * @description User settings object (e.g., {timezone: 'Asia/Ho_Chi_Minh'})
+             */
+            settings?: {
+                [key: string]: unknown;
+            };
+        };
+        /**
          * UserPublic
          * @description Public user info — returned in auth responses.
          */
@@ -1595,6 +1628,10 @@ export interface components {
             email: string;
             /** Name */
             name: string;
+            /** Settings */
+            settings?: {
+                [key: string]: unknown;
+            };
         };
         /** ValidationError */
         ValidationError: {
@@ -1671,12 +1708,12 @@ export interface components {
             size_h?: number | null;
         };
         /** CreateCategoryRequest */
-        apps__finance__schemas__CreateCategoryRequest: {
+        apps__catalog__CreateCategoryRequest: {
             /** Name */
             name: string;
             /**
              * Icon
-             * @default Tag
+             * @default Folder
              */
             icon: string;
             /**
@@ -1685,10 +1722,10 @@ export interface components {
              */
             color: string;
             /**
-             * Budget
+             * Order
              * @default 0
              */
-            budget: number;
+            order: number;
         };
     };
     responses: never;
@@ -1834,6 +1871,39 @@ export interface operations {
             };
         };
     };
+    update_settings_api_auth_me_settings_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateUserSettingsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserPublic"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_categories_api_catalog_categories_get: {
         parameters: {
             query?: never;
@@ -1865,7 +1935,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CreateCategoryRequest"];
+                "application/json": components["schemas"]["apps__catalog__CreateCategoryRequest"];
             };
         };
         responses: {
@@ -2896,7 +2966,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["apps__finance__schemas__CreateCategoryRequest"];
+                "application/json": components["schemas"]["CreateCategoryRequest"];
             };
         };
         responses: {
@@ -2993,7 +3063,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["apps__finance__schemas__CreateCategoryRequest"];
+                "application/json": components["schemas"]["CreateCategoryRequest"];
             };
         };
         responses: {

@@ -1,5 +1,5 @@
 import type { Event } from "../api";
-import { isSameDay } from "../utils/dateHelpers";
+import { isSameDayInTimezone } from "../utils/dateHelpers";
 
 interface FilterEventsProps {
   events: Event[];
@@ -12,15 +12,28 @@ export function filterEventsByCalendar({ events, selectedCalendar }: FilterEvent
     : events;
 }
 
-export function groupEventsByDate(events: Event[]) {
+interface GroupEventsOptions {
+  timezone?: string;
+}
+
+export function groupEventsByDate(events: Event[], options: GroupEventsOptions = {}) {
+  const { timezone } = options;
   return events.reduce((acc, event) => {
-    const dateKey = new Date(event.start_datetime).toISOString().split("T")[0];
     const dateObj = new Date(event.start_datetime);
+    // Use user's timezone for date key and label
+    const dateKey = dateObj.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      timeZone: timezone,
+    }).split("/").reverse().join("-"); // Convert MM/DD/YYYY to YYYY-MM-DD
+
     const dateLabel = dateObj.toLocaleDateString("en-US", {
       weekday: "long",
       year: "numeric",
       month: "long",
       day: "numeric",
+      timeZone: timezone,
     });
     if (!acc[dateKey]) {
       acc[dateKey] = { label: dateLabel, events: [] };
@@ -30,8 +43,13 @@ export function groupEventsByDate(events: Event[]) {
   }, {} as Record<string, { label: string; events: Event[] }>);
 }
 
-export function getEventsForDay(events: Event[], date: Date) {
-  return events.filter((e) => isSameDay(new Date(e.start_datetime), date));
+interface GetEventsOptions {
+  timezone?: string;
+}
+
+export function getEventsForDay(events: Event[], date: Date, options: GetEventsOptions = {}) {
+  const { timezone } = options;
+  return events.filter((e) => isSameDayInTimezone(new Date(e.start_datetime), date, timezone));
 }
 
 export function calculateEventStyle(event: Event, hourHeight: number = 60) {

@@ -1,4 +1,5 @@
 import type { Calendar, Event } from "../api";
+import { useUserTimezone } from "@/hooks/useUserTimezone";
 
 interface ListViewProps {
   calendars: Calendar[];
@@ -6,6 +7,7 @@ interface ListViewProps {
 }
 
 export function ListView({ calendars, eventsByDate }: ListViewProps) {
+  const { formatTime } = useUserTimezone();
   const sortedDateKeys = Object.keys(eventsByDate).sort();
 
   return (
@@ -109,15 +111,9 @@ export function ListView({ calendars, eventsByDate }: ListViewProps) {
                           }}
                         >
                           <span style={{ fontWeight: 500 }}>
-                            {new Date(event.start_datetime).toLocaleTimeString("en-US", {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
+                            {formatTime(event.start_datetime)}
                             {" - "}
-                            {new Date(event.end_datetime).toLocaleTimeString("en-US", {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
+                            {formatTime(event.end_datetime)}
                           </span>
                           {calendar && (
                             <span

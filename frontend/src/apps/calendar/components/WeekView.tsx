@@ -1,6 +1,7 @@
-import { HOURS, HOUR_HEIGHT, DAY_NAMES, isSameDay } from "../utils/dateHelpers";
+import { HOURS, HOUR_HEIGHT, DAY_NAMES, isSameDay, isSameDayInTimezone } from "../utils/dateHelpers";
 import { calculateEventStyle } from "../utils/eventHelpers";
 import type { Calendar, Event } from "../api";
+import { useUserTimezone } from "@/hooks/useUserTimezone";
 
 interface WeekViewProps {
   weekDates: Date[];
@@ -10,10 +11,11 @@ interface WeekViewProps {
 }
 
 export function WeekView({ weekDates, calendars, events, onCellClick }: WeekViewProps) {
+  const { formatTime, timezone } = useUserTimezone();
   const today = new Date();
 
   const getEventsForDay = (date: Date) => {
-    return events.filter((e) => isSameDay(new Date(e.start_datetime), date));
+    return events.filter((e) => isSameDayInTimezone(new Date(e.start_datetime), date, timezone));
   };
 
   return (
@@ -64,7 +66,7 @@ export function WeekView({ weekDates, calendars, events, onCellClick }: WeekView
                 style={{
                   fontSize: "1.25rem",
                   fontWeight: 700,
-                  color: isToday ? "var(--color-primary)" : "var(--color-foreground)",
+                  color: isToday ? "white" : "var(--color-foreground)",
                   marginTop: "0.25rem",
                   width: "36px",
                   height: "36px",
@@ -73,7 +75,6 @@ export function WeekView({ weekDates, calendars, events, onCellClick }: WeekView
                   justifyContent: "center",
                   borderRadius: "50%",
                   background: isToday ? "var(--color-primary)" : "transparent",
-                  color: isToday ? "white" : undefined,
                   margin: "0.25rem auto 0",
                 }}
               >
@@ -164,16 +165,11 @@ export function WeekView({ weekDates, calendars, events, onCellClick }: WeekView
                       boxShadow: "0 1px 2px rgba(0,0,0,0.2)",
                       zIndex: 5,
                     }}
-                    title={`${event.title}\n${new Date(event.start_datetime).toLocaleTimeString(
-                      "en-US"
-                    )} - ${new Date(event.end_datetime).toLocaleTimeString("en-US")}`}
+                    title={`${event.title}\n${formatTime(event.start_datetime)} - ${formatTime(event.end_datetime)}`}
                   >
                     <div style={{ fontWeight: 600, whiteSpace: "nowrap" }}>{event.title}</div>
                     <div style={{ fontSize: "0.625rem", opacity: 0.9 }}>
-                      {new Date(event.start_datetime).toLocaleTimeString("en-US", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                      {formatTime(event.start_datetime, { hour: "2-digit", minute: "2-digit" })}
                       {event.location && ` 📍 ${event.location}`}
                     </div>
                   </div>

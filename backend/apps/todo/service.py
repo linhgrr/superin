@@ -257,18 +257,20 @@ class TaskService:
         # Convert back to UTC for comparison with stored due_date (which is UTC)
         start_of_today_utc = start_of_today.astimezone(pytz.UTC)
         end_of_today_utc = end_of_today.astimezone(pytz.UTC)
-        now_utc = datetime.now(UTC)
+        # Use naive UTC for comparison with stored due_date (which is offset-naive)
+        now_utc_naive = datetime.utcnow()
 
         all_tasks = await self.repo.find_by_user(user_id, limit=10000)
         pending = [t for t in all_tasks if t.status == "pending"]
         completed = [t for t in all_tasks if t.status == "completed"]
         overdue = [
             t for t in pending
-            if t.due_date and t.due_date < now_utc
+            if t.due_date and t.due_date < now_utc_naive
         ]
         due_today = [
             t for t in pending
-            if t.due_date and start_of_today_utc <= t.due_date <= end_of_today_utc
+            # Compare naive due_date with naive datetime (both in UTC)
+            if t.due_date and start_of_today_utc.replace(tzinfo=None) <= t.due_date <= end_of_today_utc.replace(tzinfo=None)
         ]
 
         # Tag summary

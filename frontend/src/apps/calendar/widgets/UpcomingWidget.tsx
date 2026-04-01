@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { listEvents, type Event } from "../api";
 import { Calendar } from "lucide-react";
+import { useUserTimezone } from "@/hooks/useUserTimezone";
 
 interface UpcomingWidgetProps {
   maxItems?: number;
@@ -10,6 +11,7 @@ interface UpcomingWidgetProps {
 export default function UpcomingWidget({ maxItems = 3, calendarFilter }: UpcomingWidgetProps) {
   const [events, setEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { timezone, formatDate, formatTime } = useUserTimezone();
 
   useEffect(() => {
     loadEvents();
@@ -28,20 +30,27 @@ export default function UpcomingWidget({ maxItems = 3, calendarFilter }: Upcomin
     }
   }
 
-  const formatDate = (dateStr: string) => {
+  const formatEventDate = (dateStr: string) => {
     const date = new Date(dateStr);
     const today = new Date();
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    if (date.toDateString() === today.toDateString()) return "Today";
-    if (date.toDateString() === tomorrow.toDateString()) return "Tomorrow";
+    // Format using user's timezone
+    const dateInTz = timezone
+      ? new Date(date.toLocaleString("en-US", { timeZone: timezone }))
+      : date;
+    const todayInTz = timezone
+      ? new Date(today.toLocaleString("en-US", { timeZone: timezone }))
+      : today;
+    const tomorrowInTz = new Date(todayInTz);
+    tomorrowInTz.setDate(tomorrowInTz.getDate() + 1);
 
-    return date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+    if (dateInTz.toDateString() === todayInTz.toDateString()) return "Today";
+    if (dateInTz.toDateString() === tomorrowInTz.toDateString()) return "Tomorrow";
+
+    return formatDate(dateStr, { weekday: "short", month: "short", day: "numeric" });
   };
-
-  const formatTime = (dateStr: string) =>
-    new Date(dateStr).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", justifyContent: "center" }}>
@@ -104,7 +113,7 @@ export default function UpcomingWidget({ maxItems = 3, calendarFilter }: Upcomin
                   {event.title}
                 </div>
                 <div style={{ fontSize: "0.6875rem", color: "var(--color-muted)" }}>
-                  {formatDate(event.start_datetime)} · {formatTime(event.start_datetime)}
+                  {formatEventDate(event.start_datetime)} · {formatTime(event.start_datetime)}
                 </div>
               </div>
             </div>

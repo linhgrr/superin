@@ -10,12 +10,14 @@ import {
 import { WeekView } from "../components/WeekView";
 import { ListView } from "../components/ListView";
 import { CreateEventModal } from "../components/CreateEventModal";
-import { getWeekDates } from "../utils/dateHelpers";
+import { getWeekDatesInTimezone } from "../utils/dateHelpers";
 import { filterEventsByCalendar, groupEventsByDate } from "../utils/eventHelpers";
+import { useUserTimezone } from "@/hooks/useUserTimezone";
 
 type ViewMode = "list" | "week";
 
 export default function CalendarScreen() {
+  const { timezone } = useUserTimezone();
   const [calendars, setCalendars] = useState<Calendar[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>("week");
@@ -26,12 +28,12 @@ export default function CalendarScreen() {
   const [newEventDate, setNewEventDate] = useState<Date | null>(null);
 
   // Derived state
-  const weekDates = useMemo(() => getWeekDates(new Date(currentDate)), [currentDate]);
+  const weekDates = useMemo(() => getWeekDatesInTimezone(currentDate, timezone), [currentDate, timezone]);
   const filteredEvents = useMemo(
     () => filterEventsByCalendar({ events, selectedCalendar }),
     [events, selectedCalendar]
   );
-  const eventsByDate = useMemo(() => groupEventsByDate(filteredEvents), [filteredEvents]);
+  const eventsByDate = useMemo(() => groupEventsByDate(filteredEvents, { timezone }), [filteredEvents, timezone]);
 
   // Load data
   const loadData = useCallback(async () => {
@@ -178,6 +180,14 @@ function Header({
   onSelectCalendar,
   onChangeView,
 }: HeaderProps) {
+  const { formatDate } = useUserTimezone();
+
+  // Get month/year from first date, format with timezone
+  const firstDate = weekDates[0];
+  const headerLabel = firstDate
+    ? formatDate(firstDate, { month: "long", year: "numeric" })
+    : "";
+
   return (
     <div
       style={{
@@ -197,7 +207,7 @@ function Header({
         <button onClick={onToday} style={{ ...navButtonStyle, fontWeight: 500 }}>Today</button>
         <button onClick={onNextWeek} style={navButtonStyle}>→</button>
         <span style={{ marginLeft: "1rem", fontWeight: 600, fontSize: "0.9375rem" }}>
-          {weekDates[0].toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+          {headerLabel}
         </span>
       </div>
 

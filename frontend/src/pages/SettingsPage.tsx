@@ -21,9 +21,11 @@ import {
   X,
   Command,
   LogOut,
+  Globe,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/components/providers/AppProviders";
+import { updateUserSettings } from "@/api/auth";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -37,6 +39,7 @@ interface SettingsState {
   emailNotifications: boolean;
   pushNotifications: boolean;
   marketingEmails: boolean;
+  timezone: string;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -48,7 +51,35 @@ const DEFAULT_SETTINGS: SettingsState = {
   emailNotifications: true,
   pushNotifications: true,
   marketingEmails: false,
+  timezone: "UTC",
 };
+
+const TIMEZONES = [
+  { value: "UTC", label: "UTC" },
+  { value: "Asia/Ho_Chi_Minh", label: "Ho Chi Minh City (GMT+7)" },
+  { value: "Asia/Bangkok", label: "Bangkok (GMT+7)" },
+  { value: "Asia/Singapore", label: "Singapore (GMT+8)" },
+  { value: "Asia/Hong_Kong", label: "Hong Kong (GMT+8)" },
+  { value: "Asia/Tokyo", label: "Tokyo (GMT+9)" },
+  { value: "Asia/Seoul", label: "Seoul (GMT+9)" },
+  { value: "Asia/Shanghai", label: "Shanghai (GMT+8)" },
+  { value: "Asia/Taipei", label: "Taipei (GMT+8)" },
+  { value: "Asia/Jakarta", label: "Jakarta (GMT+7)" },
+  { value: "Asia/Kuala_Lumpur", label: "Kuala Lumpur (GMT+8)" },
+  { value: "Asia/Manila", label: "Manila (GMT+8)" },
+  { value: "Asia/Dubai", label: "Dubai (GMT+4)" },
+  { value: "Asia/Mumbai", label: "Mumbai (GMT+5:30)" },
+  { value: "Europe/London", label: "London (GMT)" },
+  { value: "Europe/Paris", label: "Paris (GMT+1)" },
+  { value: "Europe/Berlin", label: "Berlin (GMT+1)" },
+  { value: "America/New_York", label: "New York (GMT-5)" },
+  { value: "America/Los_Angeles", label: "Los Angeles (GMT-8)" },
+  { value: "America/Chicago", label: "Chicago (GMT-6)" },
+  { value: "America/Toronto", label: "Toronto (GMT-5)" },
+  { value: "Australia/Sydney", label: "Sydney (GMT+11)" },
+  { value: "Australia/Melbourne", label: "Melbourne (GMT+11)" },
+  { value: "Pacific/Auckland", label: "Auckland (GMT+13)" },
+];
 
 const KEYBOARD_SHORTCUTS = [
   {
@@ -280,7 +311,12 @@ export default function SettingsPage() {
     return saved ? { ...DEFAULT_SETTINGS, ...JSON.parse(saved) } : DEFAULT_SETTINGS;
   });
 
-  // Apply theme effect
+  // Sync timezone from user settings when available
+  useEffect(() => {
+    if (user?.settings?.timezone) {
+      setSettings((prev) => ({ ...prev, timezone: user.settings.timezone }));
+    }
+  }, [user?.settings?.timezone]);
   useEffect(() => {
     const root = document.documentElement;
     const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
@@ -330,7 +366,15 @@ export default function SettingsPage() {
       setSettings(updated);
       localStorage.setItem("shin_settings", JSON.stringify(updated));
 
-      // Simulate API call
+      // Sync timezone to backend if changed
+      if (newSettings.timezone) {
+        try {
+          await updateUserSettings({ settings: { timezone: newSettings.timezone } });
+        } catch {
+          // Silent fail - localStorage already has the value
+        }
+      }
+
       await new Promise((resolve) => setTimeout(resolve, 300));
       setIsSaving(false);
       toast.success("Settings saved", { description: "Your preferences have been updated" });
@@ -392,6 +436,64 @@ export default function SettingsPage() {
       </div>
 
       <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: "1.25rem" }}>
+        {/* Timezone Selector */}
+        <div style={{ marginBottom: "1.25rem" }}>
+          <label
+            style={{
+              display: "block",
+              fontSize: "0.8125rem",
+              fontWeight: 600,
+              color: "var(--color-foreground-muted)",
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+              marginBottom: "0.5rem",
+            }}
+          >
+            Timezone
+          </label>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+            <div
+              style={{
+                width: "40px",
+                height: "40px",
+                borderRadius: "10px",
+                background: "var(--color-primary-muted)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "var(--color-primary)",
+                flexShrink: 0,
+              }}
+            >
+              <Globe size={20} />
+            </div>
+            <select
+              value={settings.timezone}
+              onChange={(e) => saveSettings({ timezone: e.target.value })}
+              style={{
+                flex: 1,
+                padding: "0.625rem 0.875rem",
+                borderRadius: "10px",
+                border: "1px solid var(--color-border)",
+                background: "var(--color-surface)",
+                color: "var(--color-foreground)",
+                fontSize: "0.875rem",
+                cursor: "pointer",
+                outline: "none",
+              }}
+            >
+              {TIMEZONES.map((tz) => (
+                <option key={tz.value} value={tz.value}>
+                  {tz.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <p style={{ fontSize: "0.75rem", color: "var(--color-muted)", marginTop: "0.5rem" }}>
+            Used for scheduling and AI time awareness
+          </p>
+        </div>
+
         <button
           onClick={handleLogout}
           className="btn btn-danger"
