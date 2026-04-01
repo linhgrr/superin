@@ -17,7 +17,7 @@ Message persistence:
   - RootAgent can load history for non-assistant-ui callers.
   - assistant-ui callers send full message history, so the chat route skips DB reload.
   - After streaming completes, new user/assistant turns are saved back to DB.
-  - Each child AppAgent maintains app-scoped in-process thread memory via LangGraph checkpointers.
+  - Each child AppAgent is a stateless LangGraph specialist invoked by the root agent.
 """
 
 from .agent import RootAgent, root_agent

@@ -214,10 +214,11 @@ The dashboard is manifest-driven:
 - dashboard renders the app module's `DashboardWidget`
 
 Size contract:
-- `small`
-- `medium`
-- `large`
-- `full-width`
+- `compact`
+- `standard`
+- `wide`
+- `tall`
+- `full`
 
 The same size contract must match:
 - backend manifest
@@ -235,6 +236,7 @@ The root chat agent lives in:
 Responsibilities:
 - determine which installed apps are available for the current user
 - build `ask_{app_id}` tools from installed child agents
+- receive structured results back from delegated child agents
 - parse assistant-ui message history into LangChain messages
 - stream root text + root tool call/result events
 - persist latest user/assistant text turns
@@ -248,7 +250,7 @@ Contract:
 - `graph` is always a compiled LangGraph graph
 - `tools()` returns app domain tools
 - `build_prompt()` returns app-specific prompt text
-- `delegate(question, thread_id)` runs the app on an app-scoped child thread
+- `delegate(question, thread_id)` returns a structured result envelope for the root agent
 
 Current child agents:
 - [finance/agent.py](/home/linh/Downloads/superin/backend/apps/finance/agent.py)
@@ -293,10 +295,10 @@ Install/uninstall updates use optimistic state and refresh on failure.
 
 - MongoDB chat persistence currently stores user/assistant text turns, not the
   full structured tool-call/tool-result history.
-- Child-agent memory uses in-process LangGraph `MemorySaver`, so it is not yet
-  durable across server restarts.
-- `scripts/create_plugin.py` still needs to be brought fully in line with the
-  newer frontend sub-app structure described in the plugin guide.
+- Child agents are currently stateless per invocation; there is no durable
+  per-app thread memory yet.
+- The unified `scripts/superin.py` CLI still has room to grow around deeper
+  scaffold/sync workflows, but it is now the single supported developer entrypoint.
 
 ## Verification
 
@@ -305,8 +307,9 @@ For contract-sensitive changes, run:
 ```bash
 source /home/linh/miniconda3/etc/profile.d/conda.sh
 conda activate linhdz
-python scripts/codegen.py
-node scripts/validate-manifests.mjs
+python scripts/superin.py codegen
+python scripts/superin.py manifests validate
+ruff check backend
 npm run build:frontend
 python -m py_compile backend/apps/chat.py backend/core/agents/root/agent.py backend/core/agents/base_app.py
 ```

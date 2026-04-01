@@ -47,7 +47,7 @@ backend/core/agents/root/agent.py
 
 backend/core/agents/base_app.py
   -> each child app is a compiled LangGraph agent
-  -> delegate(question, thread_id) runs child graph on app-scoped thread
+  -> delegate(question, thread_id) returns a structured result for the root agent
 ```
 
 ## Request Payload
@@ -134,6 +134,11 @@ The FastAPI route converts them into assistant-ui stream parts:
 - tool call -> `add_tool_call(...)`
 - tool result -> `set_response(...)` or `add_tool_result(...)`
 
+Important:
+- only root-level tool events are streamed to assistant-ui
+- child-internal domain tools such as `finance_add_transaction` must stay hidden from the frontend
+- every streamed tool result must correspond to a previously streamed root-level tool call id
+
 ## Parent / Child-Agent Boundary
 
 This project uses the LangGraph pattern where the outer/root agent wraps each
@@ -154,15 +159,14 @@ The UI should only see:
 - the root assistant's final text
 
 This prevents duplicated messages and avoids exposing child-agent internals.
+`ask_{app_id}` results are structured objects, not plain text strings.
 
 ## Threading and Memory
 
 - Frontend callers send the full active-thread history each turn.
 - Therefore the chat route uses `skip_db_load=True`.
 - Root agent still persists the latest user/assistant text turns to MongoDB after streaming.
-- Child app agents use app-scoped LangGraph thread ids:
-  - root thread: `thread_1`
-  - finance child thread: `thread_1:finance`
+- Child app agents are currently stateless per invocation.
 
 Important:
 - MongoDB persistence currently stores user/assistant text turns, not the full
@@ -190,6 +194,7 @@ const runtime = useDataStreamRuntime({
 Current rendering:
 - `text` parts render as markdown bubbles
 - `tool-call` parts render as compact badges
+- error states render via `MessagePrimitive.Error` / `ErrorPrimitive`
 - no frontend-side `execute` handlers
 
 ## Verification Checklist

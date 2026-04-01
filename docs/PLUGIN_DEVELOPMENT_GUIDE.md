@@ -151,6 +151,8 @@ Rules:
 - `graph` must never be `None`
 - prompts belong in `prompts.py`, not inline in `agent.py`
 - child agents are invoked by the root agent through `delegate(question, thread_id)`
+- `delegate(...)` should return a structured result envelope, not only plain text
+- app tools should convert domain failures into structured `{ ok, data/error }` results
 - app-specific tools must enforce user scoping
 
 ### Registration
@@ -215,7 +217,7 @@ needed by the frontend validator:
   "id": "example",
   "name": "Example",
   "widgets": [
-    { "id": "example.summary", "size": "medium" }
+    { "id": "example.summary", "size": "standard" }
   ]
 }
 ```
@@ -245,6 +247,7 @@ Rules:
 - backend decides which `ask_{app_id}` tools exist based on installed apps
 - frontend should only see root-level tool events such as `ask_finance`
 - child-agent internal tool calls must stay hidden from the UI
+- root-level `ask_{app_id}` results should be structured so the root agent can tell `success`, `partial`, and `failed`
 
 See:
 - [ASSISTANT_UI_INTEGRATION.md](/home/linh/Downloads/superin/docs/ASSISTANT_UI_INTEGRATION.md)
@@ -323,8 +326,8 @@ Behavior:
 - [ ] reusable app UI lives in `components/`
 - [ ] app page domain slices live in `features/`
 - [ ] no side-effect `registerWidget()` pattern
-- [ ] `python scripts/codegen.py` ran if shared schema changed
-- [ ] `node scripts/validate-manifests.mjs` passes
+- [ ] `python scripts/superin.py codegen` ran if shared schema changed
+- [ ] `python scripts/superin.py manifests validate` passes
 - [ ] `npm run build:frontend` passes
 
 ## Generator Status

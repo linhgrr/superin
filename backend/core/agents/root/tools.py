@@ -2,9 +2,11 @@
 Tools used by the orchestrator agent.
 """
 
-from core.agents.base_app import BaseAppAgent
+from typing import Any
+
 from langchain_core.tools import BaseTool, tool
 
+from core.agents.base_app import BaseAppAgent
 from shared.agent_context import get_thread_context
 
 
@@ -17,7 +19,7 @@ def _build_ask_tool(app_id: str, agent: BaseAppAgent, agent_description: str) ->
     """
 
     @tool(f"ask_{app_id}", description=agent_description)
-    async def ask_app(question: str) -> str:
+    async def ask_app(question: str) -> dict[str, Any]:
         thread_id = get_thread_context()
         if not thread_id:
             raise RuntimeError(f"Missing thread context for ask_{app_id}")

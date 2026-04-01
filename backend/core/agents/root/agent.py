@@ -24,6 +24,29 @@ from shared.llm import get_llm
 from .prompts import build_system_prompt
 from .tools import _build_ask_tool
 
+
+def _normalize_tool_output(output: Any) -> Any:
+    if isinstance(output, ToolMessage):
+        content = output.content
+        if isinstance(content, str):
+            try:
+                return json.loads(content)
+            except Exception:
+                return content
+        return jsonable_encoder(content)
+
+    if hasattr(output, "content"):
+        content = getattr(output, "content")
+        if isinstance(content, str):
+            try:
+                return json.loads(content)
+            except Exception:
+                return content
+        return jsonable_encoder(content)
+
+    return jsonable_encoder(output)
+
+
 class RootAgent:
     """
     Top-level LangGraph orchestrator.
@@ -244,6 +267,7 @@ class RootAgent:
             assistant_buffer = ""
             pending_save: asyncio.Task[None] | None = None
             active_delegations: set[str] = set()
+            visible_tool_names = {tool_.name for tool_ in tools}
 
             async for event in graph.astream_events(
                 {"messages": langchain_messages},
@@ -264,6 +288,8 @@ class RootAgent:
                         assistant_buffer += str(content)
                         yield {"type": "token", "content": str(content)}
                 elif event_type == "on_tool_start":
+                    if tool_name not in visible_tool_names:
+                        continue
                     if active_delegations and run_id not in active_delegations:
                         continue
                     inp = data.get("input", {})
@@ -276,12 +302,32 @@ class RootAgent:
                         "args": jsonable_encoder(inp) if isinstance(inp, dict) else {},
                     }
                 elif event_type == "on_tool_end":
+                    if tool_name not in visible_tool_names:
+                        continue
                     if active_delegations and run_id not in active_delegations:
                         continue
                     yield {
                         "type": "tool_result",
                         "toolCallId": run_id,
-                        "result": jsonable_encoder(data.get("output", {})),
+                        "result": _normalize_tool_output(data.get("output", {})),
+                    }
+                    active_delegations.discard(run_id)
+                elif event_type == "on_tool_error":
+                    if tool_name not in visible_tool_names:
+                        continue
+                    if active_delegations and run_id not in active_delegations:
+                        continue
+                    yield {
+                        "type": "tool_result",
+                        "toolCallId": run_id,
+                        "result": {
+                            "ok": False,
+                            "error": {
+                                "message": str(data.get("error", "Tool execution failed")),
+                                "code": "tool_error",
+                                "retryable": True,
+                            },
+                        },
                     }
                     active_delegations.discard(run_id)
 

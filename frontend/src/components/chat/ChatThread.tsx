@@ -9,6 +9,8 @@
 
 import {
   ComposerPrimitive,
+  ErrorPrimitive,
+  MessagePrimitive,
   ThreadPrimitive,
   useMessage,
 } from "@assistant-ui/react";
@@ -126,6 +128,23 @@ function MessageBubble() {
           ))}
         </div>
       ) : null}
+
+      <MessagePrimitive.Error>
+        <ErrorPrimitive.Root
+          style={{
+            marginBottom: "0.5rem",
+            padding: "0.625rem 0.875rem",
+            borderRadius: "0.75rem",
+            background: "oklch(0.63 0.24 25 / 0.12)",
+            border: "1px solid oklch(0.63 0.24 25 / 0.28)",
+            color: "var(--color-danger)",
+            fontSize: "0.8125rem",
+            lineHeight: 1.45,
+          }}
+        >
+          <ErrorPrimitive.Message />
+        </ErrorPrimitive.Root>
+      </MessagePrimitive.Error>
     </div>
   );
 }
