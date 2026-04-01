@@ -18,6 +18,10 @@ export interface DashboardWidgetProps {
   widget: AppCatalogEntry["widgets"][number];
 }
 
+export interface DashboardWidgetRendererProps {
+  widget: AppCatalogEntry["widgets"][number];
+}
+
 export interface FrontendAppDefinition {
   manifest: FrontendAppManifest;
   AppView: ComponentType;

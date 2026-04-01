@@ -43,7 +43,7 @@ Responsibilities:
 
 ### Frontend files
 
-Each frontend app should contain:
+Each frontend app should contain this protocol:
 
 ```text
 frontend/src/apps/{app_id}/
@@ -52,14 +52,24 @@ frontend/src/apps/{app_id}/
   AppView.tsx
   DashboardWidget.tsx
   api.ts
+  components/
+  features/
+  views/
+  widgets/
+  lib/
 ```
 
 Responsibilities:
 - `manifest.json`: frontend mirror used by manifest validation
 - `index.ts`: exports one `FrontendAppDefinition`
-- `AppView.tsx`: full app page view
-- `DashboardWidget.tsx`: dashboard renderer for that app's widgets
+- `AppView.tsx`: thin public entrypoint that delegates to `views/`
+- `DashboardWidget.tsx`: thin public entrypoint that delegates to `widgets/`
 - `api.ts`: app-specific frontend API client helpers
+- `components/`: reusable app-local UI pieces
+- `features/`: domain slices with state and UI for the app page
+- `views/`: top-level screen composition for the app page
+- `widgets/`: dashboard widget dispatcher plus individual widget renderers
+- `lib/`: app-local helpers and constants
 
 Current registry:
 - [index.ts](/home/linh/Downloads/superin/frontend/src/apps/index.ts)
@@ -188,6 +198,12 @@ Do not create:
 - `registerWidget(...)`
 - root-level side-effect imports for app widget registration
 
+Frontend entrypoints should stay small:
+- `AppView.tsx` should be orchestration only
+- `DashboardWidget.tsx` should be dispatch/orchestration only
+- heavy UI and state should live below `features/`, `components/`, `views/`, `widgets/`
+- each manifest widget should usually have its own file under `widgets/`
+
 ### Manifest mirror
 
 `frontend/src/apps/{app_id}/manifest.json` must mirror backend manifest fields
@@ -255,7 +271,7 @@ What each command checks:
 
 1. Create backend manifest, models, repository, service, tools, routes, prompts, and agent.
 2. Register the plugin in backend `__init__.py`.
-3. Create frontend app module with `manifest.json`, `index.ts`, `AppView.tsx`, `DashboardWidget.tsx`, `api.ts`.
+3. Create frontend app module with `manifest.json`, `index.ts`, `AppView.tsx`, `DashboardWidget.tsx`, `api.ts`, plus the `components/`, `features/`, `views/`, `widgets/`, and `lib/` folders as needed.
 4. Add the frontend app to [index.ts](/home/linh/Downloads/superin/frontend/src/apps/index.ts).
 5. Run codegen and manifest validation.
 6. Install the app through the app store and test:
@@ -277,13 +293,22 @@ What each command checks:
 - [ ] routes call service, service calls repository
 - [ ] app is registered with `register_plugin(...)`
 - [ ] frontend exports one `FrontendAppDefinition`
+- [ ] `AppView.tsx` is thin and delegates to `views/`
+- [ ] `DashboardWidget.tsx` is thin and delegates to `widgets/`
+- [ ] reusable app UI lives in `components/`
+- [ ] app page domain slices live in `features/`
 - [ ] no side-effect `registerWidget()` pattern
 - [ ] `python scripts/codegen.py` ran if shared schema changed
 - [ ] `node scripts/validate-manifests.mjs` passes
 - [ ] `npm run build:frontend` passes
 
-## Current Caveat
+## Generator Status
 
-The guide describes the target plugin scaffold and runtime contract.
-[create_plugin.py](/home/linh/Downloads/superin/scripts/create_plugin.py) still
-needs a follow-up update to fully emit the newer frontend sub-app structure by default.
+[create_plugin.py](/home/linh/Downloads/superin/scripts/create_plugin.py) now
+scaffolds the current protocol by default:
+- backend `BaseAppAgent` child agent with `prompts.py`
+- frontend app module under `frontend/src/apps/{app_id}`
+- map-based widget dispatcher with one generated widget file
+
+Generated code is only a starting point. Real app-specific feature logic still
+needs to be implemented manually.
