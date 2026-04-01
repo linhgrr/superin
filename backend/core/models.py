@@ -53,6 +53,9 @@ class WidgetPreference(Document):
     enabled: bool = False
     position: int = 0
     config: dict = {}
+    # Custom dimensions - override manifest default
+    size_w: int | None = None  # Grid width (2-12)
+    size_h: int | None = None  # Grid height (1-6)
 
     class Settings:
         name = "widget_preferences"

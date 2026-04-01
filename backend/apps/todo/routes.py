@@ -327,5 +327,9 @@ async def update_preferences(
                 pref.position = u.position
             if u.config is not None:
                 pref.config = u.config
+            if u.size_w is not None:
+                pref.size_w = u.size_w
+            if u.size_h is not None:
+                pref.size_h = u.size_h
             await pref.save()
     return await get_preferences(user_id)

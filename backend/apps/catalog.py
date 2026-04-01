@@ -279,6 +279,8 @@ def _pref_to_schema(p: WidgetPreference) -> WidgetPreferenceSchema:
         enabled=p.enabled,
         position=p.position,
         config=p.config,
+        size_w=p.size_w,
+        size_h=p.size_h,
     )
 
 
@@ -326,6 +328,10 @@ async def update_preferences(
                 pref.position = u.position
             if u.config is not None:
                 pref.config = u.config
+            if u.size_w is not None:
+                pref.size_w = u.size_w
+            if u.size_h is not None:
+                pref.size_h = u.size_h
             await pref.save()
 
     return await get_preferences(app_id, user_id)
