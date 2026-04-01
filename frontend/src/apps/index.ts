@@ -1,8 +1,10 @@
+import { calendarApp } from "./calendar";
 import { financeApp } from "./finance";
 import { todoApp } from "./todo";
 import type { FrontendAppDefinition } from "./types";
 
 export const FRONTEND_APPS = {
+  calendar: calendarApp,
   finance: financeApp,
   todo: todoApp,
 } as const satisfies Record<string, FrontendAppDefinition>;
