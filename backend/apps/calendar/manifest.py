@@ -71,17 +71,19 @@ calendar_manifest = AppManifestSchema(
     widgets=[month_view_widget, upcoming_widget, day_summary_widget],
     agent_description="Helps users create events, check availability, schedule recurring events, and time-block Todo tasks.",
     tools=[
-        "calendar_list_events",
-        "calendar_search_events",
-        "calendar_get_event",
-        "calendar_create_event",
-        "calendar_update_event",
-        "calendar_delete_event",
-        "calendar_check_conflicts",
+        # Event lifecycle - consolidated design
+        "calendar_schedule_event",    # Create + auto conflict check
+        "calendar_reschedule_event",  # Move to new time
+        "calendar_edit_event",        # Edit metadata only
+        "calendar_cancel_event",      # Delete/cancel
+        "calendar_find_events",       # Search + list + get
+        # Calendar management
         "calendar_list_calendars",
-        "calendar_create_recurring",
+        # Recurring events
+        "calendar_make_recurring",
         "calendar_stop_recurring",
-        "calendar_schedule_task",
+        # Todo integration
+        "calendar_block_task_time",
     ],
     models=["Event", "Calendar", "RecurringRule"],
     category="productivity",
