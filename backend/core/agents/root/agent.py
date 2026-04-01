@@ -16,6 +16,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, Tool
 from langchain_core.tools import BaseTool, tool
 from langgraph.prebuilt import create_react_agent
 
+from core.input_sanitizer import sanitize_for_memory, sanitize_user_content
 from core.models import ConversationMessage, User, UserAppInstallation, get_user_local_time
 from core.registry import PLUGIN_REGISTRY
 from shared.agent_context import clear_agent_context, set_thread_context, set_user_context
@@ -121,20 +122,27 @@ class RootAgent:
         user_content: str,
         assistant_content: str,
     ) -> None:
-        """Persist user + assistant messages to MongoDB after streaming completes."""
-        if user_content:
+        """Persist user + assistant messages to MongoDB after streaming completes.
+
+        Content is sanitized before storage to prevent ASI06: Memory Poisoning.
+        """
+        # Sanitize content before persistence (ASI06 defense)
+        sanitized_user_content = sanitize_for_memory(user_content)
+        sanitized_assistant_content = sanitize_for_memory(assistant_content)
+
+        if sanitized_user_content:
             await ConversationMessage(
                 user_id=PydanticObjectId(user_id),
                 thread_id=thread_id,
                 role="user",
-                content=user_content,
+                content=sanitized_user_content,
             ).insert()
-        if assistant_content:
+        if sanitized_assistant_content:
             await ConversationMessage(
                 user_id=PydanticObjectId(user_id),
                 thread_id=thread_id,
                 role="assistant",
-                content=assistant_content,
+                content=sanitized_assistant_content,
             ).insert()
 
     async def astream(
@@ -182,10 +190,16 @@ class RootAgent:
                         langchain_messages.append(AIMessage(content=msg.content))
 
             user_buffer = ""
+            sanitization_warnings: list[str] = []
             for msg in messages:
                 role = msg.get("role", "user")
                 content = msg.get("content", "")
                 msg_id = msg.get("id")
+
+                # Sanitize user content to prevent prompt injection (ASI01)
+                if role == "user":
+                    content, warnings = sanitize_user_content(content)
+                    sanitization_warnings.extend(warnings)
 
                 tool_calls = msg.get("tool_calls", [])
 
@@ -193,7 +207,11 @@ class RootAgent:
                 if isinstance(content, list):
                     for p in content:
                         if isinstance(p, dict) and p.get("type") == "text":
-                            text_parts.append(p.get("text", ""))
+                            text = p.get("text", "")
+                            # Sanitize text content in arrays
+                            if role == "user":
+                                text, _ = sanitize_user_content(text)
+                            text_parts.append(text)
                         elif isinstance(p, dict) and p.get("type") in ("tool-call", "tool_call"):
                             raw_arguments = (
                                 p.get("args")
@@ -266,6 +284,14 @@ class RootAgent:
                             tool_call_id=msg.get("tool_call_id", ""),
                             id=msg_id
                         ))
+
+            # Log any sanitization warnings as security events (ASI01 detection)
+            if sanitization_warnings:
+                logging.getLogger(__name__).warning(
+                    "Input sanitization warnings for user %s: %s",
+                    user_id,
+                    ", ".join(sanitization_warnings),
+                )
 
             # ── Run graph ────────────────────────────────────────────────────
             config = {

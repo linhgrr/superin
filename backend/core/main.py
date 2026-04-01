@@ -17,6 +17,7 @@ from core.exceptions import (
     validation_handler,
 )
 from core.logging_middleware import RequestLoggingMiddleware
+from core.security_middleware import SecurityHeadersMiddleware
 from core.verify import verify_plugins
 
 # Configure logging
@@ -72,12 +73,30 @@ def create_app() -> FastAPI:
     )
 
     # ── Middleware ─────────────────────────────────────────────────────────
+    # Security headers first (processed last on response)
+    app.add_middleware(SecurityHeadersMiddleware)
+
+    # CORS - hardened configuration
+    # In production, explicitly list allowed origins instead of using wildcard
+    cors_origins = settings.cors_origins
+    # Ensure no wildcard origins in production
+    if "*" in cors_origins and settings.hf_space is not True:
+        logger.warning("CORS wildcard (*) not recommended for production")
+
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.cors_origins,
+        allow_origins=cors_origins,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],  # Specific methods only
+        allow_headers=[
+            "Authorization",
+            "Content-Type",
+            "Accept",
+            "X-Requested-With",
+            "Origin",
+        ],  # Specific headers only
+        expose_headers=["Content-Type", "Authorization"],
+        max_age=600,  # Cache preflight for 10 minutes
     )
     app.add_middleware(RequestLoggingMiddleware)
 
