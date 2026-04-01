@@ -7,6 +7,9 @@ from beanie import PydanticObjectId
 
 from apps.calendar.models import Calendar, Event, RecurringRule
 
+# Default color for new calendars
+DEFAULT_CALENDAR_COLOR = "oklch(0.70 0.18 250)"  # Blue-ish
+
 
 class EventRepository:
     async def find_by_user(
@@ -163,7 +166,7 @@ class CalendarRepository:
         calendar = Calendar(
             user_id=PydanticObjectId(user_id),
             name=name,
-            color=color or "oklch(0.70 0.18 250)",
+            color=color or DEFAULT_CALENDAR_COLOR,
             is_default=is_default,
         )
         await calendar.insert()

@@ -5,6 +5,11 @@ from typing import Literal
 
 from apps.calendar.models import Calendar, Event, RecurringRule
 from apps.calendar.repository import CalendarRepository, EventRepository, RecurringRuleRepository
+from apps.todo.service import task_service as todo_task_service
+
+# Default colors for calendars
+DEFAULT_CALENDAR_COLOR = "oklch(0.70 0.18 250)"  # Blue-ish
+WORK_CALENDAR_COLOR = "oklch(0.65 0.21 145)"  # Green-ish
 
 
 class CalendarService:
@@ -229,6 +234,11 @@ class CalendarService:
         calendar_id: str | None = None,
     ) -> dict:
         """Create time-blocked event from Todo task."""
+        # Fetch the actual task to get its title
+        task = await todo_task_service.get_task(task_id, user_id)
+        if not task:
+            raise ValueError(f"Task '{task_id}' not found")
+
         # Get default calendar if none specified
         if not calendar_id:
             default = await self.calendars.find_default(user_id)
@@ -239,10 +249,10 @@ class CalendarService:
         # Calculate end time
         end_datetime = start_datetime + timedelta(minutes=duration_minutes)
 
-        # Create event with task reference
+        # Create event with task reference and actual task title
         event = await self.events.create(
             user_id=user_id,
-            title=f"Task: {task_id}",  # Will be updated with actual task title
+            title=task["title"],
             start_datetime=start_datetime,
             end_datetime=end_datetime,
             calendar_id=calendar_id,
@@ -254,9 +264,9 @@ class CalendarService:
     # ─── Install / Uninstall ────────────────────────────────────────────────────
 
     async def on_install(self, user_id: str) -> None:
-        """Create default calendar for new user."""
-        await self.calendars.create(user_id, "Personal", "oklch(0.70 0.18 250)", True)
-        await self.calendars.create(user_id, "Work", "oklch(0.65 0.21 145)", False)
+        """Create default calendars for new user."""
+        await self.calendars.create(user_id, "Personal", DEFAULT_CALENDAR_COLOR, True)
+        await self.calendars.create(user_id, "Work", WORK_CALENDAR_COLOR, False)
 
     async def on_uninstall(self, user_id: str) -> None:
         """Clean up all user data."""
