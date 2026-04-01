@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 import { listEvents, type Event } from "../api";
-import Widget from "./Widget";
+import { Sun, Sunrise } from "lucide-react";
 
 export default function DaySummaryWidget() {
-  const [todayEvents, setTodayEvents] = useState<Event[]>([]);
-  const [tomorrowEvents, setTomorrowEvents] = useState<Event[]>([]);
+  const [todayCount, setTodayCount] = useState(0);
+  const [nextEvent, setNextEvent] = useState<Event | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -21,115 +21,117 @@ export default function DaySummaryWidget() {
       const todayEnd = new Date(now);
       todayEnd.setHours(23, 59, 59, 999);
 
-      const tomorrowStart = new Date(todayStart);
-      tomorrowStart.setDate(tomorrowStart.getDate() + 1);
       const tomorrowEnd = new Date(todayEnd);
       tomorrowEnd.setDate(tomorrowEnd.getDate() + 1);
 
-      const [today, tomorrow] = await Promise.all([
-        listEvents(todayStart.toISOString(), todayEnd.toISOString()),
-        listEvents(tomorrowStart.toISOString(), tomorrowEnd.toISOString()),
-      ]);
+      // Get today's events count
+      const todayEvents = await listEvents(todayStart.toISOString(), todayEnd.toISOString(), undefined, 100);
+      setTodayCount(todayEvents.length);
 
-      setTodayEvents(today);
-      setTomorrowEvents(tomorrow);
+      // Get next upcoming event (from now)
+      const upcoming = await listEvents(now.toISOString(), tomorrowEnd.toISOString(), undefined, 1);
+      setNextEvent(upcoming[0] || null);
     } finally {
       setIsLoading(false);
     }
   }
 
   const formatTime = (dateStr: string) =>
-    new Date(dateStr).toLocaleTimeString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    new Date(dateStr).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
 
   return (
-    <Widget isLoading={isLoading}>
-      <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-        {/* Today */}
-        <div>
-          <div
-            style={{
-              fontSize: "0.75rem",
-              fontWeight: 600,
-              color: "var(--color-primary)",
-              marginBottom: "0.5rem",
-            }}
-          >
-            Today ({todayEvents.length} events)
+    <div style={{ height: "100%", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+      {isLoading ? (
+        <div style={{ color: "var(--color-muted)", fontSize: "0.875rem" }}>Loading…</div>
+      ) : (
+        <div style={{ display: "flex", gap: "1rem" }}>
+          {/* Today count */}
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <div
+              style={{
+                width: "32px",
+                height: "32px",
+                borderRadius: "8px",
+                background: "var(--color-primary-muted)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "var(--color-primary)",
+                flexShrink: 0,
+              }}
+            >
+              <Sun size={16} />
+            </div>
+            <div>
+              <div style={{ fontSize: "0.625rem", color: "var(--color-muted)", textTransform: "uppercase" }}>
+                Today
+              </div>
+              <div style={{ fontSize: "1.125rem", fontWeight: 600, color: "var(--color-foreground)" }}>
+                {todayCount} events
+              </div>
+            </div>
           </div>
-          {todayEvents.length === 0 ? (
-            <div style={{ fontSize: "0.8125rem", color: "var(--color-foreground-muted)" }}>
-              No events
-            </div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>
-              {todayEvents.slice(0, 3).map((e) => (
-                <div
-                  key={e.id}
-                  style={{
-                    fontSize: "0.8125rem",
-                    display: "flex",
-                    gap: "0.5rem",
-                  }}
-                >
-                  <span style={{ color: "var(--color-foreground-muted)", minWidth: "45px" }}>
-                    {formatTime(e.start_datetime)}
-                  </span>
-                  <span style={{ fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {e.title}
-                  </span>
-                </div>
-              ))}
-              {todayEvents.length > 3 && (
-                <div style={{ fontSize: "0.75rem", color: "var(--color-foreground-muted)", marginTop: "0.25rem" }}>
-                  +{todayEvents.length - 3} more
-                </div>
-              )}
-            </div>
-          )}
-        </div>
 
-        {/* Tomorrow */}
-        <div style={{ paddingTop: "0.75rem", borderTop: "1px solid var(--color-border)" }}>
-          <div
-            style={{
-              fontSize: "0.75rem",
-              fontWeight: 600,
-              color: "var(--color-foreground-muted)",
-              marginBottom: "0.5rem",
-            }}
-          >
-            Tomorrow ({tomorrowEvents.length} events)
-          </div>
-          {tomorrowEvents.length === 0 ? (
-            <div style={{ fontSize: "0.8125rem", color: "var(--color-foreground-muted)" }}>
-              No events
-            </div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>
-              {tomorrowEvents.slice(0, 2).map((e) => (
+          {/* Next event */}
+          {nextEvent ? (
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flex: 1, minWidth: 0 }}>
+              <div
+                style={{
+                  width: "32px",
+                  height: "32px",
+                  borderRadius: "8px",
+                  background: "var(--color-success-muted, oklch(0.72 0.19 145 / 0.15))",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "var(--color-success)",
+                  flexShrink: 0,
+                }}
+              >
+                <Sunrise size={16} />
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: "0.625rem", color: "var(--color-muted)", textTransform: "uppercase" }}>
+                  Next · {formatTime(nextEvent.start_datetime)}
+                </div>
                 <div
-                  key={e.id}
                   style={{
                     fontSize: "0.8125rem",
-                    display: "flex",
-                    gap: "0.5rem",
+                    fontWeight: 500,
+                    color: "var(--color-foreground)",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
                   }}
                 >
-                  <span style={{ color: "var(--color-foreground-muted)", minWidth: "45px" }}>
-                    {formatTime(e.start_datetime)}
-                  </span>
-                  <span style={{ fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {e.title}
-                  </span>
+                  {nextEvent.title}
                 </div>
-              ))}
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <div
+                style={{
+                  width: "32px",
+                  height: "32px",
+                  borderRadius: "8px",
+                  background: "var(--color-surface)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "var(--color-muted)",
+                  flexShrink: 0,
+                }}
+              >
+                <Sunrise size={16} />
+              </div>
+              <div style={{ fontSize: "0.75rem", color: "var(--color-muted)" }}>
+                No upcoming events
+              </div>
             </div>
           )}
         </div>
-      </div>
-    </Widget>
+      )}
+    </div>
   );
 }
