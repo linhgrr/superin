@@ -21,7 +21,7 @@ export function UpcomingWidget({ maxItems = 5, calendarFilter }: UpcomingWidgetP
       const now = new Date().toISOString();
       const end = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // 7 days from now
 
-      let evts = await listEvents(now, end, calendarFilter || undefined, maxItems);
+      const evts = await listEvents(now, end, calendarFilter || undefined, maxItems);
       setEvents(evts.slice(0, maxItems));
     } finally {
       setIsLoading(false);
@@ -29,10 +29,10 @@ export function UpcomingWidget({ maxItems = 5, calendarFilter }: UpcomingWidgetP
   }
 
   return (
-    <Widget title="Sự kiện sắp tới" isLoading={isLoading}>
+    <Widget title="Upcoming Events" isLoading={isLoading}>
       {events.length === 0 ? (
         <div style={{ padding: "1rem", textAlign: "center", color: "var(--color-foreground-muted)" }}>
-          Không có sự kiện nào
+          No events
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
@@ -50,7 +50,7 @@ export function UpcomingWidget({ maxItems = 5, calendarFilter }: UpcomingWidgetP
             >
               <div style={{ fontWeight: 500, fontSize: "0.875rem" }}>{event.title}</div>
               <div style={{ fontSize: "0.75rem", color: "var(--color-foreground-muted)" }}>
-                {new Date(event.start_datetime).toLocaleString("vi-VN", {
+                {new Date(event.start_datetime).toLocaleString("en-US", {
                   weekday: "short",
                   month: "short",
                   day: "numeric",

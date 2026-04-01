@@ -51,12 +51,12 @@ export function MonthViewWidget({ defaultCalendar, showTimeBlockedTasks = true }
   const startOffset = firstDay === 0 ? 6 : firstDay - 1;
 
   const monthNames = [
-    "Tháng 1", "Tháng 2", "Tháng 3", "Tháng 4",
-    "Tháng 5", "Tháng 6", "Tháng 7", "Tháng 8",
-    "Tháng 9", "Tháng 10", "Tháng 11", "Tháng 12",
+    "January", "February", "March", "April",
+    "May", "June", "July", "August",
+    "September", "October", "November", "December",
   ];
 
-  const dayNames = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
+  const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
   // Group events by date
   const eventsByDay = events.reduce((acc, event) => {

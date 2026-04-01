@@ -39,7 +39,7 @@ export function DaySummaryWidget() {
   }
 
   const formatTime = (dateStr: string) =>
-    new Date(dateStr).toLocaleTimeString("vi-VN", {
+    new Date(dateStr).toLocaleTimeString("en-US", {
       hour: "2-digit",
       minute: "2-digit",
     });
@@ -57,11 +57,11 @@ export function DaySummaryWidget() {
               marginBottom: "0.5rem",
             }}
           >
-            Hôm nay ({todayEvents.length} sự kiện)
+            Today ({todayEvents.length} events)
           </div>
           {todayEvents.length === 0 ? (
             <div style={{ fontSize: "0.8125rem", color: "var(--color-foreground-muted)" }}>
-              Không có sự kiện
+              No events
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>
@@ -84,7 +84,7 @@ export function DaySummaryWidget() {
               ))}
               {todayEvents.length > 3 && (
                 <div style={{ fontSize: "0.75rem", color: "var(--color-foreground-muted)", marginTop: "0.25rem" }}>
-                  +{todayEvents.length - 3} sự kiện khác
+                  +{todayEvents.length - 3} more
                 </div>
               )}
             </div>
@@ -101,11 +101,11 @@ export function DaySummaryWidget() {
               marginBottom: "0.5rem",
             }}
           >
-            Ngày mai ({tomorrowEvents.length} sự kiện)
+            Tomorrow ({tomorrowEvents.length} events)
           </div>
           {tomorrowEvents.length === 0 ? (
             <div style={{ fontSize: "0.8125rem", color: "var(--color-foreground-muted)" }}>
-              Không có sự kiện
+              No events
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>

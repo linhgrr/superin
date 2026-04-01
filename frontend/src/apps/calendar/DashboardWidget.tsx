@@ -9,9 +9,6 @@ interface DashboardWidgetProps {
 }
 
 export default function DashboardWidget({ widgetId }: DashboardWidgetProps) {
-  // Extract config from widget.config if available
-  const config = widgetId.startsWith("calendar.") ? {} : {};
-
   switch (widgetId) {
     case "calendar.month-view":
       return <MonthViewWidget />;
