@@ -338,6 +338,187 @@ class FinanceService:
             "wallet_count": len(wallets),
         }
 
+    # ─── Budget Monitoring ──────────────────────────────────────────────────────
+
+    async def check_budget(self, user_id: str, category_id: str | None = None) -> dict:
+        """Check spending vs budget for categories."""
+        now = datetime.utcnow()
+        start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+        categories = await self.categories.find_by_user(user_id)
+        txs = await self.transactions.find_by_user(user_id, type_="expense", skip=0, limit=10000)
+        month_txs = [t for t in txs if t.date >= start_of_month]
+
+        # If specific category requested
+        if category_id:
+            cat = await self.categories.find_by_id(category_id, user_id)
+            if not cat:
+                raise ValueError("Category not found")
+
+            spent = sum(t.amount for t in month_txs if str(t.category_id) == category_id)
+            budget = cat.budget
+            remaining = budget - spent if budget > 0 else None
+            percentage = (spent / budget * 100) if budget > 0 else None
+
+            return {
+                "category_id": category_id,
+                "category_name": cat.name,
+                "budget": budget,
+                "spent": round(spent, 2),
+                "remaining": round(remaining, 2) if remaining is not None else None,
+                "percentage_used": round(percentage, 1) if percentage is not None else None,
+                "over_budget": spent > budget if budget > 0 else False,
+            }
+
+        # All categories overview
+        results = []
+        total_budget = 0
+        total_spent = 0
+
+        for cat in categories:
+            cat_spent = sum(t.amount for t in month_txs if str(t.category_id) == str(cat.id))
+            total_budget += cat.budget
+            total_spent += cat_spent
+
+            if cat.budget > 0:
+                results.append({
+                    "category_id": str(cat.id),
+                    "category_name": cat.name,
+                    "budget": cat.budget,
+                    "spent": round(cat_spent, 2),
+                    "remaining": round(cat.budget - cat_spent, 2),
+                    "percentage_used": round(cat_spent / cat.budget * 100, 1),
+                    "over_budget": cat_spent > cat.budget,
+                })
+
+        return {
+            "categories": results,
+            "total_budget": total_budget,
+            "total_spent": round(total_spent, 2),
+            "month": now.month,
+            "year": now.year,
+        }
+
+    # ─── Transaction Search ─────────────────────────────────────────────────────
+
+    async def search_transactions(
+        self,
+        user_id: str,
+        query: str | None = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+        limit: int = 20,
+    ) -> list[dict]:
+        """Search transactions by keyword or date range."""
+        txs = await self.transactions.find_by_user(user_id, skip=0, limit=10000)
+
+        filtered = txs
+
+        # Filter by date range
+        if start_date:
+            filtered = [t for t in filtered if t.date >= start_date]
+        if end_date:
+            filtered = [t for t in filtered if t.date <= end_date]
+
+        # Filter by keyword in note
+        if query:
+            query_lower = query.lower()
+            filtered = [
+                t for t in filtered
+                if (t.note and query_lower in t.note.lower())
+                or query_lower in str(t.amount)
+                or query_lower in t.type
+            ]
+
+        return [_tx_to_dict(t) for t in filtered[:limit]]
+
+    # ─── Statistics & Analytics ───────────────────────────────────────────────────
+
+    async def get_category_breakdown(self, user_id: str, month: int | None = None, year: int | None = None) -> dict:
+        """Get spending breakdown by category for a specific month."""
+        now = datetime.utcnow()
+        target_month = month if month else now.month
+        target_year = year if year else now.year
+
+        # Get date range
+        start_date = datetime(target_year, target_month, 1)
+        if target_month == 12:
+            end_date = datetime(target_year + 1, 1, 1)
+        else:
+            end_date = datetime(target_year, target_month + 1, 1)
+
+        txs = await self.transactions.find_by_user(user_id, type_="expense", skip=0, limit=10000)
+        month_txs = [t for t in txs if start_date <= t.date < end_date]
+
+        categories = await self.categories.find_by_user(user_id)
+        cat_map = {str(c.id): c.name for c in categories}
+
+        # Aggregate by category
+        breakdown = {}
+        total = 0
+        for t in month_txs:
+            cat_name = cat_map.get(str(t.category_id), "Uncategorized")
+            breakdown[cat_name] = breakdown.get(cat_name, 0) + t.amount
+            total += t.amount
+
+        # Sort by amount descending
+        sorted_breakdown = sorted(
+            [{"category": k, "amount": round(v, 2), "percentage": round(v/total*100, 1) if total > 0 else 0}
+             for k, v in breakdown.items()],
+            key=lambda x: x["amount"],
+            reverse=True
+        )
+
+        return {
+            "month": target_month,
+            "year": target_year,
+            "total_spending": round(total, 2),
+            "breakdown": sorted_breakdown,
+            "category_count": len(breakdown),
+        }
+
+    async def get_monthly_trend(self, user_id: str, months: int = 6) -> dict:
+        """Get income/expense trend over recent months."""
+        txs = await self.transactions.find_by_user(user_id, skip=0, limit=10000)
+
+        # Group by month
+        monthly_data = {}
+        for t in txs:
+            key = (t.date.year, t.date.month)
+            if key not in monthly_data:
+                monthly_data[key] = {"income": 0, "expense": 0}
+            if t.type == "income":
+                monthly_data[key]["income"] += t.amount
+            else:
+                monthly_data[key]["expense"] += t.amount
+
+        # Get last N months
+        sorted_months = sorted(monthly_data.keys(), reverse=True)[:months]
+        trend = []
+        for year, month in sorted_months:
+            data = monthly_data[(year, month)]
+            trend.append({
+                "year": year,
+                "month": month,
+                "income": round(data["income"], 2),
+                "expense": round(data["expense"], 2),
+                "net": round(data["income"] - data["expense"], 2),
+            })
+
+        # Calculate averages
+        if trend:
+            avg_income = sum(m["income"] for m in trend) / len(trend)
+            avg_expense = sum(m["expense"] for m in trend) / len(trend)
+        else:
+            avg_income = avg_expense = 0
+
+        return {
+            "trend": trend,
+            "average_income": round(avg_income, 2),
+            "average_expense": round(avg_expense, 2),
+            "average_net": round(avg_income - avg_expense, 2),
+        }
+
     # ─── Install / Uninstall hooks ──────────────────────────────────────────────
 
     async def on_install(self, user_id: str) -> None:

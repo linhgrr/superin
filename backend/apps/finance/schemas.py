@@ -1,7 +1,8 @@
 """Finance plugin Pydantic request/response schemas."""
 
 from datetime import datetime
-from typing import Literal, Optional
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -23,11 +24,11 @@ class CreateTransactionRequest(BaseModel):
     type: Literal["income", "expense"]
     amount: float = Field(gt=0)
     date: datetime
-    note: Optional[str] = None
+    note: str | None = None
 
 
 class TransferRequest(BaseModel):
     from_wallet_id: str
     to_wallet_id: str
     amount: float = Field(gt=0)
-    note: Optional[str] = None
+    note: str | None = None

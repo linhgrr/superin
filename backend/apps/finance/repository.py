@@ -1,11 +1,11 @@
 """Finance plugin data access layer — Beanie queries only, no business logic."""
 
 from datetime import datetime
-from typing import Literal, Sequence
+from typing import Literal
 
 from beanie import PydanticObjectId
 
-from apps.finance.models import Wallet, Transaction, Category
+from apps.finance.models import Category, Transaction, Wallet
 
 
 class WalletRepository:

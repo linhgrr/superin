@@ -560,3 +560,149 @@ async def finance_get_summary() -> dict:
         return await finance_service.get_summary(user_id)
 
     return await safe_tool_call(operation, action="getting financial summary")
+
+
+# ─── Budget Monitoring ─────────────────────────────────────────────────────────
+
+@tool
+async def finance_check_budget(category_id: str | None = None) -> dict:
+    """
+    Check spending vs budget for categories.
+
+    Use when:
+    - User asks about their budget status
+    - "Am I over budget on food?"
+    - "How much can I still spend on entertainment?"
+    - Want to see all budget categories overview
+
+    Args:
+        category_id: Specific category to check (optional).
+                     If not provided, returns all categories with budgets.
+
+    Returns:
+        For single category:
+        - budget, spent, remaining, percentage_used, over_budget flag
+        For all categories:
+        - List of categories with budgets, total_budget, total_spent
+
+    Examples:
+        - "Check my food budget" → category_id="food_cat_id"
+        - "How am I doing with budgets?" → no category_id
+        - "Did I exceed my entertainment budget?"
+    """
+    async def operation() -> dict:
+        user_id = get_user_context()
+        return await finance_service.check_budget(user_id, category_id)
+
+    return await safe_tool_call(operation, action="checking budget")
+
+
+# ─── Transaction Search ────────────────────────────────────────────────────────
+
+@tool
+async def finance_search_transactions(
+    query: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    limit: int = 20,
+) -> list[dict]:
+    """
+    Search transactions by keyword or date range.
+
+    Use when:
+    - User wants to find specific transactions
+    - Searching by description/note
+    - Looking for transactions in a date range
+    - "Find my coffee purchases"
+
+    Args:
+        query: Search term to look for in notes/descriptions
+        start_date: Start date in ISO format (e.g., "2025-01-01")
+        end_date: End date in ISO format (e.g., "2025-01-31")
+        limit: Maximum results (default 20)
+
+    Returns:
+        List of matching transactions
+
+    Examples:
+        - "Find transactions with coffee" → query="coffee"
+        - "Show me last week's expenses" → start_date="2025-03-25", end_date="2025-04-01"
+        - "Search for salary in January" → query="salary", start_date="2025-01-01", end_date="2025-01-31"
+    """
+    async def operation() -> list[dict]:
+        user_id = get_user_context()
+        start_dt = datetime.fromisoformat(start_date) if start_date else None
+        end_dt = datetime.fromisoformat(end_date) if end_date else None
+        return await finance_service.search_transactions(
+            user_id, query, start_dt, end_dt, limit
+        )
+
+    return await safe_tool_call(operation, action="searching transactions")
+
+
+# ─── Statistics & Analytics ────────────────────────────────────────────────────
+
+@tool
+async def finance_get_category_breakdown(
+    month: int | None = None,
+    year: int | None = None,
+) -> dict:
+    """
+    Get spending breakdown by category for a specific month.
+
+    Use when:
+    - User wants to see where money went
+    - "What did I spend the most on?"
+    - Analyzing spending patterns by category
+
+    Args:
+        month: Month number (1-12), defaults to current month
+        year: Year, defaults to current year
+
+    Returns:
+        - Total spending for the month
+        - Breakdown by category with amounts and percentages
+        - Categories sorted by spending (highest first)
+
+    Examples:
+        - "What did I spend on in March?" → month=3
+        - "Show my spending breakdown" → current month
+        - "Category spending last month" → month=previous
+    """
+    async def operation() -> dict:
+        user_id = get_user_context()
+        return await finance_service.get_category_breakdown(user_id, month, year)
+
+    return await safe_tool_call(operation, action="getting category breakdown")
+
+
+@tool
+async def finance_get_monthly_trend(months: int = 6) -> dict:
+    """
+    Get income and expense trend over recent months.
+
+    Use when:
+    - User wants to see financial trends over time
+    - "Am I spending more each month?"
+    - "How has my income changed?"
+    - Financial health check over time
+
+    Args:
+        months: Number of months to look back (default 6, max 12)
+
+    Returns:
+        - Monthly trend with income, expense, net for each month
+        - Averages over the period
+        - Sorted from most recent
+
+    Examples:
+        - "Show my spending trend" → months=6
+        - "How have I been doing the last 3 months?" → months=3
+        - "Yearly trend" → months=12
+    """
+    async def operation() -> dict:
+        user_id = get_user_context()
+        capped_months = min(months, 12)  # Cap at 12 months
+        return await finance_service.get_monthly_trend(user_id, capped_months)
+
+    return await safe_tool_call(operation, action="getting monthly trend")

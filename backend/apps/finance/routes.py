@@ -1,6 +1,8 @@
 """Finance plugin FastAPI routes — thin layer calling finance_service."""
 
 
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from apps.finance.schemas import (
@@ -216,6 +218,53 @@ async def delete_transaction(
         return await finance_service.delete_transaction(transaction_id, user_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+# ─── Search ────────────────────────────────────────────────────────────────────
+
+@router.get("/transactions/search")
+async def search_transactions(
+    query: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    limit: int = Query(20, le=100),
+    user_id: str = Depends(get_current_user),
+):
+    """Search transactions by keyword or date range."""
+    return await finance_service.search_transactions(user_id, query, start_date, end_date, limit)
+
+
+# ─── Budget & Analytics ─────────────────────────────────────────────────────────
+
+@router.get("/budget/check")
+async def check_budget(
+    category_id: str | None = None,
+    user_id: str = Depends(get_current_user),
+):
+    """Check spending vs budget for categories."""
+    try:
+        return await finance_service.check_budget(user_id, category_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get("/analytics/category-breakdown")
+async def get_category_breakdown(
+    month: int | None = Query(None, ge=1, le=12),
+    year: int | None = Query(None, ge=2020, le=2100),
+    user_id: str = Depends(get_current_user),
+):
+    """Get spending breakdown by category."""
+    return await finance_service.get_category_breakdown(user_id, month, year)
+
+
+@router.get("/analytics/monthly-trend")
+async def get_monthly_trend(
+    months: int = Query(6, ge=1, le=12),
+    user_id: str = Depends(get_current_user),
+):
+    """Get income/expense trend over recent months."""
+    return await finance_service.get_monthly_trend(user_id, months)
 
 
 # ─── Preferences (required by platform) ─────────────────────────────────────────

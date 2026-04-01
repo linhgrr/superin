@@ -2,10 +2,9 @@
 
 from shared.schemas import (
     AppManifestSchema,
-    WidgetManifestSchema,
     ConfigFieldSchema,
+    WidgetManifestSchema,
 )
-
 
 wallet_widget = WidgetManifestSchema(
     id="finance.total-balance",
@@ -45,21 +44,37 @@ recent_tx_widget = WidgetManifestSchema(
 finance_manifest = AppManifestSchema(
     id="finance",
     name="Finance",
-    version="1.0.0",
-    description="Track spending, budgets, and wallets",
+    version="1.1.0",
+    description="Track spending, budgets, and wallets with analytics",
     icon="Wallet",
     color="oklch(0.72 0.19 145)",
     widgets=[wallet_widget, budget_widget, recent_tx_widget],
-    agent_description="Helps users track expenses, manage budgets, create wallets, and analyze spending patterns.",
+    agent_description="Helps users track expenses, manage budgets, create wallets, analyze spending patterns, and monitor financial trends.",
     tools=[
-        "finance_add_transaction",
         "finance_list_wallets",
+        "finance_get_wallet",
         "finance_create_wallet",
+        "finance_update_wallet",
+        "finance_delete_wallet",
         "finance_list_categories",
+        "finance_get_category",
+        "finance_create_category",
+        "finance_update_category",
+        "finance_delete_category",
         "finance_list_transactions",
+        "finance_get_transaction",
+        "finance_search_transactions",
+        "finance_add_transaction",
+        "finance_update_transaction",
+        "finance_delete_transaction",
+        "finance_transfer",
+        "finance_check_budget",
+        "finance_get_category_breakdown",
+        "finance_get_monthly_trend",
+        "finance_get_summary",
     ],
     models=["Wallet", "Transaction", "Category"],
     category="finance",
-    tags=["finance", "budget", "wallets", "transactions"],
+    tags=["finance", "budget", "wallets", "transactions", "analytics"],
     author="Shin Team",
 )
