@@ -2,14 +2,18 @@
 
 from langchain_core.tools import BaseTool
 
+from apps.todo.prompts import get_todo_prompt
+from apps.todo.service import task_service
 from apps.todo.tools import (
     todo_add_task,
     todo_complete_task,
     todo_delete_task,
+    todo_get_summary,
+    todo_get_task,
     todo_list_tasks,
+    todo_toggle_task,
+    todo_update_task,
 )
-from apps.todo.prompts import get_todo_prompt
-from apps.todo.service import task_service
 from core.agents.base_app import BaseAppAgent
 from shared.agent_context import set_user_context
 
@@ -23,8 +27,12 @@ class TodoAgent(BaseAppAgent):
         return [
             todo_add_task,
             todo_list_tasks,
+            todo_get_task,
+            todo_update_task,
+            todo_toggle_task,
             todo_complete_task,
             todo_delete_task,
+            todo_get_summary,
         ]
 
     def build_prompt(self) -> str:
