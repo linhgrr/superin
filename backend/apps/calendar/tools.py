@@ -1,4 +1,11 @@
-"""Calendar plugin LangGraph tools."""
+"""Calendar plugin LangGraph tools - Consolidated Design.
+
+Following tool design principles:
+- Consolidate related operations (create + conflict check)
+- Split by workflow (reschedule vs edit metadata)
+- Clear examples in docstrings
+- Return structured data for agent decision-making
+"""
 
 from datetime import datetime
 from typing import Literal
@@ -9,102 +16,12 @@ from apps.calendar.service import calendar_service
 from shared.agent_context import get_user_context
 from shared.tool_results import safe_tool_call
 
-# ─── Core Event Tools ─────────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════════════
+# EVENT MANAGEMENT - CONSOLIDATED
+# ═══════════════════════════════════════════════════════════════════════════════
 
 @tool
-async def calendar_list_events(
-    start: str | None = None,
-    end: str | None = None,
-    calendar_id: str | None = None,
-    limit: int = 100,
-) -> list[dict]:
-    """
-    List calendar events with optional time range and calendar filters.
-
-    Use when:
-    - User asks to see their calendar
-    - "What's on my schedule?"
-    - "Show me events for next week"
-
-    Args:
-        start: Start datetime in ISO format (optional, default: now)
-        end: End datetime in ISO format (optional)
-        calendar_id: Filter by specific calendar (optional)
-        limit: Max events to return (default 100)
-
-    Returns:
-        List of events with id, title, start/end times, type
-
-    Examples:
-        - "What's on my calendar today?" → start="today", end="today+1day"
-        - "Show work events" → calendar_id="work_calendar_id"
-    """
-    async def operation() -> list[dict]:
-        user_id = get_user_context()
-        start_dt = datetime.fromisoformat(start) if start else datetime.utcnow()
-        end_dt = datetime.fromisoformat(end) if end else None
-        return await calendar_service.list_events(user_id, start_dt, end_dt, calendar_id, limit)
-
-    return await safe_tool_call(operation, action="listing events")
-
-
-@tool
-async def calendar_search_events(
-    query: str,
-    limit: int = 20,
-) -> list[dict]:
-    """
-    Search events by title, description, or location.
-
-    Use when:
-    - User wants to find a specific event
-    - "Find my meeting with John"
-    - "Search for dentist appointment"
-
-    Args:
-        query: Search term (searches title, description, location)
-        limit: Max results (default 20)
-
-    Returns:
-        List of matching events
-    """
-    async def operation() -> list[dict]:
-        user_id = get_user_context()
-        return await calendar_service.search_events(user_id, query, limit)
-
-    return await safe_tool_call(operation, action="searching events")
-
-
-@tool
-async def calendar_get_event(event_id: str) -> dict:
-    """
-    Get full details of a single event.
-
-    Use when:
-    - User asks about a specific event by ID
-    - Need complete event info including attendees, reminders
-
-    Args:
-        event_id: Event unique identifier
-
-    Returns:
-        Complete event details
-
-    Errors:
-        NOT_FOUND: Event ID does not exist
-    """
-    async def operation() -> dict:
-        user_id = get_user_context()
-        event = await calendar_service.get_event(event_id, user_id)
-        if not event:
-            raise ValueError(f"Event '{event_id}' not found")
-        return event
-
-    return await safe_tool_call(operation, action="getting event")
-
-
-@tool
-async def calendar_create_event(
+async def calendar_schedule_event(
     title: str,
     start: str,
     end: str,
@@ -116,17 +33,20 @@ async def calendar_create_event(
     task_id: str | None = None,
     color: str | None = None,
     reminders: list[int] | None = None,
+    allow_conflicts: bool = False,
 ) -> dict:
     """
-    Create a new calendar event with optional conflict detection.
+    Create a calendar event with automatic conflict detection.
 
     Use when:
-    - User wants to add an event to their calendar
+    - User wants to schedule/schedule anything
     - "Schedule a meeting tomorrow 2pm"
     - "Add dentist appointment next Friday"
+    - "Block 2 hours for the project"
 
-    IMPORTANT: Before creating, consider checking conflicts with calendar_check_conflicts
-    to warn user about overlapping events.
+    This tool automatically checks for conflicts BEFORE creating. It returns:
+    - The created event (if no conflicts or allow_conflicts=True)
+    - List of conflicting events (if any found)
 
     Args:
         title: Event name (required)
@@ -140,131 +60,313 @@ async def calendar_create_event(
         task_id: If type="time_blocked_task", link to Todo task ID
         color: Custom color override (optional)
         reminders: Minutes before to remind [15, 60] (optional)
+        allow_conflicts: If True, create even with conflicts (default: False)
 
     Returns:
-        Created event with id
+        {
+            "success": True,
+            "event": {...},
+            "conflicts": [...],  # Empty if no conflicts
+            "had_conflicts": False  # True if conflicts were detected
+        }
 
-    Errors:
-        INVALID_TIME: End must be after start
-        CALENDAR_NOT_FOUND: Invalid calendar_id
+    Examples:
+        - "Schedule meeting tomorrow 2-3pm":
+          → start="2025-04-02T14:00", end="2025-04-02T15:00", calendar_id="..."
+
+        - "Add lunch with John Friday" (if busy, will warn about conflicts):
+          → title="Lunch with John", start="...", end="..."
+          → Tool returns conflicts, agent asks user to confirm
     """
     async def operation() -> dict:
         user_id = get_user_context()
         start_dt = datetime.fromisoformat(start)
         end_dt = datetime.fromisoformat(end)
-        return await calendar_service.create_event(
-            user_id, title, start_dt, end_dt, calendar_id,
-            description, location, is_all_day, type_, task_id, color, reminders
+
+        # Check for conflicts first
+        conflicts = await calendar_service.check_conflicts(
+            user_id, start_dt, end_dt, exclude_event_id=None
         )
 
-    return await safe_tool_call(operation, action="creating event")
+        if conflicts and not allow_conflicts:
+            # Return conflicts without creating - let agent decide
+            return {
+                "success": False,
+                "event": None,
+                "conflicts": conflicts,
+                "had_conflicts": True,
+                "message": f"Found {len(conflicts)} conflicting events. Set allow_conflicts=True to schedule anyway."
+            }
+
+        # No conflicts or user allows conflicts - create the event
+        event = await calendar_service.create_event(
+            user_id=user_id,
+            title=title,
+            start_datetime=start_dt,
+            end_datetime=end_dt,
+            calendar_id=calendar_id,
+            description=description,
+            location=location,
+            is_all_day=is_all_day,
+            type_=type_,
+            task_id=task_id,
+            color=color,
+            reminders=reminders,
+        )
+
+        return {
+            "success": True,
+            "event": event,
+            "conflicts": conflicts if conflicts else [],
+            "had_conflicts": len(conflicts) > 0,
+        }
+
+    return await safe_tool_call(operation, action="scheduling event")
 
 
 @tool
-async def calendar_update_event(
+async def calendar_reschedule_event(
+    event_id: str,
+    new_start: str,
+    new_end: str,
+    allow_conflicts: bool = False,
+) -> dict:
+    """
+    Move an event to a different time/day.
+
+    Use when:
+    - User wants to move/change event time
+    - "Move my meeting to 3pm"
+    - "Reschedule tomorrow's dentist to next week"
+    - "Push the standup 30 minutes later"
+
+    Automatically checks for conflicts at the new time. Returns both the
+    updated event and any conflicts found.
+
+    Args:
+        event_id: Event to reschedule (required)
+        new_start: New start datetime ISO format (required)
+        new_end: New end datetime ISO format (required)
+        allow_conflicts: If True, move even with conflicts (default: False)
+
+    Returns:
+        {
+            "success": True,
+            "event": {...},
+            "conflicts": [...],
+            "had_conflicts": False
+        }
+
+    Examples:
+        - "Move my 2pm meeting to 3pm":
+          → event_id="...", new_start="2025-04-02T15:00", new_end="2025-04-02T16:00"
+
+        - "Reschedule standup to tomorrow morning":
+          → event_id="standup_id", new_start="2025-04-02T09:00", new_end="2025-04-02T09:15"
+    """
+    async def operation() -> dict:
+        user_id = get_user_context()
+        new_start_dt = datetime.fromisoformat(new_start)
+        new_end_dt = datetime.fromisoformat(new_end)
+
+        # Check for conflicts at new time (excluding this event)
+        conflicts = await calendar_service.check_conflicts(
+            user_id, new_start_dt, new_end_dt, exclude_event_id=event_id
+        )
+
+        if conflicts and not allow_conflicts:
+            return {
+                "success": False,
+                "event": None,
+                "conflicts": conflicts,
+                "had_conflicts": True,
+                "message": f"New time conflicts with {len(conflicts)} events. Set allow_conflicts=True to reschedule anyway."
+            }
+
+        # Update the event
+        updated = await calendar_service.update_event(
+            event_id=event_id,
+            user_id=user_id,
+            start_datetime=new_start_dt,
+            end_datetime=new_end_dt,
+        )
+
+        return {
+            "success": True,
+            "event": updated,
+            "conflicts": conflicts if conflicts else [],
+            "had_conflicts": len(conflicts) > 0,
+        }
+
+    return await safe_tool_call(operation, action="rescheduling event")
+
+
+@tool
+async def calendar_edit_event(
     event_id: str,
     title: str | None = None,
-    start: str | None = None,
-    end: str | None = None,
-    calendar_id: str | None = None,
     description: str | None = None,
     location: str | None = None,
+    calendar_id: str | None = None,
     color: str | None = None,
     reminders: list[int] | None = None,
 ) -> dict:
     """
-    Update an existing event's details.
+    Edit event metadata (title, description, location, etc.) without changing time.
 
     Use when:
-    - User wants to change event details
-    - "Move my meeting to 3pm"
-    - "Change the location"
+    - User wants to change event details (NOT time)
+    - "Rename meeting to 'Client Call - ABC Corp'"
+    - "Add location: Conference Room B"
+    - "Change the meeting description"
+    - "Move this event to my Work calendar"
+
+    Note: This tool does NOT change event time. Use calendar_reschedule_event
+    for time changes (as that requires conflict checking).
 
     Args:
-        event_id: Event to update (required)
-        title, start, end, etc.: New values (only provided fields updated)
+        event_id: Event to edit (required)
+        title: New title (optional)
+        description: New description (optional)
+        location: New location (optional)
+        calendar_id: Move to different calendar (optional)
+        color: New color (optional)
+        reminders: New reminder minutes [15, 60] (optional)
 
     Returns:
         Updated event details
 
-    Note: If changing time, consider checking conflicts first.
+    Examples:
+        - "Add Zoom link to the description":
+          → event_id="...", description="https://zoom.us/j/..."
+
+        - "Change location to Room 302":
+          → event_id="...", location="Room 302"
     """
     async def operation() -> dict:
         user_id = get_user_context()
-        kwargs = {"title": title, "description": description, "location": location, "color": color, "reminders": reminders}
-        if start:
-            kwargs["start_datetime"] = datetime.fromisoformat(start)
-        if end:
-            kwargs["end_datetime"] = datetime.fromisoformat(end)
-        if calendar_id:
-            kwargs["calendar_id"] = calendar_id
+
+        kwargs = {
+            "title": title,
+            "description": description,
+            "location": location,
+            "calendar_id": calendar_id,
+            "color": color,
+            "reminders": reminders,
+        }
         # Remove None values
         kwargs = {k: v for k, v in kwargs.items() if v is not None}
+
         return await calendar_service.update_event(event_id, user_id, **kwargs)
 
-    return await safe_tool_call(operation, action="updating event")
+    return await safe_tool_call(operation, action="editing event")
 
 
 @tool
-async def calendar_delete_event(event_id: str) -> dict:
+async def calendar_cancel_event(
+    event_id: str,
+    permanent: bool = True,
+) -> dict:
     """
-    Delete an event permanently.
+    Cancel (delete) an event.
 
     Use when:
     - User wants to cancel/remove an event
-    - "Delete my meeting tomorrow"
+    - "Cancel my meeting tomorrow"
+    - "Delete the dentist appointment"
+    - "Remove that event"
 
     Args:
-        event_id: Event to delete
+        event_id: Event to cancel (required)
+        permanent: If True, permanently delete (default: True)
+                   If False, mark as cancelled but keep visible
 
     Returns:
         Success confirmation
 
-    Warning: Cannot be undone.
+    Examples:
+        - "Cancel my 2pm": → event_id="..."
+        - "Delete the recurring meeting": → event_id="..."
     """
     async def operation() -> dict:
         user_id = get_user_context()
-        return await calendar_service.delete_event(event_id, user_id)
+        result = await calendar_service.delete_event(event_id, user_id)
+        return {
+            "success": True,
+            "deleted": result.get("success", True),
+            "id": event_id,
+        }
 
-    return await safe_tool_call(operation, action="deleting event")
+    return await safe_tool_call(operation, action="cancelling event")
 
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# EVENT SEARCH & LISTING
+# ═══════════════════════════════════════════════════════════════════════════════
 
 @tool
-async def calendar_check_conflicts(
-    start: str,
-    end: str,
-    exclude_event_id: str | None = None,
+async def calendar_find_events(
+    query: str | None = None,
+    start: str | None = None,
+    end: str | None = None,
+    calendar_id: str | None = None,
+    limit: int = 20,
 ) -> list[dict]:
     """
-    Check for conflicting events in a time range.
+    Find events by search query OR time range OR calendar.
 
     Use when:
-    - Before creating/updating an event to warn about conflicts
-    - "Am I free at 2pm?"
-    - "Check if I have anything at that time"
+    - User asks to see their calendar
+    - "What's on my schedule?"
+    - "Find my meeting with John"
+    - "Show me events for next week"
+    - "What do I have on Friday?"
+
+    This is the primary discovery tool. It combines search + listing:
+    - If query provided: searches title/description/location
+    - If time range provided: filters by date range
+    - If calendar_id provided: filters to that calendar
 
     Args:
-        start: Start datetime ISO format
-        end: End datetime ISO format
-        exclude_event_id: Event to exclude (when checking update)
+        query: Search term (searches title, description, location)
+        start: Start datetime ISO format (optional, for time range)
+        end: End datetime ISO format (optional, for time range)
+        calendar_id: Filter by specific calendar (optional)
+        limit: Max results (default 20)
 
     Returns:
-        List of conflicting events (empty if no conflicts)
+        List of events with id, title, start/end times, calendar
 
     Examples:
-        - Before creating: Check conflicts → if found, warn user
-        - "Check my availability Friday afternoon"
+        - "What's on my calendar today?":
+          → start="2025-04-01T00:00", end="2025-04-01T23:59"
+
+        - "Find my meeting with John":
+          → query="John"
+
+        - "Show work events next week":
+          → calendar_id="work_id", start="2025-04-07", end="2025-04-13"
     """
     async def operation() -> list[dict]:
         user_id = get_user_context()
-        start_dt = datetime.fromisoformat(start)
-        end_dt = datetime.fromisoformat(end)
-        return await calendar_service.check_conflicts(user_id, start_dt, end_dt, exclude_event_id)
 
-    return await safe_tool_call(operation, action="checking conflicts")
+        # If query provided, do search
+        if query:
+            return await calendar_service.search_events(user_id, query, limit)
+
+        # Otherwise do time-based listing
+        start_dt = datetime.fromisoformat(start) if start else None
+        end_dt = datetime.fromisoformat(end) if end else None
+        return await calendar_service.list_events(
+            user_id, start_dt, end_dt, calendar_id, limit
+        )
+
+    return await safe_tool_call(operation, action="finding events")
 
 
-# ─── Calendar Management ───────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════════════
+# CALENDAR MANAGEMENT
+# ═══════════════════════════════════════════════════════════════════════════════
 
 @tool
 async def calendar_list_calendars() -> list[dict]:
@@ -275,9 +377,14 @@ async def calendar_list_calendars() -> list[dict]:
     - User asks about their calendars
     - Need to show available calendars for creating events
     - "What calendars do I have?"
+    - "Show my calendars"
 
     Returns:
         List of calendars with id, name, color, is_default
+
+    Examples:
+        - "What calendars do I have?" → Returns all calendars
+        - "Which calendar should I use?" → Call this, then suggest default
     """
     async def operation() -> list[dict]:
         user_id = get_user_context()
@@ -286,10 +393,12 @@ async def calendar_list_calendars() -> list[dict]:
     return await safe_tool_call(operation, action="listing calendars")
 
 
-# ─── Recurring Events ─────────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════════════
+# RECURRING EVENTS
+# ═══════════════════════════════════════════════════════════════════════════════
 
 @tool
-async def calendar_create_recurring(
+async def calendar_make_recurring(
     event_id: str,
     frequency: Literal["daily", "weekly", "monthly", "yearly"],
     interval: int = 1,
@@ -298,67 +407,94 @@ async def calendar_create_recurring(
     max_occurrences: int | None = None,
 ) -> dict:
     """
-    Make an event repeat automatically (recurring).
+    Make an event repeat automatically (create recurring series).
 
     Use when:
     - User wants an event to repeat
     - "Make this a weekly meeting"
     - "Repeat daily for 30 days"
+    - "This should happen every Monday and Wednesday"
 
     Args:
-        event_id: Event to use as template (required)
+        event_id: Event to use as template for the series (required)
         frequency: How often - "daily", "weekly", "monthly", "yearly"
-        interval: Every N frequencies (default: 1)
+        interval: Every N frequencies (default: 1, e.g., every 2 weeks)
         days_of_week: For weekly - which days [0=Monday, 6=Sunday]
         end_date: When to stop repeating (ISO format, optional)
         max_occurrences: Max times to repeat (optional)
 
     Returns:
-        Created recurring rule
+        Created recurring rule details
 
     Examples:
-        - "Weekly team meeting on Mondays" → frequency="weekly", days_of_week=[0]
-        - "Daily for 2 weeks" → frequency="daily", max_occurrences=14
+        - "Weekly team meeting on Mondays":
+          → event_id="...", frequency="weekly", days_of_week=[0]
+
+        - "Daily standup for 2 weeks":
+          → event_id="...", frequency="daily", max_occurrences=10
+
+        - "Bi-weekly sync":
+          → event_id="...", frequency="weekly", interval=2
     """
     async def operation() -> dict:
         user_id = get_user_context()
         end_dt = datetime.fromisoformat(end_date) if end_date else None
         return await calendar_service.create_recurring_rule(
-            user_id, event_id, frequency, interval, days_of_week, end_dt, max_occurrences
+            user_id=user_id,
+            event_template_id=event_id,
+            frequency=frequency,
+            interval=interval,
+            days_of_week=days_of_week,
+            end_date=end_dt,
+            max_occurrences=max_occurrences,
         )
 
-    return await safe_tool_call(operation, action="creating recurring rule")
+    return await safe_tool_call(operation, action="making event recurring")
 
 
 @tool
-async def calendar_stop_recurring(rule_id: str) -> dict:
+async def calendar_stop_recurring(
+    rule_id: str,
+    keep_past: bool = True,
+) -> dict:
     """
-    Stop an event from repeating (deactivate recurring rule).
+    Stop future occurrences of a recurring series.
 
     Use when:
     - User wants to cancel future occurrences
     - "Stop my daily reminder"
-    - "Cancel the recurring meeting"
+    - "Cancel the recurring meeting starting next week"
 
     Args:
-        rule_id: Recurring rule to stop
+        rule_id: Recurring rule to stop (required)
+        keep_past: If True, keep past occurrences (default: True)
 
     Returns:
         Stopped rule details
 
-    Note: Existing occurrences remain, future ones won't be created.
+    Note: Past events remain. Only future occurrences are stopped.
+
+    Examples:
+        - "Stop the weekly standup": → rule_id="..."
     """
     async def operation() -> dict:
         user_id = get_user_context()
-        return await calendar_service.stop_recurring_rule(rule_id, user_id)
+        result = await calendar_service.stop_recurring_rule(rule_id, user_id)
+        return {
+            "success": True,
+            "rule": result,
+            "message": "Future occurrences stopped. Past events remain."
+        }
 
     return await safe_tool_call(operation, action="stopping recurring rule")
 
 
-# ─── Todo Integration ───────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════════════
+# TODO INTEGRATION
+# ═══════════════════════════════════════════════════════════════════════════════
 
 @tool
-async def calendar_schedule_task(
+async def calendar_block_task_time(
     task_id: str,
     start: str,
     duration_minutes: int,
@@ -371,12 +507,14 @@ async def calendar_schedule_task(
     - User wants to block time for a task
     - "Schedule my Write Report task for Friday 9am"
     - "Block 2 hours for the project task"
+    - "Put 'Prepare Presentation' on my calendar tomorrow"
 
     This creates an Event with type="time_blocked_task" linked to the Todo task.
+    The event uses the task title as the event title.
 
     Args:
-        task_id: Todo task ID to schedule
-        start: Start datetime ISO format
+        task_id: Todo task ID to schedule (required)
+        start: Start datetime ISO format (required)
         duration_minutes: How long to block (15-480 min)
         calendar_id: Which calendar (optional, uses default if not provided)
 
@@ -384,14 +522,21 @@ async def calendar_schedule_task(
         Created event with task reference
 
     Examples:
-        - "Schedule Write Report for tomorrow 9am, 2 hours"
+        - "Schedule Write Report for tomorrow 9am, 2 hours":
           → task_id="...", start="2025-04-02T09:00", duration_minutes=120
+
+        - "Block time for Q1 planning Friday afternoon":
+          → task_id="q1_planning", start="2025-04-04T14:00", duration_minutes=180
     """
     async def operation() -> dict:
         user_id = get_user_context()
         start_dt = datetime.fromisoformat(start)
         return await calendar_service.schedule_task(
-            user_id, task_id, start_dt, duration_minutes, calendar_id
+            user_id=user_id,
+            task_id=task_id,
+            start_datetime=start_dt,
+            duration_minutes=duration_minutes,
+            calendar_id=calendar_id,
         )
 
-    return await safe_tool_call(operation, action="scheduling task")
+    return await safe_tool_call(operation, action="blocking task time")

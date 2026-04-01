@@ -5,17 +5,15 @@ from langchain_core.tools import BaseTool
 from apps.calendar.prompts import get_calendar_prompt
 from apps.calendar.service import calendar_service
 from apps.calendar.tools import (
-    calendar_check_conflicts,
-    calendar_create_event,
-    calendar_create_recurring,
-    calendar_delete_event,
-    calendar_get_event,
+    calendar_block_task_time,
+    calendar_cancel_event,
+    calendar_edit_event,
+    calendar_find_events,
     calendar_list_calendars,
-    calendar_list_events,
-    calendar_schedule_task,
-    calendar_search_events,
+    calendar_make_recurring,
+    calendar_reschedule_event,
+    calendar_schedule_event,
     calendar_stop_recurring,
-    calendar_update_event,
 )
 from core.agents.base_app import BaseAppAgent
 from shared.agent_context import set_user_context
@@ -28,21 +26,19 @@ class CalendarAgent(BaseAppAgent):
 
     def tools(self) -> list[BaseTool]:
         return [
-            # Event tools
-            calendar_list_events,
-            calendar_search_events,
-            calendar_get_event,
-            calendar_create_event,
-            calendar_update_event,
-            calendar_delete_event,
-            calendar_check_conflicts,
-            # Calendar tools
+            # Event lifecycle - consolidated design
+            calendar_schedule_event,    # Create + auto conflict check
+            calendar_reschedule_event,  # Move to new time
+            calendar_edit_event,        # Edit metadata only
+            calendar_cancel_event,      # Delete/cancel
+            calendar_find_events,       # Search + list + get
+            # Calendar management
             calendar_list_calendars,
-            # Recurring tools
-            calendar_create_recurring,
+            # Recurring events
+            calendar_make_recurring,
             calendar_stop_recurring,
-            # Integration
-            calendar_schedule_task,
+            # Todo integration
+            calendar_block_task_time,
         ]
 
     def build_prompt(self) -> str:

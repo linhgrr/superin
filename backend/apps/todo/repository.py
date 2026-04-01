@@ -18,20 +18,23 @@ class TaskRepository:
         include_archived: bool = False,
         limit: int = 20,
     ) -> list[Task]:
-        query = Task.user_id == PydanticObjectId(user_id)
+        # Build conditions as separate arguments for Beanie
+        conditions: list = [
+            Task.user_id == PydanticObjectId(user_id),
+        ]
 
         if not include_archived:
-            query = query & (Task.is_archived == False)  # noqa: E712
+            conditions.append(Task.is_archived == False)  # noqa: E712
 
         if status:
-            query = query & (Task.status == status)
+            conditions.append(Task.status == status)
         if priority:
-            query = query & (Task.priority == priority)
+            conditions.append(Task.priority == priority)
         if tag:
-            query = query & (tag in Task.tags)
+            conditions.append(tag in Task.tags)
 
         return (
-            await Task.find(query)
+            await Task.find(*conditions)
             .sort("-created_at")
             .limit(limit)
             .to_list()
@@ -48,11 +51,11 @@ class TaskRepository:
         search_lower = query.lower()
 
         # Get all non-archived tasks for the user
-        base_query = Task.user_id == PydanticObjectId(user_id)
+        conditions = [Task.user_id == PydanticObjectId(user_id)]
         if not include_archived:
-            base_query = base_query & (Task.is_archived == False)  # noqa: E712
+            conditions.append(Task.is_archived == False)  # noqa: E712
 
-        all_tasks = await Task.find(base_query).to_list()
+        all_tasks = await Task.find(*conditions).to_list()
 
         # Filter by search term
         filtered = [

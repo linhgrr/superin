@@ -21,24 +21,21 @@ class EventRepository:
         limit: int = 100,
     ) -> list[Event]:
         """List events with time range filter."""
-        query = Event.user_id == PydanticObjectId(user_id)
+        conditions = [Event.user_id == PydanticObjectId(user_id)]
 
         if calendar_id:
-            query = query & (Event.calendar_id == PydanticObjectId(calendar_id))
+            conditions.append(Event.calendar_id == PydanticObjectId(calendar_id))
 
         if start and end:
-            # Events overlapping with range - use proper grouping
-            # (start1 < end2) AND (end1 > start2) for overlap detection
-            overlap_query = (
-                (Event.start_datetime < end) & (Event.end_datetime > start)
-            )
-            query = query & overlap_query
+            # Events overlapping with range: (start1 < end2) AND (end1 > start2)
+            conditions.append(Event.start_datetime < end)
+            conditions.append(Event.end_datetime > start)
         elif start:
-            query = query & (Event.end_datetime > start)
+            conditions.append(Event.end_datetime > start)
         elif end:
-            query = query & (Event.start_datetime < end)
+            conditions.append(Event.start_datetime < end)
 
-        return await Event.find(query).sort("start_datetime").limit(limit).to_list()
+        return await Event.find(*conditions).sort("start_datetime").limit(limit).to_list()
 
     async def find_by_id(self, event_id: str, user_id: str) -> Event | None:
         return await Event.find_one(
@@ -74,17 +71,17 @@ class EventRepository:
         exclude_event_id: str | None = None,
     ) -> list[Event]:
         """Find events overlapping with given time range."""
-        query = Event.user_id == PydanticObjectId(user_id)
-
         # Overlap condition: (start1 < end2) and (end1 > start2)
-        query = query & (
-            (Event.start_datetime < end) & (Event.end_datetime > start)
-        )
+        conditions = [
+            Event.user_id == PydanticObjectId(user_id),
+            Event.start_datetime < end,
+            Event.end_datetime > start,
+        ]
 
         if exclude_event_id:
-            query = query & (Event.id != PydanticObjectId(exclude_event_id))
+            conditions.append(Event.id != PydanticObjectId(exclude_event_id))
 
-        return await Event.find(query).sort("start_datetime").to_list()
+        return await Event.find(*conditions).sort("start_datetime").to_list()
 
     async def create(
         self,
