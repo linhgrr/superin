@@ -1,7 +1,7 @@
 import type { DashboardWidgetRendererProps } from "../types";
 import { useFinanceSummary } from "./useFinanceSummary";
 
-export default function QuickStatsWidget({ widget }: DashboardWidgetRendererProps) {
+export default function BudgetOverviewWidget({ widget }: DashboardWidgetRendererProps) {
   const { summary, loading } = useFinanceSummary();
 
   return (

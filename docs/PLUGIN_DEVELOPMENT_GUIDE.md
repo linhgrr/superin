@@ -91,7 +91,7 @@ example_widget = WidgetManifestSchema(
     name="Example Summary",
     description="Shows the current status",
     icon="Box",
-    size="medium",
+    size="standard",
 )
 
 example_manifest = AppManifestSchema(
@@ -110,10 +110,11 @@ example_manifest = AppManifestSchema(
 ```
 
 Widget size values must be one of:
-- `small`
-- `medium`
-- `large`
-- `full-width`
+- `compact`
+- `standard`
+- `wide`
+- `tall`
+- `full`
 
 ### Agent
 
@@ -255,17 +256,41 @@ After changing shared schemas or manifests:
 ```bash
 source /home/linh/miniconda3/etc/profile.d/conda.sh
 conda activate linhdz
-python scripts/codegen.py
-node scripts/validate-manifests.mjs
+python scripts/superin.py codegen
+python scripts/superin.py manifests validate
 npm run build:frontend
 ```
 
 What each command checks:
-- `python scripts/codegen.py`: regenerates OpenAPI and frontend generated types
-- `node scripts/validate-manifests.mjs`: checks backend/frontend manifest integrity
+- `python scripts/superin.py codegen`: regenerates OpenAPI and frontend generated types
+- `python scripts/superin.py manifests validate`: checks backend/frontend manifest integrity and required frontend app files
 - `npm run build:frontend`: catches frontend type/runtime build errors
 
-`npm run dev` already runs manifest validation before booting both apps.
+## CLI
+
+The user-facing developer entrypoint is:
+
+```bash
+python scripts/superin.py <command>
+```
+
+Useful commands:
+
+```bash
+python scripts/superin.py codegen
+python scripts/superin.py manifests validate
+python scripts/superin.py plugin create calendar
+python scripts/superin.py plugin sync-fe calendar
+python scripts/superin.py plugin sync-fe --all
+python scripts/superin.py dev
+```
+
+Behavior:
+- `plugin create` scaffolds backend and frontend using the current protocol
+- `plugin sync-fe` regenerates managed frontend app files from backend manifest data
+- `dev` starts backend first, then frontend
+
+`npm run dev` and `npm run validate:manifests` are convenience aliases that also route through this CLI.
 
 ## Recommended Build Order
 
@@ -304,7 +329,7 @@ What each command checks:
 
 ## Generator Status
 
-[create_plugin.py](/home/linh/Downloads/superin/scripts/create_plugin.py) now
+[superin.py](/home/linh/Downloads/superin/scripts/superin.py) now
 scaffolds the current protocol by default:
 - backend `BaseAppAgent` child agent with `prompts.py`
 - frontend app module under `frontend/src/apps/{app_id}`

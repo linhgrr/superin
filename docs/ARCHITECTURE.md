@@ -126,11 +126,8 @@ frontend/
     types/generated/
 
 scripts/
+  superin.py
   codegen.py
-  export_backend_manifests.py
-  validate-manifests.mjs
-  dev-concurrent.mjs
-  create_plugin.py
 ```
 
 ## Backend Plugin Model
@@ -189,22 +186,24 @@ Contract flow:
 
 ```text
 backend/shared/schemas.py
-  -> python scripts/codegen.py
+  -> python scripts/superin.py codegen
   -> openapi.json
   -> frontend/src/types/generated/api.ts
 
 backend apps/*/manifest.py
-  -> python scripts/export_backend_manifests.py
-  -> scripts/validate-manifests.mjs
+  -> python scripts/superin.py manifests validate
   -> checked against frontend/src/apps/*/manifest.json
 ```
 
 Developer commands:
-- `npm run validate:manifests`
-- `npm run dev:concurrent`
+- `python scripts/superin.py codegen`
+- `python scripts/superin.py manifests validate`
+- `python scripts/superin.py plugin create <app_id>`
+- `python scripts/superin.py plugin sync-fe <app_id>`
+- `python scripts/superin.py dev`
 - `npm run dev`
 
-`npm run dev` validates manifest integrity before starting frontend and backend.
+`npm run dev` now delegates to the unified CLI.
 
 ## Dashboard / Widget System
 
