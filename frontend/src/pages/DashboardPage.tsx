@@ -59,11 +59,16 @@ function appIdFrom(widgetId: string) {
 // ─── Auto Rearrange Helper ───────────────────────────────────────────────────
 
 function autoRearrangeWidgets(widgets: ResolvedWidget[], prefs: Map<string, WidgetPreferenceSchema>): Layout[] {
+  // Sort by actual width (custom size from prefs or default from manifest)
   const sorted = [...widgets].sort((a, b) => {
-    // Larger widgets first for better packing
-    const aSize = getSizeConfig(a.widget.size);
-    const bSize = getSizeConfig(b.widget.size);
-    return bSize.width - aSize.width;
+    const aPref = prefs.get(a.widgetId);
+    const bPref = prefs.get(b.widgetId);
+    const aConfig = getSizeConfig(a.widget.size);
+    const bConfig = getSizeConfig(b.widget.size);
+    // Use actual width (custom or default)
+    const aWidth = aPref?.size_w ?? aConfig.width;
+    const bWidth = bPref?.size_w ?? bConfig.width;
+    return bWidth - aWidth; // Larger first for better packing
   });
 
   const layout: Layout[] = [];
@@ -428,6 +433,13 @@ function DashboardInner({
 
       const updates: PreferenceUpdate[] = currentLayout.map((item) => {
         const existing = prefs.get(item.i);
+        const defaultConfig = getSizeConfig(
+          visibleWidgets.find((vw) => vw.widgetId === item.i)?.widget.size ?? "standard"
+        );
+
+        // Save position AND current size (in case it changed during drag)
+        const sizeW = item.w !== defaultConfig.width ? item.w : null;
+        const sizeH = item.h !== defaultConfig.rglH ? item.h : null;
 
         return {
           widget_id: item.i,
@@ -436,6 +448,8 @@ function DashboardInner({
             gridX: item.x,
             gridY: item.y,
           },
+          size_w: sizeW,
+          size_h: sizeH,
         };
       });
 
@@ -447,7 +461,7 @@ function DashboardInner({
         void loadPrefs(false);
       }
     },
-    [applyUpdatesLocally, loadPrefs, persistUpdates, prefs]
+    [applyUpdatesLocally, loadPrefs, persistUpdates, prefs, visibleWidgets]
   );
 
   // Handle resize - save custom dimensions
