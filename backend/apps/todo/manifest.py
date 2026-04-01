@@ -2,8 +2,8 @@
 
 from shared.schemas import (
     AppManifestSchema,
-    WidgetManifestSchema,
     ConfigFieldSchema,
+    WidgetManifestSchema,
 )
 
 task_list_widget = WidgetManifestSchema(
@@ -45,12 +45,16 @@ todo_manifest = AppManifestSchema(
     icon="CheckSquare",
     color="oklch(0.70 0.18 145)",
     widgets=[task_list_widget, today_widget],
-    agent_description="Helps users manage tasks, set reminders, and organize to-do lists.",
+    agent_description="Helps users manage tasks, set reminders, organize to-do lists, and track productivity.",
     tools=[
         "todo_add_task",
         "todo_list_tasks",
+        "todo_get_task",
+        "todo_update_task",
+        "todo_toggle_task",
         "todo_complete_task",
         "todo_delete_task",
+        "todo_get_summary",
     ],
     models=["Task"],
     category="productivity",
