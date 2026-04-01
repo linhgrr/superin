@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
 
-from apps.auth_schemas import LoginRequest, RegisterRequest
+from apps.auth_schemas import LoginRequest, RegisterRequest, UpdateUserSettingsRequest
 from core.auth import create_access_token, create_refresh_token, decode_token, get_current_user
 from core.constants import AUTH_COOKIE_MAX_AGE_SECONDS, AUTH_COOKIE_NAME
 from core.logging_middleware import login_limiter
