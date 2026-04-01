@@ -134,11 +134,9 @@ function WidgetContent({
 
 function WidgetCard({
   widget,
-  color,
   children,
 }: {
   widget: AppCatalogEntry["widgets"][number];
-  color?: string | null;
   children: React.ReactNode;
 }) {
   const [mousePos, setMousePos] = useState({ x: 50, y: 50 });
@@ -161,21 +159,7 @@ function WidgetCard({
         flexDirection: "column",
       } as React.CSSProperties}
     >
-      {color && (
-        <div
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            height: "3px",
-            background: color,
-            borderRadius: "16px 16px 0 0",
-            zIndex: 1,
-          }}
-        />
-      )}
-      <div className="widget-card-title" style={{ marginTop: color ? "3px" : undefined, flexShrink: 0 }}>
+      <div className="widget-card-title" style={{ flexShrink: 0 }}>
         {widget.name}
       </div>
       <div style={{ flex: 1, minHeight: 0, overflow: "auto" }}>
@@ -509,7 +493,7 @@ function DashboardInner({
       >
         {visibleWidgets.map(({ widgetId, appId, widget, app }) => (
           <div key={widgetId} className="rgl-item-view">
-            <WidgetCard widget={widget} color={app.color}>
+            <WidgetCard widget={widget}>
               <WidgetContent appId={appId} widgetId={widgetId} widget={widget} />
             </WidgetCard>
           </div>

@@ -444,6 +444,8 @@ body {
   overflow-x: hidden;
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
+  position: relative;
+  z-index: 100;
 }
 
 .sidebar-brand {
@@ -556,6 +558,8 @@ body {
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   flex-shrink: 0;
+  position: relative;
+  z-index: 100;
 }
 
 .app-header-title {

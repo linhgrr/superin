@@ -62,7 +62,7 @@ function TourMenu() {
             padding: "0.5rem",
             minWidth: "180px",
             boxShadow: "0 8px 32px oklch(0 0 0 / 0.3)",
-            zIndex: 100,
+            zIndex: 1000,
             animation: "fadeInScale 0.15s ease",
           }}
         >
@@ -214,7 +214,7 @@ export default function Header({ title, showTourTrigger = true }: HeaderProps) {
                   padding: "0.5rem",
                   minWidth: "180px",
                   boxShadow: "0 8px 32px oklch(0 0 0 / 0.3)",
-                  zIndex: 100,
+                  zIndex: 1000,
                   animation: "fadeInScale 0.15s ease",
                 }}
               >
