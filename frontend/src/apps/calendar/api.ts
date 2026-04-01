@@ -1,4 +1,4 @@
-import { client } from "@/api/client";
+import { api } from "@/api/client";
 
 export interface Calendar {
   id: string;
@@ -56,8 +56,7 @@ export interface UpdateEventRequest {
 // ─── Calendars ───────────────────────────────────────────────────────────────
 
 export async function listCalendars(): Promise<Calendar[]> {
-  const res = await client.get("/api/apps/calendar/calendars");
-  return res.data as Calendar[];
+  return api.get("/api/apps/calendar/calendars");
 }
 
 // ─── Events ────────────────────────────────────────────────────────────────────
@@ -74,8 +73,7 @@ export async function listEvents(
   if (calendarId) params.append("calendar_id", calendarId);
   params.append("limit", limit.toString());
 
-  const res = await client.get(`/api/apps/calendar/events?${params.toString()}`);
-  return res.data as Event[];
+  return api.get(`/api/apps/calendar/events?${params.toString()}`);
 }
 
 export async function searchEvents(query: string, limit: number = 20): Promise<Event[]> {
@@ -83,27 +81,23 @@ export async function searchEvents(query: string, limit: number = 20): Promise<E
   params.append("q", query);
   params.append("limit", limit.toString());
 
-  const res = await client.get(`/api/apps/calendar/events/search?${params.toString()}`);
-  return res.data as Event[];
+  return api.get(`/api/apps/calendar/events/search?${params.toString()}`);
 }
 
 export async function getEvent(eventId: string): Promise<Event> {
-  const res = await client.get(`/api/apps/calendar/events/${eventId}`);
-  return res.data as Event;
+  return api.get(`/api/apps/calendar/events/${eventId}`);
 }
 
 export async function createEvent(request: CreateEventRequest): Promise<Event> {
-  const res = await client.post("/api/apps/calendar/events", request);
-  return res.data as Event;
+  return api.post("/api/apps/calendar/events", request);
 }
 
 export async function updateEvent(eventId: string, request: UpdateEventRequest): Promise<Event> {
-  const res = await client.patch(`/api/apps/calendar/events/${eventId}`, request);
-  return res.data as Event;
+  return api.patch(`/api/apps/calendar/events/${eventId}`, request);
 }
 
 export async function deleteEvent(eventId: string): Promise<void> {
-  await client.delete(`/api/apps/calendar/events/${eventId}`);
+  await api.delete(`/api/apps/calendar/events/${eventId}`);
 }
 
 export async function checkConflicts(
@@ -116,8 +110,7 @@ export async function checkConflicts(
   params.append("end", end);
   if (excludeEventId) params.append("exclude_event_id", excludeEventId);
 
-  const res = await client.get(`/api/apps/calendar/conflicts/check?${params.toString()}`);
-  return res.data as Event[];
+  return api.get(`/api/apps/calendar/conflicts/check?${params.toString()}`);
 }
 
 // ─── Recurring Rules ──────────────────────────────────────────────────────────
@@ -147,18 +140,15 @@ export async function createRecurringRule(
   eventId: string,
   request: CreateRecurringRuleRequest
 ): Promise<RecurringRule> {
-  const res = await client.post(`/api/apps/calendar/events/${eventId}/recurring`, request);
-  return res.data as RecurringRule;
+  return api.post(`/api/apps/calendar/events/${eventId}/recurring`, request);
 }
 
 export async function listRecurringRules(): Promise<RecurringRule[]> {
-  const res = await client.get("/api/apps/calendar/recurring");
-  return res.data as RecurringRule[];
+  return api.get("/api/apps/calendar/recurring");
 }
 
 export async function stopRecurringRule(ruleId: string): Promise<RecurringRule> {
-  const res = await client.patch(`/api/apps/calendar/recurring/${ruleId}/stop`);
-  return res.data as RecurringRule;
+  return api.patch(`/api/apps/calendar/recurring/${ruleId}/stop`);
 }
 
 // ─── Todo Integration ─────────────────────────────────────────────────────────
@@ -171,6 +161,5 @@ export interface ScheduleTaskRequest {
 }
 
 export async function scheduleTask(taskId: string, request: Omit<ScheduleTaskRequest, "task_id">): Promise<Event> {
-  const res = await client.post(`/api/apps/calendar/tasks/${taskId}/schedule`, request);
-  return res.data as Event;
+  return api.post(`/api/apps/calendar/tasks/${taskId}/schedule`, request);
 }
