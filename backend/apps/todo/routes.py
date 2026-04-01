@@ -282,7 +282,11 @@ async def stop_recurring_rule(
 
 @router.get("/summary")
 async def todo_summary(user_id: str = Depends(get_current_user)):
-    return await task_service.get_summary(user_id)
+    # Fetch user to get their timezone setting
+    from core.models import User
+    user = await User.get(user_id)
+    user_timezone = user.settings.get("timezone", "UTC") if user else "UTC"
+    return await task_service.get_summary(user_id, user_timezone)
 
 
 # ─── Preferences ──────────────────────────────────────────────────────────────

@@ -1,7 +1,9 @@
 """Todo plugin business logic."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Literal
+
+import pytz
 
 from apps.todo.models import RecurringRule, SubTask, Task
 from apps.todo.repository import RecurringRuleRepository, SubTaskRepository, TaskRepository
@@ -241,21 +243,32 @@ class TaskService:
 
     # ─── Summary ─────────────────────────────────────────────────────────────────
 
-    async def get_summary(self, user_id: str) -> dict:
-        today = datetime.utcnow()
-        start_of_today = today.replace(hour=0, minute=0, second=0, microsecond=0)
-        end_of_today = today.replace(hour=23, minute=59, second=59)
+    async def get_summary(self, user_id: str, user_timezone: str = "UTC") -> dict:
+        # Get user's local "today" range
+        tz_name = user_timezone or "UTC"
+        try:
+            tz = pytz.timezone(tz_name)
+        except pytz.UnknownTimeZoneError:
+            tz = pytz.UTC
+
+        now_local = datetime.now(UTC).astimezone(tz)
+        start_of_today = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+        end_of_today = now_local.replace(hour=23, minute=59, second=59, microsecond=0)
+        # Convert back to UTC for comparison with stored due_date (which is UTC)
+        start_of_today_utc = start_of_today.astimezone(pytz.UTC)
+        end_of_today_utc = end_of_today.astimezone(pytz.UTC)
+        now_utc = datetime.now(UTC)
 
         all_tasks = await self.repo.find_by_user(user_id, limit=10000)
         pending = [t for t in all_tasks if t.status == "pending"]
         completed = [t for t in all_tasks if t.status == "completed"]
         overdue = [
             t for t in pending
-            if t.due_date and t.due_date < today
+            if t.due_date and t.due_date < now_utc
         ]
         due_today = [
             t for t in pending
-            if t.due_date and start_of_today <= t.due_date <= end_of_today
+            if t.due_date and start_of_today_utc <= t.due_date <= end_of_today_utc
         ]
 
         # Tag summary
