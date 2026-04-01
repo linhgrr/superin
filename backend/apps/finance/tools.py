@@ -387,6 +387,11 @@ async def finance_add_transaction(
     - User records income or spending
     - Adding a transaction manually
 
+    IMPORTANT - For expense transactions:
+    - Before adding, consider using finance_check_budget to see current budget status
+    - This allows warning the user if they're about to exceed their budget
+    - After adding, you can check budget again to show remaining amount
+
     Args:
         wallet_id: Which wallet/account
         category_id: Spending/income category
@@ -405,6 +410,7 @@ async def finance_add_transaction(
 
     Examples:
         - "I spent $50 on food" → amount=50, type_="expense", category="Food"
+          (Consider checking food budget first with finance_check_budget)
         - "Got $1000 salary" → amount=1000, type_="income", category="Salary"
     """
     async def operation() -> dict:

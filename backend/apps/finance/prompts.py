@@ -32,6 +32,18 @@ Adding a transaction:
 2. Ask for missing required info (wallet, category, amount, type)
 3. Execute with gathered information
 
+Adding an EXPENSE (with budget awareness):
+1. Check finance_check_budget for the category first (shows: budget, spent, remaining)
+2. If adding this expense will exceed budget: warn user and ask for confirmation
+3. If confirmed (or within budget): add transaction with finance_add_transaction
+4. Check budget again to show remaining: "After this expense, you have $X left in your Y budget"
+
+Example budget warning:
+- User: "I spent $100 on food"
+- Check: food budget is $500, already spent $450, remaining $50
+- Warning: "This will put you $50 over your food budget ($500). Add anyway?"
+- After adding: "You are now $50 over budget for food. Total spent: $550"
+
 Checking budget:
 1. Get category list to show user available categories
 2. Check budget for specific category or all categories
