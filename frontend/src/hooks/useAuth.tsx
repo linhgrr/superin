@@ -16,7 +16,7 @@ import {
 } from "react";
 
 import { getMe, login as apiLogin, logout as apiLogout, register as apiRegister } from "@/api/auth";
-import { clearAccessToken, isAuthenticated, setAccessToken } from "@/api/client";
+import { clearAccessToken, isAuthenticated, setAccessToken } from "@/api/axios";
 import type { LoginRequest, RegisterRequest, UserPublic } from "@/types/generated/api";
 
 interface AuthContextValue {

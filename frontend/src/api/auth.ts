@@ -1,11 +1,14 @@
 /**
- * Auth API — login, register, logout, token refresh, current user.
+ * Auth API — login, register, logout, current user.
+ *
+ * Uses axios client with automatic token handling.
  */
 
 import type {
   LoginRequest,
   RegisterRequest,
   TokenResponse,
+  UpdateUserSettingsRequest,
   UserPublic,
 } from "@/types/generated/api";
 import { api, setAccessToken, clearAccessToken } from "./client";
@@ -38,6 +41,13 @@ export async function logout(): Promise<void> {
 // GET /api/auth/me
 export async function getMe(): Promise<UserPublic> {
   return api.get<UserPublic>("/api/auth/me");
+}
+
+// PATCH /api/auth/me/settings
+export async function updateUserSettings(
+  payload: UpdateUserSettingsRequest
+): Promise<UserPublic> {
+  return api.patch<UserPublic>("/api/auth/me/settings", payload);
 }
 
 // Re-export types for convenience

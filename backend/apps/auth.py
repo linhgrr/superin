@@ -35,6 +35,17 @@ def _set_refresh_cookie(response: Response, token: str) -> None:
     )
 
 
+def _blacklist_token(payload: dict) -> TokenBlacklist | None:
+    """Create a TokenBlacklist entry from a decoded token payload."""
+    jti = payload.get("jti")
+    if not jti:
+        return None
+    return TokenBlacklist(
+        jti=jti,
+        expires_at=datetime.fromtimestamp(payload["exp"], tz=UTC),
+    )
+
+
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register(request: RegisterRequest, response: Response) -> TokenResponse:
     existing = await User.find_one(User.email == request.email)
@@ -106,10 +117,9 @@ async def refresh_tokens(
 
     # Rotate: blacklist old refresh token
     if jti:
-        await TokenBlacklist(
-            jti=jti,
-            expires_at=datetime.fromtimestamp(payload["exp"], tz=UTC),
-        ).insert()
+        blacklist_entry = _blacklist_token(payload)
+        if blacklist_entry:
+            await blacklist_entry.insert()
 
     resp = _token_response(user)
     _set_refresh_cookie(response, resp.refresh_token)
@@ -117,7 +127,20 @@ async def refresh_tokens(
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-async def logout(response: Response) -> None:
+async def logout(
+    response: Response,
+    refresh_token: str | None = Cookie(None, alias=AUTH_COOKIE_NAME),
+) -> None:
+    # Blacklist the refresh token to prevent reuse after logout
+    if refresh_token:
+        try:
+            payload = decode_token(refresh_token)
+            blacklist_entry = _blacklist_token(payload)
+            if blacklist_entry:
+                await blacklist_entry.insert()
+        except Exception:
+            pass  # Token invalid or expired, just delete cookie
+
     response.delete_cookie(key=AUTH_COOKIE_NAME, secure=True)
 
 

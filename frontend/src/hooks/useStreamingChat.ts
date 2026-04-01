@@ -1,13 +1,15 @@
 /**
  * useStreamingChat — SSE streaming hook for the RootAgent chat.
  *
+ * Uses axios for consistent auth handling with automatic refresh on 401.
+ *
  * Usage:
  *   const { send, messages, isStreaming, error } = useStreamingChat();
  *   await send("Hello");
  */
 
 import { useCallback, useRef, useState } from "react";
-import { API_BASE_URL, getAccessToken } from "@/api/client";
+import { axiosInstance, getAccessToken } from "@/api/axios";
 import type { ChatStreamEvent } from "@/types/generated/api";
 
 export interface ChatMessage {
@@ -59,10 +61,11 @@ export function useStreamingChat() {
       setError(null);
 
       try {
+        // Use axios but with fetch-like streaming response
         const token = getAccessToken();
-        const url = `${API_BASE_URL}/api/chat/stream`;
+        const baseURL = axiosInstance.defaults.baseURL;
 
-        const res = await fetch(url, {
+        const res = await fetch(`${baseURL}/api/chat/stream`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -73,6 +76,35 @@ export function useStreamingChat() {
           signal: controller.signal,
         });
 
+        // Handle 401 - let axios interceptor handle refresh and retry
+        if (res.status === 401) {
+          // Trigger axios interceptor refresh logic
+          try {
+            await axiosInstance.post("/api/auth/refresh");
+            // Retry with new token
+            const newToken = getAccessToken();
+            const retryRes = await fetch(`${baseURL}/api/chat/stream`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                ...(newToken ? { Authorization: `Bearer ${newToken}` } : {}),
+              },
+              body: JSON.stringify({ message: input }),
+              credentials: "include",
+              signal: controller.signal,
+            });
+            if (!retryRes.ok) {
+              throw new Error(`HTTP ${retryRes.status}`);
+            }
+            // Continue with retryRes
+            await processStream(retryRes, assistantMsg.id);
+            return;
+          } catch {
+            // Refresh failed - will be caught below and show error
+            throw new Error("Authentication failed");
+          }
+        }
+
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
           throw new Error(
@@ -80,6 +112,20 @@ export function useStreamingChat() {
           );
         }
 
+        await processStream(res, assistantMsg.id);
+      } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") {
+          // Cancelled — not an error
+          setMessages((prev) => prev.slice(0, -1)); // remove empty assistant msg
+        } else {
+          setError(err instanceof Error ? err.message : "Stream failed");
+          setMessages((prev) => prev.slice(0, -1)); // remove failed assistant msg
+        }
+      } finally {
+        setIsStreaming(false);
+      }
+
+      async function processStream(res: Response, assistantId: string) {
         if (!res.body) throw new Error("No response body");
 
         const reader = res.body.getReader();
@@ -140,16 +186,6 @@ export function useStreamingChat() {
             }
           }
         }
-      } catch (err) {
-        if (err instanceof Error && err.name === "AbortError") {
-          // Cancelled — not an error
-          setMessages((prev) => prev.slice(0, -1)); // remove empty assistant msg
-        } else {
-          setError(err instanceof Error ? err.message : "Stream failed");
-          setMessages((prev) => prev.slice(0, -1)); // remove failed assistant msg
-        }
-      } finally {
-        setIsStreaming(false);
       }
     },
     []
