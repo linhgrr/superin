@@ -328,10 +328,19 @@ async def update_preferences(
                 pref.position = u.position
             if u.config is not None:
                 pref.config = u.config
+            # size_w and size_h: explicit None means reset to default
             if u.size_w is not None:
                 pref.size_w = u.size_w
+            else:
+                # Check if size_w was explicitly provided (even as null)
+                # by checking if the field was set in the update
+                if "size_w" in u.model_dump(exclude_unset=True):
+                    pref.size_w = None
             if u.size_h is not None:
                 pref.size_h = u.size_h
+            else:
+                if "size_h" in u.model_dump(exclude_unset=True):
+                    pref.size_h = None
             await pref.save()
 
     return await get_preferences(app_id, user_id)

@@ -104,6 +104,7 @@ function buildLayoutItem(
   rw: ResolvedWidget,
   pref: WidgetPreferenceSchema | undefined,
   previousWidgets: ResolvedWidget[],
+  allPrefs: Map<string, WidgetPreferenceSchema>,
 ): Layout {
   // Use custom dimensions from preferences if available, otherwise use manifest default
   const config = getSizeConfig(rw.widget.size);
@@ -120,12 +121,16 @@ function buildLayoutItem(
   let col = 0;
   let row = 0;
   for (const previousWidget of previousWidgets) {
+    const prevPref = allPrefs.get(previousWidget.widgetId);
     const prevConfig = getSizeConfig(previousWidget.widget.size);
-    const prevW = prevConfig.width;
+    // Use custom width if saved, otherwise use default
+    const prevW = prevPref?.size_w ?? prevConfig.width;
     col += prevW;
     if (col >= 12) {
       col = 0;
-      row += prevConfig.rglH;
+      // Use custom height for row calculation
+      const prevH = prevPref?.size_h ?? prevConfig.rglH;
+      row += prevH;
     }
   }
   return { i: rw.widgetId, x: col % 12, y: row, w, h };
@@ -307,7 +312,7 @@ function DashboardInner({
 
   const layout = useMemo<Layout[]>(() => {
     return visibleWidgets.map((rw, idx) =>
-      buildLayoutItem(rw, prefs.get(rw.widgetId), visibleWidgets.slice(0, idx))
+      buildLayoutItem(rw, prefs.get(rw.widgetId), visibleWidgets.slice(0, idx), prefs)
     );
   }, [visibleWidgets, prefs]);
 
@@ -456,9 +461,9 @@ function DashboardInner({
           visibleWidgets.find((vw) => vw.widgetId === item.i)?.widget.size ?? "standard"
         );
 
-        // Only save custom size if different from manifest default
-        const sizeW = item.w !== defaultConfig.width ? item.w : undefined;
-        const sizeH = item.h !== defaultConfig.rglH ? item.h : undefined;
+        // Save custom size if different from manifest default, otherwise explicit null to reset
+        const sizeW = item.w !== defaultConfig.width ? item.w : null;
+        const sizeH = item.h !== defaultConfig.rglH ? item.h : null;
 
         return {
           widget_id: item.i,
@@ -567,6 +572,7 @@ function DashboardInner({
         isResizable
         resizeHandles={["se"]}
         compactType={null}
+        preventCollision
         onLayoutChange={handleLayoutChange}
         onDragStop={handleDragStop}
         onResizeStop={handleResizeStop}
