@@ -13,7 +13,7 @@ import ReactGridLayout, { Responsive } from "react-grid-layout";
 type Layout = ReactGridLayout.Layout;
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
-import { Grid3X3, Plus, Sparkles } from "lucide-react";
+import { Grid3X3, Plus, Sparkles, LayoutGrid } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { getFrontendApp } from "@/apps";
@@ -54,6 +54,50 @@ function getSizeConfig(size: string) {
 function appIdFrom(widgetId: string) {
   const dot = widgetId.indexOf(".");
   return dot === -1 ? widgetId : widgetId.slice(0, dot);
+}
+
+// ─── Auto Rearrange Helper ───────────────────────────────────────────────────
+
+function autoRearrangeWidgets(widgets: ResolvedWidget[], prefs: Map<string, WidgetPreferenceSchema>): Layout[] {
+  const sorted = [...widgets].sort((a, b) => {
+    // Larger widgets first for better packing
+    const aSize = getSizeConfig(a.widget.size);
+    const bSize = getSizeConfig(b.widget.size);
+    return bSize.width - aSize.width;
+  });
+
+  const layout: Layout[] = [];
+  let currentRow = 0;
+  let currentCol = 0;
+  let rowHeight = 0;
+
+  for (const rw of sorted) {
+    const pref = prefs.get(rw.widgetId);
+    const config = getSizeConfig(rw.widget.size);
+    const w = pref?.size_w ?? config.width;
+    const h = pref?.size_h ?? config.rglH;
+
+    // Check if widget fits in current row
+    if (currentCol + w > 12) {
+      // Move to next row
+      currentRow += rowHeight;
+      currentCol = 0;
+      rowHeight = 0;
+    }
+
+    layout.push({
+      i: rw.widgetId,
+      x: currentCol,
+      y: currentRow,
+      w,
+      h,
+    });
+
+    currentCol += w;
+    rowHeight = Math.max(rowHeight, h);
+  }
+
+  return layout;
 }
 
 function buildLayoutItem(
@@ -439,6 +483,34 @@ function DashboardInner({
     [applyUpdatesLocally, loadPrefs, persistUpdates, prefs, visibleWidgets]
   );
 
+  // Auto rearrange widgets in optimal grid layout
+  const handleAutoRearrange = useCallback(async () => {
+    if (visibleWidgets.length === 0) return;
+
+    const newLayout = autoRearrangeWidgets(visibleWidgets, prefs);
+    currentLayoutRef.current = newLayout;
+
+    const updates: PreferenceUpdate[] = newLayout.map((item) => {
+      const existing = prefs.get(item.i);
+      return {
+        widget_id: item.i,
+        config: {
+          ...(existing?.config ?? {}),
+          gridX: item.x,
+          gridY: item.y,
+        },
+      };
+    });
+
+    applyUpdatesLocally(updates);
+
+    try {
+      await persistUpdates(updates);
+    } catch {
+      void loadPrefs(false);
+    }
+  }, [applyUpdatesLocally, loadPrefs, persistUpdates, prefs, visibleWidgets]);
+
   if (!isPrefsLoaded) {
     return (
       <div className="widget-grid">
@@ -461,7 +533,17 @@ function DashboardInner({
   return (
     <div ref={containerRef} style={{ animation: "fadeIn 0.4s ease" }}>
       {/* Add widget button */}
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1rem" }}>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", marginBottom: "1rem" }}>
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          onClick={handleAutoRearrange}
+          aria-label="Auto rearrange widgets"
+          style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
+        >
+          <LayoutGrid size={16} />
+          Auto Arrange
+        </button>
         <button
           type="button"
           className="btn btn-secondary btn-sm"
