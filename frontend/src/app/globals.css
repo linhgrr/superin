@@ -23,6 +23,24 @@
   --font-heading: "Poppins", ui-sans-serif, system-ui, sans-serif;
 }
 
+:root {
+  --color-primary: oklch(0.65 0.21 280);
+  --color-primary-foreground: oklch(0.98 0 0);
+  --color-success: oklch(0.72 0.19 145);
+  --color-warning: oklch(0.75 0.18 85);
+  --color-danger: oklch(0.63 0.24 25);
+  --color-background: oklch(0.14 0.01 265);
+  --color-foreground: oklch(0.95 0.01 265);
+  --color-surface: oklch(0.18 0.01 265);
+  --color-surface-elevated: oklch(0.22 0.01 265);
+  --color-border: oklch(0.28 0.02 265);
+  --color-muted: oklch(0.55 0.02 265);
+  --color-ring: oklch(0.65 0.21 280);
+  --font-sans: "Open Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-heading: "Poppins", ui-sans-serif, system-ui, sans-serif;
+  color-scheme: dark;
+}
+
 /* ─── Base Styles ─────────────────────────────────────────────────────────── */
 
 *,

@@ -14,10 +14,10 @@ import {
   useRef,
   useState,
 } from "react";
-import type { UserPublic } from "@/types/generated/api";
-import { login as apiLogin, register as apiRegister, logout as apiLogout, getMe } from "@/api/auth";
-import type { LoginRequest, RegisterRequest } from "@/types/generated/api";
-import { setAccessToken, clearAccessToken, isAuthenticated } from "@/api/client";
+
+import { getMe, login as apiLogin, logout as apiLogout, register as apiRegister } from "@/api/auth";
+import { clearAccessToken, isAuthenticated, setAccessToken } from "@/api/client";
+import type { LoginRequest, RegisterRequest, UserPublic } from "@/types/generated/api";
 
 interface AuthContextValue {
   user: UserPublic | null;
@@ -35,7 +35,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const initialized = useRef(false);
 
-  // Boot: try to restore session from /me endpoint
   useEffect(() => {
     if (initialized.current) return;
     initialized.current = true;
@@ -74,7 +73,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo(
     () => ({ user, isLoading, isAuthenticated: user !== null, login, register, logout }),
-    [user, isLoading, login, register, logout]
+    [user, isLoading, login, logout, register]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
