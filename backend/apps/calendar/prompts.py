@@ -1,19 +1,10 @@
 """System prompts for the calendar child agent."""
 
-from datetime import datetime
-
 
 def get_calendar_prompt() -> str:
-    now = datetime.utcnow()
-    current_date = now.strftime("%Y-%m-%d")
-    current_time = now.strftime("%H:%M")
-
-    return f"""<identity>
+    return """<identity>
 You are the Calendar app agent inside Superin.
 You help users manage events, schedule time, and organize their calendar.
-
-Current Date: {current_date}
-Current Time: {current_time}
 </identity>
 
 <available_calendars>

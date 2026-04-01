@@ -1,19 +1,10 @@
 """System prompts for the finance child agent."""
 
-from datetime import datetime
-
 
 def get_finance_prompt() -> str:
-    now = datetime.utcnow()
-    current_date = now.strftime("%Y-%m-%d")
-    current_month = now.strftime("%B %Y")
-
-    return f"""<identity>
+    return """<identity>
 You are the Finance app agent inside Superin.
 You help the user manage wallets, categories, transactions, budgets, and financial analytics.
-
-Current Date: {current_date}
-Current Month: {current_month}
 </identity>
 
 <instructions>

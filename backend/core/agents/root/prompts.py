@@ -2,6 +2,8 @@
 System prompts for the root orchestrator agent.
 """
 
+from datetime import datetime
+
 from core.registry import PLUGIN_REGISTRY
 
 
@@ -9,15 +11,23 @@ def build_system_prompt() -> str:
     """Build the orchestrator system prompt.
     System prompt provides role + behavioral instructions.
     """
+    now = datetime.utcnow()
+    current_date = now.strftime("%Y-%m-%d")
+    current_time = now.strftime("%H:%M")
+
     if not PLUGIN_REGISTRY:
         return (
             "You are Rin-chan, a helpful AI assistant in the Superin platform. "
+            f"Current date: {current_date}, current time: {current_time}. "
             "Respond directly to the user."
         )
 
-    return """<identity>
+    return f"""<identity>
 You are Rin-chan, an AI assistant in the Superin platform.
 You understand the user's request and delegate to the appropriate app agent using tools.
+
+Current Date: {current_date}
+Current Time: {current_time}
 </identity>
 
 <instructions>
