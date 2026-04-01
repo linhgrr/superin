@@ -246,10 +246,11 @@ style={{ background: "rgba(26, 26, 46, 0.8)" }}
 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
 
 // ✅ Widget size classes cho grid
-<div className="widget-small">
-<div className="widget-medium">
-<div className="widget-large">
-<div className="widget-full-width">
+<div className="widget-size-compact">
+<div className="widget-size-standard">
+<div className="widget-size-wide">
+<div className="widget-size-tall">
+<div className="widget-size-full">
 ```
 
 ---
@@ -349,7 +350,7 @@ describe("WidgetGrid", () => {
   it("renders widget with correct size class", () => {
     render(<WidgetGrid widgets={[{ id: "f.tb", size: "medium" }]} />);
     const widget = screen.getByTestId("widget-f-tb");
-    expect(widget.className).toContain("widget-medium");
+    expect(widget.className).toContain("widget-size-standard");
   });
 });
 ```

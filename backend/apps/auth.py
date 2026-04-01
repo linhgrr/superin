@@ -126,4 +126,23 @@ async def get_me(user_id: str = Depends(get_current_user)) -> UserPublic:
     user = await User.get(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    return UserPublic(id=str(user.id), email=user.email, name=user.name)
+    return UserPublic(id=str(user.id), email=user.email, name=user.name, settings=user.settings or {})
+
+
+@router.patch("/me/settings")
+async def update_settings(
+    request: UpdateUserSettingsRequest,
+    user_id: str = Depends(get_current_user),
+) -> UserPublic:
+    """Update user settings (timezone, etc.)."""
+    user = await User.get(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Merge new settings with existing
+    current_settings = user.settings or {}
+    current_settings.update(request.settings)
+    user.settings = current_settings
+    await user.save()
+
+    return UserPublic(id=str(user.id), email=user.email, name=user.name, settings=user.settings)

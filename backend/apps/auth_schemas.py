@@ -16,3 +16,9 @@ class RegisterRequest(BaseModel):
 
 class RefreshRequest(BaseModel):
     """Body not needed — refresh token comes via httpOnly cookie."""
+
+
+class UpdateUserSettingsRequest(BaseModel):
+    """Update user settings like timezone."""
+
+    settings: dict = Field(default_factory=dict, description="User settings object (e.g., {timezone: 'Asia/Ho_Chi_Minh'})")

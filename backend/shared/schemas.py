@@ -35,6 +35,7 @@ class UserPublic(BaseModel):
     id: str
     email: str
     name: str
+    settings: dict = Field(default_factory=dict)
 
 
 # ─── Auth ──────────────────────────────────────────────────────────────────────

@@ -66,10 +66,11 @@ Tìm trong `globals.css`:
 .amount-positive   /* Income/green */
 .amount-negative  /* Expense/red */
 .section-label     /* UPPERCASE section headers */
-.widget-small     /* grid-column: span 4 */
-.widget-medium    /* grid-column: span 6 */
-.widget-large     /* grid-column: span 8 */
-.widget-full-width /* grid-column: span 12 */
+.widget-size-compact   /* grid-column: span 4 */
+.widget-size-standard  /* grid-column: span 6 */
+.widget-size-wide      /* grid-column: span 8 */
+.widget-size-tall      /* grid-column: span 6, taller */
+.widget-size-full      /* grid-column: span 12 */
 ```
 
 ---

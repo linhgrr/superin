@@ -135,11 +135,11 @@ Backend manifest, frontend types, và CSS phải đồng nhất:
 
 | Size | Backend | Frontend CSS |
 |------|---------|--------------|
-| compact | `compact` | `widget-small` |
-| standard | `standard` | `widget-medium` |
-| wide | `wide` | `widget-large` |
-| tall | `tall` | `widget-tall` |
-| full | `full` | `widget-full-width` |
+| compact | `compact` | `widget-size-compact` |
+| standard | `standard` | `widget-size-standard` |
+| wide | `wide` | `widget-size-wide` |
+| tall | `tall` | `widget-size-tall` |
+| full | `full` | `widget-size-full` |
 
 Widget ID format: `{app_id}.{kebab-name}` (vd: `finance.total-balance`)
 
@@ -231,13 +231,14 @@ npm run build:frontend
 ### Widget CSS Classes
 
 ```css
-.widget-card       /* Container */
-.widget-small      /* 4 cols */
-.widget-medium     /* 6 cols */
-.widget-large      /* 8 cols */
-.widget-full-width /* 12 cols */
-.stat-value        /* KPI numbers */
-.section-label     /* UPPERCASE headers */
+.widget-card            /* Container */
+.widget-size-compact    /* 4 cols */
+.widget-size-standard   /* 6 cols */
+.widget-size-wide       /* 8 cols */
+.widget-size-tall      /* 6 cols, taller */
+.widget-size-full      /* 12 cols */
+.stat-value            /* KPI numbers */
+.section-label         /* UPPERCASE headers */
 ```
 
 ---
