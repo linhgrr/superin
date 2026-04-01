@@ -150,7 +150,7 @@ class CalendarRepository:
     async def find_default(self, user_id: str) -> Calendar | None:
         return await Calendar.find_one(
             Calendar.user_id == PydanticObjectId(user_id),
-            Calendar.is_default == True,
+            Calendar.is_default,
         )
 
     async def create(

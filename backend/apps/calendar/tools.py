@@ -9,7 +9,6 @@ from apps.calendar.service import calendar_service
 from shared.agent_context import get_user_context
 from shared.tool_results import safe_tool_call
 
-
 # ─── Core Event Tools ─────────────────────────────────────────────────────────
 
 @tool

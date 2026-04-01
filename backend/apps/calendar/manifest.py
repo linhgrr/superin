@@ -6,7 +6,6 @@ from shared.schemas import (
     WidgetManifestSchema,
 )
 
-
 month_view_widget = WidgetManifestSchema(
     id="calendar.month-view",
     name="Month View",
