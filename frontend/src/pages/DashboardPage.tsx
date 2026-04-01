@@ -132,9 +132,11 @@ function WidgetContent({
 
 function WidgetCard({
   widget,
+  color,
   children,
 }: {
   widget: AppCatalogEntry["widgets"][number];
+  color?: string | null;
   children: React.ReactNode;
 }) {
   const [mousePos, setMousePos] = useState({ x: 50, y: 50 });
@@ -155,7 +157,23 @@ function WidgetCard({
         "--mouse-y": `${mousePos.y}%`,
       } as React.CSSProperties}
     >
-      <div className="widget-card-title">{widget.name}</div>
+      {color && (
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            height: "3px",
+            background: color,
+            borderRadius: "16px 16px 0 0",
+            zIndex: 1,
+          }}
+        />
+      )}
+      <div className="widget-card-title" style={{ marginTop: color ? "3px" : undefined }}>
+        {widget.name}
+      </div>
       {children}
     </div>
   );
@@ -441,9 +459,9 @@ function DashboardInner({
         margin={[16, 16]}
         containerPadding={[0, 0]}
       >
-        {visibleWidgets.map(({ widgetId, appId, widget }) => (
+        {visibleWidgets.map(({ widgetId, appId, widget, app }) => (
           <div key={widgetId} className="rgl-item-view">
-            <WidgetCard widget={widget}>
+            <WidgetCard widget={widget} color={app.color}>
               <WidgetContent appId={appId} widgetId={widgetId} widget={widget} />
             </WidgetCard>
           </div>

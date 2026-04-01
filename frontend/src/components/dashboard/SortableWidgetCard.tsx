@@ -10,6 +10,7 @@
  *   <SortableWidgetCard
  *     widgetId="finance.total-balance"
  *     widgetSize="medium"
+ *     color="oklch(0.70 0.18 250)"
  *     onRemove={handleRemove}
  *   >
  *     <WidgetContent />
@@ -26,6 +27,7 @@ import type { WidgetManifestSchema } from "@/types/generated/api";
 export interface SortableWidgetCardProps {
   widgetId: string;
   widgetSize: WidgetManifestSchema["size"];
+  color?: string | null;
   onRemove: (widgetId: string) => void;
   children: React.ReactNode;
 }
@@ -35,6 +37,7 @@ export interface SortableWidgetCardProps {
 export default function SortableWidgetCard({
   widgetId,
   widgetSize,
+  color,
   onRemove,
   children,
 }: SortableWidgetCardProps) {
@@ -78,7 +81,23 @@ export default function SortableWidgetCard({
       </div>
 
       {/* Widget content */}
-      <div className="widget-card">{children}</div>
+      <div className="widget-card" style={{ position: "relative" }}>
+        {color && (
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              height: "3px",
+              background: color,
+              borderRadius: "16px 16px 0 0",
+              zIndex: 1,
+            }}
+          />
+        )}
+        {children}
+      </div>
     </div>
   );
 }
