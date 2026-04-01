@@ -1,5 +1,5 @@
 /**
- * DashboardPage — main landing after login.
+ * DashboardPage — Refined dashboard experience.
  *
  * Architecture:
  *   DashboardPage
@@ -13,7 +13,7 @@ import ReactGridLayout, { Responsive } from "react-grid-layout";
 type Layout = ReactGridLayout.Layout;
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
-import { Grid3X3, Plus } from "lucide-react";
+import { Grid3X3, Plus, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { getFrontendApp } from "@/apps";
@@ -37,9 +37,8 @@ const ROW_HEIGHT = 80;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-/** Flattened widget record used internally to track position & visibility. */
 interface ResolvedWidget {
-  widgetId: string; // full id e.g. "finance.total-balance"
+  widgetId: string;
   appId: string;
   app: AppCatalogEntry;
   widget: AppCatalogEntry["widgets"][number];
@@ -57,7 +56,6 @@ function appIdFrom(widgetId: string) {
   return dot === -1 ? widgetId : widgetId.slice(0, dot);
 }
 
-/** Build an RGL Layout item from a resolved widget + its saved config. */
 function buildLayoutItem(
   rw: ResolvedWidget,
   pref: WidgetPreferenceSchema | undefined,
@@ -67,7 +65,6 @@ function buildLayoutItem(
   const w = config.width;
   const h = config.rglH;
 
-  // Use saved grid position from pref.config if available
   const savedX = pref?.config?.gridX as number | undefined;
   const savedY = pref?.config?.gridY as number | undefined;
 
@@ -75,8 +72,6 @@ function buildLayoutItem(
     return { i: rw.widgetId, x: savedX, y: savedY, w, h };
   }
 
-  // Auto-pack fallback: place sequentially in the 12-column grid
-  // Each widget takes `w` columns, so stack them row by row
   let col = 0;
   let row = 0;
   for (const previousWidget of previousWidgets) {
@@ -92,7 +87,6 @@ function buildLayoutItem(
 
 // ─── WidgetContent ─────────────────────────────────────────────────────────────
 
-/** Renders the actual widget component based on appId. */
 function WidgetContent({
   appId,
   widgetId,
@@ -109,16 +103,65 @@ function WidgetContent({
     return <DashboardWidget widgetId={widgetId} widget={widget} />;
   }
 
-  // Fallback for unknown apps
   return (
-    <div>
-      <p className="section-label">{widget.name}</p>
-      <p style={{ fontSize: "0.875rem", color: "var(--color-muted)", margin: "0.25rem 0 0" }}>
+    <div className="empty-state" style={{ padding: "2rem 1rem" }}>
+      <div
+        style={{
+          width: "48px",
+          height: "48px",
+          borderRadius: "12px",
+          background: "var(--color-surface-elevated)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          marginBottom: "0.75rem",
+          color: "var(--color-foreground-muted)",
+        }}
+      >
+        <Grid3X3 size={24} />
+      </div>
+      <p className="widget-card-title">{widget.name}</p>
+      <p style={{ fontSize: "0.8125rem", color: "var(--color-foreground-muted)", margin: 0 }}>
         {widget.description}
       </p>
     </div>
   );
 }
+
+// ─── WidgetCard ──────────────────────────────────────────────────────────────
+
+function WidgetCard({
+  widget,
+  children,
+}: {
+  widget: AppCatalogEntry["widgets"][number];
+  children: React.ReactNode;
+}) {
+  const [mousePos, setMousePos] = useState({ x: 50, y: 50 });
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    setMousePos({ x, y });
+  };
+
+  return (
+    <div
+      className="widget-card"
+      onMouseMove={handleMouseMove}
+      style={{
+        "--mouse-x": `${mousePos.x}%`,
+        "--mouse-y": `${mousePos.y}%`,
+      } as React.CSSProperties}
+    >
+      <div className="widget-card-title">{widget.name}</div>
+      {children}
+    </div>
+  );
+}
+
+// ─── DashboardInner ─────────────────────────────────────────────────────────
 
 function DashboardInner({
   installedApps,
@@ -148,8 +191,6 @@ function DashboardInner({
     () => new Set(installedApps.map((a) => a.id)),
     [installedApps]
   );
-
-  // ── Load preferences ────────────────────────────────────────────────────────
 
   const replacePrefs = useCallback((entries: Iterable<[string, WidgetPreferenceSchema]>) => {
     setPrefs(new Map(entries));
@@ -196,9 +237,6 @@ function DashboardInner({
     return next;
   }, [installedApps, isWidgetEnabled, prefs]);
 
-  /**
-   * Returns widgets that should currently be visible, sorted by position.
-   */
   const visibleWidgets = useMemo<ResolvedWidget[]>(() => {
     const items: ResolvedWidget[] = [];
 
@@ -214,8 +252,6 @@ function DashboardInner({
 
     return items.sort((a, b) => a.position - b.position);
   }, [installedApps, isWidgetEnabled, prefs]);
-
-  // ── Build RGL layout ────────────────────────────────────────────────────────
 
   const layout = useMemo<Layout[]>(() => {
     return visibleWidgets.map((rw, idx) =>
@@ -355,8 +391,6 @@ function DashboardInner({
     [applyUpdatesLocally, loadPrefs, persistUpdates, prefs]
   );
 
-  // ── Render ──────────────────────────────────────────────────────────────────
-
   if (!isPrefsLoaded) {
     return (
       <div className="widget-grid">
@@ -367,7 +401,7 @@ function DashboardInner({
               style={{
                 minHeight: WIDGET_SIZES[size].height === "auto" ? "120px" : WIDGET_SIZES[size].height,
                 background: "var(--color-surface-elevated)",
-                animation: "pulse 1.5s infinite",
+                animation: `pulse 1.5s ease-in-out ${i * 0.2}s infinite`,
               }}
             />
           </div>
@@ -377,15 +411,17 @@ function DashboardInner({
   }
 
   return (
-    <div ref={containerRef}>
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "0.75rem" }}>
+    <div ref={containerRef} style={{ animation: "fadeIn 0.4s ease" }}>
+      {/* Add widget button */}
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1rem" }}>
         <button
           type="button"
           className="btn btn-secondary btn-sm"
           onClick={() => setIsDialogOpen(true)}
           aria-label="Add widget"
+          style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
         >
-          <Plus size={14} />
+          <Plus size={16} />
           Add Widget
         </button>
       </div>
@@ -407,9 +443,9 @@ function DashboardInner({
       >
         {visibleWidgets.map(({ widgetId, appId, widget }) => (
           <div key={widgetId} className="rgl-item-view">
-            <div className="widget-card">
+            <WidgetCard widget={widget}>
               <WidgetContent appId={appId} widgetId={widgetId} widget={widget} />
-            </div>
+            </WidgetCard>
           </div>
         ))}
       </ResponsiveGridLayout>
@@ -427,13 +463,10 @@ function DashboardInner({
   );
 }
 
-
 // ─── Page root ────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
   const { installedApps: catalog, isCatalogLoading: loading } = useAppCatalog();
-
-  // ── Loading skeleton ───────────────────────────────────────────────────────
 
   if (loading) {
     return (
@@ -445,7 +478,7 @@ export default function DashboardPage() {
               style={{
                 minHeight: WIDGET_SIZES[size].height === "auto" ? "120px" : WIDGET_SIZES[size].height,
                 background: "var(--color-surface-elevated)",
-                animation: "pulse 1.5s infinite",
+                animation: `pulse 1.5s ease-in-out ${i * 0.15}s infinite`,
               }}
             />
           </div>
@@ -454,39 +487,25 @@ export default function DashboardPage() {
     );
   }
 
-  // ── Empty state ─────────────────────────────────────────────────────────────
-
   const allWidgets = catalog.flatMap((app) => app.widgets ?? []);
 
   if (allWidgets.length === 0) {
     return (
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          height: "60vh",
-          gap: "0.75rem",
-          color: "var(--color-muted)",
-        }}
-      >
-        <Grid3X3 size={48} />
-        <p style={{ fontSize: "1rem", fontWeight: 500, color: "var(--color-foreground)" }}>
-          No apps installed yet
-        </p>
-        <p style={{ fontSize: "0.875rem" }}>
-          Visit the{" "}
-          <a href="/store" style={{ color: "var(--color-primary)" }}>
+      <div className="empty-state" style={{ height: "60vh" }}>
+        <div className="empty-state-icon">
+          <Sparkles size={32} />
+        </div>
+        <h3 className="empty-state-title">Welcome to Shin</h3>
+        <p className="empty-state-description">
+          Your dashboard is empty. Visit the{" "}
+          <a href="/store" style={{ color: "var(--color-primary)", fontWeight: 600 }}>
             App Store
           </a>{" "}
-          to get started.
+          to install your first app.
         </p>
       </div>
     );
   }
-
-  // ── Normal render ───────────────────────────────────────────────────────────
 
   return <DashboardInner installedApps={catalog} />;
 }

@@ -1,8 +1,5 @@
 /**
- * ChatThread — chat UI built with @assistant-ui/react primitives.
- *
- * Runtime: shared via AppProviders (AssistantRuntimeProvider wrapping the whole app).
- * This component only renders the ThreadPrimitive — no runtime creation here.
+ * ChatThread — Refined chat experience with @assistant-ui/react.
  */
 
 "use client";
@@ -14,7 +11,7 @@ import {
   ThreadPrimitive,
   useMessage,
 } from "@assistant-ui/react";
-import { Zap } from "lucide-react";
+import { Zap, Send, Sparkles } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -26,20 +23,7 @@ function ToolCallBadge({
   argsText?: string;
 }) {
   return (
-    <div
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: "0.375rem",
-        background: "oklch(0.65 0.21 280 / 0.1)",
-        border: "1px solid oklch(0.65 0.21 280 / 0.3)",
-        borderRadius: "999px",
-        padding: "0.2rem 0.625rem",
-        fontSize: "0.6875rem",
-        color: "var(--color-primary)",
-        fontFamily: "monospace",
-      }}
-    >
+    <div className="tool-call-badge">
       <Zap size={12} style={{ fontWeight: 600 }} />
       <span>{toolName}</span>
       {argsText ? (
@@ -70,7 +54,7 @@ function MessageBubble() {
   const isRunning = isAssistant && message.status?.type === "running";
 
   return (
-    <div>
+    <div style={{ animation: "fadeInScale 0.2s ease" }}>
       <div
         style={{
           display: "flex",
@@ -79,21 +63,7 @@ function MessageBubble() {
         }}
       >
         <div
-          style={{
-            maxWidth: "85%",
-            padding: "0.625rem 0.875rem",
-            borderRadius: "0.875rem",
-            background: isUser
-              ? "var(--color-primary)"
-              : "var(--color-surface-elevated)",
-            color: isUser
-              ? "var(--color-primary-foreground)"
-              : "var(--color-foreground)",
-            fontSize: "0.875rem",
-            lineHeight: 1.5,
-            whiteSpace: "pre-wrap",
-            wordBreak: "break-word",
-          }}
+          className={isUser ? "message-bubble message-bubble-user" : "message-bubble message-bubble-assistant"}
         >
           {textParts.map((part, index) => (
             <div
@@ -104,7 +74,11 @@ function MessageBubble() {
             </div>
           ))}
           {isRunning && textParts.length === 0 ? (
-            <span style={{ color: "var(--color-muted)" }}>Thinking…</span>
+            <span style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <span className="animate-pulse">●</span>
+              <span className="animate-pulse" style={{ animationDelay: "0.2s" }}>●</span>
+              <span className="animate-pulse" style={{ animationDelay: "0.4s" }}>●</span>
+            </span>
           ) : null}
         </div>
       </div>
@@ -135,8 +109,8 @@ function MessageBubble() {
             marginBottom: "0.5rem",
             padding: "0.625rem 0.875rem",
             borderRadius: "0.75rem",
-            background: "oklch(0.63 0.24 25 / 0.12)",
-            border: "1px solid oklch(0.63 0.24 25 / 0.28)",
+            background: "oklch(0.62 0.22 25 / 0.12)",
+            border: "1px solid oklch(0.62 0.22 25 / 0.28)",
             color: "var(--color-danger)",
             fontSize: "0.8125rem",
             lineHeight: 1.45,
@@ -151,20 +125,25 @@ function MessageBubble() {
 
 export default function ChatThread() {
   return (
-    <ThreadPrimitive.Root
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        height: "100%",
-        overflow: "hidden",
-        background: "var(--color-surface)",
-        borderLeft: "1px solid var(--color-border)",
-      }}
-    >
+    <ThreadPrimitive.Root className="chat-container">
+      {/* Header */}
+      <div className="chat-header">
+        <div>
+          <div className="chat-header-title">
+            <span style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <Sparkles size={16} style={{ color: "var(--color-primary)" }} />
+              Shin AI
+            </span>
+          </div>
+          <div className="chat-header-subtitle">Powered by RootAgent</div>
+        </div>
+      </div>
+
+      {/* Messages */}
       <ThreadPrimitive.Viewport
         autoScroll={true}
         turnAnchor="bottom"
-        style={{ flex: 1, overflowY: "auto", padding: "1rem" }}
+        className="chat-messages"
       >
         <ThreadPrimitive.Messages
           components={{
@@ -175,60 +154,15 @@ export default function ChatThread() {
         />
       </ThreadPrimitive.Viewport>
 
-      <ComposerPrimitive.Root
-        style={{
-          padding: "0.75rem 1rem",
-          borderTop: "1px solid var(--color-border)",
-          display: "flex",
-          gap: "0.5rem",
-          alignItems: "flex-end",
-        }}
-      >
+      {/* Input */}
+      <ComposerPrimitive.Root className="chat-input-container">
         <ComposerPrimitive.Input
-          placeholder="Ask Rin... (Enter to send)"
+          placeholder="Ask Shin anything... (Enter to send)"
           maxRows={5}
-          style={{
-            flex: 1,
-            background: "var(--color-surface-elevated)",
-            border: "1px solid var(--color-border)",
-            borderRadius: "0.75rem",
-            padding: "0.5rem 0.75rem",
-            color: "var(--color-foreground)",
-            fontSize: "0.875rem",
-            outline: "none",
-            resize: "none",
-            overflowY: "auto",
-            lineHeight: 1.5,
-          }}
+          className="chat-input"
         />
-        <ComposerPrimitive.Send
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: "2.25rem",
-            height: "2.25rem",
-            borderRadius: "0.75rem",
-            background: "var(--color-primary)",
-            color: "var(--color-primary-foreground)",
-            border: "none",
-            cursor: "pointer",
-            flexShrink: 0,
-          }}
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <line x1="22" y1="2" x2="11" y2="13" />
-            <polygon points="22,2 15,22 11,13 2,9" />
-          </svg>
+        <ComposerPrimitive.Send className="chat-send-btn">
+          <Send size={16} />
         </ComposerPrimitive.Send>
       </ComposerPrimitive.Root>
     </ThreadPrimitive.Root>

@@ -1,30 +1,32 @@
 /**
- * Sidebar — installed app icons + nav.
+ * Sidebar — Refined navigation with glassmorphism.
  *
- * Reads installed apps from shared app catalog state.
- * Highlights the active app via current URL.
+ * Installed apps navigation with refined hover states.
  */
 
 import { memo } from "react";
-import { NavLink } from "react-router-dom";
-import { LayoutDashboard, Store } from "lucide-react";
+import { NavLink, useLocation } from "react-router-dom";
+import { LayoutDashboard, Store, Sparkles } from "lucide-react";
 import { useAppCatalog } from "@/components/providers/AppProviders";
 import type { AppCatalogEntry } from "@/types/generated/api";
 
 const APP_ICON_COLORS: Record<string, string> = {
-  finance: "oklch(0.72 0.19 145)",
-  todo: "oklch(0.65 0.21 280)",
+  finance: "linear-gradient(135deg, oklch(0.72 0.19 145) 0%, oklch(0.65 0.22 145) 100%)",
+  todo: "linear-gradient(135deg, oklch(0.65 0.21 280) 0%, oklch(0.60 0.23 280) 100%)",
 };
 
 function AppIcon({ entry }: { entry: AppCatalogEntry }) {
-  const color = entry.color || APP_ICON_COLORS[entry.id] || "var(--color-primary)";
+  const gradient = entry.color
+    ? `linear-gradient(135deg, ${entry.color} 0%, ${entry.color}dd 100%)`
+    : APP_ICON_COLORS[entry.id] || "linear-gradient(135deg, var(--color-primary) 0%, oklch(0.72 0.24 45) 100%)";
+
   return (
     <div
       style={{
         width: "32px",
         height: "32px",
-        borderRadius: "8px",
-        background: color,
+        borderRadius: "10px",
+        background: gradient,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -32,6 +34,8 @@ function AppIcon({ entry }: { entry: AppCatalogEntry }) {
         fontWeight: 700,
         flexShrink: 0,
         color: "white",
+        boxShadow: "0 2px 8px oklch(0 0 0 / 0.25)",
+        fontFamily: "var(--font-display)",
       }}
     >
       {entry.icon ? entry.icon.slice(0, 2).toUpperCase() : entry.name.slice(0, 2).toUpperCase()}
@@ -41,77 +45,50 @@ function AppIcon({ entry }: { entry: AppCatalogEntry }) {
 
 function Sidebar() {
   const { installedApps } = useAppCatalog();
+  const location = useLocation();
+
+  const isActive = (path: string) => {
+    return location.pathname.startsWith(path);
+  };
 
   return (
     <aside className="sidebar">
-      {/* Logo / brand */}
-      <div
-        style={{
-          padding: "1rem",
-          borderBottom: "1px solid var(--color-border)",
-          display: "flex",
-          alignItems: "center",
-          gap: "0.5rem",
-        }}
-      >
-        <div
-          style={{
-            width: "32px",
-            height: "32px",
-            borderRadius: "8px",
-            background: "var(--color-primary)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontWeight: 700,
-            color: "var(--color-primary-foreground)",
-            fontSize: "0.875rem",
-          }}
-        >
-          S
+      {/* Brand */}
+      <div className="sidebar-brand">
+        <div className="sidebar-brand-icon">
+          <Sparkles size={18} />
         </div>
-        <span
-          style={{
-            fontFamily: "var(--font-heading)",
-            fontWeight: 600,
-            fontSize: "0.9375rem",
-            color: "var(--color-foreground)",
-          }}
-        >
-          Shin
-        </span>
+        <span className="sidebar-brand-text">Shin</span>
       </div>
 
-      {/* Home */}
-      <NavLink
-        to="/dashboard"
-        className={({ isActive }) => `app-item${isActive ? " active" : ""}`}
-      >
-        <LayoutDashboard size={16} />
-        <span>Dashboard</span>
-      </NavLink>
+      {/* Navigation */}
+      <nav style={{ padding: "0.75rem 0" }}>
+        {/* Dashboard */}
+        <NavLink
+          to="/dashboard"
+          className={({ isActive }) => `app-item${isActive ? " active" : ""}`}
+        >
+          <LayoutDashboard size={18} strokeWidth={2} />
+          <span>Dashboard</span>
+        </NavLink>
 
-      {/* Installed apps */}
-      {installedApps.length > 0 && (
-        <div style={{ marginTop: "1rem" }}>
-          <p
-            className="section-label"
-            style={{ padding: "0 1rem", marginBottom: "0.25rem" }}
-          >
-            Apps
-          </p>
-          {installedApps.map((app) => (
-            <NavLink
-              key={app.id}
-              to={`/apps/${app.id}`}
-              className={({ isActive }) => `app-item${isActive ? " active" : ""}`}
-            >
-              <AppIcon entry={app} />
-              <span>{app.name}</span>
-            </NavLink>
-          ))}
-        </div>
-      )}
+        {/* Installed Apps */}
+        {installedApps.length > 0 && (
+          <div style={{ marginTop: "1.5rem" }}>
+            <p className="section-label">Apps</p>
+            {installedApps.map((app) => (
+              <NavLink
+                key={app.id}
+                to={`/apps/${app.id}`}
+                className={({ isActive }) => `app-item${isActive ? " active" : ""}`}
+              >
+                <AppIcon entry={app} />
+                <span>{app.name}</span>
+              </NavLink>
+            ))}
+          </div>
+        )}
+      </nav>
 
       {/* Store */}
       <div style={{ marginTop: "auto", padding: "1rem", borderTop: "1px solid var(--color-border)" }}>
@@ -119,7 +96,7 @@ function Sidebar() {
           to="/store"
           className={({ isActive }) => `app-item${isActive ? " active" : ""}`}
         >
-          <Store size={16} />
+          <Store size={18} strokeWidth={2} />
           <span>App Store</span>
         </NavLink>
       </div>

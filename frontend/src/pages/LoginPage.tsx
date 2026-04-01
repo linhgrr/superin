@@ -1,8 +1,7 @@
 /**
- * LoginPage — /login
+ * LoginPage — Refined auth experience.
  *
- * Tabs: Login / Register.
- * Validates email + password, shows inline errors, redirects on success.
+ * Tabs: Login / Register with refined animations.
  */
 
 import { useState } from "react";
@@ -10,6 +9,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { ApiError } from "@/api/client";
 import { APP_NAME } from "@/config";
+import { Eye, EyeOff, ArrowRight, Sparkles } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -51,65 +51,6 @@ function validateRegisterForm(f: FormState): FieldErrors {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function FieldError({ msg }: { msg?: string }) {
-  if (!msg) return null;
-  return (
-    <span
-      style={{
-        display: "block",
-        marginTop: "0.25rem",
-        fontSize: "0.75rem",
-        color: "var(--color-danger)",
-      }}
-    >
-      {msg}
-    </span>
-  );
-}
-
-function FormInput({
-  label,
-  id,
-  type = "text",
-  value,
-  onChange,
-  error,
-  placeholder,
-  autoComplete,
-}: {
-  label: string;
-  id: string;
-  type?: string;
-  value: string;
-  onChange: (v: string) => void;
-  error?: string;
-  placeholder?: string;
-  autoComplete?: string;
-}) {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>
-      <label
-        htmlFor={id}
-        style={{ fontSize: "0.875rem", fontWeight: 500, color: "var(--color-muted)" }}
-      >
-        {label}
-      </label>
-      <input
-        id={id}
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        autoComplete={autoComplete}
-        style={error ? { borderColor: "var(--color-danger)" } : {}}
-      />
-      <FieldError msg={error} />
-    </div>
-  );
-}
-
-// ─── Main component ───────────────────────────────────────────────────────────
-
 type Mode = "login" | "register";
 
 export default function LoginPage() {
@@ -120,11 +61,11 @@ export default function LoginPage() {
   const [form, setForm] = useState<FormState>({ email: "", password: "", name: "" });
   const [errors, setErrors] = useState<FieldErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   function setField(field: keyof FormState) {
     return (value: string) => {
       setForm((f) => ({ ...f, [field]: value }));
-      // Clear field error on change
       setErrors((e) => ({ ...e, [field]: undefined, global: undefined }));
     };
   }
@@ -166,71 +107,21 @@ export default function LoginPage() {
   }
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "var(--color-background)",
-        padding: "1rem",
-      }}
-    >
-      <div
-        style={{
-          width: "100%",
-          maxWidth: "400px",
-          background: "var(--color-surface)",
-          border: "1px solid var(--color-border)",
-          borderRadius: "1rem",
-          padding: "2rem",
-        }}
-      >
+    <div className="login-container">
+      <div className="login-card">
         {/* Brand */}
-        <div style={{ textAlign: "center", marginBottom: "2rem" }}>
-          <div
-            style={{
-              width: "48px",
-              height: "48px",
-              borderRadius: "12px",
-              background: "var(--color-primary)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              margin: "0 auto 0.75rem",
-              fontSize: "1.5rem",
-              fontWeight: 700,
-              color: "var(--color-primary-foreground)",
-            }}
-          >
-            S
+        <div className="login-brand">
+          <div className="login-brand-icon">
+            <Sparkles size={28} />
           </div>
-          <h1
-            style={{
-              fontSize: "1.25rem",
-              fontWeight: 700,
-              fontFamily: "var(--font-heading)",
-              color: "var(--color-foreground)",
-              margin: 0,
-            }}
-          >
-            {APP_NAME}
-          </h1>
-          <p style={{ fontSize: "0.875rem", color: "var(--color-muted)", margin: "0.25rem 0 0" }}>
+          <h1 className="login-brand-title">{APP_NAME}</h1>
+          <p className="login-brand-subtitle">
             {mode === "login" ? "Welcome back" : "Create your account"}
           </p>
         </div>
 
         {/* Tabs */}
-        <div
-          style={{
-            display: "flex",
-            background: "var(--color-surface-elevated)",
-            borderRadius: "0.5rem",
-            padding: "3px",
-            marginBottom: "1.5rem",
-          }}
-        >
+        <div className="login-tabs">
           {(["login", "register"] as Mode[]).map((m) => (
             <button
               key={m}
@@ -239,21 +130,7 @@ export default function LoginPage() {
                 setMode(m);
                 setErrors({});
               }}
-              style={{
-                flex: 1,
-                padding: "0.375rem",
-                borderRadius: "calc(0.5rem - 2px)",
-                border: "none",
-                cursor: "pointer",
-                fontSize: "0.875rem",
-                fontWeight: 500,
-                transition: "background 0.15s, color 0.15s",
-                background: mode === m ? "var(--color-surface)" : "transparent",
-                color:
-                  mode === m
-                    ? "var(--color-foreground)"
-                    : "var(--color-muted)",
-              }}
+              className={`login-tab ${mode === m ? "login-tab-active" : "login-tab-inactive"}`}
             >
               {m === "login" ? "Sign In" : "Sign Up"}
             </button>
@@ -262,98 +139,108 @@ export default function LoginPage() {
 
         {/* Global error */}
         {errors.global && (
-          <div
-            style={{
-              background: "oklch(0.63 0.24 25 / 0.1)",
-              border: "1px solid var(--color-danger)",
-              borderRadius: "0.5rem",
-              padding: "0.625rem 0.75rem",
-              fontSize: "0.875rem",
-              color: "var(--color-danger)",
-              marginBottom: "1rem",
-            }}
-          >
+          <div className="login-global-error animate-fade-in">
             {errors.global}
           </div>
         )}
 
         {/* Form */}
         <form onSubmit={handleSubmit} noValidate>
-          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
             {mode === "register" && (
-              <FormInput
-                label="Full Name"
-                id="name"
-                value={form.name ?? ""}
-                onChange={setField("name")}
-                error={errors.name}
-                placeholder="Nguyễn Văn A"
-                autoComplete="name"
-              />
+              <div className="login-form-group">
+                <label className="login-label">Full Name</label>
+                <input
+                  type="text"
+                  value={form.name ?? ""}
+                  onChange={(e) => setField("name")(e.target.value)}
+                  placeholder="John Doe"
+                  autoComplete="name"
+                  className="login-input"
+                />
+                {errors.name && <span className="login-error">{errors.name}</span>}
+              </div>
             )}
-            <FormInput
-              label="Email"
-              id="email"
-              type="email"
-              value={form.email}
-              onChange={setField("email")}
-              error={errors.email}
-              placeholder="you@example.com"
-              autoComplete="email"
-            />
-            <FormInput
-              label="Password"
-              id="password"
-              type="password"
-              value={form.password}
-              onChange={setField("password")}
-              error={errors.password}
-              placeholder={mode === "register" ? "At least 8 characters" : undefined}
-              autoComplete={mode === "login" ? "current-password" : "new-password"}
-            />
+
+            <div className="login-form-group">
+              <label className="login-label">Email Address</label>
+              <input
+                type="email"
+                value={form.email}
+                onChange={(e) => setField("email")(e.target.value)}
+                placeholder="you@example.com"
+                autoComplete="email"
+                className="login-input"
+              />
+              {errors.email && <span className="login-error">{errors.email}</span>}
+            </div>
+
+            <div className="login-form-group">
+              <label className="login-label">Password</label>
+              <div style={{ position: "relative" }}>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={form.password}
+                  onChange={(e) => setField("password")(e.target.value)}
+                  placeholder={mode === "register" ? "At least 8 characters" : "Enter your password"}
+                  autoComplete={mode === "login" ? "current-password" : "new-password"}
+                  className="login-input"
+                  style={{ paddingRight: "2.75rem" }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  style={{
+                    position: "absolute",
+                    right: "0.75rem",
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    padding: "0.25rem",
+                    color: "var(--color-foreground-muted)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+              {errors.password && <span className="login-error">{errors.password}</span>}
+            </div>
 
             <button
               type="submit"
-              className="btn btn-primary"
+              className="btn btn-primary login-submit"
               disabled={isSubmitting}
-              style={{
-                width: "100%",
-                justifyContent: "center",
-                padding: "0.625rem",
-                fontSize: "0.9375rem",
-                opacity: isSubmitting ? 0.7 : 1,
-                cursor: isSubmitting ? "not-allowed" : "pointer",
-              }}
             >
-              {isSubmitting
-                ? mode === "login"
-                  ? "Signing in…"
-                  : "Creating account…"
-                : mode === "login"
-                ? "Sign In"
-                : "Create Account"}
+              {isSubmitting ? (
+                <span style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                  <span className="animate-spin">⏳</span>
+                  {mode === "login" ? "Signing in…" : "Creating account…"}
+                </span>
+              ) : (
+                <span style={{ display: "flex", alignItems: "center", gap: "0.5rem", justifyContent: "center" }}>
+                  {mode === "login" ? "Sign In" : "Create Account"}
+                  <ArrowRight size={18} />
+                </span>
+              )}
             </button>
           </div>
         </form>
 
         {/* Footer */}
         {mode === "login" && (
-          <p style={{ textAlign: "center", fontSize: "0.8125rem", color: "var(--color-muted)", marginTop: "1.25rem" }}>
+          <p className="login-footer">
             Don't have an account?{" "}
             <button
               type="button"
               onClick={() => setMode("register")}
-              style={{
-                background: "none",
-                border: "none",
-                color: "var(--color-primary)",
-                cursor: "pointer",
-                fontSize: "inherit",
-                padding: 0,
-                fontWeight: 500,
-              }}
+              className="login-footer-link"
             >
-              Sign up
+              Sign up for free
             </button>
           </p>
         )}

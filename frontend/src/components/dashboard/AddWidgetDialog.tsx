@@ -1,13 +1,5 @@
 /**
- * AddWidgetDialog — 2-step widget manager.
- *
- * Step 1: pick an installed app
- * Step 2: show or hide widgets from that app
- *
- * Props:
- *   catalog     — AppCatalogEntry[]  (already filtered for is_installed)
- *   onToggleWidget — toggle widget visibility
- *   onClose     — () => void
+ * AddWidgetDialog — Refined 2-step widget manager.
  */
 
 import {
@@ -18,14 +10,12 @@ import {
   Eye,
   EyeOff,
   LayoutGrid,
-  Loader2,
   PieChart,
   Wallet,
+  X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { AppCatalogEntry } from "@/types/generated/api";
-
-// ─── Props ───────────────────────────────────────────────────────────────────
 
 export interface AddWidgetDialogProps {
   catalog: AppCatalogEntry[];
@@ -34,8 +24,6 @@ export interface AddWidgetDialogProps {
   onToggleWidget: (widgetId: string, enabled: boolean) => Promise<void> | void;
   onClose: () => void;
 }
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const SIZE_LABELS: Record<string, string> = {
   compact: "Compact",
@@ -53,6 +41,14 @@ const ICON_COMPONENTS = {
   Wallet,
 } as const;
 
+const SIZE_BADGE_COLORS: Record<string, { bg: string; text: string }> = {
+  compact: { bg: "oklch(0.55 0.05 80 / 0.15)", text: "oklch(0.55 0.05 80)" },
+  standard: { bg: "oklch(0.65 0.1 280 / 0.15)", text: "oklch(0.65 0.1 280)" },
+  wide: { bg: "oklch(0.65 0.18 35 / 0.15)", text: "oklch(0.65 0.18 35)" },
+  tall: { bg: "oklch(0.55 0.15 250 / 0.15)", text: "oklch(0.55 0.15 250)" },
+  full: { bg: "oklch(0.6 0.2 145 / 0.15)", text: "oklch(0.6 0.2 145)" },
+};
+
 function IconGlyph({
   iconName,
   fallback,
@@ -68,11 +64,26 @@ function IconGlyph({
       return <LucideIcon size={size} strokeWidth={2} />;
     }
   }
-
   return <span>{fallback.slice(0, 2).toUpperCase()}</span>;
 }
 
-// ─── Component ───────────────────────────────────────────────────────────────
+function LoadingSpinner() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="animate-spin"
+    >
+      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+    </svg>
+  );
+}
 
 export default function AddWidgetDialog({
   catalog,
@@ -82,8 +93,8 @@ export default function AddWidgetDialog({
   onClose,
 }: AddWidgetDialogProps) {
   const [selectedApp, setSelectedApp] = useState<AppCatalogEntry | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
-  // Close on Escape
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -92,8 +103,6 @@ export default function AddWidgetDialog({
     return () => document.removeEventListener("keydown", handler);
   }, [onClose]);
 
-  // Trap focus inside panel when open
-  const panelRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     panelRef.current?.focus();
   }, []);
@@ -115,40 +124,70 @@ export default function AddWidgetDialog({
           aria-modal="true"
           aria-label="Add Widget"
           onClick={(e) => e.stopPropagation()}
+          style={{ maxWidth: "420px" }}
         >
           <div className="dialog-header">
             <span className="dialog-title">Add Widget</span>
+            <button
+              type="button"
+              className="btn btn-ghost btn-icon"
+              onClick={onClose}
+              style={{ marginLeft: "auto" }}
+            >
+              <X size={18} />
+            </button>
           </div>
 
-          <div className="dialog-body">
+          <div className="dialog-body" style={{ padding: "0.5rem" }}>
             {catalog.length === 0 ? (
-              <p className="dialog-empty-message">No apps installed</p>
+              <div className="empty-state" style={{ padding: "2rem 1rem" }}>
+                <p style={{ color: "var(--color-foreground-muted)" }}>No apps installed</p>
+              </div>
             ) : (
-              catalog.map((app) => (
-                <button
-                  key={app.id}
-                  type="button"
-                  className="option-btn app-option-btn"
-                  onClick={() => setSelectedApp(app)}
-                >
-                  <div
-                    className="dialog-icon-badge"
-                    style={{ "--icon-bg": app.color + "22", "--icon-color": app.color } as React.CSSProperties}
-                  >
-                    <IconGlyph iconName={app.icon} fallback={app.name} size={18} />
-                  </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>
+                {catalog.map((app) => {
+                  const visibleCount = app.widgets.filter((widget) =>
+                    enabledWidgetIds.has(widget.id)
+                  ).length;
+                  const hasWidgets = visibleCount > 0;
 
-                  <div className="option-info">
-                    <div className="option-name">{app.name}</div>
-                    <div className="app-option-count">
-                      {app.widgets.filter((widget) => enabledWidgetIds.has(widget.id)).length}/
-                      {app.widgets.length} visible
-                    </div>
-                  </div>
+                  return (
+                    <button
+                      key={app.id}
+                      type="button"
+                      className="option-btn"
+                      onClick={() => setSelectedApp(app)}
+                      style={{
+                        padding: "0.875rem 1rem",
+                        borderRadius: "12px",
+                        transition: "all 0.2s ease",
+                      }}
+                    >
+                      <div
+                        className="option-icon"
+                        style={{
+                          background: app.color
+                            ? `${app.color}22`
+                            : "var(--color-surface-elevated)",
+                          color: app.color || "var(--color-foreground-muted)",
+                          border: app.color ? `1px solid ${app.color}33` : undefined,
+                        }}
+                      >
+                        <IconGlyph iconName={app.icon} fallback={app.name} size={18} />
+                      </div>
 
-                  <LayoutGrid size={16} className="dialog-option-chevron" />
-                </button>
-              ))
+                      <div className="option-info">
+                        <div className="option-name">{app.name}</div>
+                        <div style={{ fontSize: "0.75rem", color: "var(--color-foreground-muted)" }}>
+                          {visibleCount}/{app.widgets.length} widgets visible
+                        </div>
+                      </div>
+
+                      <LayoutGrid size={18} style={{ color: "var(--color-foreground-muted)" }} />
+                    </button>
+                  );
+                })}
+              </div>
             )}
           </div>
         </div>
@@ -170,79 +209,136 @@ export default function AddWidgetDialog({
         aria-modal="true"
         aria-label={`${selectedApp.name} widgets`}
         onClick={(e) => e.stopPropagation()}
+        style={{ maxWidth: "480px" }}
       >
         <div className="dialog-header">
           <button
             type="button"
-            className="btn btn-ghost dialog-back-btn"
+            className="btn btn-ghost btn-icon"
             onClick={() => setSelectedApp(null)}
             aria-label="Back to app list"
           >
             <ArrowLeft size={18} />
           </button>
-          <div className="option-info">
+          <div className="option-info" style={{ marginLeft: "0.5rem" }}>
             <span className="dialog-title">{selectedApp.name}</span>
-            <div className="app-option-count">
+            <div style={{ fontSize: "0.75rem", color: "var(--color-foreground-muted)" }}>
               {selectedAppVisibleCount}/{widgets.length} widgets visible
             </div>
           </div>
+          <button
+            type="button"
+            className="btn btn-ghost btn-icon"
+            onClick={onClose}
+            style={{ marginLeft: "auto" }}
+          >
+            <X size={18} />
+          </button>
         </div>
 
-        <div className="dialog-body">
+        <div className="dialog-body" style={{ padding: "0.5rem" }}>
           {widgets.length === 0 ? (
-            <p className="dialog-empty-message">No widgets available</p>
+            <div className="empty-state" style={{ padding: "2rem 1rem" }}>
+              <p style={{ color: "var(--color-foreground-muted)" }}>No widgets available</p>
+            </div>
           ) : (
-            widgets.map((widget) => (
-              <div key={widget.id} className="option-btn widget-option-row">
-                <div className="widget-option-icon">
-                  <IconGlyph iconName={widget.icon} fallback={widget.name} size={16} />
-                </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+              {widgets.map((widget) => {
+                const isEnabled = enabledWidgetIds.has(widget.id);
+                const isBusy = busyWidgetId === widget.id;
+                const sizeStyle = SIZE_BADGE_COLORS[widget.size] || SIZE_BADGE_COLORS.standard;
 
-                <div className="option-info">
-                  <div className="option-name">{widget.name}</div>
-                  <div className="widget-option-desc">{widget.description}</div>
-                </div>
-
-                <div className="widget-option-meta">
-                  <div className="widget-option-badges">
-                    <span className="widget-size-badge">
-                      {SIZE_LABELS[widget.size] ?? widget.size}
-                    </span>
-                    <span
-                      className={
-                        enabledWidgetIds.has(widget.id)
-                          ? "widget-visibility-badge is-visible"
-                          : "widget-visibility-badge is-hidden"
-                      }
-                    >
-                      {enabledWidgetIds.has(widget.id) ? "Visible" : "Hidden"}
-                    </span>
-                  </div>
-
-                  <button
-                    type="button"
-                    className={
-                      enabledWidgetIds.has(widget.id)
-                        ? "btn btn-ghost btn-sm widget-visibility-btn"
-                        : "btn btn-primary btn-sm widget-visibility-btn"
-                    }
-                    disabled={busyWidgetId === widget.id}
-                    onClick={async () => {
-                      await onToggleWidget(widget.id, !enabledWidgetIds.has(widget.id));
+                return (
+                  <div
+                    key={widget.id}
+                    className="option-btn"
+                    style={{
+                      flexDirection: "column",
+                      alignItems: "flex-start",
+                      padding: "1rem",
+                      borderRadius: "12px",
+                      gap: "0.75rem",
+                      border: isEnabled ? "1px solid var(--color-primary-muted)" : undefined,
+                      background: isEnabled ? "var(--color-primary-muted)" : undefined,
                     }}
                   >
-                    {busyWidgetId === widget.id ? (
-                      <Loader2 size={14} className="animate-spin" />
-                    ) : enabledWidgetIds.has(widget.id) ? (
-                      <EyeOff size={14} />
-                    ) : (
-                      <Eye size={14} />
-                    )}
-                    {enabledWidgetIds.has(widget.id) ? "Hide" : "Show"}
-                  </button>
-                </div>
-              </div>
-            ))
+                    <div style={{ display: "flex", width: "100%", gap: "0.75rem" }}>
+                      <div className="option-icon">
+                        <IconGlyph iconName={widget.icon} fallback={widget.name} size={16} />
+                      </div>
+
+                      <div className="option-info" style={{ flex: 1 }}>
+                        <div className="option-name">{widget.name}</div>
+                        <div className="option-description">{widget.description}</div>
+                      </div>
+                    </div>
+
+                    <div
+                      style={{
+                        display: "flex",
+                        width: "100%",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        marginTop: "0.25rem",
+                      }}
+                    >
+                      <div style={{ display: "flex", gap: "0.375rem" }}>
+                        <span
+                          className="badge"
+                          style={{
+                            background: sizeStyle.bg,
+                            color: sizeStyle.text,
+                            fontSize: "0.625rem",
+                            padding: "0.25rem 0.5rem",
+                          }}
+                        >
+                          {SIZE_LABELS[widget.size] ?? widget.size}
+                        </span>
+                        <span
+                          className="badge"
+                          style={{
+                            background: isEnabled
+                              ? "oklch(0.75 0.18 145 / 0.15)"
+                              : "oklch(0.55 0.02 265 / 0.15)",
+                            color: isEnabled
+                              ? "var(--color-success)"
+                              : "var(--color-foreground-muted)",
+                            fontSize: "0.625rem",
+                            padding: "0.25rem 0.5rem",
+                          }}
+                        >
+                          {isEnabled ? "Visible" : "Hidden"}
+                        </span>
+                      </div>
+
+                      <button
+                        type="button"
+                        className={`btn btn-sm ${isEnabled ? "btn-ghost" : "btn-primary"}`}
+                        disabled={isBusy}
+                        onClick={async () => {
+                          await onToggleWidget(widget.id, !isEnabled);
+                        }}
+                        style={{ minWidth: "80px", justifyContent: "center" }}
+                      >
+                        {isBusy ? (
+                          <LoadingSpinner />
+                        ) : isEnabled ? (
+                          <>
+                            <EyeOff size={14} style={{ marginRight: "0.375rem" }} />
+                            Hide
+                          </>
+                        ) : (
+                          <>
+                            <Eye size={14} style={{ marginRight: "0.375rem" }} />
+                            Show
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
       </div>
