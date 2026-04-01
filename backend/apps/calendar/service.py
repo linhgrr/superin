@@ -5,7 +5,6 @@ from typing import Literal
 
 from apps.calendar.models import Calendar, Event, RecurringRule
 from apps.calendar.repository import CalendarRepository, EventRepository, RecurringRuleRepository
-from apps.todo.service import task_service as todo_task_service
 
 # Default colors for calendars
 DEFAULT_CALENDAR_COLOR = "oklch(0.70 0.18 250)"  # Blue-ish
@@ -234,8 +233,11 @@ class CalendarService:
         calendar_id: str | None = None,
     ) -> dict:
         """Create time-blocked event from Todo task."""
-        # Fetch the actual task to get its title
-        task = await todo_task_service.get_task(task_id, user_id)
+        # Local import to avoid circular dependency
+        from apps.todo.repository import TaskRepository
+
+        task_repo = TaskRepository()
+        task = await task_repo.find_by_id(task_id, user_id)
         if not task:
             raise ValueError(f"Task '{task_id}' not found")
 
@@ -252,7 +254,7 @@ class CalendarService:
         # Create event with task reference and actual task title
         event = await self.events.create(
             user_id=user_id,
-            title=task["title"],
+            title=task.title,
             start_datetime=start_datetime,
             end_datetime=end_datetime,
             calendar_id=calendar_id,
