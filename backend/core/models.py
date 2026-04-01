@@ -7,6 +7,7 @@ Plugin-specific models live in backend/apps/{app_id}/models.py.
 from datetime import UTC, datetime
 from typing import Literal
 
+import pytz
 from beanie import Document, PydanticObjectId
 from pydantic import Field
 
@@ -22,8 +23,6 @@ def get_user_local_time(user: "User") -> tuple[str, str]:
         tuple of (date_str, time_str) in user's local timezone.
         Defaults to UTC if user has no timezone set.
     """
-    import pytz
-
     tz_name = user.settings.get("timezone", "UTC")
     try:
         tz = pytz.timezone(tz_name)
@@ -46,7 +45,6 @@ class User(Document):
     class Settings:
         name = "users"
         indexes = [["email"]]
-
 
 
 class UserAppInstallation(Document):

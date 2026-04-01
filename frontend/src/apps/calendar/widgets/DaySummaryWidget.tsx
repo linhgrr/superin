@@ -24,12 +24,13 @@ export default function DaySummaryWidget() {
       const tomorrowEnd = new Date(todayEnd);
       tomorrowEnd.setDate(tomorrowEnd.getDate() + 1);
 
-      // Get today's events count
-      const todayEvents = await listEvents(todayStart.toISOString(), todayEnd.toISOString(), undefined, 100);
-      setTodayCount(todayEvents.length);
+      // Fetch in parallel
+      const [todayEvents, upcoming] = await Promise.all([
+        listEvents(todayStart.toISOString(), todayEnd.toISOString(), undefined, 100),
+        listEvents(now.toISOString(), tomorrowEnd.toISOString(), undefined, 1),
+      ]);
 
-      // Get next upcoming event (from now)
-      const upcoming = await listEvents(now.toISOString(), tomorrowEnd.toISOString(), undefined, 1);
+      setTodayCount(todayEvents.length);
       setNextEvent(upcoming[0] || null);
     } finally {
       setIsLoading(false);
