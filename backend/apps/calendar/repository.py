@@ -27,12 +27,12 @@ class EventRepository:
             query = query & (Event.calendar_id == PydanticObjectId(calendar_id))
 
         if start and end:
-            # Events overlapping with range
-            query = query & (
-                (Event.start_datetime >= start) & (Event.start_datetime < end)
-                | (Event.end_datetime > start) & (Event.end_datetime <= end)
-                | (Event.start_datetime <= start) & (Event.end_datetime >= end)
+            # Events overlapping with range - use proper grouping
+            # (start1 < end2) AND (end1 > start2) for overlap detection
+            overlap_query = (
+                (Event.start_datetime < end) & (Event.end_datetime > start)
             )
+            query = query & overlap_query
         elif start:
             query = query & (Event.end_datetime > start)
         elif end:
