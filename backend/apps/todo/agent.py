@@ -5,13 +5,13 @@ from langchain_core.tools import BaseTool
 from apps.todo.prompts import get_todo_prompt
 from apps.todo.service import task_service
 from apps.todo.tools import (
-    todo_add_recurring_task,
     todo_add_subtask,
     todo_add_tag,
     todo_add_task,
     todo_archive_task,
     todo_complete_subtask,
     todo_complete_task,
+    todo_create_recurring_task,
     todo_delete_subtask,
     todo_delete_task,
     todo_get_summary,
@@ -60,7 +60,7 @@ class TodoAgent(BaseAppAgent):
             todo_uncomplete_subtask,
             todo_delete_subtask,
             # Recurring tools
-            todo_add_recurring_task,
+            todo_create_recurring_task,
             todo_list_recurring_tasks,
             todo_stop_recurring_task,
         ]

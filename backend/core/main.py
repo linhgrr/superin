@@ -4,20 +4,20 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from core.config import settings
-from core.db import init_db, close_db
+from core.db import close_db, init_db
 from core.discovery import discover_apps
-from core.verify import verify_plugins
 from core.exceptions import (
+    generic_handler,
     http_exception_handler,
     validation_handler,
-    generic_handler,
 )
 from core.logging_middleware import RequestLoggingMiddleware
+from core.verify import verify_plugins
 
 # Configure logging
 logging.basicConfig(

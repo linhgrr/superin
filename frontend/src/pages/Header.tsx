@@ -1,41 +1,26 @@
 /**
  * Header — Refined top navigation.
  *
- * Shows page title, user menu với refined interactions.
+ * Shows page title, quick actions, and user menu.
+ * Simplified: Command Palette, Tour, and User menu only.
+ * Theme moved to Settings page.
  */
 
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { LogOut, Settings, Sun, Moon, ChevronDown } from "lucide-react";
+import { useOnboarding } from "@/components/providers/AppProviders";
+import { LogOut, Settings, Command, HelpCircle, PlayCircle, User } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 
 interface HeaderProps {
   title?: string;
+  showTourTrigger?: boolean;
 }
 
-type Theme = "light" | "dark" | "system";
-
-function ThemeToggle() {
-  const [theme, setTheme] = useState<Theme>(() => {
-    return (localStorage.getItem("theme") as Theme) || "system";
-  });
+function TourMenu() {
+  const { startTour, resetTours, isCompleted } = useOnboarding();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const root = document.documentElement;
-    const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-
-    if (theme === "dark" || (theme === "system" && systemDark)) {
-      root.classList.add("dark");
-      root.classList.remove("light");
-    } else {
-      root.classList.add("light");
-      root.classList.remove("dark");
-    }
-
-    localStorage.setItem("theme", theme);
-  }, [theme]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -47,20 +32,22 @@ function ThemeToggle() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const getIcon = () => {
-    if (theme === "light") return <Sun size={16} />;
-    if (theme === "dark") return <Moon size={16} />;
-    return window.matchMedia("(prefers-color-scheme: dark)").matches ? <Moon size={16} /> : <Sun size={16} />;
-  };
+  const tours = [
+    { id: "welcome" as const, label: "Welcome Tour", icon: <HelpCircle size={14} /> },
+    { id: "dashboard" as const, label: "Dashboard Tour", icon: <PlayCircle size={14} /> },
+    { id: "apps" as const, label: "Apps Tour", icon: <PlayCircle size={14} /> },
+    { id: "chat" as const, label: "Chat Tour", icon: <PlayCircle size={14} /> },
+    { id: "store" as const, label: "Store Tour", icon: <PlayCircle size={14} /> },
+  ];
 
   return (
     <div ref={dropdownRef} style={{ position: "relative" }}>
       <button
         className="btn btn-ghost btn-icon"
         onClick={() => setIsOpen(!isOpen)}
-        title="Theme"
+        title="Start Tour"
       >
-        {getIcon()}
+        <HelpCircle size={16} />
       </button>
 
       {isOpen && (
@@ -73,44 +60,78 @@ function ThemeToggle() {
             border: "1px solid var(--color-border)",
             borderRadius: "12px",
             padding: "0.5rem",
-            minWidth: "140px",
+            minWidth: "180px",
             boxShadow: "0 8px 32px oklch(0 0 0 / 0.3)",
             zIndex: 100,
             animation: "fadeInScale 0.15s ease",
           }}
         >
-          {(["light", "dark", "system"] as Theme[]).map((t) => (
+          <div
+            style={{
+              padding: "0.5rem 0.75rem",
+              fontSize: "0.6875rem",
+              fontWeight: 700,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              color: "var(--color-foreground-muted)",
+            }}
+          >
+            Guided Tours
+          </div>
+          {tours.map((tour) => (
             <button
-              key={t}
+              key={tour.id}
               className="btn"
               onClick={() => {
-                setTheme(t);
+                startTour(tour.id);
                 setIsOpen(false);
               }}
               style={{
                 width: "100%",
                 justifyContent: "flex-start",
-                background: theme === t ? "var(--color-primary-muted)" : "transparent",
-                color: theme === t ? "var(--color-primary)" : "var(--color-foreground)",
+                background: "transparent",
+                color: "var(--color-foreground)",
                 padding: "0.5rem 0.75rem",
                 fontSize: "0.8125rem",
                 borderRadius: "8px",
-                fontWeight: theme === t ? 600 : 500,
+                display: "flex",
+                alignItems: "center",
+                gap: "0.5rem",
               }}
             >
-              {t === "light" && <Sun size={14} style={{ marginRight: "0.5rem" }} />}
-              {t === "dark" && <Moon size={14} style={{ marginRight: "0.5rem" }} />}
-              {t === "system" && <Settings size={14} style={{ marginRight: "0.5rem" }} />}
-              {t.charAt(0).toUpperCase() + t.slice(1)}
+              {tour.icon}
+              <span style={{ flex: 1 }}>{tour.label}</span>
+              {isCompleted(tour.id) && (
+                <span style={{ fontSize: "0.625rem", color: "var(--color-success)" }}>✓</span>
+              )}
             </button>
           ))}
+          <div style={{ borderTop: "1px solid var(--color-border)", margin: "0.5rem 0" }} />
+          <button
+            className="btn"
+            onClick={() => {
+              resetTours();
+              setIsOpen(false);
+            }}
+            style={{
+              width: "100%",
+              justifyContent: "flex-start",
+              background: "transparent",
+              color: "var(--color-foreground-muted)",
+              padding: "0.5rem 0.75rem",
+              fontSize: "0.8125rem",
+              borderRadius: "8px",
+            }}
+          >
+            Reset All Tours
+          </button>
         </div>
       )}
     </div>
   );
 }
 
-export default function Header({ title }: HeaderProps) {
+export default function Header({ title, showTourTrigger = true }: HeaderProps) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -140,21 +161,27 @@ export default function Header({ title }: HeaderProps) {
 
       {/* Right actions */}
       <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-        {/* Theme toggle */}
-        <ThemeToggle />
+        {/* Command Palette trigger */}
+        <button
+          className="btn btn-ghost btn-icon"
+          onClick={() => {
+            window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }));
+          }}
+          title="Command Palette (Cmd+K)"
+        >
+          <Command size={16} />
+        </button>
+
+        {/* Tour Menu */}
+        {showTourTrigger && <TourMenu />}
 
         {/* User menu */}
         {user && (
           <div ref={userMenuRef} style={{ position: "relative" }}>
             <button
-              className="btn btn-ghost"
+              className="btn btn-ghost btn-icon"
               onClick={() => setShowUserMenu(!showUserMenu)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "0.625rem",
-                padding: "0.5rem 0.75rem",
-              }}
+              title={user.name}
             >
               <div
                 style={{
@@ -173,28 +200,6 @@ export default function Header({ title }: HeaderProps) {
               >
                 {user.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
               </div>
-              <div style={{ textAlign: "left" }}>
-                <div
-                  style={{
-                    fontSize: "0.8125rem",
-                    fontWeight: 600,
-                    color: "var(--color-foreground)",
-                    lineHeight: 1.2,
-                  }}
-                >
-                  {user.name}
-                </div>
-                <div
-                  style={{
-                    fontSize: "0.6875rem",
-                    color: "var(--color-foreground-muted)",
-                    lineHeight: 1.2,
-                  }}
-                >
-                  {user.email}
-                </div>
-              </div>
-              <ChevronDown size={14} style={{ color: "var(--color-foreground-muted)" }} />
             </button>
 
             {showUserMenu && (
@@ -213,6 +218,48 @@ export default function Header({ title }: HeaderProps) {
                   animation: "fadeInScale 0.15s ease",
                 }}
               >
+                {/* User info */}
+                <div
+                  style={{
+                    padding: "0.75rem",
+                    borderBottom: "1px solid var(--color-border)",
+                    marginBottom: "0.5rem",
+                  }}
+                >
+                  <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--color-foreground)" }}>
+                    {user.name}
+                  </div>
+                  <div style={{ fontSize: "0.75rem", color: "var(--color-foreground-muted)", marginTop: "0.25rem" }}>
+                    {user.email}
+                  </div>
+                </div>
+
+                {/* Settings link */}
+                <button
+                  className="btn"
+                  onClick={() => {
+                    navigate("/settings");
+                    setShowUserMenu(false);
+                  }}
+                  style={{
+                    width: "100%",
+                    justifyContent: "flex-start",
+                    background: "transparent",
+                    color: "var(--color-foreground)",
+                    padding: "0.5rem 0.75rem",
+                    fontSize: "0.8125rem",
+                    borderRadius: "8px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                    marginBottom: "0.25rem",
+                  }}
+                >
+                  <Settings size={14} />
+                  Settings
+                </button>
+
+                {/* Logout */}
                 <button
                   className="btn"
                   onClick={handleLogout}
@@ -224,9 +271,12 @@ export default function Header({ title }: HeaderProps) {
                     padding: "0.5rem 0.75rem",
                     fontSize: "0.8125rem",
                     borderRadius: "8px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
                   }}
                 >
-                  <LogOut size={14} style={{ marginRight: "0.5rem" }} />
+                  <LogOut size={14} />
                   Sign out
                 </button>
               </div>

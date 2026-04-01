@@ -1,18 +1,17 @@
 import type { ComponentType } from "react";
 import type { DashboardWidgetProps, DashboardWidgetRendererProps } from "../types";
+import TotalBalanceWidget from "./TotalBalanceWidget";
 import BudgetOverviewWidget from "./BudgetOverviewWidget";
 import RecentTransactionsWidget from "./RecentTransactionsWidget";
-import TotalBalanceWidget from "./TotalBalanceWidget";
 
-const FINANCE_WIDGETS = {
+const WIDGET_COMPONENTS = {
   "finance.total-balance": TotalBalanceWidget,
-  "finance.balance-summary": TotalBalanceWidget,
   "finance.budget-overview": BudgetOverviewWidget,
   "finance.recent-transactions": RecentTransactionsWidget,
 } as const satisfies Record<string, ComponentType<DashboardWidgetRendererProps>>;
 
 export default function FinanceDashboardWidget({ widgetId, widget }: DashboardWidgetProps) {
-  const Component = FINANCE_WIDGETS[widgetId as keyof typeof FINANCE_WIDGETS];
+  const Component = WIDGET_COMPONENTS[widgetId as keyof typeof WIDGET_COMPONENTS];
 
   if (Component) {
     return <Component widget={widget} />;

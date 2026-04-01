@@ -42,7 +42,7 @@ function ToolCallBadge({
 function MessageBubble({
   role,
   content,
-  toolCalls,
+  toolCalls: _toolCalls,
 }: {
   role: "user" | "assistant";
   content: string;
@@ -130,7 +130,7 @@ export default function ChatPanel() {
         <div>
           <div style={{ fontWeight: 600, fontSize: "0.9375rem" }}>Shin AI</div>
           <div style={{ fontSize: "0.6875rem", color: "var(--color-muted)" }}>
-            Powered by RootAgent
+            Powered by Linhdz
           </div>
         </div>
         {messages.length > 0 && (
@@ -162,7 +162,7 @@ export default function ChatPanel() {
             }}
           >
             <div style={{ fontSize: "1.5rem", marginBottom: "0.5rem" }}>✨</div>
-            Ask Shin anything about your apps.
+            Ask Rin anything about your apps.
           </div>
         )}
 

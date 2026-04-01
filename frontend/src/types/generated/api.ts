@@ -98,7 +98,14 @@ export interface paths {
         };
         /**
          * List Categories
-         * @description List all app categories (public).
+         * @description List all app categories, merged from DB and app registry.
+         *
+         *     Categories are discovered from:
+         *     1. AppCategory documents in DB (admin-managed categories)
+         *     2. App manifests in PLUGIN_REGISTRY (auto-discovered from installed apps)
+         *
+         *     This enables true plug-n-play: when a new app declares a new category,
+         *     it automatically appears in the UI without manual registration.
          */
         get: operations["list_categories_api_catalog_categories_get"];
         put?: never;
@@ -266,6 +273,261 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/apps/calendar/widgets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Widgets */
+        get: operations["list_widgets_api_apps_calendar_widgets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/apps/calendar/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Events
+         * @description List events with optional filters.
+         */
+        get: operations["list_events_api_apps_calendar_events_get"];
+        put?: never;
+        /**
+         * Create Event
+         * @description Create new event.
+         */
+        post: operations["create_event_api_apps_calendar_events_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/apps/calendar/events/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search Events
+         * @description Search events by query.
+         */
+        get: operations["search_events_api_apps_calendar_events_search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/apps/calendar/events/{event_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Event
+         * @description Get single event.
+         */
+        get: operations["get_event_api_apps_calendar_events__event_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Event
+         * @description Delete event.
+         */
+        delete: operations["delete_event_api_apps_calendar_events__event_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Event
+         * @description Update event.
+         */
+        patch: operations["update_event_api_apps_calendar_events__event_id__patch"];
+        trace?: never;
+    };
+    "/api/apps/calendar/conflicts/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Check Conflicts
+         * @description Check for conflicting events.
+         */
+        get: operations["check_conflicts_api_apps_calendar_conflicts_check_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/apps/calendar/calendars": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Calendars
+         * @description List all calendars.
+         */
+        get: operations["list_calendars_api_apps_calendar_calendars_get"];
+        put?: never;
+        /**
+         * Create Calendar
+         * @description Create new calendar.
+         */
+        post: operations["create_calendar_api_apps_calendar_calendars_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/apps/calendar/calendars/{calendar_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Calendar
+         * @description Delete calendar and all its events.
+         */
+        delete: operations["delete_calendar_api_apps_calendar_calendars__calendar_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Calendar
+         * @description Update calendar.
+         */
+        patch: operations["update_calendar_api_apps_calendar_calendars__calendar_id__patch"];
+        trace?: never;
+    };
+    "/api/apps/calendar/events/{event_id}/recurring": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Recurring
+         * @description Make event recurring.
+         */
+        post: operations["create_recurring_api_apps_calendar_events__event_id__recurring_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/apps/calendar/recurring": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Recurring Rules
+         * @description List recurring rules.
+         */
+        get: operations["list_recurring_rules_api_apps_calendar_recurring_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/apps/calendar/recurring/{rule_id}/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Stop Recurring
+         * @description Stop recurring rule.
+         */
+        patch: operations["stop_recurring_api_apps_calendar_recurring__rule_id__stop_patch"];
+        trace?: never;
+    };
+    "/api/apps/calendar/tasks/{task_id}/schedule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Schedule Task
+         * @description Schedule Todo task as time-blocked event.
+         */
+        post: operations["schedule_task_api_apps_calendar_tasks__task_id__schedule_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/apps/calendar/preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Preferences */
+        get: operations["get_preferences_api_apps_calendar_preferences_get"];
+        /** Update Preferences */
+        put: operations["update_preferences_api_apps_calendar_preferences_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/apps/finance/widgets": {
         parameters: {
             query?: never;
@@ -312,10 +574,18 @@ export interface paths {
         get: operations["get_wallet_api_apps_finance_wallets__wallet_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete Wallet
+         * @description Delete a wallet if empty.
+         */
+        delete: operations["delete_wallet_api_apps_finance_wallets__wallet_id__delete"];
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Update Wallet
+         * @description Update wallet name.
+         */
+        patch: operations["update_wallet_api_apps_finance_wallets__wallet_id__patch"];
         trace?: never;
     };
     "/api/apps/finance/categories": {
@@ -336,6 +606,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/apps/finance/categories/{category_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Category
+         * @description Get a single category by ID.
+         */
+        get: operations["get_category_api_apps_finance_categories__category_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Category
+         * @description Delete a category if it has no transactions.
+         */
+        delete: operations["delete_category_api_apps_finance_categories__category_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Category
+         * @description Update a category.
+         */
+        patch: operations["update_category_api_apps_finance_categories__category_id__patch"];
+        trace?: never;
+    };
     "/api/apps/finance/transactions": {
         parameters: {
             query?: never;
@@ -348,6 +646,114 @@ export interface paths {
         put?: never;
         /** Create Transaction */
         post: operations["create_transaction_api_apps_finance_transactions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/apps/finance/transactions/{transaction_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Transaction
+         * @description Get a single transaction by ID.
+         */
+        get: operations["get_transaction_api_apps_finance_transactions__transaction_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Transaction
+         * @description Delete a transaction and reverse its effect on wallet balance.
+         */
+        delete: operations["delete_transaction_api_apps_finance_transactions__transaction_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Transaction
+         * @description Update a transaction.
+         */
+        patch: operations["update_transaction_api_apps_finance_transactions__transaction_id__patch"];
+        trace?: never;
+    };
+    "/api/apps/finance/transactions/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search Transactions
+         * @description Search transactions by keyword or date range.
+         */
+        get: operations["search_transactions_api_apps_finance_transactions_search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/apps/finance/budget/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Check Budget
+         * @description Check spending vs budget for categories.
+         */
+        get: operations["check_budget_api_apps_finance_budget_check_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/apps/finance/analytics/category-breakdown": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Category Breakdown
+         * @description Get spending breakdown by category.
+         */
+        get: operations["get_category_breakdown_api_apps_finance_analytics_category_breakdown_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/apps/finance/analytics/monthly-trend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Monthly Trend
+         * @description Get income/expense trend over recent months.
+         */
+        get: operations["get_monthly_trend_api_apps_finance_analytics_monthly_trend_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -430,11 +836,34 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Tasks */
+        /**
+         * List Tasks
+         * @description List tasks with optional filtering.
+         */
         get: operations["list_tasks_api_apps_todo_tasks_get"];
         put?: never;
         /** Create Task */
         post: operations["create_task_api_apps_todo_tasks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/apps/todo/tasks/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search Tasks
+         * @description Search tasks by query string.
+         */
+        get: operations["search_tasks_api_apps_todo_tasks_search_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -448,10 +877,17 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Get Task
+         * @description Get a single task by ID with subtasks.
+         */
+        get: operations["get_task_api_apps_todo_tasks__task_id__get"];
         put?: never;
         post?: never;
-        /** Delete Task */
+        /**
+         * Delete Task
+         * @description Permanently delete a task and all its subtasks.
+         */
         delete: operations["delete_task_api_apps_todo_tasks__task_id__delete"];
         options?: never;
         head?: never;
@@ -477,6 +913,234 @@ export interface paths {
          * @description Flip task between pending and completed.
          */
         patch: operations["toggle_task_api_apps_todo_tasks__task_id__toggle_patch"];
+        trace?: never;
+    };
+    "/api/apps/todo/tasks/{task_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Archive Task
+         * @description Archive (soft delete) a task.
+         */
+        patch: operations["archive_task_api_apps_todo_tasks__task_id__archive_patch"];
+        trace?: never;
+    };
+    "/api/apps/todo/tasks/{task_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Restore Task
+         * @description Restore an archived task.
+         */
+        patch: operations["restore_task_api_apps_todo_tasks__task_id__restore_patch"];
+        trace?: never;
+    };
+    "/api/apps/todo/tasks/archived/list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Archived
+         * @description List archived (soft deleted) tasks.
+         */
+        get: operations["list_archived_api_apps_todo_tasks_archived_list_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/apps/todo/tasks/{task_id}/tags/{tag}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add Tag
+         * @description Add a tag to a task.
+         */
+        post: operations["add_tag_api_apps_todo_tasks__task_id__tags__tag__post"];
+        /**
+         * Remove Tag
+         * @description Remove a tag from a task.
+         */
+        delete: operations["remove_tag_api_apps_todo_tasks__task_id__tags__tag__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/apps/todo/tasks/{task_id}/subtasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Subtasks
+         * @description Get all subtasks for a parent task.
+         */
+        get: operations["get_subtasks_api_apps_todo_tasks__task_id__subtasks_get"];
+        put?: never;
+        /**
+         * Add Subtask
+         * @description Add a subtask to a parent task.
+         */
+        post: operations["add_subtask_api_apps_todo_tasks__task_id__subtasks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/apps/todo/subtasks/{subtask_id}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Complete Subtask
+         * @description Mark a subtask as completed.
+         */
+        patch: operations["complete_subtask_api_apps_todo_subtasks__subtask_id__complete_patch"];
+        trace?: never;
+    };
+    "/api/apps/todo/subtasks/{subtask_id}/uncomplete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Uncomplete Subtask
+         * @description Mark a completed subtask as not completed.
+         */
+        patch: operations["uncomplete_subtask_api_apps_todo_subtasks__subtask_id__uncomplete_patch"];
+        trace?: never;
+    };
+    "/api/apps/todo/subtasks/{subtask_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Subtask
+         * @description Delete a subtask permanently.
+         */
+        delete: operations["delete_subtask_api_apps_todo_subtasks__subtask_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/apps/todo/tasks/{task_id}/recurring": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Recurring Rule
+         * @description Create a recurring rule based on a task template.
+         */
+        post: operations["create_recurring_rule_api_apps_todo_tasks__task_id__recurring_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/apps/todo/recurring": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Recurring Rules
+         * @description List all recurring task rules.
+         */
+        get: operations["list_recurring_rules_api_apps_todo_recurring_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/apps/todo/recurring/{rule_id}/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Stop Recurring Rule
+         * @description Stop a task from recurring.
+         */
+        patch: operations["stop_recurring_rule_api_apps_todo_recurring__rule_id__stop_patch"];
         trace?: never;
     };
     "/api/apps/todo/summary": {
@@ -624,13 +1288,20 @@ export interface components {
             /** Step */
             step?: number | null;
         };
+        /** CreateCalendarRequest */
+        CreateCalendarRequest: {
+            /** Name */
+            name: string;
+            /** Color */
+            color?: string | null;
+        };
         /** CreateCategoryRequest */
         CreateCategoryRequest: {
             /** Name */
             name: string;
             /**
              * Icon
-             * @default Tag
+             * @default Folder
              */
             icon: string;
             /**
@@ -639,10 +1310,72 @@ export interface components {
              */
             color: string;
             /**
-             * Budget
+             * Order
              * @default 0
              */
-            budget: number;
+            order: number;
+        };
+        /** CreateEventRequest */
+        CreateEventRequest: {
+            /** Title */
+            title: string;
+            /**
+             * Start Datetime
+             * Format: date-time
+             */
+            start_datetime: string;
+            /**
+             * End Datetime
+             * Format: date-time
+             */
+            end_datetime: string;
+            /** Calendar Id */
+            calendar_id: string;
+            /** Description */
+            description?: string | null;
+            /** Location */
+            location?: string | null;
+            /**
+             * Is All Day
+             * @default false
+             */
+            is_all_day: boolean;
+            /**
+             * Type
+             * @default event
+             * @enum {string}
+             */
+            type: "event" | "time_blocked_task";
+            /** Task Id */
+            task_id?: string | null;
+            /** Color */
+            color?: string | null;
+            /** Reminders */
+            reminders?: number[];
+        };
+        /** CreateRecurringRuleRequest */
+        CreateRecurringRuleRequest: {
+            /**
+             * Frequency
+             * @enum {string}
+             */
+            frequency: "daily" | "weekly" | "monthly" | "yearly";
+            /**
+             * Interval
+             * @default 1
+             */
+            interval: number;
+            /** Days Of Week */
+            days_of_week?: number[] | null;
+            /** End Date */
+            end_date?: string | null;
+            /** Max Occurrences */
+            max_occurrences?: number | null;
+        };
+        /** CreateSubTaskRequest */
+        CreateSubTaskRequest: {
+            /** Title */
+            title: string;
         };
         /** CreateTaskRequest */
         CreateTaskRequest: {
@@ -652,12 +1385,18 @@ export interface components {
             description?: string | null;
             /** Due Date */
             due_date?: string | null;
+            /** Due Time */
+            due_time?: string | null;
             /**
              * Priority
              * @default medium
              * @enum {string}
              */
             priority: "low" | "medium" | "high";
+            /** Tags */
+            tags?: string[];
+            /** Reminder Minutes */
+            reminder_minutes?: number | null;
         };
         /** CreateTransactionRequest */
         CreateTransactionRequest: {
@@ -720,6 +1459,10 @@ export interface components {
             config?: {
                 [key: string]: unknown;
             } | null;
+            /** Size W */
+            size_w?: number | null;
+            /** Size H */
+            size_h?: number | null;
         };
         /** RegisterRequest */
         RegisterRequest: {
@@ -732,6 +1475,20 @@ export interface components {
             password: string;
             /** Name */
             name: string;
+        };
+        /** ScheduleTaskRequest */
+        ScheduleTaskRequest: {
+            /** Task Id */
+            task_id: string;
+            /**
+             * Start Datetime
+             * Format: date-time
+             */
+            start_datetime: string;
+            /** Duration Minutes */
+            duration_minutes: number;
+            /** Calendar Id */
+            calendar_id?: string | null;
         };
         /** SelectOption */
         SelectOption: {
@@ -765,6 +1522,17 @@ export interface components {
             /** Note */
             note?: string | null;
         };
+        /** UpdateCalendarRequest */
+        UpdateCalendarRequest: {
+            /** Name */
+            name?: string | null;
+            /** Color */
+            color?: string | null;
+            /** Is Visible */
+            is_visible?: boolean | null;
+            /** Is Default */
+            is_default?: boolean | null;
+        };
         /** UpdateCategoryRequest */
         UpdateCategoryRequest: {
             /** Name */
@@ -776,6 +1544,27 @@ export interface components {
             /** Order */
             order?: number | null;
         };
+        /** UpdateEventRequest */
+        UpdateEventRequest: {
+            /** Title */
+            title?: string | null;
+            /** Start Datetime */
+            start_datetime?: string | null;
+            /** End Datetime */
+            end_datetime?: string | null;
+            /** Calendar Id */
+            calendar_id?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Location */
+            location?: string | null;
+            /** Is All Day */
+            is_all_day?: boolean | null;
+            /** Color */
+            color?: string | null;
+            /** Reminders */
+            reminders?: number[] | null;
+        };
         /** UpdateTaskRequest */
         UpdateTaskRequest: {
             /** Title */
@@ -784,10 +1573,16 @@ export interface components {
             description?: string | null;
             /** Due Date */
             due_date?: string | null;
+            /** Due Time */
+            due_time?: string | null;
             /** Priority */
             priority?: ("low" | "medium" | "high") | null;
             /** Status */
             status?: ("pending" | "completed") | null;
+            /** Tags */
+            tags?: string[] | null;
+            /** Reminder Minutes */
+            reminder_minutes?: number | null;
         };
         /**
          * UserPublic
@@ -870,14 +1665,18 @@ export interface components {
             config?: {
                 [key: string]: unknown;
             };
+            /** Size W */
+            size_w?: number | null;
+            /** Size H */
+            size_h?: number | null;
         };
         /** CreateCategoryRequest */
-        apps__catalog__CreateCategoryRequest: {
+        apps__finance__schemas__CreateCategoryRequest: {
             /** Name */
             name: string;
             /**
              * Icon
-             * @default Folder
+             * @default Tag
              */
             icon: string;
             /**
@@ -886,10 +1685,10 @@ export interface components {
              */
             color: string;
             /**
-             * Order
+             * Budget
              * @default 0
              */
-            order: number;
+            budget: number;
         };
     };
     responses: never;
@@ -1066,7 +1865,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["apps__catalog__CreateCategoryRequest"];
+                "application/json": components["schemas"]["CreateCategoryRequest"];
             };
         };
         responses: {
@@ -1358,6 +2157,548 @@ export interface operations {
             };
         };
     };
+    list_widgets_api_apps_calendar_widgets_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    list_events_api_apps_calendar_events_get: {
+        parameters: {
+            query?: {
+                start?: string | null;
+                end?: string | null;
+                calendar_id?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_event_api_apps_calendar_events_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateEventRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_events_api_apps_calendar_events_search_get: {
+        parameters: {
+            query: {
+                q: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_event_api_apps_calendar_events__event_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_event_api_apps_calendar_events__event_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_event_api_apps_calendar_events__event_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateEventRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_conflicts_api_apps_calendar_conflicts_check_get: {
+        parameters: {
+            query: {
+                start: string;
+                end: string;
+                exclude_event_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_calendars_api_apps_calendar_calendars_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    create_calendar_api_apps_calendar_calendars_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCalendarRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_calendar_api_apps_calendar_calendars__calendar_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                calendar_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_calendar_api_apps_calendar_calendars__calendar_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                calendar_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCalendarRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_recurring_api_apps_calendar_events__event_id__recurring_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateRecurringRuleRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_recurring_rules_api_apps_calendar_recurring_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    stop_recurring_api_apps_calendar_recurring__rule_id__stop_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    schedule_task_api_apps_calendar_tasks__task_id__schedule_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScheduleTaskRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_preferences_api_apps_calendar_preferences_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WidgetPreferenceSchema"][];
+                };
+            };
+        };
+    };
+    update_preferences_api_apps_calendar_preferences_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PreferenceUpdate"][];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WidgetPreferenceSchema"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_widgets_api_apps_finance_widgets_get: {
         parameters: {
             query?: never;
@@ -1462,6 +2803,70 @@ export interface operations {
             };
         };
     };
+    delete_wallet_api_apps_finance_wallets__wallet_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wallet_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_wallet_api_apps_finance_wallets__wallet_id__patch: {
+        parameters: {
+            query: {
+                name: string;
+            };
+            header?: never;
+            path: {
+                wallet_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_categories_api_apps_finance_categories_get: {
         parameters: {
             query?: never;
@@ -1491,7 +2896,104 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CreateCategoryRequest"];
+                "application/json": components["schemas"]["apps__finance__schemas__CreateCategoryRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_category_api_apps_finance_categories__category_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                category_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_category_api_apps_finance_categories__category_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                category_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_category_api_apps_finance_categories__category_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                category_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["apps__finance__schemas__CreateCategoryRequest"];
             };
         };
         responses: {
@@ -1562,6 +3064,231 @@ export interface operations {
                 "application/json": components["schemas"]["CreateTransactionRequest"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_transaction_api_apps_finance_transactions__transaction_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                transaction_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_transaction_api_apps_finance_transactions__transaction_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                transaction_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_transaction_api_apps_finance_transactions__transaction_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                transaction_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTransactionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_transactions_api_apps_finance_transactions_search_get: {
+        parameters: {
+            query?: {
+                query?: string | null;
+                start_date?: string | null;
+                end_date?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_budget_api_apps_finance_budget_check_get: {
+        parameters: {
+            query?: {
+                category_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_category_breakdown_api_apps_finance_analytics_category_breakdown_get: {
+        parameters: {
+            query?: {
+                month?: number | null;
+                year?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_monthly_trend_api_apps_finance_analytics_monthly_trend_get: {
+        parameters: {
+            query?: {
+                months?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -1714,6 +3441,7 @@ export interface operations {
             query?: {
                 status?: ("pending" | "completed") | null;
                 priority?: ("low" | "medium" | "high") | null;
+                tag?: string | null;
                 limit?: number;
             };
             header?: never;
@@ -1754,6 +3482,70 @@ export interface operations {
                 "application/json": components["schemas"]["CreateTaskRequest"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_tasks_api_apps_todo_tasks_search_get: {
+        parameters: {
+            query: {
+                q: string;
+                include_archived?: boolean;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_task_api_apps_todo_tasks__task_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -1847,6 +3639,408 @@ export interface operations {
             header?: never;
             path: {
                 task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_task_api_apps_todo_tasks__task_id__archive_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_task_api_apps_todo_tasks__task_id__restore_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_archived_api_apps_todo_tasks_archived_list_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_tag_api_apps_todo_tasks__task_id__tags__tag__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+                tag: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_tag_api_apps_todo_tasks__task_id__tags__tag__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+                tag: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_subtasks_api_apps_todo_tasks__task_id__subtasks_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_subtask_api_apps_todo_tasks__task_id__subtasks_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSubTaskRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    complete_subtask_api_apps_todo_subtasks__subtask_id__complete_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                subtask_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    uncomplete_subtask_api_apps_todo_subtasks__subtask_id__uncomplete_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                subtask_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_subtask_api_apps_todo_subtasks__subtask_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                subtask_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_recurring_rule_api_apps_todo_tasks__task_id__recurring_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateRecurringRuleRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_recurring_rules_api_apps_todo_recurring_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    stop_recurring_rule_api_apps_todo_recurring__rule_id__stop_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rule_id: string;
             };
             cookie?: never;
         };

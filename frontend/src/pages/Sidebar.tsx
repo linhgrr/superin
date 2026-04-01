@@ -1,24 +1,54 @@
+"use client";
+
 /**
  * Sidebar — Refined navigation with glassmorphism.
  *
  * Installed apps navigation with refined hover states.
+ * Now uses backend catalog as source of truth for icons and colors.
  */
 
-import { memo } from "react";
-import { NavLink, useLocation } from "react-router-dom";
-import { LayoutDashboard, Store, Sparkles } from "lucide-react";
+import { memo, useMemo } from "react";
+import { NavLink } from "react-router-dom";
+import { LayoutDashboard, Store, Sparkles, Settings } from "lucide-react";
 import { useAppCatalog } from "@/components/providers/AppProviders";
+import { DynamicIcon } from "@/lib/icon-resolver";
 import type { AppCatalogEntry } from "@/types/generated/api";
 
-const APP_ICON_COLORS: Record<string, string> = {
-  finance: "linear-gradient(135deg, oklch(0.72 0.19 145) 0%, oklch(0.65 0.22 145) 100%)",
-  todo: "linear-gradient(135deg, oklch(0.65 0.21 280) 0%, oklch(0.60 0.23 280) 100%)",
-};
+/**
+ * Generate a gradient from an oklch color string.
+ * Creates a visually pleasing gradient based on the app's color.
+ */
+function generateGradient(color: string | undefined | null): string {
+  if (!color) {
+    return "linear-gradient(135deg, var(--color-primary) 0%, oklch(0.72 0.24 45) 100%)";
+  }
+
+  // If it's already a gradient, return as-is
+  if (color.includes("gradient")) {
+    return color;
+  }
+
+  // Parse oklch color and create a slightly darker variant for gradient
+  // Expected format: "oklch(0.72 0.19 145)"
+  const oklchMatch = color.match(/oklch\(([\d.]+)\s+([\d.]+)\s+(\d+)\)/);
+  if (oklchMatch) {
+    const l = parseFloat(oklchMatch[1]);
+    const c = parseFloat(oklchMatch[2]);
+    const h = parseInt(oklchMatch[3]);
+
+    // Create a slightly darker/shifted variant for gradient end
+    const l2 = Math.max(0.4, l - 0.07);
+    const c2 = c * 1.1;
+
+    return `linear-gradient(135deg, ${color} 0%, oklch(${l2} ${c2} ${h}) 100%)`;
+  }
+
+  // Fallback: just return a gradient using the provided color
+  return `linear-gradient(135deg, ${color} 0%, ${color}dd 100%)`;
+}
 
 function AppIcon({ entry }: { entry: AppCatalogEntry }) {
-  const gradient = entry.color
-    ? `linear-gradient(135deg, ${entry.color} 0%, ${entry.color}dd 100%)`
-    : APP_ICON_COLORS[entry.id] || "linear-gradient(135deg, var(--color-primary) 0%, oklch(0.72 0.24 45) 100%)";
+  const gradient = useMemo(() => generateGradient(entry.color), [entry.color]);
 
   return (
     <div
@@ -38,18 +68,17 @@ function AppIcon({ entry }: { entry: AppCatalogEntry }) {
         fontFamily: "var(--font-display)",
       }}
     >
-      {entry.icon ? entry.icon.slice(0, 2).toUpperCase() : entry.name.slice(0, 2).toUpperCase()}
+      {entry.icon ? (
+        <DynamicIcon name={entry.icon} size={16} strokeWidth={2.5} />
+      ) : (
+        <span>{entry.name.slice(0, 2).toUpperCase()}</span>
+      )}
     </div>
   );
 }
 
 function Sidebar() {
   const { installedApps } = useAppCatalog();
-  const location = useLocation();
-
-  const isActive = (path: string) => {
-    return location.pathname.startsWith(path);
-  };
 
   return (
     <aside className="sidebar">
@@ -90,14 +119,22 @@ function Sidebar() {
         )}
       </nav>
 
-      {/* Store */}
+      {/* Store & Settings */}
       <div style={{ marginTop: "auto", padding: "1rem", borderTop: "1px solid var(--color-border)" }}>
         <NavLink
           to="/store"
           className={({ isActive }) => `app-item${isActive ? " active" : ""}`}
+          style={{ marginBottom: "0.25rem" }}
         >
           <Store size={18} strokeWidth={2} />
           <span>App Store</span>
+        </NavLink>
+        <NavLink
+          to="/settings"
+          className={({ isActive }) => `app-item${isActive ? " active" : ""}`}
+        >
+          <Settings size={18} strokeWidth={2} />
+          <span>Settings</span>
         </NavLink>
       </div>
     </aside>

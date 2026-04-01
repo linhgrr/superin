@@ -3,15 +3,13 @@ import type { DashboardWidgetProps, DashboardWidgetRendererProps } from "../type
 import TaskListWidget from "./TaskListWidget";
 import TodayWidget from "./TodayWidget";
 
-const TODO_WIDGETS = {
+const WIDGET_COMPONENTS = {
   "todo.task-list": TaskListWidget,
-  "todo.task-count": TaskListWidget,
-  "todo.summary": TaskListWidget,
   "todo.today": TodayWidget,
 } as const satisfies Record<string, ComponentType<DashboardWidgetRendererProps>>;
 
 export default function TodoDashboardWidget({ widgetId, widget }: DashboardWidgetProps) {
-  const Component = TODO_WIDGETS[widgetId as keyof typeof TODO_WIDGETS];
+  const Component = WIDGET_COMPONENTS[widgetId as keyof typeof WIDGET_COMPONENTS];
 
   if (Component) {
     return <Component widget={widget} />;

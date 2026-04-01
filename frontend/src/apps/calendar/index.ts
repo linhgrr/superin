@@ -5,8 +5,10 @@ import type { FrontendAppDefinition, FrontendAppManifest } from "../types";
 
 const calendarManifest = manifest as FrontendAppManifest;
 
-export const calendarApp = {
+const calendarApp = {
   manifest: calendarManifest,
   AppView,
   DashboardWidget,
 } satisfies FrontendAppDefinition;
+
+export default calendarApp;

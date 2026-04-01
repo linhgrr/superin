@@ -5,8 +5,10 @@ import type { FrontendAppDefinition, FrontendAppManifest } from "../types";
 
 const financeManifest = manifest as FrontendAppManifest;
 
-export const financeApp = {
+const financeApp = {
   manifest: financeManifest,
   AppView,
   DashboardWidget,
 } satisfies FrontendAppDefinition;
+
+export default financeApp;

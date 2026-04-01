@@ -9,14 +9,44 @@
  *   /apps/:appId → AppPage (protected)
  */
 
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { useState, useEffect, useCallback } from "react";
+import { BrowserRouter, Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
-import { AppProviders } from "@/components/providers/AppProviders";
+import { AppProviders, CommandPalette } from "@/components/providers/AppProviders";
 import LoginPage from "@/pages/LoginPage";
 import DashboardPage from "@/pages/DashboardPage";
 import StorePage from "@/pages/StorePage";
 import AppPage from "@/pages/AppPage";
+import SettingsPage from "@/pages/SettingsPage";
 import AppShell from "@/pages/AppShell";
+
+// ─── Global Theme Loader ───────────────────────────────────────────────────────
+
+function ThemeLoader() {
+  useEffect(() => {
+    const saved = localStorage.getItem("shin_settings");
+    if (saved) {
+      try {
+        const settings = JSON.parse(saved);
+        const root = document.documentElement;
+        const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+
+        if (settings.theme === "dark" || (settings.theme === "system" && systemDark)) {
+          root.classList.add("dark");
+          root.classList.remove("light");
+        } else if (settings.theme === "light") {
+          root.classList.add("light");
+          root.classList.remove("dark");
+        }
+        // If theme is "system" and not dark, or light, we keep default (no class)
+      } catch {
+        // Ignore parse errors
+      }
+    }
+  }, []);
+
+  return null;
+}
 
 // ─── Protected route wrapper ───────────────────────────────────────────────────
 
@@ -64,6 +94,48 @@ function ShellLayout() {
   );
 }
 
+// ─── Command Palette Wrapper ─────────────────────────────────────────────────
+
+function CommandPaletteWrapper({ children }: { children: React.ReactNode }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const navigate = useNavigate();
+
+  const handleClose = useCallback(() => setIsOpen(false), []);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Cmd/Ctrl + K for Command Palette
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setIsOpen((prev) => !prev);
+      }
+      // ? for Keyboard Shortcuts (not in input)
+      if (e.key === "?" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        const target = e.target as HTMLElement;
+        if (target.tagName !== "INPUT" && target.tagName !== "TEXTAREA" && target.contentEditable !== "true") {
+          e.preventDefault();
+          navigate("/settings");
+          // Dispatch event to switch to keyboard tab
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent("shin:open-settings", { detail: "keyboard" }));
+          }, 100);
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [navigate]);
+
+  return (
+    <>
+      {children}
+      {isOpen && <CommandPalette onClose={handleClose} />}
+    </>
+  );
+}
+
 // ─── App ───────────────────────────────────────────────────────────────────────
 
 export default function App() {
@@ -71,52 +143,56 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         <AppProviders>
-        <Routes>
-          {/* Public */}
-          <Route
-            path="/login"
-            element={
-              <PublicOnly>
-                <LoginPage />
-              </PublicOnly>
-            }
-          />
+          <ThemeLoader />
+          <CommandPaletteWrapper>
+            <Routes>
+              {/* Public */}
+              <Route
+                path="/login"
+                element={
+                  <PublicOnly>
+                    <LoginPage />
+                  </PublicOnly>
+                }
+              />
 
-          {/* Protected shell */}
-          <Route element={<ShellLayout />}>
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/store" element={<StorePage />} />
-            <Route path="/apps/:appId" element={<AppPage />} />
-          </Route>
+              {/* Protected shell */}
+              <Route element={<ShellLayout />}>
+                <Route path="/dashboard" element={<DashboardPage />} />
+                <Route path="/store" element={<StorePage />} />
+                <Route path="/apps/:appId" element={<AppPage />} />
+                <Route path="/settings" element={<SettingsPage />} />
+              </Route>
 
-          {/* Default redirect */}
-          <Route path="/" element={<Navigate to="/dashboard" />} />
+              {/* Default redirect */}
+              <Route path="/" element={<Navigate to="/dashboard" />} />
 
-          {/* 404 */}
-          <Route
-            path="*"
-            element={
-              <div
-                style={{
-                  minHeight: "100vh",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "0.5rem",
-                  background: "var(--color-background)",
-                  color: "var(--color-muted)",
-                }}
-              >
-                <span style={{ fontSize: "3rem" }}>404</span>
-                <p>Page not found.</p>
-                <a href="/dashboard" style={{ color: "var(--color-primary)" }}>
-                  Go to Dashboard
-                </a>
-              </div>
-            }
-          />
-        </Routes>
+              {/* 404 */}
+              <Route
+                path="*"
+                element={
+                  <div
+                    style={{
+                      minHeight: "100vh",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "0.5rem",
+                      background: "var(--color-background)",
+                      color: "var(--color-muted)",
+                    }}
+                  >
+                    <span style={{ fontSize: "3rem" }}>404</span>
+                    <p>Page not found.</p>
+                    <a href="/dashboard" style={{ color: "var(--color-primary)" }}>
+                      Go to Dashboard
+                    </a>
+                  </div>
+                }
+              />
+            </Routes>
+          </CommandPaletteWrapper>
         </AppProviders>
       </BrowserRouter>
     </AuthProvider>

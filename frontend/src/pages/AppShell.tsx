@@ -7,7 +7,7 @@
 
 import { ReactNode, useMemo } from "react";
 import { Outlet, useLocation } from "react-router-dom";
-
+import { useAppCatalog } from "@/components/providers/AppProviders";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
 import ChatThread from "@/components/chat/ChatThread";
@@ -20,12 +20,38 @@ interface AppShellProps {
   showChat?: boolean;
 }
 
-const PAGE_TITLES: Record<string, string> = {
-  dashboard: "Dashboard",
-  store: "App Store",
-  finance: "Finance",
-  todo: "Todo",
-};
+/**
+ * Build a map of page titles from the catalog.
+ * Falls back to sentence-cased path segments.
+ */
+function usePageTitles(): Record<string, string> {
+  const { installedApps } = useAppCatalog();
+
+  return useMemo(() => {
+    const titles: Record<string, string> = {
+      dashboard: "Dashboard",
+      store: "App Store",
+      settings: "Settings",
+    };
+
+    // Add titles from installed apps
+    for (const app of installedApps) {
+      titles[app.id] = app.name;
+    }
+
+    return titles;
+  }, [installedApps]);
+}
+
+/**
+ * Convert a kebab-case or camelCase string to Title Case.
+ */
+function toTitleCase(str: string): string {
+  return str
+    .replace(/[-_]/g, " ")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 export default function AppShell({
   children,
@@ -33,17 +59,18 @@ export default function AppShell({
   showChat = true,
 }: AppShellProps) {
   const location = useLocation();
+  const pageTitles = usePageTitles();
 
   const resolvedTitle = useMemo(() => {
     if (title) return title;
 
     const [, firstSegment, secondSegment] = location.pathname.split("/");
     if (firstSegment === "apps" && secondSegment) {
-      return PAGE_TITLES[secondSegment] ?? secondSegment;
+      return pageTitles[secondSegment] ?? toTitleCase(secondSegment);
     }
 
-    return PAGE_TITLES[firstSegment] ?? "Dashboard";
-  }, [location.pathname, title]);
+    return pageTitles[firstSegment] ?? toTitleCase(firstSegment) ?? "Dashboard";
+  }, [location.pathname, title, pageTitles]);
 
   return (
     <div className="dashboard-grid">

@@ -1,58 +1,120 @@
+"use client";
+
 /**
  * StorePage — Refined app store experience.
+ *
+ * Uses backend catalog as source of truth for all metadata.
+ * Categories are fetched from /api/catalog/categories API.
  */
 
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  DollarSign,
-  Zap,
-  Heart,
-  Users,
-  Wrench,
-  Package,
   Download,
-  Trash2,
-  Search,
   Grid3X3,
   List,
+  Search,
+  Trash2,
 } from "lucide-react";
-import { installApp, uninstallApp } from "@/api/catalog";
-import { useAppCatalog } from "@/components/providers/AppProviders";
+import { getCategories, installApp, uninstallApp } from "@/api/catalog";
+import { useAppCatalog, useToast } from "@/components/providers/AppProviders";
+import { DynamicIcon } from "@/lib/icon-resolver";
 import type { AppCatalogEntry } from "@/types/generated/api";
+import type { Category } from "@/api/catalog";
 
-const CATEGORY_ICONS: Record<string, React.ReactNode> = {
-  finance: <DollarSign size={14} />,
-  productivity: <Zap size={14} />,
-  health: <Heart size={14} />,
-  social: <Users size={14} />,
-  developer: <Wrench size={14} />,
-  other: <Package size={14} />,
-};
+/**
+ * Generate a gradient from an oklch color string.
+ */
+function generateGradient(color: string | undefined | null): string {
+  if (!color) {
+    return "linear-gradient(135deg, var(--color-muted) 0%, var(--color-border) 100%)";
+  }
 
-const CATEGORY_LABELS: Record<string, string> = {
-  finance: "Finance",
-  productivity: "Productivity",
-  health: "Health",
-  social: "Social",
-  developer: "Developer",
-  other: "Other",
-};
+  // If it's already a gradient, return as-is
+  if (color.includes("gradient")) {
+    return color;
+  }
 
-const CATEGORY_GRADIENTS: Record<string, string> = {
-  finance: "linear-gradient(135deg, oklch(0.72 0.19 145) 0%, oklch(0.65 0.22 145) 100%)",
-  productivity: "linear-gradient(135deg, oklch(0.65 0.2 85) 0%, oklch(0.7 0.22 85) 100%)",
-  health: "linear-gradient(135deg, oklch(0.65 0.22 25) 0%, oklch(0.6 0.24 25) 100%)",
-  social: "linear-gradient(135deg, oklch(0.6 0.18 280) 0%, oklch(0.65 0.2 280) 100%)",
-  developer: "linear-gradient(135deg, oklch(0.55 0.15 250) 0%, oklch(0.6 0.17 250) 100%)",
-  other: "linear-gradient(135deg, oklch(0.5 0.05 80) 0%, oklch(0.55 0.08 80) 100%)",
-};
+  // Parse oklch color and create a gradient
+  const oklchMatch = color.match(/oklch\(([\d.]+)\s+([\d.]+)\s+(\d+)\)/);
+  if (oklchMatch) {
+    const l = parseFloat(oklchMatch[1]);
+    const c = parseFloat(oklchMatch[2]);
+    const h = parseInt(oklchMatch[3]);
+
+    const l2 = Math.max(0.4, l - 0.07);
+    const c2 = c * 1.1;
+
+    return `linear-gradient(135deg, ${color} 0%, oklch(${l2} ${c2} ${h}) 100%)`;
+  }
+
+  return `linear-gradient(135deg, ${color} 0%, ${color}dd 100%)`;
+}
+
+/**
+ * Format category name for display.
+ */
+function formatCategoryLabel(category: string): string {
+  // Capitalize first letter
+  return category.charAt(0).toUpperCase() + category.slice(1).toLowerCase();
+}
 
 export default function StorePage() {
   const { catalog, isCatalogLoading, refreshCatalog, setAppInstalled } = useAppCatalog();
+  const toast = useToast();
   const [installing, setInstalling] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+
+  // Categories from API
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(true);
+
+  // Fetch categories on mount
+  useEffect(() => {
+    async function loadCategories() {
+      try {
+        const cats = await getCategories();
+        setCategories(cats);
+      } catch {
+        // Silently fail - categories are for UI enhancement only
+      } finally {
+        setIsLoadingCategories(false);
+      }
+    }
+    void loadCategories();
+  }, []);
+
+  // Build category lookup map
+  const categoryMap = useMemo(() => {
+    const map: Record<string, Category> = {};
+    for (const cat of categories) {
+      map[cat.name.toLowerCase()] = cat;
+      map[cat.id.toLowerCase()] = cat; // Also map by id
+    }
+    return map;
+  }, [categories]);
+
+  // Get category metadata with fallback
+  const getCategory = (categoryId: string): Category => {
+    const key = categoryId.toLowerCase();
+    return (
+      categoryMap[key] || {
+        id: categoryId,
+        name: formatCategoryLabel(categoryId),
+        icon: "Package",
+        color: "oklch(0.5 0.05 80)",
+        order: 999,
+      }
+    );
+  };
+
+  // Extract unique category IDs from catalog, merged with API categories
+  const availableCategories = useMemo(() => {
+    const catIds = new Set(catalog.map((a) => a.category.toLowerCase()));
+    const merged = new Set([...categories.map((c) => c.name.toLowerCase()), ...catIds]);
+    return ["all", ...Array.from(merged).sort()];
+  }, [catalog, categories]);
 
   async function handleToggle(app: AppCatalogEntry) {
     if (installing.has(app.id)) return;
@@ -62,11 +124,14 @@ export default function StorePage() {
     try {
       if (app.is_installed) {
         await uninstallApp({ app_id: app.id });
+        toast.success(`${app.name} uninstalled`, { description: "The app has been removed from your workspace" });
       } else {
         await installApp({ app_id: app.id });
+        toast.success(`${app.name} installed`, { description: "The app is now available in your workspace", action: { label: "Open", onClick: () => window.location.href = `/apps/${app.id}` } });
       }
     } catch {
       setAppInstalled(app.id, app.is_installed);
+      toast.error(`Failed to ${app.is_installed ? "uninstall" : "install"} ${app.name}`, { description: "Please try again later" });
       await refreshCatalog();
     } finally {
       setInstalling((s) => {
@@ -77,10 +142,8 @@ export default function StorePage() {
     }
   }
 
-  const categories = ["all", ...new Set(catalog.map((a) => a.category))];
-
   const filtered = catalog.filter((app) => {
-    const matchesCategory = filter === "all" || app.category === filter;
+    const matchesCategory = filter === "all" || app.category.toLowerCase() === filter.toLowerCase();
     const matchesSearch =
       searchQuery === "" ||
       app.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -102,7 +165,7 @@ export default function StorePage() {
             key={i}
             className="store-card"
             style={{
-              height: "200px",
+              height: "240px",
               animation: `fadeIn 0.4s ease ${i * 0.1}s both`,
             }}
           >
@@ -170,26 +233,37 @@ export default function StorePage() {
 
         {/* Category chips */}
         <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-          {categories.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setFilter(cat)}
-              className={`badge ${filter === cat ? "badge-primary" : "badge-neutral"}`}
-              style={{
-                cursor: "pointer",
-                padding: "0.5rem 0.875rem",
-                fontSize: "0.75rem",
-                display: "flex",
-                alignItems: "center",
-                gap: "0.375rem",
-                transition: "all 0.2s ease",
-                transform: filter === cat ? "scale(1.02)" : "scale(1)",
-              }}
-            >
-              {cat !== "all" && CATEGORY_ICONS[cat]}
-              {cat === "all" ? "All Apps" : CATEGORY_LABELS[cat]}
-            </button>
-          ))}
+          {availableCategories.map((catId) => {
+            const cat = getCategory(catId);
+            const isSelected = filter.toLowerCase() === catId.toLowerCase();
+
+            return (
+              <button
+                key={catId}
+                onClick={() => setFilter(catId)}
+                className={`badge ${isSelected ? "badge-primary" : "badge-neutral"}`}
+                style={{
+                  cursor: "pointer",
+                  padding: "0.5rem 0.875rem",
+                  fontSize: "0.75rem",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.375rem",
+                  transition: "all 0.2s ease",
+                  transform: isSelected ? "scale(1.02)" : "scale(1)",
+                }}
+              >
+                {catId !== "all" && (
+                  <DynamicIcon
+                    name={cat.icon}
+                    size={14}
+                    strokeWidth={2}
+                  />
+                )}
+                {catId === "all" ? "All Apps" : cat.name}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -208,14 +282,15 @@ export default function StorePage() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-            gap: "1.25rem",
+            gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+            gap: "1.5rem",
           }}
         >
           {filtered.map((app, i) => (
             <AppCard
               key={app.id}
               app={app}
+              getCategory={getCategory}
               installing={installing}
               onToggle={handleToggle}
               delay={i * 0.05}
@@ -228,6 +303,7 @@ export default function StorePage() {
             <AppListItem
               key={app.id}
               app={app}
+              getCategory={getCategory}
               installing={installing}
               onToggle={handleToggle}
               delay={i * 0.03}
@@ -243,43 +319,38 @@ export default function StorePage() {
 
 interface AppCardProps {
   app: AppCatalogEntry;
+  getCategory: (id: string) => Category;
   installing: Set<string>;
   onToggle: (app: AppCatalogEntry) => void;
   delay?: number;
 }
 
-function AppCard({ app, installing, onToggle, delay = 0 }: AppCardProps) {
-  const [mousePos, setMousePos] = useState({ x: 50, y: 50 });
+function AppCard({ app, getCategory, installing, onToggle, delay = 0 }: AppCardProps) {
+  const gradient = useMemo(() => {
+    // Use app's color if available, otherwise derive from category
+    return generateGradient(app.color || getCategory(app.category).color);
+  }, [app.color, app.category, getCategory]);
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
-    setMousePos({ x, y });
-  };
-
-  const gradient =
-    app.color || CATEGORY_GRADIENTS[app.category] || CATEGORY_GRADIENTS.other;
+  const category = getCategory(app.category);
 
   return (
     <div
       className="store-card"
-      onMouseMove={handleMouseMove}
       style={{
-        "--mouse-x": `${mousePos.x}%`,
-        "--mouse-y": `${mousePos.y}%`,
         animation: `fadeInScale 0.4s cubic-bezier(0.16, 1, 0.3, 1) ${delay}s both`,
-      } as React.CSSProperties}
+      }}
     >
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "flex-start", gap: "1rem" }}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: "1rem", marginBottom: "0.25rem" }}>
         <div
           className="store-card-icon"
           style={{ background: gradient }}
         >
-          {app.icon
-            ? app.icon.slice(0, 2).toUpperCase()
-            : app.name.slice(0, 2).toUpperCase()}
+          {app.icon ? (
+            <DynamicIcon name={app.icon} size={24} strokeWidth={2} />
+          ) : (
+            <span>{app.name.slice(0, 2).toUpperCase()}</span>
+          )}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <h3 className="store-card-title">{app.name}</h3>
@@ -288,7 +359,7 @@ function AppCard({ app, installing, onToggle, delay = 0 }: AppCardProps) {
               className="badge badge-neutral"
               style={{ fontSize: "0.625rem", padding: "0.125rem 0.5rem" }}
             >
-              {CATEGORY_LABELS[app.category] ?? app.category}
+              {category.name}
             </span>
             <span>v{app.version}</span>
           </div>
@@ -331,9 +402,12 @@ function AppCard({ app, installing, onToggle, delay = 0 }: AppCardProps) {
 
 // ─── App List Item Component ────────────────────────────────────────────────
 
-function AppListItem({ app, installing, onToggle, delay = 0 }: AppCardProps) {
-  const gradient =
-    app.color || CATEGORY_GRADIENTS[app.category] || CATEGORY_GRADIENTS.other;
+function AppListItem({ app, getCategory, installing, onToggle, delay = 0 }: AppCardProps) {
+  const gradient = useMemo(() => {
+    return generateGradient(app.color || getCategory(app.category).color);
+  }, [app.color, app.category, getCategory]);
+
+  const category = getCategory(app.category);
 
   return (
     <div
@@ -362,9 +436,11 @@ function AppListItem({ app, installing, onToggle, delay = 0 }: AppCardProps) {
           boxShadow: "0 2px 8px oklch(0 0 0 / 0.2)",
         }}
       >
-        {app.icon
-          ? app.icon.slice(0, 2).toUpperCase()
-          : app.name.slice(0, 2).toUpperCase()}
+        {app.icon ? (
+          <DynamicIcon name={app.icon} size={20} strokeWidth={2} />
+        ) : (
+          <span>{app.name.slice(0, 2).toUpperCase()}</span>
+        )}
       </div>
 
       <div style={{ flex: 1, minWidth: 0, marginLeft: "1rem" }}>
@@ -384,7 +460,7 @@ function AppListItem({ app, installing, onToggle, delay = 0 }: AppCardProps) {
             className="badge badge-neutral"
             style={{ fontSize: "0.625rem", padding: "0.125rem 0.5rem" }}
           >
-            {CATEGORY_LABELS[app.category] ?? app.category}
+            {category.name}
           </span>
         </div>
         <p

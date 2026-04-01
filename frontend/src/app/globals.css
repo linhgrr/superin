@@ -286,6 +286,28 @@ body {
   }
 }
 
+@keyframes toastSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(100%) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes toastExit {
+  from {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(100%) scale(0.9);
+  }
+}
+
 .animate-fade-in {
   animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
@@ -336,6 +358,43 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   WIDGET RESIZE HANDLE
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+.react-resizable-handle {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  bottom: 0;
+  right: 0;
+  cursor: se-resize;
+  z-index: 10;
+}
+
+.react-resizable-handle::after {
+  content: '';
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--color-foreground-muted);
+  border-bottom: 2px solid var(--color-foreground-muted);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+/* Show resize handle on widget hover */
+.rgl-item-view:hover .react-resizable-handle::after {
+  opacity: 0.6;
+}
+
+.react-resizable-handle:hover::after {
+  opacity: 1;
+  border-color: var(--color-primary);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════════
@@ -564,6 +623,8 @@ body {
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .widget-card::before {
@@ -590,6 +651,13 @@ body {
 
 .widget-card:hover::before {
   opacity: 1;
+}
+
+/* Content area that scrolls if needed */
+.widget-card > div:last-child {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
 }
 
 .widget-card-title {
@@ -1214,13 +1282,14 @@ tr:hover td {
   );
   border: 1px solid var(--color-border);
   border-radius: 16px;
-  padding: 1.25rem;
+  padding: 1.5rem;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.125rem;
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
   overflow: hidden;
+  min-height: 220px;
 }
 
 .store-card::before {
@@ -1248,8 +1317,8 @@ tr:hover td {
 }
 
 .store-card-icon {
-  width: 48px;
-  height: 48px;
+  width: 52px;
+  height: 52px;
   border-radius: 12px;
   display: flex;
   align-items: center;
@@ -1264,23 +1333,31 @@ tr:hover td {
 .store-card-title {
   font-family: var(--font-heading);
   font-weight: 600;
-  font-size: 1rem;
+  font-size: 1.0625rem;
   color: var(--color-foreground);
   letter-spacing: -0.01em;
+  margin-bottom: 0.375rem;
 }
 
 .store-card-meta {
   font-size: 0.75rem;
   color: var(--color-foreground-muted);
   font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .store-card-description {
   font-size: 0.875rem;
   color: var(--color-foreground-muted);
-  line-height: 1.5;
+  line-height: 1.55;
   margin: 0;
   flex: 1;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════════
@@ -1608,8 +1685,176 @@ tr:hover td {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════════
-   UTILITY CLASSES
+   ONBOARDING TOUR — Custom driver.js styling
    ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* Overlay must be on top of everything */
+#driver-popover-overlay,
+.driver-overlay {
+  z-index: 999999 !important;
+}
+
+/* Popover should be even higher */
+.driver-popover {
+  z-index: 1000000 !important;
+}
+
+/* Overlay */
+.shin-onboarding-popover {
+  background: linear-gradient(
+    165deg,
+    var(--color-surface) 0%,
+    var(--color-surface-elevated) 100%
+  ) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 24px 48px oklch(0 0 0 / 0.4), 0 0 0 1px var(--color-border) !important;
+  padding: 1.25rem !important;
+  max-width: 360px !important;
+  font-family: var(--font-sans) !important;
+  color: var(--color-foreground) !important;
+}
+
+/* Progress bar */
+.shin-tour-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.shin-tour-progress-bar {
+  flex: 1;
+  height: 4px;
+  background: var(--color-border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.shin-tour-progress-fill {
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.shin-tour-progress-text {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--color-foreground-muted);
+  font-family: var(--font-mono);
+}
+
+/* Title */
+.shin-onboarding-popover h2 {
+  font-family: var(--font-heading) !important;
+  font-size: 1.125rem !important;
+  font-weight: 600 !important;
+  color: var(--color-foreground) !important;
+  margin: 0 0 0.75rem 0 !important;
+  letter-spacing: -0.01em;
+}
+
+/* Description */
+.shin-onboarding-popover p {
+  font-size: 0.9375rem !important;
+  color: var(--color-foreground-muted) !important;
+  line-height: 1.6 !important;
+  margin: 0 !important;
+}
+
+/* Navigation buttons */
+.driver-popover-footer {
+  margin-top: 1.25rem !important;
+  display: flex !important;
+  gap: 0.5rem !important;
+}
+
+.driver-popover-footer button {
+  padding: 0.5rem 1rem !important;
+  border-radius: 10px !important;
+  font-size: 0.875rem !important;
+  font-weight: 600 !important;
+  font-family: var(--font-sans) !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  border: none !important;
+}
+
+/* Close button (skip) */
+.driver-popover-close-btn {
+  background: transparent !important;
+  color: var(--color-foreground-muted) !important;
+  position: absolute !important;
+  top: 0.75rem !important;
+  right: 0.75rem !important;
+  padding: 0.25rem !important;
+  width: 28px !important;
+  height: 28px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 6px !important;
+}
+
+.driver-popover-close-btn:hover {
+  background: var(--color-surface-floating) !important;
+  color: var(--color-foreground) !important;
+}
+
+/* Previous button */
+.driver-popover-prev-btn {
+  background: var(--color-surface-elevated) !important;
+  color: var(--color-foreground) !important;
+  border: 1px solid var(--color-border) !important;
+}
+
+.driver-popover-prev-btn:hover {
+  background: var(--color-surface-floating) !important;
+  border-color: var(--color-border-highlight) !important;
+}
+
+/* Next/Done button */
+.driver-popover-next-btn,
+.driver-popover-footer button:not(.driver-popover-prev-btn) {
+  background: linear-gradient(135deg, var(--color-primary) 0%, oklch(0.72 0.24 45) 100%) !important;
+  color: var(--color-primary-foreground) !important;
+  box-shadow: 0 4px 14px oklch(0.68 0.22 35 / 0.25) !important;
+}
+
+.driver-popover-next-btn:hover,
+.driver-popover-footer button:not(.driver-popover-prev-btn):hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 6px 20px oklch(0.68 0.22 35 / 0.35) !important;
+}
+
+/* Spotlight stage */
+.driver-active-element {
+  z-index: 10000 !important;
+}
+
+/* Overlay */
+#driver-popover-overlay {
+  background: oklch(0 0 0 / 0.7) !important;
+  backdrop-filter: blur(4px) !important;
+}
+
+/* Disabled interaction during tour */
+.driver-popover-overlay {
+  pointer-events: auto !important;
+}
+
+.driver-popover-overlay-transparent {
+  pointer-events: none !important;
+}
+
+/* Arrow styling */
+#driver-popover-arrow {
+  fill: var(--color-surface) !important;
+  stroke: var(--color-border) !important;
+  stroke-width: 1px !important;
+}
+
 
 .glass {
   background: var(--color-surface-transparent);

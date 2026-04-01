@@ -26,14 +26,18 @@ export default function TasksPanel() {
     try {
       const updated = await toggleTask(id);
       setTasks((current) => current.map((task) => (task.id === id ? updated : task)));
-    } catch {}
+    } catch {
+      // Silently ignore errors - UI will remain unchanged
+    }
   }
 
   async function handleDelete(id: string) {
     try {
       await deleteTask(id);
       setTasks((current) => current.filter((task) => task.id !== id));
-    } catch {}
+    } catch {
+      // Silently ignore errors - UI will remain unchanged
+    }
   }
 
   async function handleCreate(data: CreateTaskRequest) {

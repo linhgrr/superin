@@ -7,7 +7,7 @@ interface MonthViewWidgetProps {
   showTimeBlockedTasks?: boolean;
 }
 
-export function MonthViewWidget({ defaultCalendar, showTimeBlockedTasks = true }: MonthViewWidgetProps) {
+export default function MonthViewWidget({ defaultCalendar, showTimeBlockedTasks = true }: MonthViewWidgetProps) {
   const [events, setEvents] = useState<Event[]>([]);
   const [calendars, setCalendars] = useState<Calendar[]>([]);
   const [currentDate, setCurrentDate] = useState(new Date());

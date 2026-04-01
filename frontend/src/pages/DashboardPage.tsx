@@ -18,7 +18,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { getFrontendApp } from "@/apps";
 import AddWidgetDialog from "@/components/dashboard/AddWidgetDialog";
-import { useAppCatalog } from "@/components/providers/AppProviders";
+import { useAppCatalog, useOnboarding } from "@/components/providers/AppProviders";
 import { getAllPreferences, updatePreferences } from "@/api/catalog";
 import { WIDGET_SIZES } from "@/lib/widget-sizes";
 import type {
@@ -61,9 +61,10 @@ function buildLayoutItem(
   pref: WidgetPreferenceSchema | undefined,
   previousWidgets: ResolvedWidget[],
 ): Layout {
+  // Use custom dimensions from preferences if available, otherwise use manifest default
   const config = getSizeConfig(rw.widget.size);
-  const w = config.width;
-  const h = config.rglH;
+  const w = pref?.size_w ?? config.width;
+  const h = pref?.size_h ?? config.rglH;
 
   const savedX = pref?.config?.gridX as number | undefined;
   const savedY = pref?.config?.gridY as number | undefined;
@@ -76,7 +77,8 @@ function buildLayoutItem(
   let row = 0;
   for (const previousWidget of previousWidgets) {
     const prevConfig = getSizeConfig(previousWidget.widget.size);
-    col += prevConfig.width;
+    const prevW = prevConfig.width;
+    col += prevW;
     if (col >= 12) {
       col = 0;
       row += prevConfig.rglH;
@@ -155,6 +157,8 @@ function WidgetCard({
       style={{
         "--mouse-x": `${mousePos.x}%`,
         "--mouse-y": `${mousePos.y}%`,
+        display: "flex",
+        flexDirection: "column",
       } as React.CSSProperties}
     >
       {color && (
@@ -171,10 +175,12 @@ function WidgetCard({
           }}
         />
       )}
-      <div className="widget-card-title" style={{ marginTop: color ? "3px" : undefined }}>
+      <div className="widget-card-title" style={{ marginTop: color ? "3px" : undefined, flexShrink: 0 }}>
         {widget.name}
       </div>
-      {children}
+      <div style={{ flex: 1, minHeight: 0, overflow: "auto" }}>
+        {children}
+      </div>
     </div>
   );
 }
@@ -298,6 +304,8 @@ function DashboardInner({
           position: update.position ?? existing?.position ?? 0,
           config: update.config ?? existing?.config,
           size: update.size ?? existing?.size ?? null,
+          size_w: update.size_w ?? existing?.size_w ?? null,
+          size_h: update.size_h ?? existing?.size_h ?? null,
         });
       }
 
@@ -409,6 +417,44 @@ function DashboardInner({
     [applyUpdatesLocally, loadPrefs, persistUpdates, prefs]
   );
 
+  // Handle resize - save custom dimensions
+  const handleResizeStop = useCallback(
+    async (currentLayout: Layout[]) => {
+      currentLayoutRef.current = currentLayout;
+
+      const updates: PreferenceUpdate[] = currentLayout.map((item) => {
+        const existing = prefs.get(item.i);
+        const defaultConfig = getSizeConfig(
+          visibleWidgets.find((vw) => vw.widgetId === item.i)?.widget.size ?? "standard"
+        );
+
+        // Only save custom size if different from manifest default
+        const sizeW = item.w !== defaultConfig.width ? item.w : undefined;
+        const sizeH = item.h !== defaultConfig.rglH ? item.h : undefined;
+
+        return {
+          widget_id: item.i,
+          config: {
+            ...(existing?.config ?? {}),
+            gridX: item.x,
+            gridY: item.y,
+          },
+          size_w: sizeW,
+          size_h: sizeH,
+        };
+      });
+
+      applyUpdatesLocally(updates);
+
+      try {
+        await persistUpdates(updates);
+      } catch {
+        void loadPrefs(false);
+      }
+    },
+    [applyUpdatesLocally, loadPrefs, persistUpdates, prefs, visibleWidgets]
+  );
+
   if (!isPrefsLoaded) {
     return (
       <div className="widget-grid">
@@ -452,10 +498,12 @@ function DashboardInner({
         rowHeight={ROW_HEIGHT}
         width={containerWidth}
         isDraggable
-        isResizable={false}
+        isResizable
+        resizeHandles={["se"]}
         compactType={null}
         onLayoutChange={handleLayoutChange}
         onDragStop={handleDragStop}
+        onResizeStop={handleResizeStop}
         margin={[16, 16]}
         containerPadding={[0, 0]}
       >
@@ -485,6 +533,33 @@ function DashboardInner({
 
 export default function DashboardPage() {
   const { installedApps: catalog, isCatalogLoading: loading } = useAppCatalog();
+  const { startTour, isCompleted } = useOnboarding();
+  const tourStartedRef = useRef(false);
+
+  // Auto-start welcome tour for first-time users (only once)
+  useEffect(() => {
+    // Small delay to ensure onboarding state is fully loaded from localStorage
+    const timer = setTimeout(() => {
+      if (!loading && !tourStartedRef.current && !isCompleted("welcome")) {
+        tourStartedRef.current = true;
+        // Wait for DOM to be ready and elements to exist
+        const checkAndStart = () => {
+          const sidebar = document.querySelector(".sidebar-brand");
+          if (sidebar) {
+            console.log("[Onboarding] Starting welcome tour...");
+            startTour("welcome");
+          } else {
+            console.log("[Onboarding] Waiting for sidebar...");
+            // Retry after 500ms if element not found
+            setTimeout(checkAndStart, 500);
+          }
+        };
+        checkAndStart();
+      }
+    }, 100); // 100ms delay to let onboarding state hydrate
+
+    return () => clearTimeout(timer);
+  }, [loading, isCompleted, startTour]);
 
   if (loading) {
     return (

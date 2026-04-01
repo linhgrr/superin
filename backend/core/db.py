@@ -19,6 +19,8 @@ async def init_db() -> None:
     _client = AsyncMongoClient(settings.mongodb_uri)
 
     # Import here to avoid circular imports
+    from beanie import init_beanie
+
     from core.models import (
         AppCategory,
         ConversationMessage,
@@ -28,8 +30,6 @@ async def init_db() -> None:
         WidgetPreference,
     )
     from core.registry import get_plugin_models
-
-    from beanie import init_beanie
 
     await init_beanie(
         database=_client["superin"],

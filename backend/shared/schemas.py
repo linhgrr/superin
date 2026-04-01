@@ -5,11 +5,11 @@ App-specific schemas live in backend/apps/{app_id}/schemas.py.
 """
 
 from datetime import datetime
-from typing import Any, Literal, Optional, Union
+from typing import Any, Literal
+
 from pydantic import BaseModel, EmailStr, Field
 
-from shared.enums import WidgetSize, ConfigFieldType, ChatEventType
-
+from shared.enums import ConfigFieldType, WidgetSize
 
 # ─── User ───────────────────────────────────────────────────────────────────────
 
@@ -77,16 +77,16 @@ class ConfigFieldSchema(BaseModel):
     label: str
     type: ConfigFieldType
     required: bool = False
-    default: Optional[Any] = None
+    default: Any | None = None
     options: list[SelectOption] = Field(default_factory=list)
-    options_source: Optional[str] = Field(
+    options_source: str | None = Field(
         default=None,
         description="Widget resolver ID for dynamic options, e.g. 'finance.wallets'",
     )
-    placeholder: Optional[str] = None
-    min: Optional[float] = None
-    max: Optional[float] = None
-    step: Optional[float] = None
+    placeholder: str | None = None
+    min: float | None = None
+    max: float | None = None
+    step: float | None = None
 
 
 class WidgetManifestSchema(BaseModel):
@@ -106,13 +106,16 @@ class WidgetManifestSchema(BaseModel):
 class WidgetPreferenceSchema(BaseModel):
     """User-specific widget state stored in DB."""
 
-    id: Optional[str] = Field(default=None, alias="_id")
+    id: str | None = Field(default=None, alias="_id")
     user_id: str
     widget_id: str
     app_id: str
     enabled: bool = False
     position: int = 0
     config: dict = Field(default_factory=dict)
+    # Custom dimensions - override manifest default
+    size_w: int | None = None  # Grid width (2-12)
+    size_h: int | None = None  # Grid height (1-6)
 
     model_config = {"populate_by_name": True}
 
@@ -121,9 +124,12 @@ class PreferenceUpdate(BaseModel):
     """Update payload for a single widget preference."""
 
     widget_id: str
-    enabled: Optional[bool] = None
-    position: Optional[int] = None
-    config: Optional[dict] = None
+    enabled: bool | None = None
+    position: int | None = None
+    config: dict | None = None
+    # Custom dimensions - override manifest default
+    size_w: int | None = None  # Grid width (2-12)
+    size_h: int | None = None  # Grid height (1-6)
 
 
 # ─── App / Plugin ──────────────────────────────────────────────────────────────
@@ -198,7 +204,7 @@ class ChatStreamToolCall(BaseModel):
     tool_call_id: str
     tool_name: str
     args: dict
-    args_text: Optional[str] = None
+    args_text: str | None = None
 
 
 class ChatStreamToolResult(BaseModel):
@@ -217,10 +223,10 @@ class ChatStreamError(BaseModel):
     message: str
 
 
-ChatStreamEvent = Union[
-    ChatStreamToken,
-    ChatStreamToolCall,
-    ChatStreamToolResult,
-    ChatStreamDone,
-    ChatStreamError,
-]
+ChatStreamEvent = (
+    ChatStreamToken
+    | ChatStreamToolCall
+    | ChatStreamToolResult
+    | ChatStreamDone
+    | ChatStreamError
+)

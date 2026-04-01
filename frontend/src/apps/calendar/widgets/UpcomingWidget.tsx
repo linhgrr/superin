@@ -7,7 +7,7 @@ interface UpcomingWidgetProps {
   calendarFilter?: string | null;
 }
 
-export function UpcomingWidget({ maxItems = 5, calendarFilter }: UpcomingWidgetProps) {
+export default function UpcomingWidget({ maxItems = 5, calendarFilter }: UpcomingWidgetProps) {
   const [events, setEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 

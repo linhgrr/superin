@@ -1,13 +1,13 @@
 """HTTP middleware for request logging and rate limiting."""
 
-import time
 import logging
+import time
 from collections import defaultdict
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 
-from core.constants import RATE_LIMIT_LOGIN, RATE_LIMIT_CHAT, RATE_LIMIT_DEFAULT
+from core.constants import RATE_LIMIT_CHAT, RATE_LIMIT_DEFAULT, RATE_LIMIT_LOGIN
 
 logger = logging.getLogger(__name__)
 

@@ -2,10 +2,12 @@
 
 import json
 
+from assistant_stream import create_run
+from assistant_stream.serialization import DataStreamResponse
 from fastapi import APIRouter, Depends, Request
 
-from core.auth import get_current_user
 from core.agents.root import root_agent
+from core.auth import get_current_user
 
 router = APIRouter()
 
@@ -27,18 +29,6 @@ async def chat_stream(
     messages = body.get("messages", [])
     thread_id = body.get("threadId") or body.get("thread_id")
     # incoming_tools: JSON Schema tools from frontend — forwarded to LLM, not parsed here
-
-    try:
-        from assistant_stream import create_run
-        from assistant_stream.serialization import DataStreamResponse
-    except ImportError:
-        # assistant-stream not installed yet — return a stub response
-        from fastapi.responses import JSONResponse
-        return JSONResponse(
-            content={"error": "assistant-stream not installed. Install with: pip install assistant-stream"},
-            status_code=503,
-        )
-
     async def run(controller):
         tool_calls: dict[str, object] = {}
 

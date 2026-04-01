@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { listEvents, type Event } from "../api";
 import Widget from "./Widget";
 
-export function DaySummaryWidget() {
+export default function DaySummaryWidget() {
   const [todayEvents, setTodayEvents] = useState<Event[]>([]);
   const [tomorrowEvents, setTomorrowEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(true);

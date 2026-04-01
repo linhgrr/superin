@@ -1,6 +1,7 @@
 """Custom HTTP exceptions and FastAPI global exception handlers."""
 
 import logging
+
 from fastapi import Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse

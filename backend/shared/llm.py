@@ -19,8 +19,9 @@ def get_llm() -> Any:
     """
     global _llm
     if _llm is None:
-        from core.config import settings
         from langchain_openai import ChatOpenAI
+
+        from core.config import settings
 
         _llm = ChatOpenAI(
             api_key=settings.openai_api_key,

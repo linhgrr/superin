@@ -2,8 +2,17 @@
   "id": "calendar",
   "name": "Calendar",
   "widgets": [
-    { "id": "calendar.month-view", "size": "wide" },
-    { "id": "calendar.upcoming", "size": "standard" },
-    { "id": "calendar.day-summary", "size": "compact" }
+    {
+      "id": "calendar.month-view",
+      "size": "wide"
+    },
+    {
+      "id": "calendar.upcoming",
+      "size": "standard"
+    },
+    {
+      "id": "calendar.day-summary",
+      "size": "compact"
+    }
   ]
 }

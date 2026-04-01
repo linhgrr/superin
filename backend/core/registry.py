@@ -31,6 +31,51 @@ PLUGIN_REGISTRY: dict[str, PluginEntry] = {}
 _plugin_models: list[type] = []
 
 
+# ─── Category Registry ───────────────────────────────────────────────────────
+
+class CategoryEntry(TypedDict):
+    """Category metadata from app registration."""
+
+    id: str  # category id, e.g., "finance", "productivity"
+    name: str  # display name, e.g., "Finance", "Productivity"
+    color: str  # oklch color string
+    icon: str  # Lucide icon name
+    app_id: str  # source app that registered this category
+
+
+CATEGORY_REGISTRY: dict[str, CategoryEntry] = {}
+
+
+def register_category(
+    category_id: str,
+    name: str,
+    color: str,
+    icon: str,
+    app_id: str,
+) -> None:
+    """Register a category with metadata. Called during plugin registration."""
+    # Allow later registrations to override (for "custom" category flexibility)
+    CATEGORY_REGISTRY[category_id] = CategoryEntry(
+        id=category_id,
+        name=name,
+        color=color,
+        icon=icon,
+        app_id=app_id,
+    )
+
+
+def list_categories() -> list[CategoryEntry]:
+    """Return all registered categories as a list."""
+    return list(CATEGORY_REGISTRY.values())
+
+
+def get_category(category_id: str) -> CategoryEntry | None:
+    """Get category metadata by id."""
+    return CATEGORY_REGISTRY.get(category_id)
+
+
+# ─── Plugin Registration ───────────────────────────────────────────────────────
+
 def register_plugin(
     manifest: AppManifestSchema,
     agent: "BaseAppAgent",
@@ -48,6 +93,15 @@ def register_plugin(
         models=models,
     )
     _plugin_models.extend(models)
+
+    # Auto-register category with metadata from manifest
+    register_category(
+        category_id=manifest.category,
+        name=manifest.category.capitalize(),  # Default: capitalize category id
+        color=manifest.color,
+        icon=manifest.icon,
+        app_id=manifest.id,
+    )
 
 
 def get_plugin_models() -> list[type]:

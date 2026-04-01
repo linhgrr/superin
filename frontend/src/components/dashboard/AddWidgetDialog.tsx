@@ -1,20 +1,14 @@
+"use client";
+
 /**
  * AddWidgetDialog — Refined 2-step widget manager.
+ *
+ * Now uses dynamic icon resolution from backend-provided icon names.
  */
 
-import {
-  ArrowLeft,
-  ArrowLeftRight,
-  Calendar,
-  CheckSquare,
-  Eye,
-  EyeOff,
-  LayoutGrid,
-  PieChart,
-  Wallet,
-  X,
-} from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, Grid3X3, LayoutGrid, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { DynamicIcon } from "@/lib/icon-resolver";
 import type { AppCatalogEntry } from "@/types/generated/api";
 
 export interface AddWidgetDialogProps {
@@ -33,14 +27,6 @@ const SIZE_LABELS: Record<string, string> = {
   full: "Full Width",
 };
 
-const ICON_COMPONENTS = {
-  ArrowLeftRight,
-  Calendar,
-  CheckSquare,
-  PieChart,
-  Wallet,
-} as const;
-
 const SIZE_BADGE_COLORS: Record<string, { bg: string; text: string }> = {
   compact: { bg: "oklch(0.55 0.05 80 / 0.15)", text: "oklch(0.55 0.05 80)" },
   standard: { bg: "oklch(0.65 0.1 280 / 0.15)", text: "oklch(0.65 0.1 280)" },
@@ -58,13 +44,14 @@ function IconGlyph({
   fallback: string;
   size?: number;
 }) {
-  if (iconName) {
-    const LucideIcon = ICON_COMPONENTS[iconName as keyof typeof ICON_COMPONENTS];
-    if (LucideIcon) {
-      return <LucideIcon size={size} strokeWidth={2} />;
-    }
-  }
-  return <span>{fallback.slice(0, 2).toUpperCase()}</span>;
+  // Use DynamicIcon for any icon name - no more hardcoded mapping needed
+  return (
+    <DynamicIcon
+      name={iconName}
+      size={size}
+      strokeWidth={2}
+    />
+  );
 }
 
 function LoadingSpinner() {
@@ -149,7 +136,6 @@ export default function AddWidgetDialog({
                   const visibleCount = app.widgets.filter((widget) =>
                     enabledWidgetIds.has(widget.id)
                   ).length;
-                  const hasWidgets = visibleCount > 0;
 
                   return (
                     <button

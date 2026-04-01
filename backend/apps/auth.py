@@ -1,15 +1,15 @@
 """Auth routes — login, register, refresh, logout."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from fastapi import APIRouter, HTTPException, Response, status, Depends, Cookie
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
 
-from core.auth import create_access_token, create_refresh_token, decode_token, get_current_user
-from core.models import User, TokenBlacklist
-from core.security import get_password_hash, verify_password
-from core.logging_middleware import login_limiter
-from core.constants import AUTH_COOKIE_NAME, AUTH_COOKIE_MAX_AGE_SECONDS
 from apps.auth_schemas import LoginRequest, RegisterRequest
+from core.auth import create_access_token, create_refresh_token, decode_token, get_current_user
+from core.constants import AUTH_COOKIE_MAX_AGE_SECONDS, AUTH_COOKIE_NAME
+from core.logging_middleware import login_limiter
+from core.models import TokenBlacklist, User
+from core.security import get_password_hash, verify_password
 from shared.schemas import TokenResponse, UserPublic
 
 router = APIRouter()
@@ -108,7 +108,7 @@ async def refresh_tokens(
     if jti:
         await TokenBlacklist(
             jti=jti,
-            expires_at=datetime.fromtimestamp(payload["exp"], tz=timezone.utc),
+            expires_at=datetime.fromtimestamp(payload["exp"], tz=UTC),
         ).insert()
 
     resp = _token_response(user)

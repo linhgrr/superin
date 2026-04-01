@@ -5,8 +5,10 @@ import type { FrontendAppDefinition, FrontendAppManifest } from "../types";
 
 const todoManifest = manifest as FrontendAppManifest;
 
-export const todoApp = {
+const todoApp = {
   manifest: todoManifest,
   AppView,
   DashboardWidget,
 } satisfies FrontendAppDefinition;
+
+export default todoApp;

@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 
 from core.auth import get_current_user, get_current_user_optional
 from core.models import AppCategory, UserAppInstallation, WidgetPreference
+from core.registry import list_categories as list_registry_categories
 from core.registry import list_plugins
 from shared.schemas import (
     AppCatalogEntry,
@@ -46,9 +47,45 @@ class UpdateCategoryRequest(BaseModel):
 
 @router.get("/categories")
 async def list_categories() -> list[dict]:
-    """List all app categories (public)."""
-    cats = await AppCategory.find_all().sort("order").to_list()
-    return [_cat_to_dict(c) for c in cats]
+    """List all app categories, merged from DB and app registry.
+
+    Categories are discovered from:
+    1. AppCategory documents in DB (admin-managed categories)
+    2. App manifests in PLUGIN_REGISTRY (auto-discovered from installed apps)
+
+    This enables true plug-n-play: when a new app declares a new category,
+    it automatically appears in the UI without manual registration.
+    """
+    # Get categories from DB
+    db_cats = await AppCategory.find_all().sort("order").to_list()
+
+    # Get categories from app registry
+    registry_cats = list_registry_categories()
+
+    # Merge: DB categories take priority, registry fills gaps
+    merged: dict[str, dict] = {}
+
+    # First, add all DB categories
+    for cat in db_cats:
+        cat_id = cat.name.lower()
+        merged[cat_id] = _cat_to_dict(cat)
+
+    # Then, add registry categories if not already in DB
+    for cat in registry_cats:
+        cat_id = cat["id"].lower()
+        if cat_id not in merged:
+            # Auto-discovered category from app manifest
+            merged[cat_id] = {
+                "id": cat["id"],  # Use category id as string id
+                "name": cat["name"],
+                "icon": cat["icon"],
+                "color": cat["color"],
+                "order": 999,  # Auto-discovered categories appear at end
+                "auto_discovered": True,  # Flag for UI
+            }
+
+    # Return sorted by order, then name
+    return sorted(merged.values(), key=lambda x: (x.get("order", 0), x["name"]))
 
 
 @router.post("/categories")

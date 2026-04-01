@@ -11,7 +11,6 @@ from __future__ import annotations
 
 from typing import Literal
 
-
 # ─── Widget ────────────────────────────────────────────────────────────────────
 
 WidgetSize = Literal["compact", "standard", "wide", "tall", "full"]

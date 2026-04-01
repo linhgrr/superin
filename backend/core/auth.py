@@ -1,7 +1,7 @@
 """JWT utilities: create, verify tokens and FastAPI dependency for getting current user."""
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
@@ -18,7 +18,7 @@ def create_access_token(data: dict) -> str:
     """Create a short-lived access token (default 15 min)."""
     to_encode = data.copy()
     to_encode.update({
-        "exp": datetime.now(timezone.utc) + timedelta(minutes=settings.access_token_expire_minutes),
+        "exp": datetime.now(UTC) + timedelta(minutes=settings.access_token_expire_minutes),
         "type": "access",
         "jti": str(uuid.uuid4()),
     })
@@ -29,7 +29,7 @@ def create_refresh_token(data: dict) -> str:
     """Create a long-lived refresh token (default 7 days)."""
     to_encode = data.copy()
     to_encode.update({
-        "exp": datetime.now(timezone.utc) + timedelta(days=settings.refresh_token_expire_days),
+        "exp": datetime.now(UTC) + timedelta(days=settings.refresh_token_expire_days),
         "type": "refresh",
         "jti": str(uuid.uuid4()),
     })

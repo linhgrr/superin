@@ -34,7 +34,8 @@ def fail(message: str) -> None:
 
 
 def to_pascal_case(value: str) -> str:
-    return "".join(part.capitalize() for part in value.split("-"))
+    # Remove hyphens first, then capitalize
+    return "".join(part.capitalize() for part in value.replace("-", "").split(" "))
 
 
 def to_camel_case(value: str) -> str:
@@ -123,33 +124,31 @@ def load_frontend_manifest(app_id: str) -> dict[str, Any]:
 
 
 def sync_frontend_registry() -> None:
+    """Update frontend registry index for auto-discovery.
+
+    Note: With auto-discovery via Vite glob imports, this is now a no-op.
+    The frontend/src/apps/index.ts uses import.meta.glob to automatically
+    discover all apps without manual registration.
+    """
+    print("[sync_frontend_registry] Auto-discovery is enabled via Vite glob import.")
+    print("[sync_frontend_registry] No manual registry update needed.")
+    print(f"[sync_frontend_registry] Apps are auto-discovered from: {FRONTEND_APPS.relative_to(ROOT)}")
+
+    # List discovered apps for confirmation
     app_ids = sorted(
         entry.name
         for entry in FRONTEND_APPS.iterdir()
-        if entry.is_dir() and (entry / "manifest.json").exists()
+        if entry.is_dir() and (entry / "manifest.json").exists() and (entry / "index.ts").exists()
     )
-
-    imports = [
-        f'import {{ {to_camel_case(app_id)}App }} from "./{app_id}";'
-        for app_id in app_ids
-    ]
-    entries = [f"  {app_id}: {to_camel_case(app_id)}App," for app_id in app_ids]
-    content = (
-        "\n".join(imports)
-        + '\nimport type { FrontendAppDefinition } from "./types";\n\n'
-        + "export const FRONTEND_APPS = {\n"
-        + "\n".join(entries)
-        + '\n} as const satisfies Record<string, FrontendAppDefinition>;\n\n'
-        + "export function getFrontendApp(appId: string) {\n"
-        + "  return FRONTEND_APPS[appId as keyof typeof FRONTEND_APPS];\n"
-        + "}\n"
-    )
-    write_file(FRONTEND_APPS / "index.ts", content, overwrite=True)
+    print(f"[sync_frontend_registry] Found {len(app_ids)} apps: {', '.join(app_ids)}")
 
 
 def sync_frontend_app(app_id: str, *, force_widgets: bool = False) -> None:
     manifest = load_backend_manifest(app_id)
     app_name = manifest.name
+    # Use sanitized pascal case for file names and component names
+    # to avoid issues with special characters in manifest.name (e.g., "To-Do")
+    sanitized_name = to_pascal_case(app_id)
     app_root = FRONTEND_APPS / app_id
     ensure_dir(app_root)
 
@@ -163,7 +162,6 @@ def sync_frontend_app(app_id: str, *, force_widgets: bool = False) -> None:
         overwrite=True,
     )
 
-    app_export = f"{to_camel_case(app_id)}App"
     write_file(
         app_root / "index.ts",
         (
@@ -172,19 +170,20 @@ def sync_frontend_app(app_id: str, *, force_widgets: bool = False) -> None:
             'import DashboardWidget from "./DashboardWidget";\n'
             'import type { FrontendAppDefinition, FrontendAppManifest } from "../types";\n\n'
             f"const {to_camel_case(app_id)}Manifest = manifest as FrontendAppManifest;\n\n"
-            f"export const {app_export} = {{\n"
+            f"const {to_camel_case(app_id)}App = {{\n"
             f"  manifest: {to_camel_case(app_id)}Manifest,\n"
             "  AppView,\n"
             "  DashboardWidget,\n"
-            "} satisfies FrontendAppDefinition;\n"
+            '} satisfies FrontendAppDefinition;\n\n'
+            f'export default {to_camel_case(app_id)}App;\n'
         ),
         overwrite=True,
     )
 
-    write_file(app_root / "AppView.tsx", f'export {{ default }} from "./views/{app_name}Screen";\n', overwrite=True)
+    write_file(app_root / "AppView.tsx", f'export {{ default }} from "./views/{sanitized_name}Screen";\n', overwrite=True)
     write_file(
         app_root / "DashboardWidget.tsx",
-        f'export {{ default }} from "./widgets/{app_name}DashboardWidget";\n',
+        f'export {{ default }} from "./widgets/{sanitized_name}DashboardWidget";\n',
         overwrite=True,
     )
 
@@ -217,12 +216,12 @@ def sync_frontend_app(app_id: str, *, force_widgets: bool = False) -> None:
         if not any(directory.iterdir()):
             write_file(gitkeep, "", overwrite=False)
 
-    screen_path = views_dir / f"{app_name}Screen.tsx"
+    screen_path = views_dir / f"{sanitized_name}Screen.tsx"
     if not screen_path.exists():
         write_file(
             screen_path,
             (
-                f"export default function {app_name}Screen() {{\n"
+                f"export default function {sanitized_name}Screen() {{\n"
                 "  return (\n"
                 "    <div>\n"
                 f'      <h2 style={{{{ fontSize: "1.5rem", fontWeight: 700, margin: 0 }}}}>{app_name}</h2>\n'
@@ -268,7 +267,7 @@ def sync_frontend_app(app_id: str, *, force_widgets: bool = False) -> None:
         + "const WIDGET_COMPONENTS = {\n"
         + "\n".join(mappings)
         + '\n} as const satisfies Record<string, ComponentType<DashboardWidgetRendererProps>>;\n\n'
-        + f"export default function {app_name}DashboardWidget({{ widgetId, widget }}: DashboardWidgetProps) {{\n"
+        + f"export default function {sanitized_name}DashboardWidget({{ widgetId, widget }}: DashboardWidgetProps) {{\n"
         + "  const Component = WIDGET_COMPONENTS[widgetId as keyof typeof WIDGET_COMPONENTS];\n\n"
         + "  if (Component) {\n"
         + "    return <Component widget={widget} />;\n"
@@ -283,7 +282,7 @@ def sync_frontend_app(app_id: str, *, force_widgets: bool = False) -> None:
         + "  );\n"
         + "}\n"
     )
-    write_file(widgets_dir / f"{app_name}DashboardWidget.tsx", dispatcher, overwrite=True)
+    write_file(widgets_dir / f"{sanitized_name}DashboardWidget.tsx", dispatcher, overwrite=True)
     sync_frontend_registry()
 
 

@@ -1,5 +1,5 @@
 /**
- * App Catalog API — browse, install, uninstall apps, widget preferences.
+ * App Catalog API — browse, install, uninstall apps, widget preferences, categories.
  */
 
 import type {
@@ -11,9 +11,23 @@ import type {
 } from "@/types/generated/api";
 import { api } from "./client";
 
+export interface Category {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+  order: number;
+  auto_discovered?: boolean;
+}
+
 // GET /api/catalog — all apps with is_installed flag
 export async function getCatalog(): Promise<AppCatalogEntry[]> {
   return api.get<AppCatalogEntry[]>("/api/catalog");
+}
+
+// GET /api/catalog/categories — all categories with metadata
+export async function getCategories(): Promise<Category[]> {
+  return api.get<Category[]>("/api/catalog/categories");
 }
 
 // POST /api/catalog/install
