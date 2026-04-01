@@ -176,6 +176,53 @@
         ]
       }
     },
+    "/api/auth/me/settings": {
+      "patch": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Update Settings",
+        "description": "Update user settings (timezone, etc.).",
+        "operationId": "update_settings_api_auth_me_settings_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserPublic"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/catalog/categories": {
       "get": {
         "tags": [
@@ -213,7 +260,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateCategoryRequest"
+                "$ref": "#/components/schemas/apps__catalog__CreateCategoryRequest"
               }
             }
           },
@@ -1786,7 +1833,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/apps__finance__schemas__CreateCategoryRequest"
+                "$ref": "#/components/schemas/CreateCategoryRequest"
               }
             }
           },
@@ -1892,7 +1939,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/apps__finance__schemas__CreateCategoryRequest"
+                "$ref": "#/components/schemas/CreateCategoryRequest"
               }
             }
           }
@@ -4090,20 +4137,19 @@
           },
           "icon": {
             "type": "string",
-            "maxLength": 30,
             "title": "Icon",
-            "default": "Folder"
+            "default": "Tag"
           },
           "color": {
             "type": "string",
-            "maxLength": 50,
             "title": "Color",
             "default": "oklch(0.65 0.21 280)"
           },
-          "order": {
-            "type": "integer",
-            "title": "Order",
-            "default": 0
+          "budget": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Budget",
+            "default": 0.0
           }
         },
         "type": "object",
@@ -5018,6 +5064,19 @@
         "type": "object",
         "title": "UpdateTaskRequest"
       },
+      "UpdateUserSettingsRequest": {
+        "properties": {
+          "settings": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Settings",
+            "description": "User settings object (e.g., {timezone: 'Asia/Ho_Chi_Minh'})"
+          }
+        },
+        "type": "object",
+        "title": "UpdateUserSettingsRequest",
+        "description": "Update user settings like timezone."
+      },
       "UserPublic": {
         "properties": {
           "id": {
@@ -5031,6 +5090,11 @@
           "name": {
             "type": "string",
             "title": "Name"
+          },
+          "settings": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Settings"
           }
         },
         "type": "object",
@@ -5202,7 +5266,7 @@
         "title": "WidgetPreferenceSchema",
         "description": "User-specific widget state stored in DB."
       },
-      "apps__finance__schemas__CreateCategoryRequest": {
+      "apps__catalog__CreateCategoryRequest": {
         "properties": {
           "name": {
             "type": "string",
@@ -5212,19 +5276,20 @@
           },
           "icon": {
             "type": "string",
+            "maxLength": 30,
             "title": "Icon",
-            "default": "Tag"
+            "default": "Folder"
           },
           "color": {
             "type": "string",
+            "maxLength": 50,
             "title": "Color",
             "default": "oklch(0.65 0.21 280)"
           },
-          "budget": {
-            "type": "number",
-            "minimum": 0.0,
-            "title": "Budget",
-            "default": 0.0
+          "order": {
+            "type": "integer",
+            "title": "Order",
+            "default": 0
           }
         },
         "type": "object",
