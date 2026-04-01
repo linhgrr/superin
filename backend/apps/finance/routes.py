@@ -1,19 +1,17 @@
 """Finance plugin FastAPI routes — thin layer calling finance_service."""
 
-from datetime import datetime
-from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from core.auth import get_current_user
-from apps.finance.service import finance_service
 from apps.finance.schemas import (
-    CreateWalletRequest,
     CreateCategoryRequest,
     CreateTransactionRequest,
+    CreateWalletRequest,
     TransferRequest,
 )
-from shared.schemas import WidgetPreferenceSchema, PreferenceUpdate
+from apps.finance.service import finance_service
+from core.auth import get_current_user
+from shared.schemas import PreferenceUpdate, WidgetPreferenceSchema
 
 router = APIRouter()
 
@@ -33,17 +31,6 @@ async def list_wallets(user_id: str = Depends(get_current_user)):
     return await finance_service.list_wallets(user_id)
 
 
-@router.post("/wallets")
-async def create_wallet(
-    request: CreateWalletRequest,
-    user_id: str = Depends(get_current_user),
-):
-    try:
-        return await finance_service.create_wallet(user_id, request.name, request.currency)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
 @router.get("/wallets/{wallet_id}")
 async def get_wallet(
     wallet_id: str,
@@ -55,11 +42,59 @@ async def get_wallet(
     return wallet
 
 
+@router.post("/wallets")
+async def create_wallet(
+    request: CreateWalletRequest,
+    user_id: str = Depends(get_current_user),
+):
+    try:
+        return await finance_service.create_wallet(user_id, request.name, request.currency)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.patch("/wallets/{wallet_id}")
+async def update_wallet(
+    wallet_id: str,
+    name: str,
+    user_id: str = Depends(get_current_user),
+):
+    """Update wallet name."""
+    try:
+        return await finance_service.update_wallet(wallet_id, user_id, name)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.delete("/wallets/{wallet_id}")
+async def delete_wallet(
+    wallet_id: str,
+    user_id: str = Depends(get_current_user),
+):
+    """Delete a wallet if empty."""
+    try:
+        return await finance_service.delete_wallet(wallet_id, user_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 # ─── Categories ────────────────────────────────────────────────────────────────
 
 @router.get("/categories")
 async def list_categories(user_id: str = Depends(get_current_user)):
     return await finance_service.list_categories(user_id)
+
+
+@router.get("/categories/{category_id}")
+async def get_category(
+    category_id: str,
+    user_id: str = Depends(get_current_user),
+):
+    """Get a single category by ID."""
+    category = await finance_service.get_category(category_id, user_id)
+    if not category:
+        raise HTTPException(status_code=404, detail="Category not found")
+    return category
 
 
 @router.post("/categories")
@@ -76,6 +111,34 @@ async def create_category(
     )
 
 
+@router.patch("/categories/{category_id}")
+async def update_category(
+    category_id: str,
+    request: CreateCategoryRequest,
+    user_id: str = Depends(get_current_user),
+):
+    """Update a category."""
+    try:
+        return await finance_service.update_category(
+            category_id, user_id,
+            request.name, request.icon, request.color, request.budget
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.delete("/categories/{category_id}")
+async def delete_category(
+    category_id: str,
+    user_id: str = Depends(get_current_user),
+):
+    """Delete a category if it has no transactions."""
+    try:
+        return await finance_service.delete_category(category_id, user_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 # ─── Transactions ──────────────────────────────────────────────────────────────
 
 @router.get("/transactions")
@@ -90,6 +153,18 @@ async def list_transactions(
     return await finance_service.list_transactions(
         user_id, type_, category_id, wallet_id, skip, limit
     )
+
+
+@router.get("/transactions/{transaction_id}")
+async def get_transaction(
+    transaction_id: str,
+    user_id: str = Depends(get_current_user),
+):
+    """Get a single transaction by ID."""
+    tx = await finance_service.get_transaction(transaction_id, user_id)
+    if not tx:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    return tx
 
 
 @router.post("/transactions")
@@ -111,14 +186,47 @@ async def create_transaction(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@router.patch("/transactions/{transaction_id}")
+async def update_transaction(
+    transaction_id: str,
+    request: CreateTransactionRequest,
+    user_id: str = Depends(get_current_user),
+):
+    """Update a transaction."""
+    try:
+        return await finance_service.update_transaction(
+            transaction_id, user_id,
+            str(request.wallet_id) if request.wallet_id else None,
+            str(request.category_id) if request.category_id else None,
+            request.amount,
+            request.date,
+            request.note,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/transactions/{transaction_id}")
+async def delete_transaction(
+    transaction_id: str,
+    user_id: str = Depends(get_current_user),
+):
+    """Delete a transaction and reverse its effect on wallet balance."""
+    try:
+        return await finance_service.delete_transaction(transaction_id, user_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
 # ─── Preferences (required by platform) ─────────────────────────────────────────
 
 @router.get("/preferences")
 async def get_preferences(
     user_id: str = Depends(get_current_user),
 ) -> list[WidgetPreferenceSchema]:
-    from core.models import WidgetPreference
     from beanie import PydanticObjectId
+
+    from core.models import WidgetPreference
     prefs = await WidgetPreference.find(
         WidgetPreference.user_id == PydanticObjectId(user_id),
         WidgetPreference.app_id == "finance",
@@ -142,8 +250,9 @@ async def update_preferences(
     updates: list[PreferenceUpdate],
     user_id: str = Depends(get_current_user),
 ) -> list[WidgetPreferenceSchema]:
-    from core.models import WidgetPreference
     from beanie import PydanticObjectId
+
+    from core.models import WidgetPreference
     for u in updates:
         pref = await WidgetPreference.find_one(
             WidgetPreference.user_id == PydanticObjectId(user_id),

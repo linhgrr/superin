@@ -1,10 +1,9 @@
 """Todo plugin business logic."""
 
 from datetime import datetime
-from typing import Literal, Optional
 
-from apps.todo.repository import TaskRepository
 from apps.todo.models import Task
+from apps.todo.repository import TaskRepository
 
 
 class TaskService:
@@ -34,6 +33,11 @@ class TaskService:
         task = await self.repo.create(user_id, title, description, due_date, priority)
         return _task_to_dict(task)
 
+    async def get_task(self, task_id: str, user_id: str) -> dict | None:
+        """Get a single task by ID."""
+        task = await self.repo.find_by_id(task_id, user_id)
+        return _task_to_dict(task) if task else None
+
     async def toggle_task(self, task_id: str, user_id: str) -> dict:
         task = await self.repo.find_by_id(task_id, user_id)
         if not task:
@@ -52,7 +56,6 @@ class TaskService:
         return _task_to_dict(updated)
 
     async def get_summary(self, user_id: str) -> dict:
-        from datetime import date
         today = datetime.utcnow()
         start_of_today = today.replace(hour=0, minute=0, second=0, microsecond=0)
         end_of_today = today.replace(hour=23, minute=59, second=59)

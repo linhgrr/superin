@@ -11,6 +11,366 @@ from shared.tool_results import safe_tool_call
 
 # ─── Tools ────────────────────────────────────────────────────────────────────
 
+# ─── Wallets ───────────────────────────────────────────────────────────────────
+
+@tool
+async def finance_list_wallets() -> list[dict]:
+    """
+    List all wallets of the current user.
+
+    Use when:
+    - User asks about their wallets or accounts
+    - Need wallet context for transactions
+    - User wants to see balances
+
+    Returns:
+        List of wallets with id, name, currency, balance
+
+    Examples:
+        - "Show my wallets"
+        - "What accounts do I have?"
+        - "How much money do I have?"
+    """
+    async def operation() -> list[dict]:
+        user_id = get_user_context()
+        return await finance_service.list_wallets(user_id)
+
+    return await safe_tool_call(operation, action="listing wallets")
+
+
+@tool
+async def finance_get_wallet(wallet_id: str) -> dict:
+    """
+    Get a single wallet by ID.
+
+    Use when:
+    - User asks about a specific wallet
+    - Need wallet details before transfer
+    - Verifying wallet balance
+
+    Args:
+        wallet_id: The wallet's unique identifier
+
+    Returns:
+        Wallet details: id, name, currency, balance, created_at
+
+    Errors:
+        NOT_FOUND: Wallet ID does not exist
+    """
+    async def operation() -> dict:
+        user_id = get_user_context()
+        wallet = await finance_service.get_wallet(wallet_id, user_id)
+        if not wallet:
+            raise ValueError(f"Wallet '{wallet_id}' not found")
+        return wallet
+
+    return await safe_tool_call(operation, action="getting a wallet")
+
+
+@tool
+async def finance_create_wallet(name: str, currency: str = "USD") -> dict:
+    """
+    Create a new wallet for the current user.
+
+    Use when:
+    - User asks to create a new wallet or account
+    - Setting up a new budget category as a wallet
+
+    Args:
+        name: Wallet name (e.g., "Cash", "Bank Account", "Savings")
+        currency: 3-letter currency code (default: "USD")
+
+    Returns:
+        Created wallet with starting balance of 0
+
+    Examples:
+        - "Create a new wallet called Cash"
+        - "Add a savings account"
+    """
+    async def operation() -> dict:
+        user_id = get_user_context()
+        return await finance_service.create_wallet(user_id, name, currency)
+
+    return await safe_tool_call(operation, action="creating a wallet")
+
+
+@tool
+async def finance_update_wallet(wallet_id: str, name: str | None = None) -> dict:
+    """
+    Update a wallet's name.
+
+    Use when:
+    - User wants to rename a wallet
+    - Correcting wallet name
+
+    Args:
+        wallet_id: Wallet to update
+        name: New name for the wallet
+
+    Returns:
+        Updated wallet details
+
+    Errors:
+        NOT_FOUND: Wallet ID does not exist
+    """
+    async def operation() -> dict:
+        user_id = get_user_context()
+        return await finance_service.update_wallet(wallet_id, user_id, name)
+
+    return await safe_tool_call(operation, action="updating a wallet")
+
+
+@tool
+async def finance_delete_wallet(wallet_id: str) -> dict:
+    """
+    Delete a wallet permanently.
+
+    Use when:
+    - User asks to remove a wallet
+    - User wants to delete an empty account
+
+    Args:
+        wallet_id: Wallet to delete
+
+    Returns:
+        Success confirmation
+
+    Errors:
+        NOT_FOUND: Wallet ID does not exist
+        HAS_BALANCE: Cannot delete wallet with non-zero balance
+        HAS_TRANSACTIONS: Cannot delete wallet with transactions
+
+    Warning: This action cannot be undone. Wallet must be empty.
+    """
+    async def operation() -> dict:
+        user_id = get_user_context()
+        return await finance_service.delete_wallet(wallet_id, user_id)
+
+    return await safe_tool_call(operation, action="deleting a wallet")
+
+
+# ─── Categories ────────────────────────────────────────────────────────────────
+
+@tool
+async def finance_list_categories() -> list[dict]:
+    """
+    List all categories of the current user.
+
+    Use when:
+    - User asks about spending categories
+    - Need category context for transactions
+    - Setting up budget categories
+
+    Returns:
+        List of categories with id, name, icon, color, budget
+
+    Examples:
+        - "Show my categories"
+        - "What spending categories do I have?"
+    """
+    async def operation() -> list[dict]:
+        user_id = get_user_context()
+        return await finance_service.list_categories(user_id)
+
+    return await safe_tool_call(operation, action="listing categories")
+
+
+@tool
+async def finance_get_category(category_id: str) -> dict:
+    """
+    Get a single category by ID.
+
+    Use when:
+    - User asks about a specific category
+    - Need category details for budget planning
+
+    Args:
+        category_id: The category's unique identifier
+
+    Returns:
+        Category details: id, name, icon, color, budget
+
+    Errors:
+        NOT_FOUND: Category ID does not exist
+    """
+    async def operation() -> dict:
+        user_id = get_user_context()
+        category = await finance_service.get_category(category_id, user_id)
+        if not category:
+            raise ValueError(f"Category '{category_id}' not found")
+        return category
+
+    return await safe_tool_call(operation, action="getting a category")
+
+
+@tool
+async def finance_create_category(
+    name: str,
+    icon: str = "Tag",
+    color: str = "oklch(0.65 0.21 280)",
+    budget: float = 0.0,
+) -> dict:
+    """
+    Create a new spending/income category.
+
+    Use when:
+    - User wants to add a new budget category
+    - Creating custom spending tracking
+
+    Args:
+        name: Category name (e.g., "Food", "Transport", "Entertainment")
+        icon: Icon name for UI (default: "Tag")
+        color: Color code for UI (default: purple)
+        budget: Monthly budget limit, 0 means no limit (default: 0)
+
+    Returns:
+        Created category
+
+    Examples:
+        - "Create a category for dining out"
+        - "Add a new category called Gym with $50 budget"
+    """
+    async def operation() -> dict:
+        user_id = get_user_context()
+        return await finance_service.create_category(user_id, name, icon, color, budget)
+
+    return await safe_tool_call(operation, action="creating a category")
+
+
+@tool
+async def finance_update_category(
+    category_id: str,
+    name: str | None = None,
+    icon: str | None = None,
+    color: str | None = None,
+    budget: float | None = None,
+) -> dict:
+    """
+    Update a category's details.
+
+    Use when:
+    - User wants to rename a category
+    - Changing category budget
+    - Updating icon or color
+
+    Args:
+        category_id: Category to update
+        name: New name (optional)
+        icon: New icon (optional)
+        color: New color (optional)
+        budget: New budget limit (optional)
+
+    Returns:
+        Updated category details
+
+    Errors:
+        NOT_FOUND: Category ID does not exist
+    """
+    async def operation() -> dict:
+        user_id = get_user_context()
+        return await finance_service.update_category(
+            category_id, user_id, name, icon, color, budget
+        )
+
+    return await safe_tool_call(operation, action="updating a category")
+
+
+@tool
+async def finance_delete_category(category_id: str) -> dict:
+    """
+    Delete a category permanently.
+
+    Use when:
+    - User asks to remove a category
+    - Cleaning up unused categories
+
+    Args:
+        category_id: Category to delete
+
+    Returns:
+        Success confirmation
+
+    Errors:
+        NOT_FOUND: Category ID does not exist
+        HAS_TRANSACTIONS: Cannot delete category with transactions
+
+    Warning: This action cannot be undone. Category must have no transactions.
+    """
+    async def operation() -> dict:
+        user_id = get_user_context()
+        return await finance_service.delete_category(category_id, user_id)
+
+    return await safe_tool_call(operation, action="deleting a category")
+
+
+# ─── Transactions ──────────────────────────────────────────────────────────────
+
+@tool
+async def finance_list_transactions(
+    type_: Literal["income", "expense"] | None = None,
+    wallet_id: str | None = None,
+    category_id: str | None = None,
+    limit: int = 20,
+) -> dict:
+    """
+    List transactions with optional filtering.
+
+    Use when:
+    - User asks to see transactions
+    - Looking for specific income or expenses
+    - Reviewing spending by category
+
+    Args:
+        type_: Filter by "income" or "expense", None for all
+        wallet_id: Filter by specific wallet, None for all
+        category_id: Filter by specific category, None for all
+        limit: Max transactions to return (default 20)
+
+    Returns:
+        List of transactions with id, wallet_id, category_id, type, amount, date, note
+
+    Examples:
+        - "Show my recent expenses" → type_="expense"
+        - "What did I spend on food?" → category_id="food_cat_id"
+        - "Transactions from my cash wallet" → wallet_id="cash_wallet_id"
+    """
+    async def operation() -> list[dict]:
+        user_id = get_user_context()
+        return await finance_service.list_transactions(
+            user_id, type_, category_id, wallet_id, 0, limit
+        )
+
+    return await safe_tool_call(operation, action="listing transactions")
+
+
+@tool
+async def finance_get_transaction(transaction_id: str) -> dict:
+    """
+    Get a single transaction by ID.
+
+    Use when:
+    - User asks about a specific transaction
+    - Need transaction details for review
+
+    Args:
+        transaction_id: The transaction's unique identifier
+
+    Returns:
+        Transaction details
+
+    Errors:
+        NOT_FOUND: Transaction ID does not exist
+    """
+    async def operation() -> dict:
+        user_id = get_user_context()
+        tx = await finance_service.get_transaction(transaction_id, user_id)
+        if not tx:
+            raise ValueError(f"Transaction '{transaction_id}' not found")
+        return tx
+
+    return await safe_tool_call(operation, action="getting a transaction")
+
+
 @tool
 async def finance_add_transaction(
     wallet_id: str,
@@ -20,7 +380,33 @@ async def finance_add_transaction(
     date: str,
     note: str | None = None,
 ) -> dict:
-    """Add a new income or expense transaction."""
+    """
+    Add a new income or expense transaction.
+
+    Use when:
+    - User records income or spending
+    - Adding a transaction manually
+
+    Args:
+        wallet_id: Which wallet/account
+        category_id: Spending/income category
+        type_: "income" or "expense"
+        amount: Positive number (required)
+        date: ISO format date string
+        note: Optional description
+
+    Returns:
+        Created transaction
+
+    Errors:
+        INSUFFICIENT_BALANCE: Wallet doesn't have enough for expense
+        WALLET_NOT_FOUND: Wallet ID invalid
+        CATEGORY_NOT_FOUND: Category ID invalid
+
+    Examples:
+        - "I spent $50 on food" → amount=50, type_="expense", category="Food"
+        - "Got $1000 salary" → amount=1000, type_="income", category="Salary"
+    """
     async def operation() -> dict:
         user_id = get_user_context()
         dt = datetime.fromisoformat(date) if date else datetime.utcnow()
@@ -28,51 +414,149 @@ async def finance_add_transaction(
             user_id, wallet_id, category_id, type_, amount, dt, note
         )
 
-    return await safe_tool_call(operation, action="adding a finance transaction")
+    return await safe_tool_call(operation, action="adding a transaction")
 
 
 @tool
-async def finance_list_wallets() -> list[dict]:
-    """List all wallets of the current user."""
-    async def operation() -> list[dict]:
-        user_id = get_user_context()
-        return await finance_service.list_wallets(user_id)
-
-    return await safe_tool_call(operation, action="listing wallets")
-
-
-@tool
-async def finance_create_wallet(name: str, currency: str = "USD") -> dict:
-    """Create a new wallet for the current user."""
-    async def operation() -> dict:
-        user_id = get_user_context()
-        return await finance_service.create_wallet(user_id, name, currency)
-
-    return await safe_tool_call(operation, action="creating a wallet")
-
-
-@tool
-async def finance_list_categories() -> list[dict]:
-    """List all categories of the current user."""
-    async def operation() -> list[dict]:
-        user_id = get_user_context()
-        return await finance_service.list_categories(user_id)
-
-    return await safe_tool_call(operation, action="listing categories")
-
-
-@tool
-async def finance_list_transactions(
-    type_: str | None = None,
+async def finance_update_transaction(
+    transaction_id: str,
     wallet_id: str | None = None,
     category_id: str | None = None,
-    limit: int = 20,
+    amount: float | None = None,
+    date: str | None = None,
+    note: str | None = None,
 ) -> dict:
-    """List transactions, optionally filtered."""
-    async def operation() -> list[dict]:
+    """
+    Update an existing transaction.
+
+    Use when:
+    - User needs to correct a transaction
+    - Changing amount, date, or category
+
+    Args:
+        transaction_id: Transaction to update
+        wallet_id: New wallet (optional)
+        category_id: New category (optional)
+        amount: New amount (optional, must be positive)
+        date: New date ISO format (optional)
+        note: New note (optional)
+
+    Returns:
+        Updated transaction
+
+    Errors:
+        NOT_FOUND: Transaction ID does not exist
+        INSUFFICIENT_BALANCE: New amount exceeds wallet balance
+
+    Note: Changing amount may affect wallet balance accordingly.
+    """
+    async def operation() -> dict:
         user_id = get_user_context()
-        return await finance_service.list_transactions(
-            user_id, type_, category_id, wallet_id, limit=limit
+        dt = datetime.fromisoformat(date) if date else None
+        return await finance_service.update_transaction(
+            transaction_id, user_id, wallet_id, category_id, amount, dt, note
         )
 
-    return await safe_tool_call(operation, action="listing transactions")
+    return await safe_tool_call(operation, action="updating a transaction")
+
+
+@tool
+async def finance_delete_transaction(transaction_id: str) -> dict:
+    """
+    Delete a transaction permanently.
+
+    Use when:
+    - User wants to remove a transaction
+    - Correcting a duplicate entry
+
+    Args:
+        transaction_id: Transaction to delete
+
+    Returns:
+        Success confirmation
+
+    Errors:
+        NOT_FOUND: Transaction ID does not exist
+
+    Note: This will reverse the transaction's effect on wallet balance.
+    """
+    async def operation() -> dict:
+        user_id = get_user_context()
+        return await finance_service.delete_transaction(transaction_id, user_id)
+
+    return await safe_tool_call(operation, action="deleting a transaction")
+
+
+# ─── Transfer ──────────────────────────────────────────────────────────────────
+
+@tool
+async def finance_transfer(
+    from_wallet_id: str,
+    to_wallet_id: str,
+    amount: float,
+    note: str | None = None,
+) -> dict:
+    """
+    Transfer money between two wallets.
+
+    Use when:
+    - User moves money between accounts
+    - Transferring funds internally
+
+    Args:
+        from_wallet_id: Source wallet
+        to_wallet_id: Destination wallet
+        amount: Amount to transfer (must be positive)
+        note: Optional transfer reason
+
+    Returns:
+        Transfer details with updated wallet balances
+
+    Errors:
+        SAME_WALLET: Source and destination cannot be the same
+        INSUFFICIENT_BALANCE: Source wallet doesn't have enough
+        WALLET_NOT_FOUND: Either wallet ID invalid
+
+    Examples:
+        - "Transfer $100 from Cash to Bank"
+        - "Move 50 from Savings to Checking"
+    """
+    async def operation() -> dict:
+        user_id = get_user_context()
+        return await finance_service.transfer(
+            user_id, from_wallet_id, to_wallet_id, amount, note
+        )
+
+    return await safe_tool_call(operation, action="transferring funds")
+
+
+# ─── Summary ───────────────────────────────────────────────────────────────────
+
+@tool
+async def finance_get_summary() -> dict:
+    """
+    Get a financial summary for the current user.
+
+    Use when:
+    - User asks for financial overview
+    - User wants spending report
+    - "How am I doing financially?"
+
+    Returns:
+        Summary with:
+        - total_balance: Sum of all wallet balances
+        - income_this_month: Total income in current month
+        - expense_this_month: Total expenses in current month
+        - transaction_count: Number of transactions
+        - wallet_count: Number of wallets
+
+    Examples:
+        - "Show my financial summary"
+        - "How much did I spend this month?"
+        - "What's my net worth?"
+    """
+    async def operation() -> dict:
+        user_id = get_user_context()
+        return await finance_service.get_summary(user_id)
+
+    return await safe_tool_call(operation, action="getting financial summary")

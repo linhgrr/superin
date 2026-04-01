@@ -1,15 +1,15 @@
 """Todo plugin FastAPI routes."""
 
-from typing import Literal, Optional
+from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
 from beanie import PydanticObjectId
+from fastapi import APIRouter, Depends, HTTPException, Query
 
+from apps.todo.schemas import CreateTaskRequest, UpdateTaskRequest
+from apps.todo.service import task_service
 from core.auth import get_current_user
 from core.models import WidgetPreference
-from apps.todo.service import task_service
-from apps.todo.schemas import CreateTaskRequest, UpdateTaskRequest
-from shared.schemas import WidgetPreferenceSchema, PreferenceUpdate
+from shared.schemas import PreferenceUpdate, WidgetPreferenceSchema
 
 router = APIRouter()
 
@@ -32,6 +32,18 @@ async def list_tasks(
     limit: int = Query(20, le=100),
 ):
     return await task_service.list_tasks(user_id, status, priority, limit)
+
+
+@router.get("/tasks/{task_id}")
+async def get_task(
+    task_id: str,
+    user_id: str = Depends(get_current_user),
+):
+    """Get a single task by ID."""
+    task = await task_service.get_task(task_id, user_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return task
 
 
 @router.post("/tasks")
