@@ -15,6 +15,25 @@ def utc_now() -> datetime:
     return datetime.now(UTC)
 
 
+def get_user_local_time(user: "User") -> tuple[str, str]:
+    """Get current date and time in user's timezone.
+
+    Returns:
+        tuple of (date_str, time_str) in user's local timezone.
+        Defaults to UTC if user has no timezone set.
+    """
+    import pytz
+
+    tz_name = user.settings.get("timezone", "UTC")
+    try:
+        tz = pytz.timezone(tz_name)
+    except pytz.UnknownTimeZoneError:
+        tz = pytz.UTC
+
+    now = datetime.now(UTC).astimezone(tz)
+    return now.strftime("%Y-%m-%d"), now.strftime("%H:%M")
+
+
 class User(Document):
     """Platform user account."""
 
@@ -27,6 +46,7 @@ class User(Document):
     class Settings:
         name = "users"
         indexes = [["email"]]
+
 
 
 class UserAppInstallation(Document):

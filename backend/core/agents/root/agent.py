@@ -12,11 +12,11 @@ from typing import Any
 
 from beanie import PydanticObjectId
 from fastapi.encoders import jsonable_encoder
-from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import BaseTool, tool
 from langgraph.prebuilt import create_react_agent
 
-from core.models import ConversationMessage, UserAppInstallation
+from core.models import ConversationMessage, User, UserAppInstallation, get_user_local_time
 from core.registry import PLUGIN_REGISTRY
 from shared.agent_context import clear_agent_context, set_thread_context, set_user_context
 from shared.llm import get_llm
@@ -159,9 +159,18 @@ class RootAgent:
         tools = await self._get_user_tools(user_id)
         graph = self._get_graph(tools)
 
+        # Fetch user for timezone-aware date/time
+        user = await User.find_one(User.id == PydanticObjectId(user_id))
+        current_date, current_time = get_user_local_time(user) if user else ("", "")
+        user_context = f"Current date: {current_date}, current time: {current_time}." if current_date else ""
+
         try:
             # ── Build message list ───────────────────────────────────────────
             langchain_messages: list = []
+
+            # Add user context as first system message (for date/time awareness)
+            if user_context:
+                langchain_messages.append(SystemMessage(content=user_context))
 
             if not skip_db_load:
                 # Load history from DB — for backends that don't send full history
