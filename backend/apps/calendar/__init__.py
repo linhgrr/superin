@@ -8,7 +8,7 @@ from core.registry import register_plugin
 
 register_plugin(
     manifest=calendar_manifest,
-    agent_class=CalendarAgent,
+    agent=CalendarAgent(),
     router=router,
     models=[Event, Calendar, RecurringRule],
 )
