@@ -4,8 +4,30 @@ errors   → server WILL NOT start (RuntimeError).
 warnings → server starts but logs to console.
 """
 
+import inspect
+
 from core.registry import PLUGIN_REGISTRY
 from shared.enums import VALID_WIDGET_SIZES
+
+
+def _uses_safe_tool_call(tool: object) -> bool | None:
+    """Return whether a LangChain tool implementation uses safe_tool_call().
+
+    Returns:
+        True: implementation clearly uses safe_tool_call()
+        False: implementation source is available and does not use it
+        None: implementation source could not be inspected
+    """
+    callable_obj = getattr(tool, "coroutine", None) or getattr(tool, "func", None)
+    if callable_obj is None:
+        return None
+
+    try:
+        source = inspect.getsource(callable_obj)
+    except (OSError, TypeError):
+        return None
+
+    return "safe_tool_call(" in source
 
 
 def verify_plugins() -> tuple[list[str], list[str]]:
@@ -80,7 +102,8 @@ def verify_plugins() -> tuple[list[str], list[str]]:
 
         # ── Tool name checks ────────────────────────────────────────────────
         manifest_tools = set(m.tools)
-        registered_tools = {t.name for t in plugin["agent"].tools()}
+        agent_tools = plugin["agent"].tools()
+        registered_tools = {t.name for t in agent_tools}
         for tool_name in manifest_tools - registered_tools:
             errors.append(
                 f"[{app_id}] tool '{tool_name}' in manifest but not registered in agent"
@@ -97,6 +120,20 @@ def verify_plugins() -> tuple[list[str], list[str]]:
             if not tool_name.startswith(expected_prefix):
                 errors.append(
                     f"[{app_id}] tool '{tool_name}' must start with '{expected_prefix}'"
+                )
+
+        for tool_obj in agent_tools:
+            tool_name = tool_obj.name
+            uses_safe_tool_call = _uses_safe_tool_call(tool_obj)
+            if uses_safe_tool_call is False:
+                errors.append(
+                    f"[{app_id}] tool '{tool_name}' must wrap its domain execution "
+                    "with safe_tool_call()"
+                )
+            elif uses_safe_tool_call is None:
+                warnings.append(
+                    f"[{app_id}] tool '{tool_name}' could not be inspected for "
+                    "safe_tool_call() usage"
                 )
 
         # ── Beanie model checks ─────────────────────────────────────────────

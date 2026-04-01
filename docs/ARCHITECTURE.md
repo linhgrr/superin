@@ -251,6 +251,7 @@ Contract:
 - `tools()` returns app domain tools
 - `build_prompt()` returns app-specific prompt text
 - `delegate(question, thread_id)` returns a structured result envelope for the root agent
+- app tools must use `safe_tool_call()` so domain failures become structured tool results
 
 Current child agents:
 - [finance/agent.py](/home/linh/Downloads/superin/backend/apps/finance/agent.py)

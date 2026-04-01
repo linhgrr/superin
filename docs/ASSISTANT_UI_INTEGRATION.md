@@ -138,6 +138,7 @@ Important:
 - only root-level tool events are streamed to assistant-ui
 - child-internal domain tools such as `finance_add_transaction` must stay hidden from the frontend
 - every streamed tool result must correspond to a previously streamed root-level tool call id
+- app-domain tools should use `safe_tool_call()` so business errors become structured tool results instead of aborting the run
 
 ## Parent / Child-Agent Boundary
 

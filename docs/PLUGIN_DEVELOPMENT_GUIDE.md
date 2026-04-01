@@ -152,8 +152,10 @@ Rules:
 - prompts belong in `prompts.py`, not inline in `agent.py`
 - child agents are invoked by the root agent through `delegate(question, thread_id)`
 - `delegate(...)` should return a structured result envelope, not only plain text
+- every LLM-facing app tool must wrap its domain execution with `safe_tool_call()`
 - app tools should convert domain failures into structured `{ ok, data/error }` results
 - app-specific tools must enforce user scoping
+- startup verification fails if an app tool does not use `safe_tool_call()`
 
 ### Registration
 
