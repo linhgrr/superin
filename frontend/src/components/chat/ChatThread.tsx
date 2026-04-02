@@ -10,10 +10,12 @@ import {
   MessagePrimitive,
   ThreadPrimitive,
   useMessage,
+  useComposer,
 } from "@assistant-ui/react";
 import { Zap, Send, Sparkles } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { useCallback } from "react";
 
 function ToolCallBadge({
   toolName,
@@ -123,6 +125,31 @@ function MessageBubble() {
   );
 }
 
+function ComposerInput() {
+  const composer = useComposer();
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        if (composer.value.trim()) {
+          composer.send();
+        }
+      }
+    },
+    [composer]
+  );
+
+  return (
+    <ComposerPrimitive.Input
+      placeholder="Ask Shin anything... (Enter to send, Shift+Enter for new line)"
+      maxRows={5}
+      className="chat-input"
+      onKeyDown={handleKeyDown}
+    />
+  );
+}
+
 export default function ChatThread() {
   return (
     <ThreadPrimitive.Root className="chat-container">
@@ -156,11 +183,7 @@ export default function ChatThread() {
 
       {/* Input */}
       <ComposerPrimitive.Root className="chat-input-container">
-        <ComposerPrimitive.Input
-          placeholder="Ask Shin anything... (Enter to send)"
-          maxRows={5}
-          className="chat-input"
-        />
+        <ComposerInput />
         <ComposerPrimitive.Send className="chat-send-btn">
           <Send size={16} />
         </ComposerPrimitive.Send>
