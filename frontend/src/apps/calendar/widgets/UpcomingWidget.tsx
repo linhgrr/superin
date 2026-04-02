@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { listEvents, type Event } from "../api";
 import { Calendar } from "lucide-react";
-import { useUserTimezone } from "@/hooks/useUserTimezone";
+import { useTimezone } from "@/hooks/useTimezone";
+import { getUserTimezone } from "@/lib/timezone";
 
 interface UpcomingWidgetProps {
   maxItems?: number;
@@ -11,7 +12,7 @@ interface UpcomingWidgetProps {
 export default function UpcomingWidget({ maxItems = 3, calendarFilter }: UpcomingWidgetProps) {
   const [events, setEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { timezone, formatDate, formatTime } = useUserTimezone();
+  const { timezone, formatDate, formatTime, isToday } = useTimezone();
 
   useEffect(() => {
     loadEvents();
@@ -31,22 +32,19 @@ export default function UpcomingWidget({ maxItems = 3, calendarFilter }: Upcomin
   }
 
   const formatEventDate = (dateStr: string) => {
+    // Use centralized isToday utility
+    if (isToday(dateStr)) return "Today";
+
+    // Check for tomorrow using timezone-aware comparison
     const date = new Date(dateStr);
-    const today = new Date();
-    const tomorrow = new Date(today);
+    const tz = timezone || getUserTimezone();
+
+    const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    // Format using user's timezone
-    const dateInTz = timezone
-      ? new Date(date.toLocaleString("en-US", { timeZone: timezone }))
-      : date;
-    const todayInTz = timezone
-      ? new Date(today.toLocaleString("en-US", { timeZone: timezone }))
-      : today;
-    const tomorrowInTz = new Date(todayInTz);
-    tomorrowInTz.setDate(tomorrowInTz.getDate() + 1);
+    const dateInTz = new Date(date.toLocaleString("en-US", { timeZone: tz }));
+    const tomorrowInTz = new Date(tomorrow.toLocaleString("en-US", { timeZone: tz }));
 
-    if (dateInTz.toDateString() === todayInTz.toDateString()) return "Today";
     if (dateInTz.toDateString() === tomorrowInTz.toDateString()) return "Tomorrow";
 
     return formatDate(dateStr, { weekday: "short", month: "short", day: "numeric" });

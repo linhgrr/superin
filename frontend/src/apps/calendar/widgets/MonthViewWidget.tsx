@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { listEvents, listCalendars, type Event, type Calendar } from "../api";
+import { useTimezone } from "@/hooks/useTimezone";
 import Widget from "./Widget";
 
 interface MonthViewWidgetProps {
@@ -12,6 +13,7 @@ export default function MonthViewWidget({ defaultCalendar, showTimeBlockedTasks 
   const [calendars, setCalendars] = useState<Calendar[]>([]);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isLoading, setIsLoading] = useState(true);
+  const { timezone, getNow } = useTimezone();
 
   useEffect(() => {
     loadData();
@@ -66,8 +68,13 @@ export default function MonthViewWidget({ defaultCalendar, showTimeBlockedTasks 
     return acc;
   }, {} as Record<number, Event[]>);
 
-  const today = new Date().getDate();
-  const isCurrentMonth = new Date().getMonth() === month && new Date().getFullYear() === year;
+  // Get "today" in user's timezone for highlighting
+  const [todayDateStr] = getNow();
+  const todayDate = new Date(todayDateStr);
+  const today = todayDate.getDate();
+  const todayMonth = todayDate.getMonth();
+  const todayYear = todayDate.getFullYear();
+  const isCurrentMonth = todayMonth === month && todayYear === year;
 
   return (
     <Widget isLoading={isLoading}>

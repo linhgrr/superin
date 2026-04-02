@@ -1,10 +1,36 @@
 """Finance plugin business logic — thin wrappers over repository."""
 
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from typing import Literal
+
+import pytz
 
 from apps.finance.models import Category, Transaction, Wallet
 from apps.finance.repository import CategoryRepository, TransactionRepository, WalletRepository
+from core.timezone import DEFAULT_TIMEZONE
+
+
+def _get_month_range(user_timezone: str = DEFAULT_TIMEZONE) -> tuple[datetime, datetime]:
+    """Get start and end of current month in user's timezone, returned as UTC.
+
+    Returns:
+        Tuple of (start_of_month_utc, end_of_month_utc)
+    """
+    tz_name = user_timezone if user_timezone in pytz.all_timezones else DEFAULT_TIMEZONE
+    tz = pytz.timezone(tz_name)
+
+    now_local = datetime.now(UTC).astimezone(tz)
+    start_local = now_local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    # End of month: next month - 1 microsecond
+    if now_local.month == 12:
+        next_month = now_local.replace(year=now_local.year + 1, month=1, day=1)
+    else:
+        next_month = now_local.replace(month=now_local.month + 1, day=1)
+
+    end_local = next_month - timedelta(microseconds=1)
+
+    return start_local.astimezone(UTC), end_local.astimezone(UTC)
 
 
 class FinanceService:
@@ -318,12 +344,12 @@ class FinanceService:
 
     # ─── Summary ────────────────────────────────────────────────────────────────
 
-    async def get_summary(self, user_id: str) -> dict:
+    async def get_summary(self, user_id: str, user_timezone: str = DEFAULT_TIMEZONE) -> dict:
         wallets = await self.wallets.find_by_user(user_id)
         total_balance = sum(w.balance for w in wallets)
 
-        now = datetime.utcnow()
-        start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        # Use user timezone for "this month" calculations
+        start_of_month, _ = _get_month_range(user_timezone)
         txs = await self.transactions.find_by_user(user_id, skip=0, limit=10000)
         month_txs = [t for t in txs if t.date >= start_of_month]
 
@@ -340,10 +366,9 @@ class FinanceService:
 
     # ─── Budget Monitoring ──────────────────────────────────────────────────────
 
-    async def check_budget(self, user_id: str, category_id: str | None = None) -> dict:
+    async def check_budget(self, user_id: str, category_id: str | None = None, user_timezone: str = DEFAULT_TIMEZONE) -> dict:
         """Check spending vs budget for categories."""
-        now = datetime.utcnow()
-        start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        start_of_month, _ = _get_month_range(user_timezone)
 
         categories = await self.categories.find_by_user(user_id)
         txs = await self.transactions.find_by_user(user_id, type_="expense", skip=0, limit=10000)
@@ -391,12 +416,17 @@ class FinanceService:
                     "over_budget": cat_spent > cat.budget,
                 })
 
+        # Get current month/year from user timezone
+        tz_name = user_timezone if user_timezone in pytz.all_timezones else DEFAULT_TIMEZONE
+        tz = pytz.timezone(tz_name)
+        now_local = datetime.now(UTC).astimezone(tz)
+
         return {
             "categories": results,
             "total_budget": total_budget,
             "total_spent": round(total_spent, 2),
-            "month": now.month,
-            "year": now.year,
+            "month": now_local.month,
+            "year": now_local.year,
         }
 
     # ─── Transaction Search ─────────────────────────────────────────────────────

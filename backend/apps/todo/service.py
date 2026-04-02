@@ -7,6 +7,26 @@ import pytz
 
 from apps.todo.models import RecurringRule, SubTask, Task
 from apps.todo.repository import RecurringRuleRepository, SubTaskRepository, TaskRepository
+from core.timezone import DEFAULT_TIMEZONE, DayRange
+
+
+def _get_today_range(user_timezone: str = DEFAULT_TIMEZONE) -> DayRange:
+    """Get start and end of today in user's timezone, returned as UTC.
+
+    Returns:
+        DayRange with start (00:00:00) and end (23:59:59.999999) in UTC
+    """
+    tz_name = user_timezone if user_timezone in pytz.all_timezones else DEFAULT_TIMEZONE
+    tz = pytz.timezone(tz_name)
+
+    now_local = datetime.now(UTC).astimezone(tz)
+    start_local = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+    end_local = now_local.replace(hour=23, minute=59, second=59, microsecond=999999)
+
+    return DayRange(
+        start=start_local.astimezone(UTC),
+        end=end_local.astimezone(UTC)
+    )
 
 
 class TaskService:
@@ -243,34 +263,21 @@ class TaskService:
 
     # ─── Summary ─────────────────────────────────────────────────────────────────
 
-    async def get_summary(self, user_id: str, user_timezone: str = "UTC") -> dict:
-        # Get user's local "today" range
-        tz_name = user_timezone or "UTC"
-        try:
-            tz = pytz.timezone(tz_name)
-        except pytz.UnknownTimeZoneError:
-            tz = pytz.UTC
-
-        now_local = datetime.now(UTC).astimezone(tz)
-        start_of_today = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
-        end_of_today = now_local.replace(hour=23, minute=59, second=59, microsecond=0)
-        # Convert back to UTC for comparison with stored due_date (which is UTC)
-        start_of_today_utc = start_of_today.astimezone(pytz.UTC)
-        end_of_today_utc = end_of_today.astimezone(pytz.UTC)
-        # Use naive UTC for comparison with stored due_date (which is offset-naive)
-        now_utc_naive = datetime.utcnow()
+    async def get_summary(self, user_id: str, user_timezone: str = DEFAULT_TIMEZONE) -> dict:
+        today_range = _get_today_range(user_timezone)
+        now_utc = datetime.now(UTC)
 
         all_tasks = await self.repo.find_by_user(user_id, limit=10000)
         pending = [t for t in all_tasks if t.status == "pending"]
         completed = [t for t in all_tasks if t.status == "completed"]
         overdue = [
             t for t in pending
-            if t.due_date and t.due_date < now_utc_naive
+            if t.due_date and t.due_date < now_utc
         ]
         due_today = [
             t for t in pending
             # Compare naive due_date with naive datetime (both in UTC)
-            if t.due_date and start_of_today_utc.replace(tzinfo=None) <= t.due_date <= end_of_today_utc.replace(tzinfo=None)
+            if t.due_date and today_range.start.replace(tzinfo=None) <= t.due_date <= today_range.end.replace(tzinfo=None)
         ]
 
         # Tag summary

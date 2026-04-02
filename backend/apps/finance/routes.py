@@ -13,6 +13,7 @@ from apps.finance.schemas import (
 )
 from apps.finance.service import finance_service
 from core.auth import get_current_user
+from core.models import User
 from shared.schemas import PreferenceUpdate, WidgetPreferenceSchema
 
 router = APIRouter()
@@ -243,7 +244,10 @@ async def check_budget(
 ):
     """Check spending vs budget for categories."""
     try:
-        return await finance_service.check_budget(user_id, category_id)
+        # Fetch user to get their timezone
+        user = await User.get(user_id)
+        user_timezone = user.settings.get("timezone", "UTC") if user else "UTC"
+        return await finance_service.check_budget(user_id, category_id, user_timezone)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -347,4 +351,7 @@ async def transfer_funds(
 
 @router.get("/summary")
 async def finance_summary(user_id: str = Depends(get_current_user)):
-    return await finance_service.get_summary(user_id)
+    # Fetch user to get their timezone
+    user = await User.get(user_id)
+    user_timezone = user.settings.get("timezone", "UTC") if user else "UTC"
+    return await finance_service.get_summary(user_id, user_timezone)
