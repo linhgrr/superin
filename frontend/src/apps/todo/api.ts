@@ -64,3 +64,74 @@ export async function toggleTask(id: string): Promise<TaskRead> {
 export async function getTodoSummary(): Promise<TodoSummary> {
   return api.get<TodoSummary>(`${BASE}/summary`);
 }
+
+// ─── Subtasks ─────────────────────────────────────────────────────────────────
+
+export interface SubTask {
+  id: string;
+  parent_task_id: string;
+  title: string;
+  completed: boolean;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export async function getSubtasks(taskId: string): Promise<SubTask[]> {
+  return api.get<SubTask[]>(`${BASE}/tasks/${taskId}/subtasks`);
+}
+
+export async function createSubtask(taskId: string, title: string): Promise<SubTask> {
+  return api.post<SubTask>(`${BASE}/tasks/${taskId}/subtasks`, { title });
+}
+
+export async function completeSubtask(subtaskId: string): Promise<SubTask> {
+  return api.patch<SubTask>(`${BASE}/subtasks/${subtaskId}/complete`);
+}
+
+export async function uncompleteSubtask(subtaskId: string): Promise<SubTask> {
+  return api.patch<SubTask>(`${BASE}/subtasks/${subtaskId}/uncomplete`);
+}
+
+export async function deleteSubtask(subtaskId: string): Promise<void> {
+  return api.delete<void>(`${BASE}/subtasks/${subtaskId}`);
+}
+
+// ─── Recurring Rules ──────────────────────────────────────────────────────────
+
+export type RecurringFrequency = "daily" | "weekly" | "monthly" | "yearly";
+
+export interface RecurringRule {
+  id: string;
+  task_template_id: string;
+  frequency: RecurringFrequency;
+  interval: number;
+  days_of_week: number[] | null;
+  end_date: string | null;
+  max_occurrences: number | null;
+  occurrence_count: number;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface CreateRecurringRuleData {
+  frequency: RecurringFrequency;
+  interval: number;
+  days_of_week?: number[];
+  end_date?: string;
+  max_occurrences?: number;
+}
+
+export async function createRecurringRule(
+  taskId: string,
+  data: CreateRecurringRuleData
+): Promise<RecurringRule> {
+  return api.post<RecurringRule>(`${BASE}/tasks/${taskId}/recurring`, data);
+}
+
+export async function getRecurringRules(): Promise<RecurringRule[]> {
+  return api.get<RecurringRule[]>(`${BASE}/recurring`);
+}
+
+export async function stopRecurringRule(ruleId: string): Promise<RecurringRule> {
+  return api.patch<RecurringRule>(`${BASE}/recurring/${ruleId}/stop`);
+}
