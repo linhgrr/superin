@@ -1,13 +1,13 @@
 """Finance plugin LangGraph tools (LLM-facing)."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Literal
 
 from langchain_core.tools import tool
 
 from apps.finance.service import finance_service
+from core.models import User
 from shared.agent_context import get_user_context
-from shared.confirmation import requires_confirmation
 from shared.tool_results import safe_tool_call
 
 # ─── Tools ────────────────────────────────────────────────────────────────────
@@ -122,15 +122,7 @@ async def finance_update_wallet(wallet_id: str, name: str | None = None) -> dict
 
 
 @tool
-@requires_confirmation(
-    title="Delete Wallet",
-    description="Permanently delete wallet '{wallet_id}'",
-    risk_level="high",
-)
-async def finance_delete_wallet(
-    wallet_id: str,
-    _confirmation_id: str | None = None,
-) -> dict:
+async def finance_delete_wallet(wallet_id: str) -> dict:
     """
     Delete a wallet permanently.
 
@@ -140,7 +132,6 @@ async def finance_delete_wallet(
 
     Args:
         wallet_id: Wallet to delete
-        _confirmation_id: UI confirmation ID (automatically provided by frontend)
 
     Returns:
         Success confirmation
@@ -425,7 +416,7 @@ async def finance_add_transaction(
     """
     async def operation() -> dict:
         user_id = get_user_context()
-        dt = datetime.fromisoformat(date) if date else datetime.utcnow()
+        dt = datetime.fromisoformat(date) if date else datetime.now(UTC)
         return await finance_service.add_transaction(
             user_id, wallet_id, category_id, type_, amount, dt, note
         )
@@ -477,16 +468,7 @@ async def finance_update_transaction(
 
 
 @tool
-@requires_confirmation(
-    title="Delete Transaction",
-    description="Permanently delete transaction '{transaction_id}'. "
-                "This will reverse the transaction's effect on wallet balance.",
-    risk_level="medium",
-)
-async def finance_delete_transaction(
-    transaction_id: str,
-    _confirmation_id: str | None = None,
-) -> dict:
+async def finance_delete_transaction(transaction_id: str) -> dict:
     """
     Delete a transaction permanently.
 
@@ -496,7 +478,6 @@ async def finance_delete_transaction(
 
     Args:
         transaction_id: Transaction to delete
-        _confirmation_id: UI confirmation ID (automatically provided by frontend)
 
     Returns:
         Success confirmation
@@ -516,17 +497,11 @@ async def finance_delete_transaction(
 # ─── Transfer ──────────────────────────────────────────────────────────────────
 
 @tool
-@requires_confirmation(
-    title="Transfer Funds",
-    description="Transfer {amount} from '{from_wallet_id}' to '{to_wallet_id}'",
-    risk_level="high",
-)
 async def finance_transfer(
     from_wallet_id: str,
     to_wallet_id: str,
     amount: float,
     note: str | None = None,
-    _confirmation_id: str | None = None,
 ) -> dict:
     """
     Transfer money between two wallets.
@@ -540,7 +515,6 @@ async def finance_transfer(
         to_wallet_id: Destination wallet
         amount: Amount to transfer (must be positive)
         note: Optional transfer reason
-        _confirmation_id: UI confirmation ID (automatically provided by frontend)
 
     Returns:
         Transfer details with updated wallet balances
@@ -590,7 +564,8 @@ async def finance_get_summary() -> dict:
     """
     async def operation() -> dict:
         user_id = get_user_context()
-        return await finance_service.get_summary(user_id)
+        user = await User.get(user_id)
+        return await finance_service.get_summary(user)
 
     return await safe_tool_call(operation, action="getting financial summary")
 
@@ -625,7 +600,8 @@ async def finance_check_budget(category_id: str | None = None) -> dict:
     """
     async def operation() -> dict:
         user_id = get_user_context()
-        return await finance_service.check_budget(user_id, category_id)
+        user = await User.get(user_id)
+        return await finance_service.check_budget(user, category_id)
 
     return await safe_tool_call(operation, action="checking budget")
 

@@ -1,36 +1,13 @@
 """Finance plugin business logic — thin wrappers over repository."""
 
-from datetime import UTC, datetime, timedelta
+import asyncio
+from datetime import UTC, datetime
 from typing import Literal
-
-import pytz
 
 from apps.finance.models import Category, Transaction, Wallet
 from apps.finance.repository import CategoryRepository, TransactionRepository, WalletRepository
-from core.timezone import DEFAULT_TIMEZONE
-
-
-def _get_month_range(user_timezone: str = DEFAULT_TIMEZONE) -> tuple[datetime, datetime]:
-    """Get start and end of current month in user's timezone, returned as UTC.
-
-    Returns:
-        Tuple of (start_of_month_utc, end_of_month_utc)
-    """
-    tz_name = user_timezone if user_timezone in pytz.all_timezones else DEFAULT_TIMEZONE
-    tz = pytz.timezone(tz_name)
-
-    now_local = datetime.now(UTC).astimezone(tz)
-    start_local = now_local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-
-    # End of month: next month - 1 microsecond
-    if now_local.month == 12:
-        next_month = now_local.replace(year=now_local.year + 1, month=1, day=1)
-    else:
-        next_month = now_local.replace(month=now_local.month + 1, day=1)
-
-    end_local = next_month - timedelta(microseconds=1)
-
-    return start_local.astimezone(UTC), end_local.astimezone(UTC)
+from core.models import User
+from core.timezone import get_user_timezone_context
 
 
 class FinanceService:
@@ -324,7 +301,7 @@ class FinanceService:
             )
 
         # Record paired transactions
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         note_str = f": {note}" if note else ""
         await self.transactions.create(
             user_id, from_wallet_id, str(transfer_cat_entry.id),
@@ -344,17 +321,23 @@ class FinanceService:
 
     # ─── Summary ────────────────────────────────────────────────────────────────
 
-    async def get_summary(self, user_id: str, user_timezone: str = DEFAULT_TIMEZONE) -> dict:
+    async def get_summary(self, user: User) -> dict:
+        user_id = str(user.id)
         wallets = await self.wallets.find_by_user(user_id)
         total_balance = sum(w.balance for w in wallets)
 
         # Use user timezone for "this month" calculations
-        start_of_month, _ = _get_month_range(user_timezone)
-        txs = await self.transactions.find_by_user(user_id, skip=0, limit=10000)
-        month_txs = [t for t in txs if t.date >= start_of_month]
+        ctx = get_user_timezone_context(user)
+        start_of_month, _ = ctx.month_range()
 
-        income = sum(t.amount for t in month_txs if t.type == "income")
-        expense = sum(t.amount for t in month_txs if t.type in ("expense", "transfer_out"))
+        # Filter transactions at DB level by date range
+        start_naive = start_of_month.replace(tzinfo=None)
+        txs = await self.transactions.find_by_user(
+            user_id, start_date=start_naive, skip=0, limit=10000
+        )
+
+        income = sum(t.amount for t in txs if t.type == "income")
+        expense = sum(t.amount for t in txs if t.type in ("expense", "transfer_out"))
 
         return {
             "total_balance": total_balance,
@@ -366,13 +349,20 @@ class FinanceService:
 
     # ─── Budget Monitoring ──────────────────────────────────────────────────────
 
-    async def check_budget(self, user_id: str, category_id: str | None = None, user_timezone: str = DEFAULT_TIMEZONE) -> dict:
+    async def check_budget(self, user: User, category_id: str | None = None) -> dict:
         """Check spending vs budget for categories."""
-        start_of_month, _ = _get_month_range(user_timezone)
+        user_id = str(user.id)
+        ctx = get_user_timezone_context(user)
+        start_of_month, _ = ctx.month_range()
 
-        categories = await self.categories.find_by_user(user_id)
-        txs = await self.transactions.find_by_user(user_id, type_="expense", skip=0, limit=10000)
-        month_txs = [t for t in txs if t.date >= start_of_month]
+        # Run independent queries concurrently with DB-level date filtering
+        start_naive = start_of_month.replace(tzinfo=None)
+        categories, txs = await asyncio.gather(
+            self.categories.find_by_user(user_id),
+            self.transactions.find_by_user(
+                user_id, type_="expense", start_date=start_naive, skip=0, limit=10000
+            )
+        )
 
         # If specific category requested
         if category_id:
@@ -380,7 +370,7 @@ class FinanceService:
             if not cat:
                 raise ValueError("Category not found")
 
-            spent = sum(t.amount for t in month_txs if str(t.category_id) == category_id)
+            spent = sum(t.amount for t in txs if str(t.category_id) == category_id)
             budget = cat.budget
             remaining = budget - spent if budget > 0 else None
             percentage = (spent / budget * 100) if budget > 0 else None
@@ -401,7 +391,7 @@ class FinanceService:
         total_spent = 0
 
         for cat in categories:
-            cat_spent = sum(t.amount for t in month_txs if str(t.category_id) == str(cat.id))
+            cat_spent = sum(t.amount for t in txs if str(t.category_id) == str(cat.id))
             total_budget += cat.budget
             total_spent += cat_spent
 
@@ -417,9 +407,7 @@ class FinanceService:
                 })
 
         # Get current month/year from user timezone
-        tz_name = user_timezone if user_timezone in pytz.all_timezones else DEFAULT_TIMEZONE
-        tz = pytz.timezone(tz_name)
-        now_local = datetime.now(UTC).astimezone(tz)
+        now_local = ctx.now_local()
 
         return {
             "categories": results,
@@ -440,33 +428,28 @@ class FinanceService:
         limit: int = 20,
     ) -> list[dict]:
         """Search transactions by keyword or date range."""
-        txs = await self.transactions.find_by_user(user_id, skip=0, limit=10000)
+        # Use DB-level date filtering, only load what we need
+        txs = await self.transactions.find_by_user(
+            user_id, start_date=start_date, end_date=end_date, skip=0, limit=10000
+        )
 
-        filtered = txs
-
-        # Filter by date range
-        if start_date:
-            filtered = [t for t in filtered if t.date >= start_date]
-        if end_date:
-            filtered = [t for t in filtered if t.date <= end_date]
-
-        # Filter by keyword in note
+        # Filter by keyword in note (can't do text search in DB easily)
         if query:
             query_lower = query.lower()
-            filtered = [
-                t for t in filtered
+            txs = [
+                t for t in txs
                 if (t.note and query_lower in t.note.lower())
                 or query_lower in str(t.amount)
                 or query_lower in t.type
             ]
 
-        return [_tx_to_dict(t) for t in filtered[:limit]]
+        return [_tx_to_dict(t) for t in txs[:limit]]
 
     # ─── Statistics & Analytics ───────────────────────────────────────────────────
 
     async def get_category_breakdown(self, user_id: str, month: int | None = None, year: int | None = None) -> dict:
         """Get spending breakdown by category for a specific month."""
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         target_month = month if month else now.month
         target_year = year if year else now.year
 
@@ -477,16 +460,20 @@ class FinanceService:
         else:
             end_date = datetime(target_year, target_month + 1, 1)
 
-        txs = await self.transactions.find_by_user(user_id, type_="expense", skip=0, limit=10000)
-        month_txs = [t for t in txs if start_date <= t.date < end_date]
+        # Use DB-level date filtering and run queries concurrently
+        txs, categories = await asyncio.gather(
+            self.transactions.find_by_user(
+                user_id, type_="expense", start_date=start_date, end_date=end_date, skip=0, limit=10000
+            ),
+            self.categories.find_by_user(user_id)
+        )
 
-        categories = await self.categories.find_by_user(user_id)
         cat_map = {str(c.id): c.name for c in categories}
 
         # Aggregate by category
         breakdown = {}
         total = 0
-        for t in month_txs:
+        for t in txs:
             cat_name = cat_map.get(str(t.category_id), "Uncategorized")
             breakdown[cat_name] = breakdown.get(cat_name, 0) + t.amount
             total += t.amount

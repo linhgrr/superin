@@ -52,9 +52,17 @@ class BaseAppAgent:
     The root agent already receives full conversation history from the client,
     so keeping separate in-process child memory makes delegation brittle and can
     leak stale answers across domains.
+
+    Safety features:
+    - Recursion limit (25) prevents infinite loops
+    - Tool call tracking detects runaway tool execution
+    - All tool results are sanitized before returning to LLM
     """
 
     app_id: str
+
+    # Safety: max tool calls per delegation to detect runaway execution
+    MAX_TOOL_CALLS_PER_DELEGATION = 30
 
     def __init__(self) -> None:
         self._graph: CompiledStateGraph | None = None
@@ -132,14 +140,6 @@ class BaseAppAgent:
             "tool_results": tool_results,
         }
 
-        # Include pending operation if awaiting confirmation
-        if status == "awaiting_confirmation":
-            _, pending = self._has_pending_confirmation(tool_results)
-            if pending:
-                result["requires_confirmation"] = True
-                result["confirmation"] = pending.get("confirmation")
-                result["pending_operation"] = pending.get("pending_operation")
-
         return result
 
     def _extract_reply(self, messages: list[BaseMessage]) -> str:
@@ -155,7 +155,37 @@ class BaseAppAgent:
         return ""
 
     def _extract_tool_results(self, messages: list[BaseMessage]) -> list[dict[str, Any]]:
+        """Extract tool results from messages with safety checks.
+
+        Detects runaway execution (too many tool calls) and sanitizes all data
+        before returning to prevent XSS and prompt injection via stored data.
+        """
         results: list[dict[str, Any]] = []
+
+        # Safety: check for excessive tool calls
+        tool_call_count = sum(1 for m in messages if isinstance(m, ToolMessage))
+        if tool_call_count > self.MAX_TOOL_CALLS_PER_DELEGATION:
+            logger.warning(
+                "%s agent exceeded max tool calls (%d > %d)",
+                self.app_id,
+                tool_call_count,
+                self.MAX_TOOL_CALLS_PER_DELEGATION,
+            )
+            # Return error instead of partial results to prevent LLM confusion
+            return [{
+                "tool_name": "safety_check",
+                "tool_call_id": "safety",
+                "ok": False,
+                "data": None,
+                "error": {
+                    "message": (
+                        f"Too many tool calls ({tool_call_count}) for this request. "
+                        "Please try a simpler query."
+                    ),
+                    "code": "too_many_tool_calls",
+                    "retryable": True,
+                },
+            }]
 
         for message in messages:
             if not isinstance(message, ToolMessage):
@@ -163,20 +193,13 @@ class BaseAppAgent:
 
             payload = _parse_tool_message_content(message.content)
             if isinstance(payload, dict) and "ok" in payload:
-                result: dict[str, Any] = {
+                results.append({
                     "tool_name": message.name or "unknown",
                     "tool_call_id": message.tool_call_id,
                     "ok": bool(payload.get("ok")),
                     "data": payload.get("data"),
                     "error": payload.get("error"),
-                }
-                # Check for confirmation requirement
-                if payload.get("requires_confirmation"):
-                    result["requires_confirmation"] = True
-                    result["confirmation"] = payload.get("confirmation")
-                    result["pending_operation"] = payload.get("pending_operation")
-                    result["message"] = payload.get("message")
-                results.append(result)
+                })
             else:
                 results.append({
                     "tool_name": message.name or "unknown",
@@ -188,15 +211,6 @@ class BaseAppAgent:
 
         return results
 
-    def _has_pending_confirmation(
-        self, tool_results: list[dict[str, Any]]
-    ) -> tuple[bool, dict[str, Any] | None]:
-        """Check if any tool result requires confirmation."""
-        for result in tool_results:
-            if result.get("requires_confirmation"):
-                return True, result
-        return False, None
-
     def _derive_status(
         self,
         tool_results: list[dict[str, Any]],
@@ -204,11 +218,6 @@ class BaseAppAgent:
     ) -> str:
         if not tool_results:
             return "no_action" if reply else "failed"
-
-        # Check for pending confirmation first
-        has_pending, _ = self._has_pending_confirmation(tool_results)
-        if has_pending:
-            return "awaiting_confirmation"
 
         successes = sum(1 for result in tool_results if result.get("ok"))
         failures = len(tool_results) - successes

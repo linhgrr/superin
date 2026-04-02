@@ -1,6 +1,6 @@
 """Todo plugin Beanie document models."""
 
-from datetime import datetime, time
+from datetime import UTC, datetime, time
 from typing import Literal
 
 from beanie import Document, PydanticObjectId
@@ -22,7 +22,7 @@ class Task(Document):
     is_archived: bool = False  # New: soft delete/archive
     parent_task_id: PydanticObjectId | None = None  # New: for subtasks
     recurring_rule_id: PydanticObjectId | None = None  # New: link to recurring rule
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     completed_at: datetime | None = None
 
     class Settings:
@@ -44,7 +44,7 @@ class SubTask(Document):
     parent_task_id: PydanticObjectId  # Reference to parent Task
     title: str
     completed: bool = False
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     completed_at: datetime | None = None
 
     class Settings:
@@ -68,7 +68,7 @@ class RecurringRule(Document):
     occurrence_count: int = 0  # How many times has occurred
     last_generated_date: datetime | None = None  # Last time a task was created
     is_active: bool = True
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     class Settings:
         name = "todo_recurring_rules"

@@ -1,6 +1,6 @@
 """Calendar plugin data access layer."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Literal
 
 from beanie import PydanticObjectId
@@ -9,6 +9,15 @@ from apps.calendar.models import Calendar, Event, RecurringRule
 
 # Default color for new calendars
 DEFAULT_CALENDAR_COLOR = "oklch(0.70 0.18 250)"  # Blue-ish
+
+
+def _to_naive(dt: datetime | None) -> datetime | None:
+    """Convert timezone-aware datetime to naive UTC for DB comparison."""
+    if dt is None:
+        return None
+    if dt.tzinfo is not None:
+        return dt.astimezone().replace(tzinfo=None)
+    return dt
 
 
 class EventRepository:
@@ -26,14 +35,18 @@ class EventRepository:
         if calendar_id:
             conditions.append(Event.calendar_id == PydanticObjectId(calendar_id))
 
-        if start and end:
+        # Convert to naive for comparison with DB (which stores naive UTC)
+        start_naive = _to_naive(start)
+        end_naive = _to_naive(end)
+
+        if start_naive and end_naive:
             # Events overlapping with range: (start1 < end2) AND (end1 > start2)
-            conditions.append(Event.start_datetime < end)
-            conditions.append(Event.end_datetime > start)
-        elif start:
-            conditions.append(Event.end_datetime > start)
-        elif end:
-            conditions.append(Event.start_datetime < end)
+            conditions.append(Event.start_datetime < end_naive)
+            conditions.append(Event.end_datetime > start_naive)
+        elif start_naive:
+            conditions.append(Event.end_datetime > start_naive)
+        elif end_naive:
+            conditions.append(Event.start_datetime < end_naive)
 
         return await Event.find(*conditions).sort("start_datetime").limit(limit).to_list()
 
@@ -119,7 +132,7 @@ class EventRepository:
         for key, value in kwargs.items():
             if hasattr(event, key) and value is not None:
                 setattr(event, key, value)
-        event.updated_at = datetime.utcnow()
+        event.updated_at = datetime.now(UTC)
         await event.save()
         return event
 
@@ -217,7 +230,7 @@ class RecurringRuleRepository:
     async def update_occurrence(self, rule: RecurringRule) -> RecurringRule:
         """Increment occurrence count and update last generated date."""
         rule.occurrence_count += 1
-        rule.last_generated_date = datetime.utcnow()
+        rule.last_generated_date = datetime.now(UTC)
         await rule.save()
         return rule
 

@@ -20,6 +20,9 @@ dependencies = [
     "assistant-stream>=0.2.0",
     "python-dotenv>=1.0.0",
     "httpx>=0.28.0",
+    # Security & Sanitization
+    "nh3>=0.2.21",           # HTML sanitization (Rust-based)
+    "confusables>=1.2",      # Homoglyph detection
 ]
 
 [project.optional-dependencies]

@@ -1,32 +1,12 @@
 """Todo plugin business logic."""
 
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Literal
-
-import pytz
 
 from apps.todo.models import RecurringRule, SubTask, Task
 from apps.todo.repository import RecurringRuleRepository, SubTaskRepository, TaskRepository
-from core.timezone import DEFAULT_TIMEZONE, DayRange
-
-
-def _get_today_range(user_timezone: str = DEFAULT_TIMEZONE) -> DayRange:
-    """Get start and end of today in user's timezone, returned as UTC.
-
-    Returns:
-        DayRange with start (00:00:00) and end (23:59:59.999999) in UTC
-    """
-    tz_name = user_timezone if user_timezone in pytz.all_timezones else DEFAULT_TIMEZONE
-    tz = pytz.timezone(tz_name)
-
-    now_local = datetime.now(UTC).astimezone(tz)
-    start_local = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
-    end_local = now_local.replace(hour=23, minute=59, second=59, microsecond=999999)
-
-    return DayRange(
-        start=start_local.astimezone(UTC),
-        end=end_local.astimezone(UTC)
-    )
+from core.models import User
+from core.timezone import get_user_timezone_context
 
 
 class TaskService:
@@ -263,21 +243,28 @@ class TaskService:
 
     # ─── Summary ─────────────────────────────────────────────────────────────────
 
-    async def get_summary(self, user_id: str, user_timezone: str = DEFAULT_TIMEZONE) -> dict:
-        today_range = _get_today_range(user_timezone)
-        now_utc = datetime.now(UTC)
+    async def get_summary(self, user: User) -> dict:
+        user_id = str(user.id)
+        # Use user's timezone context
+        ctx = get_user_timezone_context(user)
+        today_range = ctx.today_range()
+        now_utc = ctx.now_utc()
 
         all_tasks = await self.repo.find_by_user(user_id, limit=10000)
         pending = [t for t in all_tasks if t.status == "pending"]
         completed = [t for t in all_tasks if t.status == "completed"]
+
+        now_naive = now_utc.replace(tzinfo=None)
         overdue = [
             t for t in pending
-            if t.due_date and t.due_date < now_utc
+            if t.due_date and t.due_date < now_naive
         ]
+
+        today_start_naive = today_range.start.replace(tzinfo=None)
+        today_end_naive = today_range.end.replace(tzinfo=None)
         due_today = [
             t for t in pending
-            # Compare naive due_date with naive datetime (both in UTC)
-            if t.due_date and today_range.start.replace(tzinfo=None) <= t.due_date <= today_range.end.replace(tzinfo=None)
+            if t.due_date and today_start_naive <= t.due_date <= today_end_naive
         ]
 
         # Tag summary

@@ -1,6 +1,6 @@
 """Finance plugin Beanie document models."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Literal
 
 from beanie import Document, PydanticObjectId
@@ -14,7 +14,7 @@ class Wallet(Document):
     name: str
     currency: str = "USD"
     balance: float = 0.0
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     class Settings:
         name = "finance_wallets"
@@ -32,7 +32,7 @@ class Category(Document):
     icon: str = "Tag"
     color: str = "oklch(0.65 0.21 280)"
     budget: float = 0.0  # monthly budget (0 = no limit)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     class Settings:
         name = "finance_categories"
@@ -51,7 +51,7 @@ class Transaction(Document):
     amount: float
     date: datetime
     note: str | None = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     class Settings:
         name = "finance_transactions"

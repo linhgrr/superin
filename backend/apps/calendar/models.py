@@ -1,6 +1,6 @@
 """Calendar plugin Beanie document models."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Literal
 
 from beanie import Document, PydanticObjectId
@@ -48,8 +48,8 @@ class Event(Document):
 
     # Metadata
     ics_uid: str | None = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     class Settings:
         name = "calendar_events"
@@ -71,7 +71,7 @@ class Calendar(Document):
     color: str = "oklch(0.70 0.18 250)"  # Default blue-ish
     is_visible: bool = True
     is_default: bool = False  # Default calendar for new events
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     class Settings:
         name = "calendar_calendars"
@@ -100,7 +100,7 @@ class RecurringRule(Document):
     is_active: bool = True
     last_generated_date: datetime | None = None
 
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     class Settings:
         name = "calendar_recurring_rules"

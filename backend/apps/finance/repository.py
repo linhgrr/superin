@@ -76,6 +76,8 @@ class TransactionRepository:
         type_: str | None = None,
         category_id: str | None = None,
         wallet_id: str | None = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
         skip: int = 0,
         limit: int = 20,
     ) -> list[Transaction]:
@@ -86,6 +88,10 @@ class TransactionRepository:
             query = query and Transaction.category_id == PydanticObjectId(category_id)
         if wallet_id:
             query = query and Transaction.wallet_id == PydanticObjectId(wallet_id)
+        if start_date:
+            query = query and Transaction.date >= start_date
+        if end_date:
+            query = query and Transaction.date <= end_date
 
         return (
             await Transaction.find(query)

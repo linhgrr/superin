@@ -6,8 +6,8 @@ from typing import Literal
 from langchain_core.tools import tool
 
 from apps.todo.service import task_service
+from core.models import User
 from shared.agent_context import get_user_context
-from shared.confirmation import requires_confirmation
 from shared.tool_results import safe_tool_call
 
 # ─── Core Task Tools ──────────────────────────────────────────────────────────
@@ -252,15 +252,7 @@ async def todo_complete_task(task_id: str) -> dict:
 
 
 @tool
-@requires_confirmation(
-    title="Delete Task",
-    description="Permanently delete task '{task_id}' and all its subtasks",
-    risk_level="high",
-)
-async def todo_delete_task(
-    task_id: str,
-    _confirmation_id: str | None = None,
-) -> dict:
+async def todo_delete_task(task_id: str) -> dict:
     """
     Delete a task permanently (including all subtasks).
 
@@ -270,7 +262,6 @@ async def todo_delete_task(
 
     Args:
         task_id: Task to delete permanently
-        _confirmation_id: UI confirmation ID (automatically provided by frontend)
 
     Returns:
         Success confirmation with deleted task ID
@@ -291,15 +282,7 @@ async def todo_delete_task(
 # ─── Archive / Soft Delete ────────────────────────────────────────────────────
 
 @tool
-@requires_confirmation(
-    title="Archive Task",
-    description="Archive (soft delete) task '{task_id}'. Can be restored later.",
-    risk_level="low",
-)
-async def todo_archive_task(
-    task_id: str,
-    _confirmation_id: str | None = None,
-) -> dict:
+async def todo_archive_task(task_id: str) -> dict:
     """
     Archive (soft delete) a task - hides from normal lists but can be restored.
 
@@ -311,7 +294,6 @@ async def todo_archive_task(
 
     Args:
         task_id: Task to archive
-        _confirmation_id: UI confirmation ID (automatically provided by frontend)
 
     Returns:
         Archived task details
@@ -504,15 +486,7 @@ async def todo_uncomplete_subtask(subtask_id: str) -> dict:
 
 
 @tool
-@requires_confirmation(
-    title="Delete Subtask",
-    description="Permanently delete subtask '{subtask_id}'",
-    risk_level="medium",
-)
-async def todo_delete_subtask(
-    subtask_id: str,
-    _confirmation_id: str | None = None,
-) -> dict:
+async def todo_delete_subtask(subtask_id: str) -> dict:
     """
     Delete a subtask permanently.
 
@@ -523,7 +497,6 @@ async def todo_delete_subtask(
 
     Args:
         subtask_id: Subtask to delete
-        _confirmation_id: UI confirmation ID (automatically provided by frontend)
 
     Returns:
         Success confirmation
@@ -654,6 +627,7 @@ async def todo_get_summary() -> dict:
     """
     async def operation() -> dict:
         user_id = get_user_context()
-        return await task_service.get_summary(user_id)
+        user = await User.get(user_id)
+        return await task_service.get_summary(user)
 
     return await safe_tool_call(operation, action="getting task summary")

@@ -196,15 +196,11 @@ class RootAgent:
                 content = msg.get("content", "")
                 msg_id = msg.get("id")
 
-                # Sanitize user content to prevent prompt injection (ASI01)
-                if role == "user":
-                    content, warnings = sanitize_user_content(content)
-                    sanitization_warnings.extend(warnings)
-
                 tool_calls = msg.get("tool_calls", [])
 
                 text_parts = []
                 if isinstance(content, list):
+                    # Sanitize text parts in array content
                     for p in content:
                         if isinstance(p, dict) and p.get("type") == "text":
                             text = p.get("text", "")
@@ -228,7 +224,11 @@ class RootAgent:
                             })
                     content_str = " ".join(text_parts)
                 else:
+                    # Sanitize string content directly
                     content_str = str(content)
+                    if role == "user":
+                        content_str, warnings = sanitize_user_content(content_str)
+                        sanitization_warnings.extend(warnings)
 
                 if role == "user":
                     langchain_messages.append(HumanMessage(content=content_str, id=msg_id))

@@ -17,7 +17,7 @@ Usage:
     date_str = ctx.format_date(utc_datetime)
 """
 
-from datetime import UTC, datetime, time
+from datetime import UTC, datetime, time, timedelta
 from typing import NamedTuple
 
 import pytz
@@ -151,6 +151,33 @@ class UserTimezoneContext:
             end=end_local.astimezone(UTC)
         )
 
+    def month_range(self) -> tuple[datetime, datetime]:
+        """Get start and end of current month in user's timezone, converted to UTC.
+
+        This is useful for monthly reports and analytics (e.g., "income this month").
+
+        Returns:
+            Tuple of (start_of_month_utc, end_of_month_utc) as aware datetimes
+        """
+        now_local = self.now_local()
+
+        # Start of month in local time
+        start_local = now_local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+        # End of month: last day of month at 23:59:59.999999
+        # Move to first day of next month, then subtract 1 microsecond
+        if now_local.month == 12:
+            next_month_start = start_local.replace(year=now_local.year + 1, month=1)
+        else:
+            next_month_start = start_local.replace(month=now_local.month + 1)
+
+        end_local = next_month_start - timedelta(microseconds=1)
+
+        return (
+            start_local.astimezone(UTC),
+            end_local.astimezone(UTC)
+        )
+
     def date_range(self, local_date: datetime) -> DayRange:
         """Get UTC range for a specific local date.
 
@@ -177,7 +204,7 @@ class UserTimezoneContext:
         """Check if a UTC datetime falls within the user's local "today".
 
         Args:
-            utc_dt: UTC datetime to check
+            utc_dt: UTC datetime to check (can be naive or aware)
 
         Returns:
             True if utc_dt is within today's range in user's timezone
@@ -186,13 +213,17 @@ class UserTimezoneContext:
             return False
 
         today = self.today_range()
-        return today.start <= utc_dt <= today.end
+        # Convert to naive for comparison if needed
+        start = today.start.replace(tzinfo=None) if today.start.tzinfo else today.start
+        end = today.end.replace(tzinfo=None) if today.end.tzinfo else today.end
+        utc_dt_naive = utc_dt.replace(tzinfo=None) if utc_dt.tzinfo else utc_dt
+        return start <= utc_dt_naive <= end
 
     def is_past(self, utc_dt: datetime | None) -> bool:
         """Check if a UTC datetime is in the past relative to user's local time.
 
         Args:
-            utc_dt: UTC datetime to check
+            utc_dt: UTC datetime to check (can be naive or aware)
 
         Returns:
             True if utc_dt is before now in user's local time
@@ -204,7 +235,11 @@ class UserTimezoneContext:
         local_dt = self.utc_to_local(utc_dt)
         now_local = self.now_local()
 
-        return local_dt < now_local
+        # Convert to naive for comparison
+        local_dt_naive = local_dt.replace(tzinfo=None) if local_dt.tzinfo else local_dt
+        now_local_naive = now_local.replace(tzinfo=None) if now_local.tzinfo else now_local
+
+        return local_dt_naive < now_local_naive
 
     def format_date(self, utc_dt: datetime | None, format_str: str = "%Y-%m-%d") -> str:
         """Format a UTC datetime for display in user's local timezone.
