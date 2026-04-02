@@ -13,14 +13,14 @@ import ReactGridLayout, { Responsive } from "react-grid-layout";
 type Layout = ReactGridLayout.Layout;
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
-import { Grid3X3, Plus, Sparkles, LayoutGrid } from "lucide-react";
+import { Plus, Sparkles, LayoutGrid } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { getFrontendApp } from "@/apps";
 import AddWidgetDialog from "@/components/dashboard/AddWidgetDialog";
 import { useAppCatalog, useOnboarding } from "@/components/providers/AppProviders";
 import { getAllPreferences, updatePreferences } from "@/api/catalog";
 import { WIDGET_SIZES } from "@/lib/widget-sizes";
+import LazyWidget from "@/apps/components/LazyWidget";
 import type {
   AppCatalogEntry,
   PreferenceUpdate,
@@ -152,36 +152,8 @@ function WidgetContent({
   widgetId: string;
   widget: AppCatalogEntry["widgets"][number];
 }) {
-  const appDefinition = getFrontendApp(appId);
-
-  if (appDefinition?.DashboardWidget) {
-    const DashboardWidget = appDefinition.DashboardWidget;
-    return <DashboardWidget widgetId={widgetId} widget={widget} />;
-  }
-
-  return (
-    <div className="empty-state" style={{ padding: "2rem 1rem" }}>
-      <div
-        style={{
-          width: "48px",
-          height: "48px",
-          borderRadius: "12px",
-          background: "var(--color-surface-elevated)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          marginBottom: "0.75rem",
-          color: "var(--color-foreground-muted)",
-        }}
-      >
-        <Grid3X3 size={24} />
-      </div>
-      <p className="widget-card-title">{widget.name}</p>
-      <p style={{ fontSize: "0.8125rem", color: "var(--color-foreground-muted)", margin: 0 }}>
-        {widget.description}
-      </p>
-    </div>
-  );
+  // Dung LazyWidget de lazy load widget component
+  return <LazyWidget appId={appId} widgetId={widgetId} widget={widget} />;
 }
 
 // ─── WidgetCard ──────────────────────────────────────────────────────────────

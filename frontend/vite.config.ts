@@ -21,5 +21,19 @@ export default defineConfig({
   build: {
     outDir: "dist",
     sourcemap: true,
+    rollupOptions: {
+      output: {
+        // Code splitting strategy cho plug-n-play apps
+        manualChunks: {
+          // Core vendor libs - preload
+          vendor: ["react", "react-dom", "react-router-dom"],
+          // UI libs
+          ui: ["@assistant-ui/react", "@assistant-ui/react-data-stream", "lucide-react"],
+        },
+        // Đảm bảo mỗi dynamic import tạo chunk riêng
+        chunkFileNames: "assets/[name]-[hash].js",
+        entryFileNames: "assets/[name]-[hash].js",
+      },
+    },
   },
 });

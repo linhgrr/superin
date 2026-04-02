@@ -1,9 +1,9 @@
 /** @type {import('lint-staged').Configuration} */
 module.exports = {
   // TypeScript / React
-  "**/*.{ts,tsx}": [
-    "eslint --fix",
-    "tsc --noEmit",
+  "frontend/**/*.{ts,tsx}": [
+    "cd frontend && eslint --fix",
+    "cd frontend && tsc --noEmit",
   ],
 
   // Python
