@@ -8,10 +8,14 @@ Provides defense against:
 - ASI01: Agent Goal Hijacking (prompt injection)
 - ASI06: Memory Poisoning via malicious content
 - Unicode confusables / homoglyph attacks
+
+All CPU-intensive sanitization operations run in thread pools
+to avoid blocking the async event loop.
 """
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import re
 import unicodedata
@@ -153,6 +157,21 @@ def sanitize_user_content(content: str | None) -> tuple[str, list[str]]:
     return content, warnings
 
 
+async def sanitize_user_content_async(content: str | None) -> tuple[str, list[str]]:
+    """Sanitize user content and detect injection attempts (async version).
+
+    Runs the CPU-intensive sanitization in a thread pool
+to avoid blocking the event loop.
+
+    Returns: (sanitized_content, warnings)
+    """
+    if content is None:
+        return "", []
+
+    # Run the heavy lifting in a thread pool
+    return await asyncio.to_thread(sanitize_user_content, content)
+
+
 def validate_tool_arguments(
     args: dict[str, Any], tool_name: str
 ) -> tuple[dict[str, Any], list[str]]:
@@ -220,6 +239,15 @@ def is_content_safe(content: str) -> tuple[bool, list[str]]:
     return True, warnings
 
 
+async def is_content_safe_async(content: str) -> tuple[bool, list[str]]:
+    """Quick check if content is safe without sanitizing (async version).
+
+    Runs the CPU-intensive checks in a thread pool
+to avoid blocking the event loop.
+    """
+    return await asyncio.to_thread(is_content_safe, content)
+
+
 def sanitize_for_memory(content: str) -> str:
     """Sanitize content before storing in persistent memory (ASI06 defense)."""
     if not content:
@@ -234,6 +262,29 @@ def sanitize_for_memory(content: str) -> str:
         attributes={},
         url_schemes=set(),
     ).strip()
+
+
+async def sanitize_for_memory_async(content: str) -> str:
+    """Sanitize content before storing in persistent memory (async version).
+
+    Runs the CPU-intensive sanitization in a thread pool
+to avoid blocking the event loop.
+    """
+    if not content:
+        return ""
+
+    # Run both sanitization steps in thread pool
+    sanitized = await asyncio.to_thread(sanitize_user_content, content)
+    sanitized_content = sanitized[0] if isinstance(sanitized, tuple) else sanitized
+
+    # nh3 is Rust-based and fast, but still run in thread for consistency
+    return await asyncio.to_thread(
+        nh3.clean,
+        sanitized_content,
+        tags=set(),
+        attributes={},
+        url_schemes=set(),
+    )
 
 
 def sanitize_db_content_for_llm(

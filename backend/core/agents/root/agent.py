@@ -16,7 +16,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, Tool
 from langchain_core.tools import BaseTool, tool
 from langgraph.prebuilt import create_react_agent
 
-from core.input_sanitizer import sanitize_for_memory, sanitize_user_content
+from core.input_sanitizer import sanitize_for_memory_async, sanitize_user_content_async
 from core.models import ConversationMessage, User, UserAppInstallation, get_user_local_time
 from core.registry import PLUGIN_REGISTRY
 from shared.agent_context import clear_agent_context, set_thread_context, set_user_context
@@ -127,8 +127,8 @@ class RootAgent:
         Content is sanitized before storage to prevent ASI06: Memory Poisoning.
         """
         # Sanitize content before persistence (ASI06 defense)
-        sanitized_user_content = sanitize_for_memory(user_content)
-        sanitized_assistant_content = sanitize_for_memory(assistant_content)
+        sanitized_user_content = await sanitize_for_memory_async(user_content)
+        sanitized_assistant_content = await sanitize_for_memory_async(assistant_content)
 
         if sanitized_user_content:
             await ConversationMessage(
@@ -206,7 +206,7 @@ class RootAgent:
                             text = p.get("text", "")
                             # Sanitize text content in arrays
                             if role == "user":
-                                text, _ = sanitize_user_content(text)
+                                text, _ = await sanitize_user_content_async(text)
                             text_parts.append(text)
                         elif isinstance(p, dict) and p.get("type") in ("tool-call", "tool_call"):
                             raw_arguments = (
@@ -227,7 +227,7 @@ class RootAgent:
                     # Sanitize string content directly
                     content_str = str(content)
                     if role == "user":
-                        content_str, warnings = sanitize_user_content(content_str)
+                        content_str, warnings = await sanitize_user_content_async(content_str)
                         sanitization_warnings.extend(warnings)
 
                 if role == "user":

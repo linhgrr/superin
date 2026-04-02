@@ -58,7 +58,7 @@ async def register(request: RegisterRequest, response: Response) -> TokenRespons
     user = User(
         email=request.email,
         name=request.name,
-        hashed_password=get_password_hash(request.password),
+        hashed_password=await get_password_hash(request.password),
     )
     await user.insert()
 
@@ -76,7 +76,7 @@ async def login(request: LoginRequest, response: Response) -> TokenResponse:
         )
 
     user = await User.find_one(User.email == request.email)
-    if not user or not verify_password(request.password, user.hashed_password):
+    if not user or not await verify_password(request.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
