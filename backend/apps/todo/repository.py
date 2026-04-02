@@ -1,6 +1,6 @@
 """Todo plugin data access layer."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Literal
 
 from beanie import PydanticObjectId
@@ -18,23 +18,20 @@ class TaskRepository:
         include_archived: bool = False,
         limit: int = 20,
     ) -> list[Task]:
-        # Build conditions as separate arguments for Beanie
-        conditions: list = [
-            Task.user_id == PydanticObjectId(user_id),
-        ]
+        query: dict[str, object] = {"user_id": PydanticObjectId(user_id)}
 
         if not include_archived:
-            conditions.append(Task.is_archived == False)  # noqa: E712
+            query["is_archived"] = False
 
         if status:
-            conditions.append(Task.status == status)
+            query["status"] = status
         if priority:
-            conditions.append(Task.priority == priority)
+            query["priority"] = priority
         if tag:
-            conditions.append(tag in Task.tags)
+            query["tags"] = {"$in": [tag]}
 
         return (
-            await Task.find(*conditions)
+            await Task.find(query)
             .sort("-created_at")
             .limit(limit)
             .to_list()
@@ -51,11 +48,11 @@ class TaskRepository:
         search_lower = query.lower()
 
         # Get all non-archived tasks for the user
-        conditions = [Task.user_id == PydanticObjectId(user_id)]
+        db_query: dict[str, object] = {"user_id": PydanticObjectId(user_id)}
         if not include_archived:
-            conditions.append(Task.is_archived == False)  # noqa: E712
+            db_query["is_archived"] = False
 
-        all_tasks = await Task.find(*conditions).to_list()
+        all_tasks = await Task.find(db_query).to_list()
 
         # Filter by search term
         filtered = [
@@ -69,15 +66,15 @@ class TaskRepository:
 
     async def find_by_id(self, task_id: str, user_id: str) -> Task | None:
         return await Task.find_one(
-            Task.id == PydanticObjectId(task_id),
-            Task.user_id == PydanticObjectId(user_id),
+            {"_id": PydanticObjectId(task_id),
+             "user_id": PydanticObjectId(user_id)},
         )
 
     async def find_archived(self, user_id: str, limit: int = 20) -> list[Task]:
         """Find archived tasks."""
         return await Task.find(
-            Task.user_id == PydanticObjectId(user_id),
-            Task.is_archived == True,  # noqa: E712
+            {"user_id": PydanticObjectId(user_id),
+             "is_archived": True},
         ).sort("-created_at").limit(limit).to_list()
 
     async def create(
@@ -131,7 +128,7 @@ class TaskRepository:
         if status is not None:
             task.status = status  # type: ignore[assignment]
             if status == "completed":
-                task.completed_at = datetime.utcnow()
+                task.completed_at = datetime.now(UTC)
             else:
                 task.completed_at = None
         if tags is not None:
@@ -172,7 +169,7 @@ class TaskRepository:
 
     async def delete_all_by_user(self, user_id: str) -> int:
         count = 0
-        async for t in Task.find(Task.user_id == PydanticObjectId(user_id)):
+        async for t in Task.find({"user_id": PydanticObjectId(user_id)}):
             await t.delete()
             count += 1
         return count
@@ -182,14 +179,14 @@ class SubTaskRepository:
     async def find_by_parent(self, parent_task_id: str, user_id: str) -> list[SubTask]:
         """Get all subtasks for a parent task."""
         return await SubTask.find(
-            SubTask.parent_task_id == PydanticObjectId(parent_task_id),
-            SubTask.user_id == PydanticObjectId(user_id),
+            {"parent_task_id": PydanticObjectId(parent_task_id),
+             "user_id": PydanticObjectId(user_id)},
         ).sort("created_at").to_list()
 
     async def find_by_id(self, subtask_id: str, user_id: str) -> SubTask | None:
         return await SubTask.find_one(
-            SubTask.id == PydanticObjectId(subtask_id),
-            SubTask.user_id == PydanticObjectId(user_id),
+            {"_id": PydanticObjectId(subtask_id),
+             "user_id": PydanticObjectId(user_id)},
         )
 
     async def create(
@@ -209,7 +206,7 @@ class SubTaskRepository:
     async def complete(self, subtask: SubTask) -> SubTask:
         """Mark subtask as completed."""
         subtask.completed = True
-        subtask.completed_at = datetime.utcnow()
+        subtask.completed_at = datetime.now(UTC)
         await subtask.save()
         return subtask
 
@@ -226,7 +223,7 @@ class SubTaskRepository:
     async def delete_all_by_parent(self, parent_task_id: str) -> int:
         """Delete all subtasks for a parent task."""
         count = 0
-        async for st in SubTask.find(SubTask.parent_task_id == PydanticObjectId(parent_task_id)):
+        async for st in SubTask.find({"parent_task_id": PydanticObjectId(parent_task_id)}):
             await st.delete()
             count += 1
         return count
@@ -234,7 +231,7 @@ class SubTaskRepository:
     async def get_progress(self, parent_task_id: str) -> dict:
         """Get completion progress for a task's subtasks."""
         subtasks = await SubTask.find(
-            SubTask.parent_task_id == PydanticObjectId(parent_task_id),
+            {"parent_task_id": PydanticObjectId(parent_task_id)},
         ).to_list()
 
         if not subtasks:
@@ -284,7 +281,7 @@ class RecurringRuleRepository:
     async def update_occurrence(self, rule: RecurringRule) -> RecurringRule:
         """Increment occurrence count and update last generated date."""
         rule.occurrence_count += 1
-        rule.last_generated_date = datetime.utcnow()
+        rule.last_generated_date = datetime.now(UTC)
         await rule.save()
         return rule
 
