@@ -143,9 +143,37 @@
         ],
         "summary": "Logout",
         "operationId": "logout_api_auth_logout_post",
+        "parameters": [
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Refresh Token"
+            }
+          }
+        ],
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
         }
       }
@@ -621,7 +649,7 @@
           "catalog"
         ],
         "summary": "Update Preferences",
-        "description": "Batch-update widget preferences.",
+        "description": "Batch-update widget preferences using shared utility.",
         "operationId": "update_preferences_api_catalog_preferences__app_id__put",
         "security": [
           {
@@ -4535,7 +4563,7 @@
             ],
             "title": "Enabled"
           },
-          "position": {
+          "sort_order": {
             "anyOf": [
               {
                 "type": "integer"
@@ -4544,7 +4572,7 @@
                 "type": "null"
               }
             ],
-            "title": "Position"
+            "title": "Sort Order"
           },
           "config": {
             "anyOf": [
@@ -4561,7 +4589,9 @@
           "size_w": {
             "anyOf": [
               {
-                "type": "integer"
+                "type": "integer",
+                "maximum": 12.0,
+                "minimum": 2.0
               },
               {
                 "type": "null"
@@ -4572,7 +4602,9 @@
           "size_h": {
             "anyOf": [
               {
-                "type": "integer"
+                "type": "integer",
+                "maximum": 6.0,
+                "minimum": 1.0
               },
               {
                 "type": "null"
@@ -5224,9 +5256,9 @@
             "title": "Enabled",
             "default": false
           },
-          "position": {
+          "sort_order": {
             "type": "integer",
-            "title": "Position",
+            "title": "Sort Order",
             "default": 0
           },
           "config": {
@@ -5237,7 +5269,9 @@
           "size_w": {
             "anyOf": [
               {
-                "type": "integer"
+                "type": "integer",
+                "maximum": 12.0,
+                "minimum": 2.0
               },
               {
                 "type": "null"
@@ -5248,7 +5282,9 @@
           "size_h": {
             "anyOf": [
               {
-                "type": "integer"
+                "type": "integer",
+                "maximum": 6.0,
+                "minimum": 1.0
               },
               {
                 "type": "null"

@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
+import { Pencil } from "lucide-react";
 import type { CreateTransactionRequest } from "@/types/generated/api";
-import { createTransaction, getTransactions, type TransactionRead } from "../../api";
+import { createTransaction, getTransactions, updateTransaction, type TransactionRead, getWallets, getCategories, type WalletRead, type CategoryRead } from "../../api";
 import Modal from "../../components/Modal";
 import SimpleForm from "../../components/SimpleForm";
+import TransactionEditForm from "../../components/TransactionEditForm";
 import { formatCurrency } from "../../lib/formatCurrency";
 import { useUserTimezone } from "@/hooks/useUserTimezone";
 
@@ -10,6 +12,9 @@ export default function TransactionsTab() {
   const { formatDate } = useUserTimezone();
   const [transactions, setTransactions] = useState<TransactionRead[]>([]);
   const [showModal, setShowModal] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<TransactionRead | null>(null);
+  const [wallets, setWallets] = useState<WalletRead[]>([]);
+  const [categories, setCategories] = useState<CategoryRead[]>([]);
   const [loading, setLoading] = useState(true);
 
   function load() {
@@ -20,8 +25,14 @@ export default function TransactionsTab() {
       .finally(() => setLoading(false));
   }
 
+  function loadWalletsAndCategories() {
+    getWallets().then(setWallets).catch(() => {});
+    getCategories().then(setCategories).catch(() => {});
+  }
+
   useEffect(() => {
     load();
+    loadWalletsAndCategories();
   }, []);
 
   return (
@@ -50,7 +61,11 @@ export default function TransactionsTab() {
             </thead>
             <tbody>
               {transactions.map((transaction) => (
-                <tr key={transaction.id}>
+                <tr
+                  key={transaction.id}
+                  onClick={() => setEditingTransaction(transaction)}
+                  style={{ cursor: "pointer" }}
+                >
                   <td style={{ whiteSpace: "nowrap" }}>
                     {formatDate(transaction.date, { month: "short", day: "numeric", year: "numeric" })}
                   </td>
@@ -83,7 +98,12 @@ export default function TransactionsTab() {
                     {formatCurrency(transaction.amount)}
                   </td>
                   <td style={{ color: "var(--color-muted)", maxWidth: "200px" }}>
-                    {transaction.note ?? "—"}
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem" }}>
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {transaction.note ?? "—"}
+                      </span>
+                      <Pencil size={14} style={{ color: "var(--color-muted)", flexShrink: 0 }} />
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -117,6 +137,24 @@ export default function TransactionsTab() {
               setShowModal(false);
               load();
             }}
+          />
+        </Modal>
+      )}
+
+      {/* Edit Modal */}
+      {editingTransaction && wallets.length > 0 && categories.length > 0 && (
+        <Modal title="Edit Transaction" onClose={() => setEditingTransaction(null)}>
+          <TransactionEditForm
+            transaction={editingTransaction}
+            wallets={wallets}
+            categories={categories}
+            onSave={(updated) => {
+              setTransactions((current) =>
+                current.map((t) => (t.id === updated.id ? updated : t))
+              );
+              setEditingTransaction(null);
+            }}
+            onCancel={() => setEditingTransaction(null)}
           />
         </Modal>
       )}

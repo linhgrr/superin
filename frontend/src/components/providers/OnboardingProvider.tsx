@@ -25,6 +25,7 @@ import { createContext, ReactNode, useContext, useCallback, useState, useEffect,
 import { driver } from "driver.js";
 import type { Driver, DriveStep } from "driver.js";
 import "driver.js/dist/driver.css";
+import { STORAGE_KEYS } from "@/constants";
 
 type TourId = "welcome" | "dashboard" | "apps" | "chat" | "store";
 
@@ -277,7 +278,7 @@ const TOURS: Record<TourId, DriveStep[]> = {
 
 function OnboardingProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<OnboardingState>(() => {
-    const saved = localStorage.getItem("shin_onboarding");
+    const saved = localStorage.getItem(STORAGE_KEYS.ONBOARDING_STATE);
     return saved
       ? JSON.parse(saved)
       : { completedTours: [], currentTour: null, stepIndex: 0 };
@@ -291,7 +292,7 @@ function OnboardingProvider({ children }: { children: ReactNode }) {
 
   // Persist state
   useEffect(() => {
-    localStorage.setItem("shin_onboarding", JSON.stringify(state));
+    localStorage.setItem(STORAGE_KEYS.ONBOARDING_STATE, JSON.stringify(state));
   }, [state]);
 
   // Stable callbacks using refs
@@ -422,7 +423,7 @@ function OnboardingProvider({ children }: { children: ReactNode }) {
     }
     setDriverObj(null);
     setState({ completedTours: [], currentTour: null, stepIndex: 0 });
-    localStorage.removeItem("shin_onboarding");
+    localStorage.removeItem(STORAGE_KEYS.ONBOARDING_STATE);
   }, []);
 
   const isCompleted = useCallback(

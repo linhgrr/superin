@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
+import { Pencil } from "lucide-react";
 import type { CreateCategoryRequest } from "@/types/generated/api";
-import { createCategory, getCategories, type CategoryRead } from "../../api";
+import { createCategory, deleteCategory, getCategories, type CategoryRead } from "../../api";
 import Modal from "../../components/Modal";
 import SimpleForm from "../../components/SimpleForm";
+import CategoryEditForm from "../../components/CategoryEditForm";
 
 export default function CategoriesTab() {
   const [categories, setCategories] = useState<CategoryRead[]>([]);
   const [showModal, setShowModal] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<CategoryRead | null>(null);
   const [loading, setLoading] = useState(true);
 
   function load() {
@@ -44,6 +47,7 @@ export default function CategoriesTab() {
           {categories.map((category) => (
             <div
               key={category.id}
+              onClick={() => setEditingCategory(category)}
               style={{
                 background: "var(--color-surface-elevated)",
                 border: "1px solid var(--color-border)",
@@ -52,6 +56,8 @@ export default function CategoriesTab() {
                 display: "flex",
                 alignItems: "center",
                 gap: "0.625rem",
+                cursor: "pointer",
+                transition: "border-color 0.15s",
               }}
             >
               <div
@@ -69,12 +75,13 @@ export default function CategoriesTab() {
               >
                 {category.icon ? category.icon.slice(0, 1) : category.name.slice(0, 1)}
               </div>
-              <div>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <p style={{ fontWeight: 500, margin: 0, fontSize: "0.875rem" }}>{category.name}</p>
                 <p style={{ fontSize: "0.75rem", color: "var(--color-muted)", margin: 0 }}>
                   Budget: ${category.budget.toLocaleString()}
                 </p>
               </div>
+              <Pencil size={14} style={{ color: "var(--color-muted)", flexShrink: 0 }} />
             </div>
           ))}
         </div>
@@ -101,6 +108,26 @@ export default function CategoriesTab() {
               setShowModal(false);
               load();
             }}
+          />
+        </Modal>
+      )}
+
+      {/* Edit Modal */}
+      {editingCategory && (
+        <Modal title="Edit Category" onClose={() => setEditingCategory(null)}>
+          <CategoryEditForm
+            category={editingCategory}
+            onSave={(updated) => {
+              setCategories((current) =>
+                current.map((c) => (c.id === updated.id ? updated : c))
+              );
+              setEditingCategory(null);
+            }}
+            onDelete={() => {
+              setCategories((current) => current.filter((c) => c.id !== editingCategory.id));
+              setEditingCategory(null);
+            }}
+            onCancel={() => setEditingCategory(null)}
           />
         </Modal>
       )}

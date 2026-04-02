@@ -1,13 +1,16 @@
 import { useEffect, useState } from "react";
+import { Pencil } from "lucide-react";
 import type { CreateWalletRequest } from "@/types/generated/api";
-import { createWallet, getWallets, type WalletRead } from "../../api";
+import { createWallet, deleteWallet, getWallets, type WalletRead } from "../../api";
 import Modal from "../../components/Modal";
 import SimpleForm from "../../components/SimpleForm";
+import WalletEditForm from "../../components/WalletEditForm";
 import { formatCurrency } from "../../lib/formatCurrency";
 
 export default function WalletsTab() {
   const [wallets, setWallets] = useState<WalletRead[]>([]);
   const [showModal, setShowModal] = useState(false);
+  const [editingWallet, setEditingWallet] = useState<WalletRead | null>(null);
   const [loading, setLoading] = useState(true);
 
   function load() {
@@ -56,8 +59,17 @@ export default function WalletsTab() {
                 border: "1px solid var(--color-border)",
                 borderRadius: "0.75rem",
                 padding: "1rem",
+                position: "relative",
               }}
             >
+              <button
+                className="btn btn-ghost"
+                onClick={() => setEditingWallet(wallet)}
+                style={{ position: "absolute", top: "0.5rem", right: "0.5rem", padding: "0.25rem" }}
+                title="Edit wallet"
+              >
+                <Pencil size={14} />
+              </button>
               <p style={{ fontWeight: 600, margin: "0 0 0.25rem" }}>{wallet.name}</p>
               <p
                 style={{
@@ -95,6 +107,22 @@ export default function WalletsTab() {
               setShowModal(false);
               load();
             }}
+          />
+        </Modal>
+      )}
+
+      {/* Edit Modal */}
+      {editingWallet && (
+        <Modal title="Edit Wallet" onClose={() => setEditingWallet(null)}>
+          <WalletEditForm
+            wallet={editingWallet}
+            onSave={(updated) => {
+              setWallets((current) =>
+                current.map((w) => (w.id === updated.id ? updated : w))
+              );
+              setEditingWallet(null);
+            }}
+            onCancel={() => setEditingWallet(null)}
           />
         </Modal>
       )}

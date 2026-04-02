@@ -1,6 +1,8 @@
-import { AlertTriangle, Trash2 } from "lucide-react";
+import { AlertTriangle, Trash2, ListTodo } from "lucide-react";
 import type { TaskRead } from "../api";
 import { useUserTimezone } from "@/hooks/useUserTimezone";
+import RecurringBadge from "./RecurringBadge";
+import type { RecurringFrequency } from "../api";
 
 const PRIORITY_STYLE = {
   high: { color: "var(--color-danger)", bg: "oklch(0.63 0.24 25 / 0.15)" },
@@ -9,18 +11,35 @@ const PRIORITY_STYLE = {
 } as const;
 
 interface TaskRowProps {
-  task: TaskRead;
+  task: TaskRead & {
+    subtask_count?: number;
+    subtask_completed?: number;
+    recurring_rule?: {
+      frequency: RecurringFrequency;
+      is_active: boolean;
+    } | null;
+  };
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
+  onClick?: () => void;
+  selected?: boolean;
 }
 
-export default function TaskRow({ task, onToggle, onDelete }: TaskRowProps) {
+export default function TaskRow({ task, onToggle, onDelete, onClick, selected }: TaskRowProps) {
   const { formatDate } = useUserTimezone();
   const priorityStyle = PRIORITY_STYLE[task.priority] ?? PRIORITY_STYLE.low;
   const overdue = task.due_date && new Date(task.due_date) < new Date() && task.status === "pending";
+  const hasSubtasks = (task.subtask_count ?? 0) > 0;
+  const allSubtasksDone = hasSubtasks && task.subtask_completed === task.subtask_count;
 
   return (
-    <tr>
+    <tr
+      onClick={onClick}
+      style={{
+        cursor: onClick ? "pointer" : "default",
+        background: selected ? "var(--color-surface-elevated)" : undefined,
+      }}
+    >
       <td>
         <input
           type="checkbox"
@@ -39,11 +58,34 @@ export default function TaskRow({ task, onToggle, onDelete }: TaskRowProps) {
         >
           {task.title}
         </span>
-        {task.description && (
-          <p style={{ fontSize: "0.75rem", color: "var(--color-muted)", margin: "0.125rem 0 0" }}>
-            {task.description}
-          </p>
-        )}
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.25rem" }}>
+          {task.description && (
+            <span style={{ fontSize: "0.75rem", color: "var(--color-muted)" }}>
+              {task.description}
+            </span>
+          )}
+          {hasSubtasks && (
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.25rem",
+                fontSize: "0.6875rem",
+                color: allSubtasksDone ? "var(--color-success)" : "var(--color-muted)",
+                fontWeight: 500,
+              }}
+            >
+              <ListTodo size={10} />
+              {task.subtask_completed ?? 0}/{task.subtask_count}
+            </span>
+          )}
+          {task.recurring_rule?.is_active && (
+            <RecurringBadge
+              frequency={task.recurring_rule.frequency}
+              isActive={task.recurring_rule.is_active}
+            />
+          )}
+        </div>
       </td>
       <td>
         <span
@@ -62,12 +104,15 @@ export default function TaskRow({ task, onToggle, onDelete }: TaskRowProps) {
       </td>
       <td style={{ fontSize: "0.8125rem", color: overdue ? "var(--color-danger)" : "var(--color-muted)" }}>
         {task.due_date ? formatDate(task.due_date, { month: "short", day: "numeric" }) : "—"}
-        {overdue && <AlertTriangle size={12} style={{ display: "inline", color: "var(--color-danger)" }} />}
+        {overdue && <AlertTriangle size={12} style={{ display: "inline", color: "var(--color-danger)", marginLeft: "0.25rem" }} />}
       </td>
       <td>
         <button
           className="btn btn-ghost"
-          onClick={() => onDelete(task.id)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(task.id);
+          }}
           style={{ padding: "0.25rem 0.5rem", color: "var(--color-danger)" }}
           title="Delete task"
         >

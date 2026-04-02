@@ -23,6 +23,7 @@ import {
   LogOut,
   Globe,
 } from "lucide-react";
+import { STORAGE_KEYS } from "@/constants";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/components/providers/AppProviders";
 import { updateUserSettings } from "@/api/auth";
@@ -307,7 +308,7 @@ export default function SettingsPage() {
 
   // Load settings from localStorage
   const [settings, setSettings] = useState<SettingsState>(() => {
-    const saved = localStorage.getItem("shin_settings");
+    const saved = localStorage.getItem(STORAGE_KEYS.USER_SETTINGS);
     return saved ? { ...DEFAULT_SETTINGS, ...JSON.parse(saved) } : DEFAULT_SETTINGS;
   });
 
@@ -344,7 +345,7 @@ export default function SettingsPage() {
   // Cross-tab sync: listen for storage changes from other tabs
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === "shin_settings" && e.newValue) {
+      if (e.key === STORAGE_KEYS.USER_SETTINGS && e.newValue) {
         try {
           const newSettings = JSON.parse(e.newValue);
           setSettings((prev) => ({ ...prev, ...newSettings }));
@@ -364,7 +365,7 @@ export default function SettingsPage() {
       setIsSaving(true);
       const updated = { ...settings, ...newSettings };
       setSettings(updated);
-      localStorage.setItem("shin_settings", JSON.stringify(updated));
+      localStorage.setItem(STORAGE_KEYS.USER_SETTINGS, JSON.stringify(updated));
 
       // Sync timezone to backend if changed
       if (newSettings.timezone) {

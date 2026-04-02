@@ -16,7 +16,7 @@ import {
 } from "react";
 
 import { getMe, login as apiLogin, logout as apiLogout, register as apiRegister } from "@/api/auth";
-import { clearAccessToken, isAuthenticated, setAccessToken } from "@/api/axios";
+import { isAuthenticated, triggerLogout } from "@/api/axios";
 import type { LoginRequest, RegisterRequest, UserPublic } from "@/types/generated/api";
 
 interface AuthContextValue {
@@ -46,19 +46,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     getMe()
       .then((u) => setUser(u))
-      .catch(() => clearAccessToken())
+      .catch(() => {
+        // Auth failed - logout and redirect (handled by triggerLogout)
+        triggerLogout();
+      })
       .finally(() => setIsLoading(false));
   }, []);
 
   const login = useCallback(async (payload: LoginRequest) => {
     const res = await apiLogin(payload);
-    setAccessToken(res.access_token);
+    // apiLogin already calls setAccessToken
     setUser(res.user);
   }, []);
 
   const register = useCallback(async (payload: RegisterRequest) => {
     const res = await apiRegister(payload);
-    setAccessToken(res.access_token);
+    // apiRegister already calls setAccessToken
     setUser(res.user);
   }, []);
 
@@ -66,7 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await apiLogout();
     } finally {
-      clearAccessToken();
+      triggerLogout();
       setUser(null);
     }
   }, []);

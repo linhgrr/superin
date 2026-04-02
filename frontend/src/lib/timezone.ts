@@ -15,6 +15,7 @@
  */
 
 import { getAccessToken } from '@/api/axios';
+import { STORAGE_KEYS } from '@/constants';
 
 // Common timezone names
 export const COMMON_TIMEZONES = {
@@ -42,9 +43,6 @@ export const COMMON_TIMEZONES = {
 
 export const DEFAULT_TIMEZONE = 'UTC';
 
-// Storage key for timezone (mirrors backend approach)
-const TIMEZONE_STORAGE_KEY = 'user_timezone';
-
 /**
  * Get user's timezone from storage or browser default.
  *
@@ -55,7 +53,7 @@ const TIMEZONE_STORAGE_KEY = 'user_timezone';
  */
 export function getUserTimezone(): string {
   // Try stored preference first
-  const stored = localStorage.getItem(TIMEZONE_STORAGE_KEY);
+  const stored = localStorage.getItem(STORAGE_KEYS.USER_TIMEZONE);
   if (stored) return stored;
 
   // Try browser timezone
@@ -73,7 +71,7 @@ export function getUserTimezone(): string {
  * Set user's timezone preference.
  */
 export function setUserTimezone(timezone: string): void {
-  localStorage.setItem(TIMEZONE_STORAGE_KEY, timezone);
+  localStorage.setItem(STORAGE_KEYS.USER_TIMEZONE, timezone);
 }
 
 /**

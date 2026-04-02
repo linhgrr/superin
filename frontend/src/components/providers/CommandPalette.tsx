@@ -27,6 +27,7 @@ import {
   User,
   Settings,
 } from "lucide-react";
+import { STORAGE_KEYS } from "@/constants";
 import { useAppCatalog } from "./AppProviders";
 import { useAuth } from "@/hooks/useAuth";
 import { DynamicIcon } from "@/lib/icon-resolver";
@@ -49,7 +50,7 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [recentCommands, setRecentCommands] = useState<string[]>(() => {
-    const saved = localStorage.getItem("shin_recent_commands");
+    const saved = localStorage.getItem(STORAGE_KEYS.RECENT_COMMANDS);
     return saved ? JSON.parse(saved) : [];
   });
   const inputRef = useRef<HTMLInputElement>(null);
@@ -131,18 +132,18 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
           }
 
           // Sync to localStorage so SettingsPage reflects the change
-          const saved = localStorage.getItem("shin_settings");
+          const saved = localStorage.getItem(STORAGE_KEYS.USER_SETTINGS);
           if (saved) {
             try {
               const settings = JSON.parse(saved);
               settings.theme = newTheme;
-              localStorage.setItem("shin_settings", JSON.stringify(settings));
+              localStorage.setItem(STORAGE_KEYS.USER_SETTINGS, JSON.stringify(settings));
             } catch {
               // Ignore parse errors
             }
           } else {
             // No existing settings, create minimal one
-            localStorage.setItem("shin_settings", JSON.stringify({ theme: newTheme }));
+            localStorage.setItem(STORAGE_KEYS.USER_SETTINGS, JSON.stringify({ theme: newTheme }));
           }
 
           // Notify any open SettingsPage to re-sync
@@ -248,10 +249,33 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
     help: "Help",
   };
 
-  // Update selected index when filtered commands change
+  // Build flat commands list and grouped display data
+  const { flatCommands, groupedDisplay, totalCount } = useMemo(() => {
+    const flat: CommandItem[] = [];
+    const grouped: Record<string, CommandItem[]> = {};
+
+    for (const category of categoryOrder) {
+      const cmds = groupedCommands[category];
+      if (cmds?.length) {
+        grouped[category] = cmds;
+        flat.push(...cmds.map((cmd) => ({ ...cmd, __category: category })));
+      }
+    }
+
+    return { flatCommands: flat, groupedDisplay: grouped, totalCount: flat.length };
+  }, [groupedCommands]);
+
+  // Reset selected index when query changes or list shrinks
   useEffect(() => {
-    setSelectedIndex(0);
-  }, [query]);
+    setSelectedIndex((prev) => Math.min(prev, Math.max(0, totalCount - 1)));
+  }, [query, totalCount]);
+
+  // Clamp selected index if list shrinks
+  useEffect(() => {
+    if (selectedIndex >= totalCount) {
+      setSelectedIndex(Math.max(0, totalCount - 1));
+    }
+  }, [selectedIndex, totalCount]);
 
   // Focus input on mount
   useEffect(() => {
@@ -263,7 +287,7 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
     (id: string) => {
       const next = [id, ...recentCommands.filter((c) => c !== id)].slice(0, 5);
       setRecentCommands(next);
-      localStorage.setItem("shin_recent_commands", JSON.stringify(next));
+      localStorage.setItem(STORAGE_KEYS.RECENT_COMMANDS, JSON.stringify(next));
     },
     [recentCommands]
   );
@@ -278,18 +302,18 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
     [onClose, trackRecent]
   );
 
-  // Keyboard navigation
+  // Keyboard navigation - stable effect, no re-attaches
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "ArrowDown") {
         e.preventDefault();
-        setSelectedIndex((prev) => Math.min(prev + 1, filteredCommands.length - 1));
+        setSelectedIndex((prev) => Math.min(prev + 1, totalCount - 1));
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
         setSelectedIndex((prev) => Math.max(prev - 1, 0));
       } else if (e.key === "Enter") {
         e.preventDefault();
-        const cmd = filteredCommands[selectedIndex];
+        const cmd = flatCommands[selectedIndex];
         if (cmd) executeCommand(cmd);
       } else if (e.key === "Escape") {
         e.preventDefault();
@@ -299,7 +323,7 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [filteredCommands, selectedIndex, executeCommand, onClose]);
+  }, [flatCommands, selectedIndex, executeCommand, onClose, totalCount]);
 
   // Scroll selected into view
   useEffect(() => {
@@ -309,9 +333,20 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
     }
   }, [selectedIndex]);
 
-  let globalIndex = 0;
-  // Reset item refs before rendering
-  itemRefs.current = [];
+  // Create stable index lookup for grouped rendering
+  const commandIndexMap = useMemo(() => {
+    const map = new Map<string, number>();
+    let idx = 0;
+    for (const category of categoryOrder) {
+      const cmds = groupedDisplay[category];
+      if (cmds?.length) {
+        for (const cmd of cmds) {
+          map.set(cmd.id, idx++);
+        }
+      }
+    }
+    return map;
+  }, [groupedDisplay]);
 
   return (
     <div
@@ -400,7 +435,7 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
             padding: "0.5rem",
           }}
         >
-          {filteredCommands.length === 0 ? (
+          {flatCommands.length === 0 ? (
             <div
               style={{
                 padding: "3rem",
@@ -416,7 +451,7 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
             </div>
           ) : (
             categoryOrder.map((category) => {
-              const cmds = groupedCommands[category];
+              const cmds = groupedDisplay[category];
               if (!cmds?.length) return null;
 
               return (
@@ -434,14 +469,15 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
                     {categoryLabels[category]}
                   </div>
                   {cmds.map((cmd) => {
-                    const isSelected = globalIndex === selectedIndex;
-                    const index = globalIndex++;
+                    const index = commandIndexMap.get(cmd.id)!;
+                    const isSelected = index === selectedIndex;
 
                     return (
                       <button
                         key={cmd.id}
                         ref={(el) => { itemRefs.current[index] = el; }}
                         onClick={() => executeCommand(cmd)}
+                        onMouseEnter={() => setSelectedIndex(index)}
                         style={{
                           width: "100%",
                           display: "flex",
@@ -456,7 +492,6 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
                           textAlign: "left",
                           transition: "all 0.15s ease",
                         }}
-                        onMouseEnter={() => setSelectedIndex(index)}
                       >
                         <div
                           style={{
@@ -580,7 +615,7 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
               to select
             </span>
           </div>
-          <span>{filteredCommands.length} commands</span>
+          <span>{flatCommands.length} commands</span>
         </div>
       </div>
     </div>

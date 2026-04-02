@@ -6,6 +6,16 @@
       "sourceType": "github",
       "computedHash": "8fdfb9bad6aef892b4f16ef3b07ef5eea3b0497d37eeaeddb07244d657cc8711"
     },
+    "llm-security": {
+      "source": "semgrep/skills",
+      "sourceType": "github",
+      "computedHash": "27fa571b75861545226c9ee3d861fda4831cbf10099bf34118d59470dffb0fc8"
+    },
+    "security-architect": {
+      "source": "oimiragieo/agent-studio",
+      "sourceType": "github",
+      "computedHash": "e7fb3a7334214c6baa5d520e9d4360419933445f36fcf29cc217e0ec988a78e1"
+    },
     "superdesign": {
       "source": "superdesigndev/superdesign-skill",
       "sourceType": "github",

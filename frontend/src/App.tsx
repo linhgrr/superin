@@ -11,6 +11,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useNavigate } from "react-router-dom";
+import { STORAGE_KEYS, ROUTES } from "@/constants";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { AppProviders, CommandPalette } from "@/components/providers/AppProviders";
 import LoginPage from "@/pages/LoginPage";
@@ -24,7 +25,7 @@ import AppShell from "@/pages/AppShell";
 
 function ThemeLoader() {
   useEffect(() => {
-    const saved = localStorage.getItem("shin_settings");
+    const saved = localStorage.getItem(STORAGE_KEYS.USER_SETTINGS);
     if (saved) {
       try {
         const settings = JSON.parse(saved);
