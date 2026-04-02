@@ -193,22 +193,40 @@ function WidgetCard({
   widget: AppCatalogEntry["widgets"][number];
   children: React.ReactNode;
 }) {
-  const [mousePos, setMousePos] = useState({ x: 50, y: 50 });
+  // Use ref to avoid re-renders on mouse move - CSS custom properties updated directly
+  const cardRef = useRef<HTMLDivElement>(null);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const x = ((e.clientX - rect.left) / rect.width) * 100;
     const y = ((e.clientY - rect.top) / rect.height) * 100;
-    setMousePos({ x, y });
+
+    // Update CSS custom properties directly - no React state, no re-render
+    const el = cardRef.current;
+    if (el) {
+      el.style.setProperty("--mouse-x", `${x}%`);
+      el.style.setProperty("--mouse-y", `${y}%`);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    // Reset to center when mouse leaves
+    const el = cardRef.current;
+    if (el) {
+      el.style.setProperty("--mouse-x", "50%");
+      el.style.setProperty("--mouse-y", "50%");
+    }
   };
 
   return (
     <div
+      ref={cardRef}
       className="widget-card"
       onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
       style={{
-        "--mouse-x": `${mousePos.x}%`,
-        "--mouse-y": `${mousePos.y}%`,
+        "--mouse-x": "50%",
+        "--mouse-y": "50%",
         display: "flex",
         flexDirection: "column",
       } as React.CSSProperties}

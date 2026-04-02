@@ -17,17 +17,29 @@ Shin SuperApp là nền tảng plugin-based với:
 
 ### Plug-n-Play Architecture
 
+**⚠️ ABSOLUTE RULE: Platform/Core không bao giờ biết về chi tiết hay sự tồn tại của bất kỳ app con nào.**
+
 Hệ thống hỗ trợ true plug-n-play cho plugins:
 
 **Backend:**
 - Auto-discovery qua `backend/core/discovery.py` — tự scan và import tất cả folders trong `backend/apps/`
 - Mỗi app tự đăng ký qua `register_plugin()` trong `__init__.py`
+- **Platform code** (core/, shared/) KHÔNG ĐƯỢC import từ bất kỳ app nào trong `apps/`
 
 **Frontend:**
 - Auto-discovery qua Vite glob import trong `src/apps/index.ts`
 - Không cần import thủ công từng app — hệ thống tự tìm tất cả `src/apps/*/index.ts`
 - Backend là source of truth cho metadata (icon, color, name, widgets)
 - Icons render động qua `DynamicIcon` resolver
+- **Platform code** (`src/lib/`, `src/components/`, `src/hooks/` trừ `useAuth`) KHÔNG ĐƯỢC import từ bất kỳ app nào
+- **TUYỆT ĐỐI KHÔNG** đặt logic app-specific bên ngoài folder `src/apps/{app_id}/`
+- Apps có thể import từ nhau nếu cần (ví dụ: calendar có thể import từ todo)
+
+**Frontend SWR Pattern (Plug-n-Play Data Fetching):**
+- Shared config ở `src/lib/swr.ts` — **KHÔNG** chứa app-specific imports
+- Mỗi app tự tạo hooks trong `src/apps/{app_id}/hooks/` (vd: `useFinanceSwr.ts`, `useTodoSwr.ts`)
+- Import SWR utilities từ `@/lib/swr` (shared), không bao giờ import từ app khác
+- Ví dụ đúng: `import { swrConfig, fetcher } from "@/lib/swr"`
 
 **CLI:**
 - `sync-fe` vẫn hữu ích để tạo boilerplate widgets, nhưng không bắt buộc để app hiển thị
@@ -178,6 +190,14 @@ npm run build:frontend
 
 ## 7. Development Rules
 
+### ⚠️ ABSOLUTE RULES - Never Violate
+
+1. **Platform agnostic to Apps** — Platform code (`src/lib/`, `src/components/`, `backend/core/`, `backend/shared/`) KHÔNG ĐƯỢC import từ bất kỳ app nào
+2. **App containment** — Mỗi app chứa tất cả code của mình trong `src/apps/{app_id}/`
+3. **Apps có thể import từ nhau** — Cross-app integration được phép (vd: calendar import từ todo)
+4. **Shared code ở `src/lib/` hoặc `src/components/`** — Không bao giờ để app-specific logic ở đây
+5. **Backend là source of truth** — manifest (icon, color, name, widgets), schemas, types đều bắt nguồn từ đây
+
 ### Plugin Development
 
 1. **Backend là source of truth** — manifest (icon, color, name, widgets), schemas, types đều bắt nguồn từ đây
@@ -202,6 +222,8 @@ npm run build:frontend
 6. **KHÔNG edit** `frontend/src/types/generated/*` (auto-generated)
 7. **Luôn dùng** design tokens từ `globals.css` (oklch colors)
 8. **Icons** — Dùng `DynamicIcon` từ `icon-resolver.ts` để render icons động từ tên (backend cung cấp)
+9. **SWR Hooks** — Mỗi app tự tạo hooks trong `hooks/` folder, import shared config từ `@/lib/swr`
+10. **Platform code KHÔNG import từ apps** — `src/lib/`, `src/components/`, `src/hooks/` (trừ `useAuth`) không được import từ `src/apps/`
 
 ### Chat/Agent
 

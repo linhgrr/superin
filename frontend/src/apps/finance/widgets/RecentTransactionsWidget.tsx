@@ -1,14 +1,14 @@
 import type { DashboardWidgetRendererProps } from "../types";
 import { formatCurrency } from "../lib/formatCurrency";
-import { useFinanceSummary } from "./useFinanceSummary";
+import { useFinanceSummary } from "../hooks/useFinanceSwr";
 import { ArrowUpRight, ArrowDownRight } from "lucide-react";
 
 export default function RecentTransactionsWidget({ widget }: DashboardWidgetRendererProps) {
-  const { summary, loading } = useFinanceSummary();
+  const { data: summary, isLoading } = useFinanceSummary();
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-      {loading ? (
+      {isLoading ? (
         <div style={{ color: "var(--color-muted)", fontSize: "0.875rem" }}>Loading…</div>
       ) : (
         <div style={{ display: "flex", gap: "1rem" }}>

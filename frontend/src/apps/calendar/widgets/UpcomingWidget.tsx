@@ -1,8 +1,7 @@
-import { useState, useEffect } from "react";
-import { listEvents, type Event } from "../api";
 import { Calendar } from "lucide-react";
 import { useTimezone } from "@/hooks/useTimezone";
 import { getUserTimezone } from "@/lib/timezone";
+import { useUpcomingEvents } from "../hooks/useCalendarSwr";
 
 interface UpcomingWidgetProps {
   maxItems?: number;
@@ -10,26 +9,8 @@ interface UpcomingWidgetProps {
 }
 
 export default function UpcomingWidget({ maxItems = 3, calendarFilter }: UpcomingWidgetProps) {
-  const [events, setEvents] = useState<Event[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { data: events = [], isLoading } = useUpcomingEvents(maxItems);
   const { timezone, formatDate, formatTime, isToday } = useTimezone();
-
-  useEffect(() => {
-    loadEvents();
-  }, [calendarFilter]);
-
-  async function loadEvents() {
-    try {
-      setIsLoading(true);
-      const now = new Date().toISOString();
-      const end = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-
-      const evts = await listEvents(now, end, calendarFilter || undefined, maxItems);
-      setEvents(evts.slice(0, maxItems));
-    } finally {
-      setIsLoading(false);
-    }
-  }
 
   const formatEventDate = (dateStr: string) => {
     // Use centralized isToday utility
@@ -77,7 +58,7 @@ export default function UpcomingWidget({ maxItems = 3, calendarFilter }: Upcomin
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-          {events.map((event) => (
+          {events.slice(0, maxItems).map((event) => (
             <div
               key={event.id}
               style={{

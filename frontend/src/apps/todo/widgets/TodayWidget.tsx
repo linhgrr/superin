@@ -1,13 +1,16 @@
 import type { DashboardWidgetRendererProps } from "../types";
-import { useTodoSummary } from "./useTodoSummary";
+import { useTodoSummary } from "../hooks/useTodoSwr";
 import { CalendarClock, AlertCircle } from "lucide-react";
 
 export default function TodayWidget({ widget }: DashboardWidgetRendererProps) {
-  const { summary, loading } = useTodoSummary();
+  const { data: summary, isLoading, isValidating } = useTodoSummary();
+
+  // Show loading state only on initial load, not on background revalidation
+  const showLoading = isLoading && !isValidating;
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-      {loading ? (
+      {showLoading ? (
         <div className="stat-value" style={{ color: "var(--color-muted)" }}>—</div>
       ) : (
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
@@ -31,7 +34,7 @@ export default function TodayWidget({ widget }: DashboardWidgetRendererProps) {
               <span className="stat-value" style={{ color: "var(--color-foreground)", fontSize: "1.75rem" }}>
                 {summary?.due_today ?? 0}
               </span>
-              {!loading && summary && summary.overdue > 0 && (
+              {!isLoading && summary && summary.overdue > 0 && (
                 <span
                   style={{
                     display: "inline-flex",

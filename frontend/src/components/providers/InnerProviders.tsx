@@ -3,7 +3,7 @@
  * These are split out to avoid circular dependencies
  */
 
-import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   AssistantRuntimeProvider,
 } from "@assistant-ui/react";
@@ -13,6 +13,7 @@ import { getCatalog } from "@/api/catalog";
 import { getAccessToken } from "@/api/client";
 import { API_BASE_URL } from "@/config";
 import { API_PATHS } from "@/constants";
+import { subscribeToAuthState } from "@/lib/auth-events";
 import type { AppCatalogEntry } from "@/types/generated/api";
 
 interface AppCatalogContextValue {
@@ -49,6 +50,7 @@ function ChatRuntimeProvider({ children }: { children: ReactNode }) {
 function AppCatalogProvider({ children }: { children: ReactNode }) {
   const [catalog, setCatalog] = useState<AppCatalogEntry[]>([]);
   const [isCatalogLoading, setIsCatalogLoading] = useState(true);
+  const wasAuthenticatedRef = useRef(false);
 
   const refreshCatalog = useCallback(async () => {
     setIsCatalogLoading(true);
@@ -59,8 +61,20 @@ function AppCatalogProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Initial fetch
   useEffect(() => {
     void refreshCatalog();
+  }, [refreshCatalog]);
+
+  // Listen for auth state changes and refresh catalog when user logs in
+  useEffect(() => {
+    return subscribeToAuthState((isAuthenticated) => {
+      // Refresh when transitioning from not authenticated to authenticated
+      if (isAuthenticated && !wasAuthenticatedRef.current) {
+        void refreshCatalog();
+      }
+      wasAuthenticatedRef.current = isAuthenticated;
+    });
   }, [refreshCatalog]);
 
   const setAppInstalled = useCallback((appId: string, isInstalled: boolean) => {

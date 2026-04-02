@@ -1,14 +1,14 @@
 import type { DashboardWidgetRendererProps } from "../types";
 import { formatCurrency } from "../lib/formatCurrency";
-import { useFinanceSummary } from "./useFinanceSummary";
+import { useFinanceSummary } from "../hooks/useFinanceSwr";
 import { Wallet } from "lucide-react";
 
 export default function TotalBalanceWidget({ widget }: DashboardWidgetRendererProps) {
-  const { summary, loading } = useFinanceSummary();
+  const { data: summary, isLoading } = useFinanceSummary();
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-      {loading ? (
+      {isLoading ? (
         <div className="stat-value" style={{ color: "var(--color-muted)" }}>—</div>
       ) : (
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>

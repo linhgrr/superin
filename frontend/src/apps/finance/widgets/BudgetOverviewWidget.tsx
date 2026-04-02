@@ -1,13 +1,13 @@
 import type { DashboardWidgetRendererProps } from "../types";
-import { useFinanceSummary } from "./useFinanceSummary";
+import { useFinanceSummary } from "../hooks/useFinanceSwr";
 import { Receipt } from "lucide-react";
 
 export default function BudgetOverviewWidget({ widget }: DashboardWidgetRendererProps) {
-  const { summary, loading } = useFinanceSummary();
+  const { data: summary, isLoading } = useFinanceSummary();
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-      {loading ? (
+      {isLoading ? (
         <div style={{ color: "var(--color-muted)", fontSize: "0.875rem" }}>Loading…</div>
       ) : (
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
