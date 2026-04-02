@@ -1,0 +1,20 @@
+/**
+ * Storage keys - centralized to prevent typos and ensure consistency
+ */
+
+export const STORAGE_KEYS = {
+  // Auth
+  ACCESS_TOKEN: "access_token",
+  REFRESH_COOKIE: "refresh_token",
+
+  // User preferences
+  USER_SETTINGS: "shin_settings",
+  USER_TIMEZONE: "user_timezone",
+
+  // App state
+  RECENT_COMMANDS: "shin_recent_commands",
+  ONBOARDING_STATE: "shin_onboarding",
+} as const;
+
+/** @deprecated Use STORAGE_KEYS.ACCESS_TOKEN directly */
+export const ACCESS_TOKEN_KEY = STORAGE_KEYS.ACCESS_TOKEN;

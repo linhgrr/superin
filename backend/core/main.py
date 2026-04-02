@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from core.config import settings
+from core.constants import API_AUTH, API_CATALOG, API_CHAT, API_ROOT
 from core.db import close_db, init_db
 from core.discovery import discover_apps
 from core.exceptions import (
@@ -107,13 +108,13 @@ def create_app() -> FastAPI:
 
     # ── Core routers ──────────────────────────────────────────────────────
     from apps.auth import router as auth_router
-    app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
+    app.include_router(auth_router, prefix=API_AUTH, tags=["auth"])
 
     from apps.catalog import router as catalog_router
-    app.include_router(catalog_router, prefix="/api/catalog", tags=["catalog"])
+    app.include_router(catalog_router, prefix=API_CATALOG, tags=["catalog"])
 
     from apps.chat import router as chat_router
-    app.include_router(chat_router, prefix="/api/chat", tags=["chat"])
+    app.include_router(chat_router, prefix=API_CHAT, tags=["chat"])
 
     # ── Plugin routers — discover and mount immediately for OpenAPI spec ──
     # Safe to call multiple times; plugin modules are already imported.
@@ -122,7 +123,7 @@ def create_app() -> FastAPI:
     for app_id, plugin in PLUGIN_REGISTRY.items():
         app.include_router(
             plugin["router"],
-            prefix=f"/api/apps/{app_id}",
+            prefix=f"{API_ROOT}/apps/{app_id}",
             tags=[app_id],
         )
 

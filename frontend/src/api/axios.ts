@@ -3,36 +3,106 @@
  *
  * Features:
  * - Automatic access token injection
+ * - Proactive token refresh (before expiry, not just on 401)
  * - 401 handling with token refresh queue (prevents race conditions)
  * - Failed refresh → auto logout redirect
  * - Request deduplication during refresh
  */
 
 import axios, { AxiosError, AxiosRequestConfig, InternalAxiosRequestConfig } from "axios";
-import { API_BASE_URL, API_TIMEOUT_MS } from "@/config";
+import { jwtDecode } from "jwt-decode";
+import { API_BASE_URL, API_TIMEOUT_MS, ACCESS_TOKEN_REFRESH_AHEAD_SECONDS } from "@/config";
+import { STORAGE_KEYS, AUTH_ROUTES, ROUTES } from "@/constants";
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+// Token expiry from backend (15 minutes)
+const ACCESS_TOKEN_EXPIRY_MS = 15 * 60 * 1000;
+
+// Cache proactive check for 30 seconds to avoid repeated checks
+const PROACTIVE_CHECK_CACHE_MS = 30_000;
 
 // ─── Token Storage ────────────────────────────────────────────────────────────
 
-const ACCESS_TOKEN_KEY = "access_token";
-
-let accessToken: string | null = sessionStorage.getItem(ACCESS_TOKEN_KEY);
+let accessToken: string | null = sessionStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+let lastProactiveCheck = 0;
+let cachedRefreshNeeded = false;
 
 export function setAccessToken(token: string): void {
   accessToken = token;
-  sessionStorage.setItem(ACCESS_TOKEN_KEY, token);
+  sessionStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, token);
+  // Reset cache on new token
+  lastProactiveCheck = 0;
+  cachedRefreshNeeded = false;
 }
 
 export function clearAccessToken(): void {
   accessToken = null;
-  sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+  sessionStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
+  lastProactiveCheck = 0;
+  cachedRefreshNeeded = false;
 }
 
 export function getAccessToken(): string | null {
-  return accessToken;
+  return accessToken ?? sessionStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
 }
 
 export function isAuthenticated(): boolean {
-  return accessToken !== null;
+  return getAccessToken() !== null;
+}
+
+/**
+ * Trigger logout and redirect to login page.
+ * Exported for use in auth hooks and components.
+ */
+export function triggerLogout(): void {
+  clearAccessToken();
+  window.location.href = ROUTES.LOGIN;
+}
+
+/**
+ * Check if token needs proactive refresh (approaching expiry).
+ * Results are cached for 30 seconds to avoid repeated checks.
+ */
+function shouldRefreshProactively(): boolean {
+  const now = Date.now();
+
+  // Return cached result if checked recently
+  if (now - lastProactiveCheck < PROACTIVE_CHECK_CACHE_MS) {
+    return cachedRefreshNeeded;
+  }
+
+  const token = getAccessToken();
+  if (!token) {
+    lastProactiveCheck = now;
+    cachedRefreshNeeded = false;
+    return false;
+  }
+
+  try {
+    const decoded = jwtDecode<{ exp?: number; iat?: number }>(token);
+    const expiryTime = decoded.exp ? decoded.exp * 1000 : null;
+    const issuedAt = decoded.iat ? decoded.iat * 1000 : null;
+
+    let needsRefresh = false;
+
+    if (expiryTime) {
+      // Check if expiring soon
+      needsRefresh = expiryTime - now < ACCESS_TOKEN_REFRESH_AHEAD_SECONDS * 1000;
+    } else if (issuedAt) {
+      // Fallback: use iat + 15 minutes
+      needsRefresh = now - issuedAt > (ACCESS_TOKEN_EXPIRY_MS - ACCESS_TOKEN_REFRESH_AHEAD_SECONDS * 1000);
+    }
+
+    lastProactiveCheck = now;
+    cachedRefreshNeeded = needsRefresh;
+    return needsRefresh;
+  } catch {
+    // Invalid token - let request fail naturally
+    lastProactiveCheck = now;
+    cachedRefreshNeeded = false;
+    return false;
+  }
 }
 
 // ─── Axios Instance ───────────────────────────────────────────────────────────
@@ -45,18 +115,6 @@ export const axiosInstance = axios.create({
   },
   withCredentials: true, // Send refresh_token cookie
 });
-
-// ─── Request Interceptor: Inject Access Token ─────────────────────────────────
-
-axiosInstance.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
-    if (accessToken) {
-      config.headers.Authorization = `Bearer ${accessToken}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
 
 // ─── Refresh Token Queue (Prevents Race Conditions) ──────────────────────────
 
@@ -72,10 +130,14 @@ function notifyRefreshSubscribers(token: string): void {
   refreshSubscribers = [];
 }
 
+function clearRefreshSubscribers(): void {
+  refreshSubscribers = [];
+}
+
 async function performRefresh(): Promise<string | null> {
   try {
     const response = await axios.post<{ access_token: string }>(
-      `${API_BASE_URL}/api/auth/refresh`,
+      `${API_BASE_URL}/api${AUTH_ROUTES.REFRESH}`,
       {},
       { withCredentials: true }
     );
@@ -87,18 +149,71 @@ async function performRefresh(): Promise<string | null> {
   }
 }
 
+// ─── Request Interceptor: Proactive Refresh + Token Injection ─────────────────
+
+interface AuthConfig extends InternalAxiosRequestConfig {
+  _skipProactiveRefresh?: boolean;
+}
+
+axiosInstance.interceptors.request.use(
+  async (config: AuthConfig) => {
+    // Skip auth for auth endpoints
+    const url = config.url ?? "";
+    if (url.includes(AUTH_ROUTES.LOGIN) || url.includes(AUTH_ROUTES.REGISTER)) {
+      return config;
+    }
+
+    // Check if proactive refresh is disabled for this request
+    const skipProactive = config._skipProactiveRefresh;
+    config._skipProactiveRefresh = undefined; // Clean up
+
+    // Check if we need proactive refresh (token expiring soon)
+    if (!skipProactive && !isRefreshing && shouldRefreshProactively()) {
+      isRefreshing = true;
+      try {
+        const newToken = await performRefresh();
+        if (!newToken) {
+          triggerLogout();
+          throw new Error("Session expired");
+        }
+        notifyRefreshSubscribers(newToken);
+      } finally {
+        isRefreshing = false;
+      }
+    }
+
+    // If refresh is in progress, queue this request
+    if (isRefreshing) {
+      return new Promise((resolve) => {
+        subscribeToRefresh((token) => {
+          config.headers.set("Authorization", `Bearer ${token}`);
+          resolve(config);
+        });
+      });
+    }
+
+    // Inject current token
+    const token = getAccessToken();
+    if (token) {
+      config.headers.set("Authorization", `Bearer ${token}`);
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
 // ─── Response Interceptor: Handle 401 + Refresh ───────────────────────────────
 
 axiosInstance.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
-    const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean };
+    const originalRequest = error.config as AuthConfig;
 
     // Only handle 401 errors from non-refresh endpoints
     if (
       error.response?.status !== 401 ||
       originalRequest._retry ||
-      originalRequest.url === "/api/auth/refresh"
+      originalRequest.url?.includes(AUTH_ROUTES.REFRESH)
     ) {
       return Promise.reject(error);
     }
@@ -110,7 +225,7 @@ axiosInstance.interceptors.response.use(
       return new Promise((resolve, reject) => {
         subscribeToRefresh((token) => {
           if (originalRequest.headers) {
-            originalRequest.headers.Authorization = `Bearer ${token}`;
+            originalRequest.headers.set("Authorization", `Bearer ${token}`);
           }
           axiosInstance(originalRequest)
             .then((response) => resolve(response))
@@ -126,9 +241,9 @@ axiosInstance.interceptors.response.use(
       const newToken = await performRefresh();
 
       if (!newToken) {
-        // Refresh failed → logout
-        clearAccessToken();
-        window.location.href = "/login";
+        // Refresh failed → logout and redirect
+        clearRefreshSubscribers();
+        triggerLogout();
         return Promise.reject(error);
       }
 
@@ -136,12 +251,12 @@ axiosInstance.interceptors.response.use(
       notifyRefreshSubscribers(newToken);
 
       if (originalRequest.headers) {
-        originalRequest.headers.Authorization = `Bearer ${newToken}`;
+        originalRequest.headers.set("Authorization", `Bearer ${newToken}`);
       }
       return axiosInstance(originalRequest);
     } catch (refreshError) {
-      clearAccessToken();
-      window.location.href = "/login";
+      clearRefreshSubscribers();
+      triggerLogout();
       return Promise.reject(refreshError);
     } finally {
       isRefreshing = false;
@@ -221,7 +336,7 @@ export const api = {
     }
   },
 
-  // Raw axios instance for streaming (SSE)
+  // Raw axios instance for advanced use cases
   get raw() {
     return axiosInstance;
   },

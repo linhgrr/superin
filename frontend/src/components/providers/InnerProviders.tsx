@@ -12,6 +12,7 @@ import { useDataStreamRuntime } from "@assistant-ui/react-data-stream";
 import { getCatalog } from "@/api/catalog";
 import { getAccessToken } from "@/api/client";
 import { API_BASE_URL } from "@/config";
+import { API_PATHS } from "@/constants";
 import type { AppCatalogEntry } from "@/types/generated/api";
 
 interface AppCatalogContextValue {
@@ -26,7 +27,7 @@ const AppCatalogContext = createContext<AppCatalogContextValue | null>(null);
 
 function ChatRuntimeProvider({ children }: { children: ReactNode }) {
   const runtime = useDataStreamRuntime({
-    api: `${API_BASE_URL}/api/chat/stream`,
+    api: `${API_BASE_URL}${API_PATHS.CHAT_STREAM}`,
     protocol: "data-stream",
     credentials: "include",
     headers: () => {

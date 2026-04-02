@@ -1,4 +1,14 @@
+/**
+ * Calendar App API — calendars, events, recurring rules, todo integration.
+ *
+ * Plug-n-play: Self-contained, no dependency on global app-specific constants.
+ */
+
 import { api } from "@/api/client";
+
+const BASE = "/api/apps/calendar";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface Calendar {
   id: string;
@@ -53,68 +63,6 @@ export interface UpdateEventRequest {
   reminders?: number[];
 }
 
-// ─── Calendars ───────────────────────────────────────────────────────────────
-
-export async function listCalendars(): Promise<Calendar[]> {
-  return api.get("/api/apps/calendar/calendars");
-}
-
-// ─── Events ────────────────────────────────────────────────────────────────────
-
-export async function listEvents(
-  start?: string,
-  end?: string,
-  calendarId?: string,
-  limit: number = 100
-): Promise<Event[]> {
-  const params = new URLSearchParams();
-  if (start) params.append("start", start);
-  if (end) params.append("end", end);
-  if (calendarId) params.append("calendar_id", calendarId);
-  params.append("limit", limit.toString());
-
-  return api.get(`/api/apps/calendar/events?${params.toString()}`);
-}
-
-export async function searchEvents(query: string, limit: number = 20): Promise<Event[]> {
-  const params = new URLSearchParams();
-  params.append("q", query);
-  params.append("limit", limit.toString());
-
-  return api.get(`/api/apps/calendar/events/search?${params.toString()}`);
-}
-
-export async function getEvent(eventId: string): Promise<Event> {
-  return api.get(`/api/apps/calendar/events/${eventId}`);
-}
-
-export async function createEvent(request: CreateEventRequest): Promise<Event> {
-  return api.post("/api/apps/calendar/events", request);
-}
-
-export async function updateEvent(eventId: string, request: UpdateEventRequest): Promise<Event> {
-  return api.patch(`/api/apps/calendar/events/${eventId}`, request);
-}
-
-export async function deleteEvent(eventId: string): Promise<void> {
-  await api.delete(`/api/apps/calendar/events/${eventId}`);
-}
-
-export async function checkConflicts(
-  start: string,
-  end: string,
-  excludeEventId?: string
-): Promise<Event[]> {
-  const params = new URLSearchParams();
-  params.append("start", start);
-  params.append("end", end);
-  if (excludeEventId) params.append("exclude_event_id", excludeEventId);
-
-  return api.get(`/api/apps/calendar/conflicts/check?${params.toString()}`);
-}
-
-// ─── Recurring Rules ──────────────────────────────────────────────────────────
-
 export interface RecurringRule {
   id: string;
   event_template_id: string;
@@ -136,23 +84,6 @@ export interface CreateRecurringRuleRequest {
   max_occurrences?: number;
 }
 
-export async function createRecurringRule(
-  eventId: string,
-  request: CreateRecurringRuleRequest
-): Promise<RecurringRule> {
-  return api.post(`/api/apps/calendar/events/${eventId}/recurring`, request);
-}
-
-export async function listRecurringRules(): Promise<RecurringRule[]> {
-  return api.get("/api/apps/calendar/recurring");
-}
-
-export async function stopRecurringRule(ruleId: string): Promise<RecurringRule> {
-  return api.patch(`/api/apps/calendar/recurring/${ruleId}/stop`);
-}
-
-// ─── Todo Integration ─────────────────────────────────────────────────────────
-
 export interface ScheduleTaskRequest {
   task_id: string;
   start_datetime: string;
@@ -160,6 +91,88 @@ export interface ScheduleTaskRequest {
   calendar_id?: string;
 }
 
-export async function scheduleTask(taskId: string, request: Omit<ScheduleTaskRequest, "task_id">): Promise<Event> {
-  return api.post(`/api/apps/calendar/tasks/${taskId}/schedule`, request);
+// ─── Calendars ───────────────────────────────────────────────────────────────
+
+export async function listCalendars(): Promise<Calendar[]> {
+  return api.get(`${BASE}/calendars`);
+}
+
+// ─── Events ────────────────────────────────────────────────────────────────────
+
+export async function listEvents(
+  start?: string,
+  end?: string,
+  calendarId?: string,
+  limit: number = 100
+): Promise<Event[]> {
+  const params = new URLSearchParams();
+  if (start) params.append("start", start);
+  if (end) params.append("end", end);
+  if (calendarId) params.append("calendar_id", calendarId);
+  params.append("limit", limit.toString());
+
+  return api.get(`${BASE}/events?${params.toString()}`);
+}
+
+export async function searchEvents(query: string, limit: number = 20): Promise<Event[]> {
+  const params = new URLSearchParams();
+  params.append("q", query);
+  params.append("limit", limit.toString());
+
+  return api.get(`${BASE}/events/search?${params.toString()}`);
+}
+
+export async function getEvent(eventId: string): Promise<Event> {
+  return api.get(`${BASE}/events/${eventId}`);
+}
+
+export async function createEvent(request: CreateEventRequest): Promise<Event> {
+  return api.post(`${BASE}/events`, request);
+}
+
+export async function updateEvent(eventId: string, request: UpdateEventRequest): Promise<Event> {
+  return api.patch(`${BASE}/events/${eventId}`, request);
+}
+
+export async function deleteEvent(eventId: string): Promise<void> {
+  await api.delete(`${BASE}/events/${eventId}`);
+}
+
+export async function checkConflicts(
+  start: string,
+  end: string,
+  excludeEventId?: string
+): Promise<Event[]> {
+  const params = new URLSearchParams();
+  params.append("start", start);
+  params.append("end", end);
+  if (excludeEventId) params.append("exclude_event_id", excludeEventId);
+
+  return api.get(`${BASE}/conflicts/check?${params.toString()}`);
+}
+
+// ─── Recurring Rules ──────────────────────────────────────────────────────────
+
+export async function createRecurringRule(
+  eventId: string,
+  request: CreateRecurringRuleRequest
+): Promise<RecurringRule> {
+  return api.post(`${BASE}/events/${eventId}/recurring`, request);
+}
+
+export async function listRecurringRules(): Promise<RecurringRule[]> {
+  return api.get(`${BASE}/recurring`);
+}
+
+export async function stopRecurringRule(ruleId: string): Promise<RecurringRule> {
+  return api.patch(`${BASE}/recurring/${ruleId}/stop`);
+}
+
+// ─── Todo Integration ─────────────────────────────────────────────────────────
+
+export async function scheduleTask(
+  taskId: string,
+  request: Omit<ScheduleTaskRequest, "task_id">
+): Promise<Event> {
+  return api.post(`${BASE}/tasks/${taskId}/schedule`, request);
 }
