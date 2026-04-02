@@ -14,7 +14,6 @@
  *   const tz = getUserTimezone();
  */
 
-import { getAccessToken } from '@/api/axios';
 import { STORAGE_KEYS } from '@/constants';
 
 // Common timezone names

@@ -21,6 +21,7 @@ interface AppCatalogContextValue {
   isCatalogLoading: boolean;
   refreshCatalog: () => Promise<void>;
   setAppInstalled: (appId: string, isInstalled: boolean) => void;
+  isReady: boolean;  // True khi catalog loading xong
 }
 
 const AppCatalogContext = createContext<AppCatalogContextValue | null>(null);
@@ -37,10 +38,13 @@ function ChatRuntimeProvider({ children }: { children: ReactNode }) {
       return token ? { Authorization: `Bearer ${token}` } : {};
     },
     onFinish: () => {
-      console.log("[ChatRuntime] Message completed");
       // Composer is automatically reset by assistant-ui primitives after successful send
     },
     onError: (error: Error) => {
+      // Ignore AbortError - expected when component unmounts during streaming
+      if (error.name === "AbortError" || error.message?.includes("BodyStreamBuffer")) {
+        return;
+      }
       console.error("[ChatRuntime]", error);
     },
   });
@@ -87,6 +91,7 @@ function AppCatalogProvider({ children }: { children: ReactNode }) {
       isCatalogLoading,
       refreshCatalog,
       setAppInstalled,
+      isReady: !isCatalogLoading,
     }),
     [catalog, isCatalogLoading, refreshCatalog, setAppInstalled]
   );

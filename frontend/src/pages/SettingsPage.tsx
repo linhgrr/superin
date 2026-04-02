@@ -18,7 +18,6 @@ import {
   Sun,
   Monitor,
   Check,
-  X,
   Command,
   LogOut,
   Globe,

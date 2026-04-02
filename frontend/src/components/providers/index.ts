@@ -6,3 +6,5 @@ export { AppCatalogProvider, ChatRuntimeProvider, AppCatalogContext, useAppCatal
 export { ToastProvider, useToast, type Toast, type ToastVariant, type ToastAction } from "./ToastProvider";
 export { CommandPalette, type CommandItem } from "./CommandPalette";
 export { OnboardingProvider, useOnboarding, type TourId, type OnboardingState } from "./OnboardingProvider";
+export { DiscoveryInitializer } from "./DiscoveryInitializer";
+export { AppProviders } from "./AppProviders";

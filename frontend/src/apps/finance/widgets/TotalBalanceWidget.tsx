@@ -3,7 +3,7 @@ import { formatCurrency } from "../lib/formatCurrency";
 import { useFinanceSummary } from "./useFinanceSummary";
 import { Wallet } from "lucide-react";
 
-export default function TotalBalanceWidget({ widget }: DashboardWidgetRendererProps) {
+export default function TotalBalanceWidget({ widget: _widget }: DashboardWidgetRendererProps) {
   const { summary, loading } = useFinanceSummary();
 
   return (

@@ -3,7 +3,7 @@ import { formatCurrency } from "../lib/formatCurrency";
 import { useFinanceSummary } from "./useFinanceSummary";
 import { ArrowUpRight, ArrowDownRight } from "lucide-react";
 
-export default function RecentTransactionsWidget({ widget }: DashboardWidgetRendererProps) {
+export default function RecentTransactionsWidget({ widget: _widget }: DashboardWidgetRendererProps) {
   const { summary, loading } = useFinanceSummary();
 
   return (

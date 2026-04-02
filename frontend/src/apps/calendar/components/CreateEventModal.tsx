@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { TIME_OPTIONS, formatDuration } from "../utils/dateHelpers";
-import { useUserTimezone } from "@/hooks/useUserTimezone";
+import { useTimezone } from "@/hooks/useTimezone";
 
 interface CreateEventModalProps {
   date: Date;
@@ -9,7 +9,7 @@ interface CreateEventModalProps {
 }
 
 export function CreateEventModal({ date, onClose, onCreate }: CreateEventModalProps) {
-  const { formatDate } = useUserTimezone();
+  const { formatDate } = useTimezone();
   const [title, setTitle] = useState("");
   const [startMinutes, setStartMinutes] = useState(9 * 60); // 9:00 AM default
   const [endMinutes, setEndMinutes] = useState(10 * 60); // 10:00 AM default

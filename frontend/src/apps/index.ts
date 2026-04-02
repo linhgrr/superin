@@ -7,6 +7,10 @@ import {
   getAppMetadata,
   hasAppMetadata,
   getRegisteredAppIds,
+  isAppViewLoaded,
+  getLoadedAppView,
+  isWidgetLoaded,
+  getLoadedWidget,
   type AppMetadata,
 } from "./lazy-registry";
 import { discoverAndRegisterApps } from "./discovery";
@@ -19,8 +23,22 @@ export {
   hasAppMetadata,
   getRegisteredAppIds,
   discoverAndRegisterApps,
+  isAppViewLoaded,
+  getLoadedAppView,
+  isWidgetLoaded,
+  getLoadedWidget,
   type AppMetadata,
 };
+
+// Re-export prefetch utilities
+export {
+  prefetchApp,
+  prefetchWidget,
+  prefetchAppAndWidget,
+  prefetchHandlers,
+  prefetchApps,
+  isAppPrefetched,
+} from "./prefetch";
 
 /**
  * Kết hợp metadata + lazy component cho backwards compatibility.
@@ -65,7 +83,6 @@ export const FRONTEND_APPS: Record<string, never> = {};
  * @deprecated Dùng getLazyApp() thay thế
  */
 export function getFrontendApp(_appId: string): undefined {
-  console.warn("[Deprecation] getFrontendApp is deprecated. Use getLazyApp instead.");
   return undefined;
 }
 

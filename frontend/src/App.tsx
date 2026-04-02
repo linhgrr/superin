@@ -13,7 +13,7 @@ import { useState, useEffect, useCallback } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import { STORAGE_KEYS, ROUTES } from "@/constants";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
-import { AppProviders, CommandPalette } from "@/components/providers/AppProviders";
+import { AppProviders, CommandPalette, DiscoveryInitializer } from "@/components/providers";
 import LoginPage from "@/pages/LoginPage";
 import DashboardPage from "@/pages/DashboardPage";
 import StorePage from "@/pages/StorePage";
@@ -90,7 +90,9 @@ function PublicOnly({ children }: { children: React.ReactNode }) {
 function ShellLayout() {
   return (
     <Protected>
-      <AppShell />
+      <DiscoveryInitializer>
+        <AppShell />
+      </DiscoveryInitializer>
     </Protected>
   );
 }

@@ -12,6 +12,7 @@ import { NavLink } from "react-router-dom";
 import { LayoutDashboard, Store, Sparkles, Settings } from "lucide-react";
 import { useAppCatalog } from "@/components/providers/AppProviders";
 import { DynamicIcon } from "@/lib/icon-resolver";
+import { prefetchHandlers } from "@/apps";
 import type { AppCatalogEntry } from "@/types/generated/api";
 
 /**
@@ -110,6 +111,7 @@ function Sidebar() {
                 key={app.id}
                 to={`/apps/${app.id}`}
                 className={({ isActive }) => `app-item${isActive ? " active" : ""}`}
+                {...prefetchHandlers(app.id)} // Prefetch on hover/focus
               >
                 <AppIcon entry={app} />
                 <span>{app.name}</span>

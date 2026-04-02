@@ -1,6 +1,6 @@
 import { AlertTriangle, Trash2, ListTodo } from "lucide-react";
 import type { TaskRead } from "../api";
-import { useUserTimezone } from "@/hooks/useUserTimezone";
+import { useTimezone } from "@/hooks/useTimezone";
 import RecurringBadge from "./RecurringBadge";
 import type { RecurringFrequency } from "../api";
 
@@ -26,7 +26,7 @@ interface TaskRowProps {
 }
 
 export default function TaskRow({ task, onToggle, onDelete, onClick, selected }: TaskRowProps) {
-  const { formatDate } = useUserTimezone();
+  const { formatDate } = useTimezone();
   const priorityStyle = PRIORITY_STYLE[task.priority] ?? PRIORITY_STYLE.low;
   const overdue = task.due_date && new Date(task.due_date) < new Date() && task.status === "pending";
   const hasSubtasks = (task.subtask_count ?? 0) > 0;

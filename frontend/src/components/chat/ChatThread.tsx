@@ -7,12 +7,54 @@ import {
   ComposerPrimitive,
   ErrorPrimitive,
   MessagePrimitive,
+  MessagePartPrimitive,
   ThreadPrimitive,
   AuiIf,
+  useMessagePartText,
 } from "@assistant-ui/react";
 import { Zap, Send, Sparkles } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+
+/**
+ * TextPart — Plain text renderer with streaming support
+ */
+function TextPart() {
+  const { text } = useMessagePartText();
+  const textContent = typeof text === "string" ? text : String(text ?? "");
+  return (
+    <div className="prose prose-sm prose-invert max-w-none break-words leading-snug whitespace-pre-wrap">
+      {textContent}
+    </div>
+  );
+}
+
+/**
+ * AssistantText — Markdown text renderer with streaming support
+ */
+function AssistantText() {
+  const { text } = useMessagePartText();
+  const textContent = typeof text === "string" ? text : String(text ?? "");
+
+  if (!textContent) {
+    return (
+      <span className="flex items-center gap-2">
+        <span className="animate-pulse">●</span>
+        <span className="animate-pulse [animation-delay:0.2s]">●</span>
+        <span className="animate-pulse [animation-delay:0.4s]">●</span>
+      </span>
+    );
+  }
+
+  return (
+    <div className="prose prose-sm prose-invert max-w-none break-words leading-tight whitespace-pre-wrap [&_p]:my-0 [&_ul]:my-0.5 [&_ol]:my-0.5 [&_li]:my-0 [&_ul_p]:my-0 [&_ol_p]:my-0 [&_li_p]:my-0">
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>{textContent}</ReactMarkdown>
+      <MessagePartPrimitive.InProgress>
+        <span className="inline-block w-2 h-4 ml-1 bg-primary animate-pulse" />
+      </MessagePartPrimitive.InProgress>
+    </div>
+  );
+}
 
 /**
  * ToolCallBadge — Compact tool execution indicator
@@ -39,18 +81,11 @@ function UserMessage() {
   return (
     <MessagePrimitive.Root className="flex justify-end mb-2">
       <div className="message-bubble message-bubble-user">
-        <MessagePrimitive.Parts>
-          {({ part }) => {
-            if (part.type === "text") {
-              return (
-                <div className="prose prose-sm prose-invert max-w-none break-words leading-snug whitespace-pre-wrap">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{part.text}</ReactMarkdown>
-                </div>
-              );
-            }
-            return null;
+        <MessagePrimitive.Parts
+          components={{
+            Text: TextPart,
           }}
-        </MessagePrimitive.Parts>
+        />
       </div>
     </MessagePrimitive.Root>
   );
@@ -65,24 +100,10 @@ function AssistantMessage() {
       <MessagePrimitive.Root className="flex justify-start mb-2">
         <div className="message-bubble message-bubble-assistant">
           <MessagePrimitive.Parts>
-            {({ part, status }) => {
+            {({ part }) => {
               // Text content
               if (part.type === "text") {
-                const isStreaming = status?.type === "running" && !part.text;
-                if (isStreaming) {
-                  return (
-                    <span className="flex items-center gap-2">
-                      <span className="animate-pulse">●</span>
-                      <span className="animate-pulse [animation-delay:0.2s]">●</span>
-                      <span className="animate-pulse [animation-delay:0.4s]">●</span>
-                    </span>
-                  );
-                }
-                return (
-                  <div className="prose prose-sm prose-invert max-w-none break-words leading-snug whitespace-pre-wrap">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{part.text}</ReactMarkdown>
-                  </div>
-                );
+                return <AssistantText />;
               }
 
               // Tool call badges
@@ -112,18 +133,25 @@ function AssistantMessage() {
 
 /**
  * ChatComposer — Message input using assistant-ui primitives
+ * Layout: input + send button side by side (full width)
  */
 function ChatComposer() {
   return (
-    <div className="chat-input-container">
-      <ComposerPrimitive.Root>
+    <div className="chat-input-container" style={{ width: "100%" }}>
+      <ComposerPrimitive.Root style={{ display: "flex", alignItems: "flex-end", gap: "0.5rem", width: "100%" }}>
         <ComposerPrimitive.Input
           placeholder="Ask Shin anything... (Enter to send, Shift+Enter for new line)"
           maxRows={5}
           className="chat-input"
+          style={{ flex: 1, minWidth: 0 }}
         />
-        <ComposerPrimitive.Send className="chat-send-btn" asChild>
-          <button type="submit" aria-label="Send message">
+        <ComposerPrimitive.Send asChild>
+          <button
+            type="submit"
+            aria-label="Send message"
+            className="chat-send-btn"
+            style={{ flexShrink: 0 }}
+          >
             <Send size={16} />
           </button>
         </ComposerPrimitive.Send>
@@ -160,9 +188,9 @@ export default function ChatThread() {
         <ThreadPrimitive.Messages>
           {({ message }) => {
             if (message.role === "user") {
-              return <UserMessage />;
+              return <UserMessage key={message.id} />;
             }
-            return <AssistantMessage />;
+            return <AssistantMessage key={message.id} />;
           }}
         </ThreadPrimitive.Messages>
       </ThreadPrimitive.Viewport>
@@ -172,4 +200,3 @@ export default function ChatThread() {
     </ThreadPrimitive.Root>
   );
 }
-

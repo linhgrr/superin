@@ -1,9 +1,10 @@
 /**
- * LazyWidget - Lazy load widget component voi Suspense
+ * LazyWidget - Lazy load widget component với Suspense
+ * Kiểm tra nếu đã prefetch thì render trực tiếp, không qua Suspense.
  */
 
-import { Suspense, useMemo } from "react";
-import { lazyLoadDashboardWidget } from "@/apps";
+import { Suspense, memo } from "react";
+import { lazyLoadDashboardWidget, isWidgetLoaded, getLoadedWidget } from "@/apps";
 import type { AppCatalogEntry } from "@/types/generated/api";
 import WidgetSkeleton from "./WidgetSkeleton";
 
@@ -14,16 +15,30 @@ interface LazyWidgetProps {
   fallback?: React.ReactNode;
 }
 
+// Static skeleton component
+const StaticWidgetSkeleton = memo(function StaticWidgetSkeleton({ size }: { size: string }) {
+  return <WidgetSkeleton size={size} />;
+});
+
 export default function LazyWidget({
   appId,
   widgetId,
   widget,
   fallback,
 }: LazyWidgetProps) {
-  // Memoize de tranh recreate lazy component moi render
-  const LazyComponent = useMemo(() => {
-    return lazyLoadDashboardWidget(appId);
-  }, [appId]);
+  // Kiểm tra nếu widget đã được prefetch
+  const isPrefetched = isWidgetLoaded(appId);
+
+  // Nếu đã prefetch, render trực tiếp component
+  if (isPrefetched) {
+    const LoadedComponent = getLoadedWidget(appId);
+    if (LoadedComponent) {
+      return <LoadedComponent widgetId={widgetId} widget={widget} />;
+    }
+  }
+
+  // Chưa prefetch - dùng lazy loading
+  const LazyComponent = lazyLoadDashboardWidget(appId);
 
   if (!LazyComponent) {
     return (
@@ -33,7 +48,7 @@ export default function LazyWidget({
     );
   }
 
-  const skeleton = fallback ?? <WidgetSkeleton size={widget.size} />;
+  const skeleton = fallback ?? <StaticWidgetSkeleton size={widget.size} />;
 
   return (
     <Suspense fallback={skeleton}>

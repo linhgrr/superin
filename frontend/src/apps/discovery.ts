@@ -1,8 +1,7 @@
 /**
  * App Discovery - Auto-detect available apps và tạo lazy loaders
  *
- * Khác với eager loading cũ, module này chỉ scan để biết app nào khả dụng
- * và tạo lazy loaders, không thực sự import code.
+ * Chỉ scan manifest.json files (nhẹ), không import index.ts (tránh eager load components)
  */
 
 import type { FrontendAppManifest } from "./types";
@@ -10,72 +9,50 @@ import { registerAppMetadata, createAppLoaders, type AppMetadata } from "./lazy-
 
 /**
  * Manifest cache - chỉ chứa JSON manifests, rất nhẹ
+ * Glob chỉ manifest.json với eager: true (manifests are lightweight metadata)
+ * Components vẫn được lazy load qua createAppLoaders
  */
-const manifestCache = import.meta.glob<{
-  default: { manifest: FrontendAppManifest };
-}>("./*/index.ts", {
-  import: "default",
-  eager: false, // Chỉ scan, không eager load components
-});
+const manifestCache = import.meta.glob<{ default: FrontendAppManifest }>(
+  "./*/manifest.json",
+  { eager: true } // Manifests are lightweight (~100-200 bytes each)
+);
 
 /**
  * Scan và đăng ký tất cả apps có sẵn.
- * Chỉ load metadata, không load component code.
+ * Chỉ load metadata (đã eager load), không load component code.
  */
-export async function discoverAndRegisterApps(): Promise<AppMetadata[]> {
+export function discoverAndRegisterApps(): AppMetadata[] {
   const registeredApps: AppMetadata[] = [];
   const entries = Object.entries(manifestCache);
 
-  for (const [path, importFn] of entries) {
+  for (const [path, module] of entries) {
     const match = path.match(/^\.\/([^/]+)\//);
     if (!match) continue;
 
     const appId = match[1];
 
     try {
-      // Chỉ load default export để lấy manifest
-      const module = await importFn();
-      const definition = module.default;
+      // Manifest đã được eager load, chỉ cần lấy default export
+      const manifest = module.default;
 
-      if (!definition?.manifest) {
-        console.warn(`[Discovery] App "${appId}" missing manifest`);
+      if (!manifest || typeof manifest !== "object" || !manifest.id) {
         continue;
       }
 
-      // Tạo lazy loaders cho app này
-      const loaders = createAppLoaders(appId, path);
+      // Tạo lazy loaders cho app này (components vẫn lazy)
+      const loaders = createAppLoaders(appId, `./${appId}/index.ts`);
 
       // Đăng ký metadata (không có components loaded)
-      registerAppMetadata(appId, definition.manifest, loaders);
+      registerAppMetadata(appId, manifest, loaders);
       registeredApps.push({
         id: appId,
-        manifest: definition.manifest,
+        manifest,
         ...loaders,
       });
-
-      if (import.meta.env.DEV) {
-        console.log(`[Discovery] Registered lazy app: ${appId}`);
-      }
-    } catch (error) {
-      console.error(`[Discovery] Failed to register app "${appId}":`, error);
+    } catch {
+      // Skip failed registrations
     }
   }
 
   return registeredApps;
-}
-
-/**
- * Lấy danh sách app paths để có thể tạo dynamic imports.
- */
-export function getAvailableAppPaths(): Record<string, string> {
-  const paths: Record<string, string> = {};
-
-  for (const path of Object.keys(manifestCache)) {
-    const match = path.match(/^\.\/([^/]+)\//);
-    if (match) {
-      paths[match[1]] = path;
-    }
-  }
-
-  return paths;
 }

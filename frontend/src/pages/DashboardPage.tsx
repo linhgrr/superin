@@ -21,6 +21,7 @@ import { useAppCatalog, useOnboarding } from "@/components/providers/AppProvider
 import { getAllPreferences, updatePreferences } from "@/api/catalog";
 import { WIDGET_SIZES } from "@/lib/widget-sizes";
 import LazyWidget from "@/apps/components/LazyWidget";
+import { prefetchApps } from "@/apps";
 import type {
   AppCatalogEntry,
   PreferenceUpdate,
@@ -208,6 +209,14 @@ function DashboardInner({
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [busyWidgetId, setBusyWidgetId] = useState<string | null>(null);
   const [isPrefsLoaded, setIsPrefsLoaded] = useState(false);
+
+  // Prefetch installed apps for instant navigation
+  useEffect(() => {
+    const appIds = installedApps.map((a) => a.id);
+    if (appIds.length > 0) {
+      prefetchApps(appIds);
+    }
+  }, [installedApps]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -565,7 +574,7 @@ function DashboardInner({
         margin={[16, 16]}
         containerPadding={[0, 0]}
       >
-        {visibleWidgets.map(({ widgetId, appId, widget, app }) => (
+        {visibleWidgets.map(({ widgetId, appId, widget }) => (
           <div key={widgetId} className="rgl-item-view">
             <WidgetCard widget={widget}>
               <WidgetContent appId={appId} widgetId={widgetId} widget={widget} />

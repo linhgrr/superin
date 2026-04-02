@@ -1,15 +1,15 @@
 import { useEffect, useState } from "react";
 import { Pencil } from "lucide-react";
 import type { CreateTransactionRequest } from "@/types/generated/api";
-import { createTransaction, getTransactions, updateTransaction, type TransactionRead, getWallets, getCategories, type WalletRead, type CategoryRead } from "../../api";
+import { createTransaction, getTransactions, type TransactionRead, getWallets, getCategories, type WalletRead, type CategoryRead } from "../../api";
 import Modal from "../../components/Modal";
 import SimpleForm from "../../components/SimpleForm";
 import TransactionEditForm from "../../components/TransactionEditForm";
 import { formatCurrency } from "../../lib/formatCurrency";
-import { useUserTimezone } from "@/hooks/useUserTimezone";
+import { useTimezone } from "@/hooks/useTimezone";
 
 export default function TransactionsTab() {
-  const { formatDate } = useUserTimezone();
+  const { formatDate } = useTimezone();
   const [transactions, setTransactions] = useState<TransactionRead[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<TransactionRead | null>(null);

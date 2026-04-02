@@ -1,5 +1,5 @@
 import type { Calendar, Event } from "../api";
-import { useUserTimezone } from "@/hooks/useUserTimezone";
+import { useTimezone } from "@/hooks/useTimezone";
 
 interface ListViewProps {
   calendars: Calendar[];
@@ -7,7 +7,7 @@ interface ListViewProps {
 }
 
 export function ListView({ calendars, eventsByDate }: ListViewProps) {
-  const { formatTime } = useUserTimezone();
+  const { formatTime } = useTimezone();
   const sortedDateKeys = Object.keys(eventsByDate).sort();
 
   return (

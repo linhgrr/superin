@@ -2,7 +2,7 @@ import type { DashboardWidgetRendererProps } from "../types";
 import { useFinanceSummary } from "./useFinanceSummary";
 import { Receipt } from "lucide-react";
 
-export default function BudgetOverviewWidget({ widget }: DashboardWidgetRendererProps) {
+export default function BudgetOverviewWidget({ widget: _widget }: DashboardWidgetRendererProps) {
   const { summary, loading } = useFinanceSummary();
 
   return (

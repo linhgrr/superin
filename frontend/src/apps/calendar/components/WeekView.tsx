@@ -1,7 +1,7 @@
 import { HOURS, HOUR_HEIGHT, DAY_NAMES, isSameDay, isSameDayInTimezone } from "../utils/dateHelpers";
 import { calculateEventStyle } from "../utils/eventHelpers";
 import type { Calendar, Event } from "../api";
-import { useUserTimezone } from "@/hooks/useUserTimezone";
+import { useTimezone } from "@/hooks/useTimezone";
 
 interface WeekViewProps {
   weekDates: Date[];
@@ -11,7 +11,7 @@ interface WeekViewProps {
 }
 
 export function WeekView({ weekDates, calendars, events, onCellClick }: WeekViewProps) {
-  const { formatTime, timezone } = useUserTimezone();
+  const { formatTime, timezone } = useTimezone();
   const today = new Date();
 
   const getEventsForDay = (date: Date) => {

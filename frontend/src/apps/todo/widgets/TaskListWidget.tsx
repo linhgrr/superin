@@ -2,7 +2,7 @@ import type { DashboardWidgetRendererProps } from "../types";
 import { CheckCircle2, Circle } from "lucide-react";
 import { useTodoSummary } from "./useTodoSummary";
 
-export default function TaskListWidget({ widget }: DashboardWidgetRendererProps) {
+export default function TaskListWidget({ widget: _widget }: DashboardWidgetRendererProps) {
   const { summary, loading } = useTodoSummary();
 
   return (

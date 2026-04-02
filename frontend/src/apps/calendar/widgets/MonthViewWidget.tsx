@@ -13,7 +13,7 @@ export default function MonthViewWidget({ defaultCalendar, showTimeBlockedTasks 
   const [calendars, setCalendars] = useState<Calendar[]>([]);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isLoading, setIsLoading] = useState(true);
-  const { timezone, getNow } = useTimezone();
+  const { getNow } = useTimezone();
 
   useEffect(() => {
     loadData();

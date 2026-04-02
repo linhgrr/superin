@@ -9,7 +9,7 @@
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useOnboarding } from "@/components/providers/AppProviders";
-import { LogOut, Settings, Command, HelpCircle, PlayCircle, User } from "lucide-react";
+import { LogOut, Settings, Command, HelpCircle, PlayCircle } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 
 interface HeaderProps {

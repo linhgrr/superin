@@ -68,7 +68,7 @@ export default function StorePage() {
 
   // Categories from API
   const [categories, setCategories] = useState<Category[]>([]);
-  const [isLoadingCategories, setIsLoadingCategories] = useState(true);
+  const [isLoadingCategories] = useState(true);
 
   // Fetch categories on mount
   useEffect(() => {

@@ -12,12 +12,12 @@ import { ListView } from "../components/ListView";
 import { CreateEventModal } from "../components/CreateEventModal";
 import { getWeekDatesInTimezone } from "../utils/dateHelpers";
 import { filterEventsByCalendar, groupEventsByDate } from "../utils/eventHelpers";
-import { useUserTimezone } from "@/hooks/useUserTimezone";
+import { useTimezone } from "@/hooks/useTimezone";
 
 type ViewMode = "list" | "week";
 
 export default function CalendarScreen() {
-  const { timezone } = useUserTimezone();
+  const { timezone } = useTimezone();
   const [calendars, setCalendars] = useState<Calendar[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>("week");
@@ -180,7 +180,7 @@ function Header({
   onSelectCalendar,
   onChangeView,
 }: HeaderProps) {
-  const { formatDate } = useUserTimezone();
+  const { formatDate } = useTimezone();
 
   // Get month/year from first date, format with timezone
   const firstDate = weekDates[0];
