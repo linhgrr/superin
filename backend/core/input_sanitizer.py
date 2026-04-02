@@ -1,9 +1,8 @@
 """Input sanitization and validation for AI agent security.
 
-Uses professional libraries for security-critical operations:
-- nh3: HTML sanitization (Rust-based, fast and safe)
-- confusables: Homoglyph/confusable character detection
-- limits: Rate limiting framework
+Uses professional libraries:
+- nh3: HTML sanitization (Rust-based)
+- confusables: Homoglyph detection
 
 Provides defense against:
 - ASI01: Agent Goal Hijacking (prompt injection)
@@ -21,34 +20,28 @@ from typing import Any
 import confusables
 import nh3
 
-# Maximum content lengths to prevent DoS
-MAX_MESSAGE_LENGTH = 10000  # characters
-MAX_TOOL_CALL_ARGUMENTS_SIZE = 5000  # JSON characters
+from core.constants import (
+    MAX_MESSAGE_LENGTH,
+    MAX_TOOL_CALL_ARGUMENTS_SIZE,
+)
 
-# Patterns commonly used in prompt injection attacks
-PROMPT_INJECTION_PATTERNS = [
-    # Ignore previous instructions
+# Injection pattern detection
+_PROMPT_INJECTION_PATTERNS = [
     r"ignore\s+(?:all\s+)?(?:previous\s+)?(?:instruction|command|prompt)s?",
     r"disregard\s+(?:all\s+)?(?:instruction|command)s?",
-    # System prompt override attempts
     r"system\s*[:\-]?\s*you\s+(?:are|must|should)",
     r"new\s+system\s+(?:instruction|prompt|command)",
     r"system\s+override",
-    # Role confusion
     r"you\s+(?:are|must)\s+(?:now\s+)?(?:an?\s+)?(?:attacker|hacker|developer|system)",
     r"forget\s+(?:your\s+)?(?:role|instruction|training)",
-    # Delimiter injection attempts
     r"<\s*/?\s*(?:system|user|assistant|instruction)",
     r"\[\s*(?:system|instruction)\s*\]",
     r"\{\s*(?:system|instruction)\s*\}",
-    # XML tag injection
     r"<\?xml[^>]*>",
     r"<!doctype[^>]*>",
-    # Suspicious patterns
     r"act\s+(?:as|like)\s+(?:if\s+)?you(?:'re|r\s+not)",
     r"pretend\s+(?:to\s+be|you\s+are)",
     r"simulate\s+(?:being|that\s+you)",
-    # Prompt extraction attempts
     r"repeat\s+(?:everything|all|your)\s+(?:above|instructions|prompt)",
     r"what\s+(?:are|were)\s+your\s+(?:instructions|rules|guidelines)",
     r"show\s+me\s+your\s+(?:system\s+)?prompt",
@@ -57,110 +50,105 @@ PROMPT_INJECTION_PATTERNS = [
     r"reveal\s+your\s+(?:hidden\s+)?instructions",
 ]
 
-# Encoded injection patterns (base64, etc.)
-ENCODED_INJECTION_PATTERNS = [
+_ENCODED_PATTERNS = [
     r"base64\s*(?:decode|decodeURIComponent|decode)",
-    r"atob\s*\(",  # JavaScript base64 decode
-    r"btoa\s*\(",  # JavaScript base64 encode (obfuscation)
+    r"atob\s*\(",
+    r"btoa\s*\(",
     r"rot13|caesar|shift\s+\d+",
     r"hex\s*(?:decode|to\s*string)",
     r"url\s*(?:decode|unescape)",
     r"unescape\s*\(",
     r"fromCharCode",
-    r"\$\{.*atob",  # Template literal with atob
-    r"eval\s*\(",  # Code execution
-    r"Function\s*\(",  # Function constructor
-    r"constructor\s*\(",  # Accessing constructor
+    r"\$\{.*atob",
+    r"eval\s*\(",
+    r"Function\s*\(",
+    r"constructor\s*\(",
 ]
 
-# Compiled regex patterns for efficiency
-_COMPILED_PATTERNS = [re.compile(p, re.IGNORECASE) for p in PROMPT_INJECTION_PATTERNS]
-_COMPILED_ENCODED_PATTERNS = [re.compile(p, re.IGNORECASE) for p in ENCODED_INJECTION_PATTERNS]
+# Compiled regexes for efficiency (compiled once at module load)
+_COMPILED_INJECTION_PATTERNS = [re.compile(p, re.IGNORECASE) for p in _PROMPT_INJECTION_PATTERNS]
+_COMPILED_ENCODED_PATTERNS = [re.compile(p, re.IGNORECASE) for p in _ENCODED_PATTERNS]
+
+# Control character removal (pre-compiled)
+_CONTROL_CHARS_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+_WHITESPACE_RE = re.compile(r"\n{4,}")
+
+# Base64 detection (pre-compiled)
+_BASE64_RE = re.compile(r'[A-Za-z0-9+/]{20,}={0,2}')
 
 
 def _normalize_unicode(text: str) -> str:
-    """Normalize unicode using NFKC form and confusables library.
-
-    Uses confusables library for professional homoglyph detection and normalization.
-    Returns the first normalized variant (prioritizing ASCII/Latin characters).
-    """
-    # Apply NFKC normalization first
+    """Normalize unicode confusables using NFKC and confusables library."""
     text = unicodedata.normalize('NFKC', text)
-    # confusables.normalize returns list of normalized variants
     normalized_list = confusables.normalize(text, prioritize_alpha=True)
-    # Return first result (should be ASCII-prioritized) or original if empty
     return normalized_list[0] if normalized_list else text
 
 
-def _check_base64_injection(text: str) -> tuple[bool, str]:
-    """Check if text contains base64-encoded injection attempts.
-
-    Returns: (is_suspicious, decoded_text_if_suspicious)
-    """
-    # Look for base64-looking strings (alphanumeric + /+=, length divisible by 4)
-    potential_base64 = re.findall(r'[A-Za-z0-9+/]{20,}={0,2}', text)
-
-    for b64_str in potential_base64:
+def _check_base64_injection(text: str, patterns: list) -> tuple[bool, str]:
+    """Check if text contains base64-encoded injection attempts."""
+    for b64_str in _BASE64_RE.findall(text):
         if len(b64_str) % 4 != 0:
             continue
-
         try:
             decoded = base64.b64decode(b64_str).decode('utf-8', errors='ignore')
-            # Check if decoded content contains injection patterns
-            for pattern in _COMPILED_PATTERNS:
+            for pattern in patterns:
                 if pattern.search(decoded):
                     return True, decoded
         except Exception:
             continue
-
     return False, ""
+
+
+def _apply_injection_filters(text: str, patterns: list, warning_msg: str) -> tuple[str, list[str]]:
+    """Apply injection patterns and return filtered text with warnings."""
+    warnings: list[str] = []
+    filtered = text
+    for pattern in patterns:
+        if pattern.search(filtered):
+            warnings.append(warning_msg)
+            filtered = pattern.sub("[FILTERED]", filtered)
+    return filtered, warnings
 
 
 def sanitize_user_content(content: str | None) -> tuple[str, list[str]]:
     """Sanitize user content and detect injection attempts.
 
-    Uses confusables library for homoglyph detection.
-
-    Returns:
-        Tuple of (sanitized_content, warnings)
+    Returns: (sanitized_content, warnings)
     """
     if content is None:
         return "", []
 
     warnings: list[str] = []
 
-    # Check length
+    # Length check
     if len(content) > MAX_MESSAGE_LENGTH:
         content = content[:MAX_MESSAGE_LENGTH]
         warnings.append("Content truncated due to length limit")
 
-    # Normalize unicode confusables first (defense against homoglyph attacks)
+    # Normalize unicode (single normalization for all checks)
     content = _normalize_unicode(content)
 
-    # Check for encoded injection attempts (base64, etc.)
-    is_b64_suspicious, b64_decoded = _check_base64_injection(content)
+    # Check for base64-encoded injection
+    is_b64_suspicious, _ = _check_base64_injection(content, _COMPILED_INJECTION_PATTERNS)
     if is_b64_suspicious:
         warnings.append("Encoded prompt injection detected (base64)")
-        content = "[ENCODED_INJECTION_BLOCKED]"
-        return content, warnings
+        return "[ENCODED_INJECTION_BLOCKED]", warnings
 
-    # Check for explicit encoding instructions
-    for pattern in _COMPILED_ENCODED_PATTERNS:
-        if pattern.search(content):
-            warnings.append("Suspicious encoding pattern detected")
-            content = pattern.sub("[FILTERED]", content)
+    # Apply encoded pattern filters
+    content, enc_warnings = _apply_injection_filters(
+        content, _COMPILED_ENCODED_PATTERNS, "Suspicious encoding pattern detected"
+    )
+    warnings.extend(enc_warnings)
 
-    # Check for injection patterns
-    for pattern in _COMPILED_PATTERNS:
-        if pattern.search(content):
-            warnings.append("Potential prompt injection detected")
-            content = pattern.sub("[FILTERED]", content)
+    # Apply injection pattern filters
+    content, inj_warnings = _apply_injection_filters(
+        content, _COMPILED_INJECTION_PATTERNS, "Potential prompt injection detected"
+    )
+    warnings.extend(inj_warnings)
 
-    # Remove null bytes and control characters (except newlines)
-    content = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", content)
-
-    # Normalize excessive whitespace
-    content = re.sub(r"\n{4,}", "\n\n\n", content)
+    # Clean control characters (pre-compiled regex)
+    content = _CONTROL_CHARS_RE.sub("", content)
+    content = _WHITESPACE_RE.sub("\n\n\n", content)
 
     return content, warnings
 
@@ -168,17 +156,22 @@ def sanitize_user_content(content: str | None) -> tuple[str, list[str]]:
 def validate_tool_arguments(
     args: dict[str, Any], tool_name: str
 ) -> tuple[dict[str, Any], list[str]]:
-    """Validate tool arguments for injection attempts.
-
-    Returns:
-        Tuple of (validated_args, warnings)
-    """
+    """Validate tool arguments for injection attempts."""
     warnings: list[str] = []
 
-    # Convert to string for size check
-    args_str = str(args)
-    if len(args_str) > MAX_TOOL_CALL_ARGUMENTS_SIZE:
-        warnings.append(f"Tool '{tool_name}' arguments too large")
+    # Size check (avoid full str() conversion if possible)
+    total_len = 0
+    for value in args.values():
+        if isinstance(value, str):
+            total_len += len(value)
+        else:
+            total_len += len(str(value))
+        if total_len > MAX_TOOL_CALL_ARGUMENTS_SIZE:
+            warnings.append(f"Tool '{tool_name}' arguments too large")
+            break
+
+    # Truncate oversized string args
+    if total_len > MAX_TOOL_CALL_ARGUMENTS_SIZE:
         for key, value in args.items():
             if isinstance(value, str) and len(value) > 1000:
                 args[key] = value[:1000] + "..."
@@ -195,39 +188,31 @@ def validate_tool_arguments(
 
 
 def is_content_safe(content: str) -> tuple[bool, list[str]]:
-    """Quick check if content is safe without sanitizing.
-
-    Returns:
-        Tuple of (is_safe, warnings)
-    """
+    """Quick check if content is safe without sanitizing."""
     warnings: list[str] = []
 
     if len(content) > MAX_MESSAGE_LENGTH:
         warnings.append("Content exceeds maximum length")
         return False, warnings
 
-    # Normalize unicode for checking
+    # Normalize once
     normalized = _normalize_unicode(content)
 
-    # Check base64 encoding
-    is_b64_suspicious, _ = _check_base64_injection(normalized)
+    # Check base64 injection
+    is_b64_suspicious, _ = _check_base64_injection(normalized, _COMPILED_INJECTION_PATTERNS)
     if is_b64_suspicious:
         warnings.append("Encoded injection pattern detected")
         return False, warnings
 
-    # Check encoded patterns
-    for pattern in _COMPILED_ENCODED_PATTERNS:
-        if pattern.search(normalized):
-            warnings.append("Suspicious encoding pattern detected")
-            return False, warnings
+    # Quick check using any() for early exit
+    if any(p.search(normalized) for p in _COMPILED_ENCODED_PATTERNS):
+        warnings.append("Suspicious encoding pattern detected")
+        return False, warnings
 
-    # Check injection patterns
-    for pattern in _COMPILED_PATTERNS:
-        if pattern.search(normalized):
-            warnings.append("Potential injection pattern detected")
-            return False, warnings
+    if any(p.search(normalized) for p in _COMPILED_INJECTION_PATTERNS):
+        warnings.append("Potential injection pattern detected")
+        return False, warnings
 
-    # Check for null bytes
     if "\x00" in content:
         warnings.append("Null bytes detected")
         return False, warnings
@@ -236,47 +221,55 @@ def is_content_safe(content: str) -> tuple[bool, list[str]]:
 
 
 def sanitize_for_memory(content: str) -> str:
-    """Sanitize content before storing in persistent memory.
-
-    This provides defense against ASI06: Memory Poisoning.
-
-    Uses nh3 library for HTML sanitization (fast, Rust-based).
-    """
+    """Sanitize content before storing in persistent memory (ASI06 defense)."""
     if not content:
         return ""
 
-    # Apply full sanitization
     sanitized, _ = sanitize_user_content(content)
 
-    # HTML sanitization using nh3
-    sanitized = nh3.clean(
+    # HTML sanitization with nh3
+    return nh3.clean(
         sanitized,
-        tags=set(),  # No HTML tags allowed
-        attributes={},  # No attributes
-        url_schemes=set(),  # No URL schemes
-    )
-
-    return sanitized.strip()
+        tags=set(),
+        attributes={},
+        url_schemes=set(),
+    ).strip()
 
 
-def sanitize_db_content_for_llm(data: dict[str, Any] | list[Any] | str | None) -> Any:
+def sanitize_db_content_for_llm(
+    data: dict[str, Any] | list[Any] | str | None,
+    max_depth: int = 10,
+    _current_depth: int = 0,
+) -> Any:
     """Sanitize database content before sending to LLM.
 
-    Prevents malicious content stored in DB (from user input) from
-    affecting the LLM or causing XSS in frontend.
+    Recursively processes nested structures with depth limit to prevent stack overflow.
 
-    Uses nh3 for HTML sanitization. Recursively processes dicts, lists, and strings.
+    Args:
+        data: Data to sanitize
+        max_depth: Maximum recursion depth (default 10)
+        _current_depth: Internal recursion tracking (do not pass)
     """
     if data is None:
         return None
+
+    if _current_depth >= max_depth:
+        # Return truncated indicator instead of recursing deeper
+        return "[MAX_DEPTH_REACHED]"
 
     if isinstance(data, str):
         return sanitize_for_memory(data)
 
     if isinstance(data, list):
-        return [sanitize_db_content_for_llm(item) for item in data]
+        return [
+            sanitize_db_content_for_llm(item, max_depth, _current_depth + 1)
+            for item in data
+        ]
 
     if isinstance(data, dict):
-        return {key: sanitize_db_content_for_llm(value) for key, value in data.items()}
+        return {
+            key: sanitize_db_content_for_llm(value, max_depth, _current_depth + 1)
+            for key, value in data.items()
+        }
 
     return data

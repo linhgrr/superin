@@ -4,17 +4,27 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any
+from typing import Any, Literal
 
 from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
 from langchain_core.tools import BaseTool
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import create_react_agent
 
+from core.constants import AGENT_RECURSION_LIMIT, MAX_TOOL_CALLS_PER_DELEGATION
 from shared.agent_context import get_user_context, set_thread_context, set_user_context
 from shared.llm import get_llm
 
 logger = logging.getLogger(__name__)
+
+# Type definitions for consistent status/error codes
+DelegationStatus = Literal["success", "no_action", "failed", "partial", "awaiting_confirmation"]
+ToolErrorCode = Literal[
+    "domain_error",
+    "invalid_request",
+    "internal_error",
+    "too_many_tool_calls",
+]
 
 
 def _content_to_text(content: Any) -> str:
@@ -48,21 +58,13 @@ def _parse_tool_message_content(content: Any) -> Any:
 class BaseAppAgent:
     """Shared implementation for child app agents invoked by the root agent.
 
-    Child agents are intentionally stateless across invocations.
-    The root agent already receives full conversation history from the client,
-    so keeping separate in-process child memory makes delegation brittle and can
-    leak stale answers across domains.
-
     Safety features:
-    - Recursion limit (25) prevents infinite loops
-    - Tool call tracking detects runaway tool execution
+    - Recursion limit (configurable) prevents infinite loops
+    - Tool call tracking detects runaway execution
     - All tool results are sanitized before returning to LLM
     """
 
     app_id: str
-
-    # Safety: max tool calls per delegation to detect runaway execution
-    MAX_TOOL_CALLS_PER_DELEGATION = 30
 
     def __init__(self) -> None:
         self._graph: CompiledStateGraph | None = None
@@ -99,7 +101,7 @@ class BaseAppAgent:
                 {"messages": [{"role": "user", "content": question}]},
                 config={
                     "configurable": {"thread_id": child_thread_id},
-                    "recursion_limit": 25,
+                    "recursion_limit": AGENT_RECURSION_LIMIT,
                 },
             )
             messages = result.get("messages", [])
@@ -131,7 +133,7 @@ class BaseAppAgent:
         status = self._derive_status(tool_results, reply)
         ok = status in {"success", "no_action"}
 
-        result: dict[str, Any] = {
+        return {
             "app": self.app_id,
             "status": status,
             "ok": ok,
@@ -139,8 +141,6 @@ class BaseAppAgent:
             "question": question,
             "tool_results": tool_results,
         }
-
-        return result
 
     def _extract_reply(self, messages: list[BaseMessage]) -> str:
         for message in reversed(messages):
@@ -155,41 +155,41 @@ class BaseAppAgent:
         return ""
 
     def _extract_tool_results(self, messages: list[BaseMessage]) -> list[dict[str, Any]]:
-        """Extract tool results from messages with safety checks.
+        """Extract tool results with safety check for excessive tool calls.
 
-        Detects runaway execution (too many tool calls) and sanitizes all data
-        before returning to prevent XSS and prompt injection via stored data.
+        Combines result extraction with tool call counting in single pass for efficiency.
         """
         results: list[dict[str, Any]] = []
-
-        # Safety: check for excessive tool calls
-        tool_call_count = sum(1 for m in messages if isinstance(m, ToolMessage))
-        if tool_call_count > self.MAX_TOOL_CALLS_PER_DELEGATION:
-            logger.warning(
-                "%s agent exceeded max tool calls (%d > %d)",
-                self.app_id,
-                tool_call_count,
-                self.MAX_TOOL_CALLS_PER_DELEGATION,
-            )
-            # Return error instead of partial results to prevent LLM confusion
-            return [{
-                "tool_name": "safety_check",
-                "tool_call_id": "safety",
-                "ok": False,
-                "data": None,
-                "error": {
-                    "message": (
-                        f"Too many tool calls ({tool_call_count}) for this request. "
-                        "Please try a simpler query."
-                    ),
-                    "code": "too_many_tool_calls",
-                    "retryable": True,
-                },
-            }]
+        tool_call_count = 0
 
         for message in messages:
             if not isinstance(message, ToolMessage):
                 continue
+
+            tool_call_count += 1
+
+            # Early check: stop processing if already exceeded limit
+            if tool_call_count > MAX_TOOL_CALLS_PER_DELEGATION:
+                logger.warning(
+                    "%s agent exceeded max tool calls (%d > %d)",
+                    self.app_id,
+                    tool_call_count,
+                    MAX_TOOL_CALLS_PER_DELEGATION,
+                )
+                return [{
+                    "tool_name": "safety_check",
+                    "tool_call_id": "safety",
+                    "ok": False,
+                    "data": None,
+                    "error": {
+                        "message": (
+                            f"Too many tool calls ({tool_call_count}) for this request. "
+                            "Please try a simpler query."
+                        ),
+                        "code": "too_many_tool_calls",
+                        "retryable": True,
+                    },
+                }]
 
             payload = _parse_tool_message_content(message.content)
             if isinstance(payload, dict) and "ok" in payload:
@@ -215,7 +215,7 @@ class BaseAppAgent:
         self,
         tool_results: list[dict[str, Any]],
         reply: str,
-    ) -> str:
+    ) -> DelegationStatus:
         if not tool_results:
             return "no_action" if reply else "failed"
 

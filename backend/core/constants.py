@@ -16,6 +16,14 @@ RATE_LIMIT_CHAT = 30      # per minute per user
 RATE_LIMIT_DEFAULT = 120  # per minute per user
 
 
+# ─── Agent Safety Limits ──────────────────────────────────────────────────────
+
+MAX_MESSAGE_LENGTH = 10000               # characters per message
+MAX_TOOL_CALL_ARGUMENTS_SIZE = 5000      # JSON characters per tool call
+MAX_TOOL_CALLS_PER_DELEGATION = 30       # per agent invocation
+AGENT_RECURSION_LIMIT = 25                # LangGraph recursion limit for child agents
+
+
 # ─── API Routes — Core Only ───────────────────────────────────────────────────
 # App-specific routes are dynamic: /api/apps/{app_id}/... (auto-discovered)
 
