@@ -16,6 +16,10 @@ from core.auth import get_current_user, get_current_user_optional
 from core.models import AppCategory, UserAppInstallation, WidgetPreference
 from core.registry import list_categories as list_registry_categories
 from core.registry import list_plugins
+from shared.preference_utils import (
+    preference_to_schema,
+    update_multiple_preferences,
+)
 from shared.schemas import (
     AppCatalogEntry,
     AppInstallRequest,
@@ -271,17 +275,8 @@ async def uninstall_app(
 # at /api/apps/{app_id}/... which take priority in FastAPI routing.
 
 def _pref_to_schema(p: WidgetPreference) -> WidgetPreferenceSchema:
-    return WidgetPreferenceSchema(
-        id=str(p.id),
-        user_id=str(p.user_id),
-        widget_id=p.widget_id,
-        app_id=p.app_id,
-        enabled=p.enabled,
-        position=p.position,
-        config=p.config,
-        size_w=p.size_w,
-        size_h=p.size_h,
-    )
+    """Convert WidgetPreference document to schema - uses shared utility."""
+    return preference_to_schema(p)
 
 
 @router.get("/preferences")
@@ -314,33 +309,6 @@ async def update_preferences(
     updates: list[PreferenceUpdate],
     user_id: str = Depends(get_current_user),
 ) -> list[WidgetPreferenceSchema]:
-    """Batch-update widget preferences."""
-    for u in updates:
-        pref = await WidgetPreference.find_one(
-            WidgetPreference.user_id == PydanticObjectId(user_id),
-            WidgetPreference.app_id == app_id,
-            WidgetPreference.widget_id == u.widget_id,
-        )
-        if pref:
-            if u.enabled is not None:
-                pref.enabled = u.enabled
-            if u.position is not None:
-                pref.position = u.position
-            if u.config is not None:
-                pref.config = u.config
-            # size_w and size_h: explicit None means reset to default
-            if u.size_w is not None:
-                pref.size_w = u.size_w
-            else:
-                # Check if size_w was explicitly provided (even as null)
-                # by checking if the field was set in the update
-                if "size_w" in u.model_dump(exclude_unset=True):
-                    pref.size_w = None
-            if u.size_h is not None:
-                pref.size_h = u.size_h
-            else:
-                if "size_h" in u.model_dump(exclude_unset=True):
-                    pref.size_h = None
-            await pref.save()
-
+    """Batch-update widget preferences using shared utility."""
+    await update_multiple_preferences(user_id, updates, app_id)
     return await get_preferences(app_id, user_id)

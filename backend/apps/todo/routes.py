@@ -14,6 +14,10 @@ from apps.todo.schemas import (
 from apps.todo.service import task_service
 from core.auth import get_current_user
 from core.models import WidgetPreference
+from shared.preference_utils import (
+    preference_to_schema,
+    update_multiple_preferences,
+)
 from shared.schemas import PreferenceUpdate, WidgetPreferenceSchema
 
 router = APIRouter()
@@ -282,11 +286,10 @@ async def stop_recurring_rule(
 
 @router.get("/summary")
 async def todo_summary(user_id: str = Depends(get_current_user)):
-    # Fetch user to get their timezone setting
+    # Fetch user to pass to service for timezone-aware calculations
     from core.models import User
     user = await User.get(user_id)
-    user_timezone = user.settings.get("timezone", "UTC") if user else "UTC"
-    return await task_service.get_summary(user_id, user_timezone)
+    return await task_service.get_summary(user)
 
 
 # ─── Preferences ──────────────────────────────────────────────────────────────
@@ -299,18 +302,7 @@ async def get_preferences(
         WidgetPreference.user_id == PydanticObjectId(user_id),
         WidgetPreference.app_id == "todo",
     ).to_list()
-    return [
-        WidgetPreferenceSchema(
-            id=str(p.id),
-            user_id=str(p.user_id),
-            widget_id=p.widget_id,
-            app_id=p.app_id,
-            enabled=p.enabled,
-            position=p.position,
-            config=p.config,
-        )
-        for p in prefs
-    ]
+    return [preference_to_schema(p) for p in prefs]
 
 
 @router.put("/preferences")
@@ -318,22 +310,5 @@ async def update_preferences(
     updates: list[PreferenceUpdate],
     user_id: str = Depends(get_current_user),
 ) -> list[WidgetPreferenceSchema]:
-    for u in updates:
-        pref = await WidgetPreference.find_one(
-            WidgetPreference.user_id == PydanticObjectId(user_id),
-            WidgetPreference.app_id == "todo",
-            WidgetPreference.widget_id == u.widget_id,
-        )
-        if pref:
-            if u.enabled is not None:
-                pref.enabled = u.enabled
-            if u.position is not None:
-                pref.position = u.position
-            if u.config is not None:
-                pref.config = u.config
-            if u.size_w is not None:
-                pref.size_w = u.size_w
-            if u.size_h is not None:
-                pref.size_h = u.size_h
-            await pref.save()
+    await update_multiple_preferences(user_id, updates, "todo")
     return await get_preferences(user_id)

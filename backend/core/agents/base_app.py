@@ -123,7 +123,7 @@ class BaseAppAgent:
         status = self._derive_status(tool_results, reply)
         ok = status in {"success", "no_action"}
 
-        return {
+        result: dict[str, Any] = {
             "app": self.app_id,
             "status": status,
             "ok": ok,
@@ -131,6 +131,16 @@ class BaseAppAgent:
             "question": question,
             "tool_results": tool_results,
         }
+
+        # Include pending operation if awaiting confirmation
+        if status == "awaiting_confirmation":
+            _, pending = self._has_pending_confirmation(tool_results)
+            if pending:
+                result["requires_confirmation"] = True
+                result["confirmation"] = pending.get("confirmation")
+                result["pending_operation"] = pending.get("pending_operation")
+
+        return result
 
     def _extract_reply(self, messages: list[BaseMessage]) -> str:
         for message in reversed(messages):
@@ -153,13 +163,20 @@ class BaseAppAgent:
 
             payload = _parse_tool_message_content(message.content)
             if isinstance(payload, dict) and "ok" in payload:
-                results.append({
+                result: dict[str, Any] = {
                     "tool_name": message.name or "unknown",
                     "tool_call_id": message.tool_call_id,
                     "ok": bool(payload.get("ok")),
                     "data": payload.get("data"),
                     "error": payload.get("error"),
-                })
+                }
+                # Check for confirmation requirement
+                if payload.get("requires_confirmation"):
+                    result["requires_confirmation"] = True
+                    result["confirmation"] = payload.get("confirmation")
+                    result["pending_operation"] = payload.get("pending_operation")
+                    result["message"] = payload.get("message")
+                results.append(result)
             else:
                 results.append({
                     "tool_name": message.name or "unknown",
@@ -171,9 +188,27 @@ class BaseAppAgent:
 
         return results
 
-    def _derive_status(self, tool_results: list[dict[str, Any]], reply: str) -> str:
+    def _has_pending_confirmation(
+        self, tool_results: list[dict[str, Any]]
+    ) -> tuple[bool, dict[str, Any] | None]:
+        """Check if any tool result requires confirmation."""
+        for result in tool_results:
+            if result.get("requires_confirmation"):
+                return True, result
+        return False, None
+
+    def _derive_status(
+        self,
+        tool_results: list[dict[str, Any]],
+        reply: str,
+    ) -> str:
         if not tool_results:
             return "no_action" if reply else "failed"
+
+        # Check for pending confirmation first
+        has_pending, _ = self._has_pending_confirmation(tool_results)
+        if has_pending:
+            return "awaiting_confirmation"
 
         successes = sum(1 for result in tool_results if result.get("ok"))
         failures = len(tool_results) - successes

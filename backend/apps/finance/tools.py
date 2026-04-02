@@ -7,6 +7,7 @@ from langchain_core.tools import tool
 
 from apps.finance.service import finance_service
 from shared.agent_context import get_user_context
+from shared.confirmation import requires_confirmation
 from shared.tool_results import safe_tool_call
 
 # ─── Tools ────────────────────────────────────────────────────────────────────
@@ -121,7 +122,15 @@ async def finance_update_wallet(wallet_id: str, name: str | None = None) -> dict
 
 
 @tool
-async def finance_delete_wallet(wallet_id: str) -> dict:
+@requires_confirmation(
+    title="Delete Wallet",
+    description="Permanently delete wallet '{wallet_id}'",
+    risk_level="high",
+)
+async def finance_delete_wallet(
+    wallet_id: str,
+    _confirmation_id: str | None = None,
+) -> dict:
     """
     Delete a wallet permanently.
 
@@ -131,6 +140,7 @@ async def finance_delete_wallet(wallet_id: str) -> dict:
 
     Args:
         wallet_id: Wallet to delete
+        _confirmation_id: UI confirmation ID (automatically provided by frontend)
 
     Returns:
         Success confirmation
@@ -467,7 +477,16 @@ async def finance_update_transaction(
 
 
 @tool
-async def finance_delete_transaction(transaction_id: str) -> dict:
+@requires_confirmation(
+    title="Delete Transaction",
+    description="Permanently delete transaction '{transaction_id}'. "
+                "This will reverse the transaction's effect on wallet balance.",
+    risk_level="medium",
+)
+async def finance_delete_transaction(
+    transaction_id: str,
+    _confirmation_id: str | None = None,
+) -> dict:
     """
     Delete a transaction permanently.
 
@@ -477,6 +496,7 @@ async def finance_delete_transaction(transaction_id: str) -> dict:
 
     Args:
         transaction_id: Transaction to delete
+        _confirmation_id: UI confirmation ID (automatically provided by frontend)
 
     Returns:
         Success confirmation
@@ -496,11 +516,17 @@ async def finance_delete_transaction(transaction_id: str) -> dict:
 # ─── Transfer ──────────────────────────────────────────────────────────────────
 
 @tool
+@requires_confirmation(
+    title="Transfer Funds",
+    description="Transfer {amount} from '{from_wallet_id}' to '{to_wallet_id}'",
+    risk_level="high",
+)
 async def finance_transfer(
     from_wallet_id: str,
     to_wallet_id: str,
     amount: float,
     note: str | None = None,
+    _confirmation_id: str | None = None,
 ) -> dict:
     """
     Transfer money between two wallets.
@@ -514,6 +540,7 @@ async def finance_transfer(
         to_wallet_id: Destination wallet
         amount: Amount to transfer (must be positive)
         note: Optional transfer reason
+        _confirmation_id: UI confirmation ID (automatically provided by frontend)
 
     Returns:
         Transfer details with updated wallet balances

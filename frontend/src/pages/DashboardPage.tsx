@@ -42,7 +42,7 @@ interface ResolvedWidget {
   appId: string;
   app: AppCatalogEntry;
   widget: AppCatalogEntry["widgets"][number];
-  position: number;
+  sort_order: number;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -307,12 +307,12 @@ function DashboardInner({
         const prefsEntry = prefs.get(widget.id);
         if (!isWidgetEnabled(widget, prefsEntry)) continue;
 
-        const position = prefsEntry?.position ?? 0;
-        items.push({ widgetId: widget.id, appId: app.id, app, widget, position });
+        const sort_order = prefsEntry?.sort_order ?? 0;
+        items.push({ widgetId: widget.id, appId: app.id, app, widget, sort_order });
       }
     }
 
-    return items.sort((a, b) => a.position - b.position);
+    return items.sort((a, b) => a.sort_order - b.sort_order);
   }, [installedApps, isWidgetEnabled, prefs]);
 
   const layout = useMemo<Layout[]>(() => {
@@ -339,7 +339,7 @@ function DashboardInner({
           widget_id: widgetId,
           app_id: existing?.app_id ?? appIdFrom(widgetId),
           enabled: update.enabled ?? existing?.enabled ?? false,
-          position: update.position ?? existing?.position ?? 0,
+          sort_order: update.sort_order ?? existing?.sort_order ?? 0,
           config: update.config ?? existing?.config,
           size: update.size ?? existing?.size ?? null,
           size_w: update.size_w ?? existing?.size_w ?? null,

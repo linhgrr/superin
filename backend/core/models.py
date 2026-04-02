@@ -69,11 +69,11 @@ class WidgetPreference(Document):
     widget_id: str  # e.g. "finance.total-balance"
     app_id: str
     enabled: bool = False
-    position: int = 0
+    sort_order: int = 0  # Sequential ordering for widget list (not grid position)
     config: dict = {}
     # Custom dimensions - override manifest default
-    size_w: int | None = None  # Grid width (2-12)
-    size_h: int | None = None  # Grid height (1-6)
+    size_w: int | None = Field(default=None, ge=2, le=12)  # Grid width (2-12)
+    size_h: int | None = Field(default=None, ge=1, le=6)  # Grid height (1-6)
 
     class Settings:
         name = "widget_preferences"

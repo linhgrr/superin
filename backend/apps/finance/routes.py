@@ -14,6 +14,10 @@ from apps.finance.schemas import (
 from apps.finance.service import finance_service
 from core.auth import get_current_user
 from core.models import User
+from shared.preference_utils import (
+    preference_to_schema,
+    update_multiple_preferences,
+)
 from shared.schemas import PreferenceUpdate, WidgetPreferenceSchema
 
 router = APIRouter()
@@ -244,10 +248,9 @@ async def check_budget(
 ):
     """Check spending vs budget for categories."""
     try:
-        # Fetch user to get their timezone
+        # Fetch user to pass to service for timezone-aware calculations
         user = await User.get(user_id)
-        user_timezone = user.settings.get("timezone", "UTC") if user else "UTC"
-        return await finance_service.check_budget(user_id, category_id, user_timezone)
+        return await finance_service.check_budget(user, category_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -284,18 +287,7 @@ async def get_preferences(
         WidgetPreference.user_id == PydanticObjectId(user_id),
         WidgetPreference.app_id == "finance",
     ).to_list()
-    return [
-        WidgetPreferenceSchema(
-            id=str(p.id),
-            user_id=str(p.user_id),
-            widget_id=p.widget_id,
-            app_id=p.app_id,
-            enabled=p.enabled,
-            position=p.position,
-            config=p.config,
-        )
-        for p in prefs
-    ]
+    return [preference_to_schema(p) for p in prefs]
 
 
 @router.put("/preferences")
@@ -303,27 +295,7 @@ async def update_preferences(
     updates: list[PreferenceUpdate],
     user_id: str = Depends(get_current_user),
 ) -> list[WidgetPreferenceSchema]:
-    from beanie import PydanticObjectId
-
-    from core.models import WidgetPreference
-    for u in updates:
-        pref = await WidgetPreference.find_one(
-            WidgetPreference.user_id == PydanticObjectId(user_id),
-            WidgetPreference.app_id == "finance",
-            WidgetPreference.widget_id == u.widget_id,
-        )
-        if pref:
-            if u.enabled is not None:
-                pref.enabled = u.enabled
-            if u.position is not None:
-                pref.position = u.position
-            if u.config is not None:
-                pref.config = u.config
-            if u.size_w is not None:
-                pref.size_w = u.size_w
-            if u.size_h is not None:
-                pref.size_h = u.size_h
-            await pref.save()
+    await update_multiple_preferences(user_id, updates, "finance")
     return await get_preferences(user_id)
 
 
@@ -351,7 +323,6 @@ async def transfer_funds(
 
 @router.get("/summary")
 async def finance_summary(user_id: str = Depends(get_current_user)):
-    # Fetch user to get their timezone
+    # Fetch user to pass to service for timezone-aware calculations
     user = await User.get(user_id)
-    user_timezone = user.settings.get("timezone", "UTC") if user else "UTC"
-    return await finance_service.get_summary(user_id, user_timezone)
+    return await finance_service.get_summary(user)
