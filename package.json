@@ -31,5 +31,8 @@
     "**/*.py": [
       "ruff check --fix"
     ]
+  },
+  "dependencies": {
+    "react-joyride": "^3.0.2"
   }
 }

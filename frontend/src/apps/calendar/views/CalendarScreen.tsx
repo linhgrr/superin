@@ -1,62 +1,61 @@
-import { useState, useMemo, lazy, Suspense } from "react";
-import { createEvent, type CreateEventRequest } from "../api";
-import { useCalendars, useEvents } from "../hooks/useCalendarSwr";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import {
+  listCalendars,
+  listEvents,
+  createEvent,
+  type Calendar,
+  type Event,
+  type CreateEventRequest,
+} from "../api";
+import { WeekView } from "../components/WeekView";
+import { ListView } from "../components/ListView";
 import { CreateEventModal } from "../components/CreateEventModal";
 import { getWeekDatesInTimezone } from "../utils/dateHelpers";
 import { filterEventsByCalendar, groupEventsByDate } from "../utils/eventHelpers";
 import { useUserTimezone } from "@/hooks/useUserTimezone";
 
-// Lazy load calendar views for bundle optimization
-const WeekView = lazy(() => import("../components/WeekView").then(m => ({ default: m.WeekView })));
-const ListView = lazy(() => import("../components/ListView").then(m => ({ default: m.ListView })));
-
 type ViewMode = "list" | "week";
-
-// View skeleton for suspense fallback
-function ViewSkeleton() {
-  return (
-    <div
-      style={{
-        flex: 1,
-        background: "var(--color-surface-elevated)",
-        borderRadius: "0.5rem",
-        animation: "pulse 1.5s ease-in-out infinite",
-      }}
-    />
-  );
-}
 
 export default function CalendarScreen() {
   const { timezone } = useUserTimezone();
+  const [calendars, setCalendars] = useState<Calendar[]>([]);
+  const [events, setEvents] = useState<Event[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>("week");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedCalendar, setSelectedCalendar] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newEventDate, setNewEventDate] = useState<Date | null>(null);
 
-  // Use SWR for data fetching with caching and deduplication
-  const { data: calendars = [] } = useCalendars();
-
-  // Calculate date range for event fetching
-  const weekDates = useMemo(() => getWeekDatesInTimezone(currentDate, timezone), [currentDate, timezone]);
-  const start = weekDates[0]?.toISOString();
-  const end = weekDates[6]?.toISOString();
-
-  const { data: events = [], isLoading: isLoadingEvents } = useEvents(
-    start,
-    end,
-    selectedCalendar || undefined,
-    200
-  );
-
   // Derived state
+  const weekDates = useMemo(() => getWeekDatesInTimezone(currentDate, timezone), [currentDate, timezone]);
   const filteredEvents = useMemo(
     () => filterEventsByCalendar({ events, selectedCalendar }),
     [events, selectedCalendar]
   );
   const eventsByDate = useMemo(() => groupEventsByDate(filteredEvents, { timezone }), [filteredEvents, timezone]);
 
-  const isLoading = isLoadingEvents && events.length === 0;
+  // Load data
+  const loadData = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const start = weekDates[0].toISOString();
+      const end = weekDates[6].toISOString();
+
+      const [cals, evts] = await Promise.all([
+        listCalendars(),
+        listEvents(start, end, selectedCalendar || undefined, 200),
+      ]);
+      setCalendars(cals);
+      setEvents(evts);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [weekDates, selectedCalendar]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   // Navigation handlers
   const goToPreviousWeek = () => {
@@ -96,7 +95,7 @@ export default function CalendarScreen() {
         calendar_id: defaultCalendar.id,
       };
       await createEvent(request);
-      // SWR will automatically revalidate
+      await loadData();
       setShowCreateModal(false);
     } catch (err) {
       console.error("Failed to create event:", err);
@@ -133,19 +132,17 @@ export default function CalendarScreen() {
         onChangeView={setViewMode}
       />
 
-      {/* Content with Suspense for lazy-loaded views */}
-      <Suspense fallback={<ViewSkeleton />}>
-        {viewMode === "week" ? (
-          <WeekView
-            weekDates={weekDates}
-            calendars={calendars}
-            events={filteredEvents}
-            onCellClick={handleCellClick}
-          />
-        ) : (
-          <ListView calendars={calendars} eventsByDate={eventsByDate} />
-        )}
-      </Suspense>
+      {/* Content */}
+      {viewMode === "week" ? (
+        <WeekView
+          weekDates={weekDates}
+          calendars={calendars}
+          events={filteredEvents}
+          onCellClick={handleCellClick}
+        />
+      ) : (
+        <ListView calendars={calendars} eventsByDate={eventsByDate} />
+      )}
 
       {/* Create Event Modal */}
       {showCreateModal && newEventDate && (

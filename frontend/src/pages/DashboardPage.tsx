@@ -193,40 +193,22 @@ function WidgetCard({
   widget: AppCatalogEntry["widgets"][number];
   children: React.ReactNode;
 }) {
-  // Use ref to avoid re-renders on mouse move - CSS custom properties updated directly
-  const cardRef = useRef<HTMLDivElement>(null);
+  const [mousePos, setMousePos] = useState({ x: 50, y: 50 });
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const x = ((e.clientX - rect.left) / rect.width) * 100;
     const y = ((e.clientY - rect.top) / rect.height) * 100;
-
-    // Update CSS custom properties directly - no React state, no re-render
-    const el = cardRef.current;
-    if (el) {
-      el.style.setProperty("--mouse-x", `${x}%`);
-      el.style.setProperty("--mouse-y", `${y}%`);
-    }
-  };
-
-  const handleMouseLeave = () => {
-    // Reset to center when mouse leaves
-    const el = cardRef.current;
-    if (el) {
-      el.style.setProperty("--mouse-x", "50%");
-      el.style.setProperty("--mouse-y", "50%");
-    }
+    setMousePos({ x, y });
   };
 
   return (
     <div
-      ref={cardRef}
       className="widget-card"
       onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
       style={{
-        "--mouse-x": "50%",
-        "--mouse-y": "50%",
+        "--mouse-x": `${mousePos.x}%`,
+        "--mouse-y": `${mousePos.y}%`,
         display: "flex",
         flexDirection: "column",
       } as React.CSSProperties}
@@ -650,10 +632,8 @@ export default function DashboardPage() {
         const checkAndStart = () => {
           const sidebar = document.querySelector(".sidebar-brand");
           if (sidebar) {
-            console.log("[Onboarding] Starting welcome tour...");
             startTour("welcome");
           } else {
-            console.log("[Onboarding] Waiting for sidebar...");
             // Retry after 500ms if element not found
             setTimeout(checkAndStart, 500);
           }
@@ -663,7 +643,7 @@ export default function DashboardPage() {
     }, 100); // 100ms delay to let onboarding state hydrate
 
     return () => clearTimeout(timer);
-  }, [loading, isCompleted, startTour]);
+  }, [loading]); // Only depend on loading - isCompleted and startTour are stable
 
   if (loading) {
     return (

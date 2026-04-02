@@ -17,7 +17,6 @@ import {
 
 import { getMe, login as apiLogin, logout as apiLogout, register as apiRegister } from "@/api/auth";
 import { isAuthenticated, triggerLogout } from "@/api/axios";
-import { notifyAuthStateChanged } from "@/lib/auth-events";
 import type { LoginRequest, RegisterRequest, UserPublic } from "@/types/generated/api";
 
 interface AuthContextValue {
@@ -58,16 +57,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const res = await apiLogin(payload);
     // apiLogin already calls setAccessToken
     setUser(res.user);
-    // Notify catalog provider to refresh
-    notifyAuthStateChanged(true);
   }, []);
 
   const register = useCallback(async (payload: RegisterRequest) => {
     const res = await apiRegister(payload);
     // apiRegister already calls setAccessToken
     setUser(res.user);
-    // Notify catalog provider to refresh
-    notifyAuthStateChanged(true);
   }, []);
 
   const logout = useCallback(async () => {
@@ -76,7 +71,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       triggerLogout();
       setUser(null);
-      notifyAuthStateChanged(false);
     }
   }, []);
 

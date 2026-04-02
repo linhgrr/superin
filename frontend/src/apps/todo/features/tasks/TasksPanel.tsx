@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import type { CreateTaskRequest } from "@/types/generated/api";
 import { createTask, deleteTask, getTasks, toggleTask, type TaskRead, getSubtasks, createSubtask, completeSubtask, uncompleteSubtask, deleteSubtask, type SubTask, createRecurringRule, type RecurringRule } from "../../api";
 import NewTaskForm from "../../components/NewTaskForm";
@@ -145,24 +145,17 @@ export default function TasksPanel() {
     setShowRecurringForm(false);
   }
 
-  // Optimize: Single pass to compute counts and filtered tasks
-  const { filtered, counts } = useMemo(() => {
-    const counts = { all: 0, pending: 0, completed: 0 };
-    const filtered: TaskRead[] = [];
+  const filtered = tasks.filter((task) => {
+    if (filter === "pending") return task.status === "pending";
+    if (filter === "completed") return task.status === "completed";
+    return true;
+  });
 
-    for (const task of tasks) {
-      counts.all++;
-      if (task.status === "pending") counts.pending++;
-      if (task.status === "completed") counts.completed++;
-
-      // Filter logic in same loop
-      if (filter === "all" || task.status === filter) {
-        filtered.push(task);
-      }
-    }
-
-    return { filtered, counts };
-  }, [tasks, filter]);
+  const counts = {
+    all: tasks.length,
+    pending: tasks.filter((task) => task.status === "pending").length,
+    completed: tasks.filter((task) => task.status === "completed").length,
+  };
 
   return (
     <>

@@ -12,9 +12,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import {
-  utcToLocalDate,
+  formatDateTime as formatDateTimeUtil,
+  formatDate as formatDateUtil,
+  formatTime as formatTimeUtil,
+  isToday as isTodayUtil,
+  isPast as isPastUtil,
   getUserTimezone,
   setUserTimezone,
+  getLocalDateTimeStrings,
 } from '@/lib/timezone';
 
 export interface UseTimezoneReturn {
@@ -65,110 +70,33 @@ export function useTimezone(): UseTimezoneReturn {
     setTimezoneState(tz);
   }, []);
 
-  // Memoize formatters with timezone dependency - fixes stale closure issue
   const formatDateTime = useCallback(
-    (utcString: string | null | undefined, options?: Intl.DateTimeFormatOptions) => {
-      const date = utcToLocalDate(utcString);
-      if (!date) return "—";
-
-      return new Intl.DateTimeFormat(undefined, {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-        ...options,
-        timeZone: timezone,
-      }).format(date);
-    },
-    [timezone]
-  );
-
-  const formatDate = useCallback(
-    (utcString: string | null | undefined, options?: Intl.DateTimeFormatOptions) => {
-      const date = utcToLocalDate(utcString);
-      if (!date) return "—";
-
-      return new Intl.DateTimeFormat(undefined, {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-        ...options,
-        timeZone: timezone,
-      }).format(date);
-    },
-    [timezone]
-  );
-
-  const formatTime = useCallback(
-    (utcString: string | null | undefined, options?: Intl.DateTimeFormatOptions) => {
-      const date = utcToLocalDate(utcString);
-      if (!date) return "—";
-
-      return new Intl.DateTimeFormat(undefined, {
-        hour: "2-digit",
-        minute: "2-digit",
-        ...options,
-        timeZone: timezone,
-      }).format(date);
-    },
-    [timezone]
-  );
-
-  const isToday = useCallback(
-    (utcString: string | null | undefined) => {
-      const date = utcToLocalDate(utcString);
-      if (!date) return false;
-
-      const now = new Date();
-
-      const dateStr = new Intl.DateTimeFormat("en-CA", {
-        timeZone: timezone,
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      }).format(date);
-
-      const todayStr = new Intl.DateTimeFormat("en-CA", {
-        timeZone: timezone,
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      }).format(now);
-
-      return dateStr === todayStr;
-    },
-    [timezone]
-  );
-
-  const isPast = useCallback(
-    (utcString: string | null | undefined) => {
-      const date = utcToLocalDate(utcString);
-      if (!date) return false;
-      return date.getTime() < Date.now();
-    },
+    (utcString: string | null | undefined) => formatDateTimeUtil(utcString),
     []
   );
 
-  const getNow = useCallback((): [string, string] => {
-    const now = new Date();
+  const formatDate = useCallback(
+    (utcString: string | null | undefined, options?: Intl.DateTimeFormatOptions) =>
+      formatDateUtil(utcString, options),
+    []
+  );
 
-    const dateStr = new Intl.DateTimeFormat("en-CA", {
-      timeZone: timezone,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).format(now);
+  const formatTime = useCallback(
+    (utcString: string | null | undefined) => formatTimeUtil(utcString),
+    []
+  );
 
-    const timeStr = new Intl.DateTimeFormat(undefined, {
-      timeZone: timezone,
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    }).format(now);
+  const isToday = useCallback(
+    (utcString: string | null | undefined) => isTodayUtil(utcString),
+    []
+  );
 
-    return [dateStr, timeStr];
-  }, [timezone]);
+  const isPast = useCallback(
+    (utcString: string | null | undefined) => isPastUtil(utcString),
+    []
+  );
+
+  const getNow = useCallback(() => getLocalDateTimeStrings(), []);
 
   return {
     timezone,

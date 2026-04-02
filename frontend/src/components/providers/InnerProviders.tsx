@@ -7,13 +7,12 @@ import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, 
 import {
   AssistantRuntimeProvider,
 } from "@assistant-ui/react";
-import { useDataStreamRuntime } from "@assistant-ui/react-data-stream";
+import { useDataStreamRuntime, type DataStreamRuntime } from "@assistant-ui/react-data-stream";
 
 import { getCatalog } from "@/api/catalog";
 import { getAccessToken } from "@/api/client";
 import { API_BASE_URL } from "@/config";
 import { API_PATHS } from "@/constants";
-import { subscribeToAuthState } from "@/lib/auth-events";
 import type { AppCatalogEntry } from "@/types/generated/api";
 
 interface AppCatalogContextValue {
@@ -27,6 +26,8 @@ interface AppCatalogContextValue {
 const AppCatalogContext = createContext<AppCatalogContextValue | null>(null);
 
 function ChatRuntimeProvider({ children }: { children: ReactNode }) {
+  const runtimeRef = useRef<DataStreamRuntime | null>(null);
+
   const runtime = useDataStreamRuntime({
     api: `${API_BASE_URL}${API_PATHS.CHAT_STREAM}`,
     protocol: "data-stream",
@@ -35,10 +36,17 @@ function ChatRuntimeProvider({ children }: { children: ReactNode }) {
       const token = getAccessToken();
       return token ? { Authorization: `Bearer ${token}` } : {};
     },
+    onFinish: () => {
+      console.log("[ChatRuntime] Message completed");
+      // Composer is automatically reset by assistant-ui primitives after successful send
+    },
     onError: (error: Error) => {
       console.error("[ChatRuntime]", error);
     },
   });
+
+  // Store runtime reference for potential external access
+  runtimeRef.current = runtime;
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>
@@ -50,7 +58,6 @@ function ChatRuntimeProvider({ children }: { children: ReactNode }) {
 function AppCatalogProvider({ children }: { children: ReactNode }) {
   const [catalog, setCatalog] = useState<AppCatalogEntry[]>([]);
   const [isCatalogLoading, setIsCatalogLoading] = useState(true);
-  const wasAuthenticatedRef = useRef(false);
 
   const refreshCatalog = useCallback(async () => {
     setIsCatalogLoading(true);
@@ -61,20 +68,8 @@ function AppCatalogProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Initial fetch
   useEffect(() => {
     void refreshCatalog();
-  }, [refreshCatalog]);
-
-  // Listen for auth state changes and refresh catalog when user logs in
-  useEffect(() => {
-    return subscribeToAuthState((isAuthenticated) => {
-      // Refresh when transitioning from not authenticated to authenticated
-      if (isAuthenticated && !wasAuthenticatedRef.current) {
-        void refreshCatalog();
-      }
-      wasAuthenticatedRef.current = isAuthenticated;
-    });
   }, [refreshCatalog]);
 
   const setAppInstalled = useCallback((appId: string, isInstalled: boolean) => {

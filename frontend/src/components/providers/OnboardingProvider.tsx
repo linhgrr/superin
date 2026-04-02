@@ -351,15 +351,13 @@ function OnboardingProvider({ children }: { children: ReactNode }) {
       doneBtnText: "Finish",
       closeBtnText: "Skip",
       onHighlighted: (element, step, options) => {
-        console.log("[Onboarding] Step highlighted:", options.state?.activeStep, "Element:", element);
         setState((prev) => ({ ...prev, stepIndex: options.state?.activeStep || 0 }));
       },
-      onDeselected: (element, step, options) => {
-        console.log("[Onboarding] Step deselected:", options.state?.activeStep);
+      onDeselected: () => {
+        // Step transition
       },
       onDestroyed: () => {
         // Called when tour is closed/skipped/destroyed
-        console.log("[Onboarding] Tour destroyed");
         setState((prev) => ({
           ...prev,
           // Mark as completed if there was an active tour
@@ -405,15 +403,9 @@ function OnboardingProvider({ children }: { children: ReactNode }) {
       },
     });
 
-    console.log("[Onboarding] Starting tour:", tourId, "with", steps.length, "steps");
-    console.log("[Onboarding] First step element:", steps[0]?.element);
-    console.log("[Onboarding] First step element found:", !!document.querySelector(steps[0]?.element || ""));
-
     setDriverObj(d);
     d.setSteps(steps);
-    console.log("[Onboarding] Calling drive()...");
     d.drive();
-    console.log("[Onboarding] drive() called");
   }, []);
 
   const resetTours = useCallback(() => {
