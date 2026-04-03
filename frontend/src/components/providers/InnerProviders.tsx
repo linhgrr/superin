@@ -16,7 +16,7 @@ function ChatRuntimeProvider({ children }: { children: ReactNode }) {
 
   const runtime = useDataStreamRuntime({
     api: `${API_BASE_URL}${API_PATHS.CHAT_STREAM}`,
-    protocol: "data-stream",
+    protocol: "ui-message-stream",
     credentials: "include",
     headers: () => {
       const token = getAccessToken();
