@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { listEvents, listCalendars, type Event, type Calendar } from "../api";
 import { useTimezone } from "@/hooks/useTimezone";
 import Widget from "./Widget";
@@ -15,11 +15,7 @@ export default function MonthViewWidget({ defaultCalendar, showTimeBlockedTasks 
   const [isLoading, setIsLoading] = useState(true);
   const { getNow } = useTimezone();
 
-  useEffect(() => {
-    loadData();
-  }, [currentDate, defaultCalendar, showTimeBlockedTasks]);
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     try {
       setIsLoading(true);
       const year = currentDate.getFullYear();
@@ -40,7 +36,11 @@ export default function MonthViewWidget({ defaultCalendar, showTimeBlockedTasks 
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [currentDate, defaultCalendar, showTimeBlockedTasks]);
+
+  useEffect(() => {
+    void loadData();
+  }, [loadData]);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();

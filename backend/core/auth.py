@@ -9,7 +9,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 
 from core.config import settings
-from core.models import TokenBlacklist
+from core.models import TokenBlacklist, User
 
 security = HTTPBearer()
 
@@ -87,3 +87,17 @@ async def get_current_user_optional(
         return await get_current_user(credentials)
     except HTTPException:
         return None
+
+
+async def get_current_admin_user(
+    user_id: Annotated[str, Depends(get_current_user)],
+) -> str:
+    """FastAPI dependency — ensures the current user is configured as an admin."""
+    user = await User.get(user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+
+    if user.email not in settings.admin_emails:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+
+    return user_id

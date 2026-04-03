@@ -21,13 +21,23 @@ export default function TransactionsTab() {
     setLoading(true);
     getTransactions({ limit: 50 })
       .then(setTransactions)
-      .catch(() => {})
+      .catch((error: unknown) => {
+        console.error("Failed to load transactions", error);
+      })
       .finally(() => setLoading(false));
   }
 
   function loadWalletsAndCategories() {
-    getWallets().then(setWallets).catch(() => {});
-    getCategories().then(setCategories).catch(() => {});
+    getWallets()
+      .then(setWallets)
+      .catch((error: unknown) => {
+        console.error("Failed to load wallets", error);
+      });
+    getCategories()
+      .then(setCategories)
+      .catch((error: unknown) => {
+        console.error("Failed to load categories", error);
+      });
   }
 
   useEffect(() => {

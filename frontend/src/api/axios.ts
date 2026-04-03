@@ -97,8 +97,8 @@ function shouldRefreshProactively(): boolean {
     lastProactiveCheck = now;
     cachedRefreshNeeded = needsRefresh;
     return needsRefresh;
-  } catch {
-    // Invalid token - let request fail naturally
+  } catch (error: unknown) {
+    console.error("Failed to decode access token for proactive refresh check", error);
     lastProactiveCheck = now;
     cachedRefreshNeeded = false;
     return false;
@@ -139,12 +139,19 @@ async function performRefresh(): Promise<string | null> {
     const response = await axios.post<{ access_token: string }>(
       `${API_BASE_URL}/api${AUTH_ROUTES.REFRESH}`,
       {},
-      { withCredentials: true }
+      {
+        withCredentials: true,
+        timeout: API_TIMEOUT_MS,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
     );
     const newToken = response.data.access_token;
     setAccessToken(newToken);
     return newToken;
-  } catch {
+  } catch (error: unknown) {
+    console.error("Failed to refresh access token", error);
     return null;
   }
 }

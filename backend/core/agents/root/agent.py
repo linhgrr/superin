@@ -18,8 +18,9 @@ from langchain_core.tools import BaseTool, tool
 from langgraph.prebuilt import create_react_agent
 
 from core.input_sanitizer import sanitize_for_memory_async, sanitize_user_content_async
-from core.models import ConversationMessage, User, UserAppInstallation, get_user_local_time
+from core.models import ConversationMessage, User, get_user_local_time
 from core.registry import PLUGIN_REGISTRY
+from core.workspace import list_installed_app_ids
 from shared.agent_context import clear_agent_context, set_thread_context, set_user_context
 from shared.llm import get_llm
 
@@ -339,12 +340,9 @@ class RootAgent:
     async def _get_user_tools(self, user_id: str) -> list[BaseTool]:
         """Get tools available to the user based on installed apps."""
         try:
-            oid = PydanticObjectId(user_id)
-            installations = await UserAppInstallation.find(
-                {"user_id": oid, "status": "active"},
-            ).to_list()
-            installed_app_ids = {inst.app_id for inst in installations}
+            installed_app_ids = set(await list_installed_app_ids(user_id))
         except Exception:
+            logger.exception("Failed to load installed apps for tool scoping")
             installed_app_ids = set()
 
         tools = [

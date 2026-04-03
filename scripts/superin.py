@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import os
 import re
@@ -25,7 +26,7 @@ SCRIPT_PATH = Path(__file__).resolve()
 
 APP_ID_RE = re.compile(r"^[a-z][a-z0-9-]*[a-z0-9]$|^[a-z]$")
 RESERVED = {"auth", "catalog", "chat", "core", "shared", "apps"}
-REQUIRES_LINHDZ = {"codegen", "manifests", "plugin"}
+REQUIRES_LINHDZ = {"codegen", "db", "manifests", "plugin"}
 
 
 def fail(message: str) -> None:
@@ -453,6 +454,48 @@ def run_dev(frontend_delay: float) -> None:
                 child.terminate()
 
 
+class CliLogger:
+    @staticmethod
+    def warning(message: str, *args: object) -> None:
+        print(message % args if args else message)
+
+    @staticmethod
+    def info(message: str, *args: object) -> None:
+        print(message % args if args else message)
+
+
+async def migrate_core_indexes() -> None:
+    if str(BACKEND_ROOT) not in sys.path:
+        sys.path.insert(0, str(BACKEND_ROOT))
+
+    from pymongo import AsyncMongoClient
+
+    from core.config import settings  # type: ignore
+    from core.index_contract import migrate_index_contract  # type: ignore
+
+    client = AsyncMongoClient(settings.mongodb_uri)
+    try:
+        await migrate_index_contract(client["superin"], logger=CliLogger())
+    finally:
+        await client.close()
+
+
+async def check_core_indexes() -> None:
+    if str(BACKEND_ROOT) not in sys.path:
+        sys.path.insert(0, str(BACKEND_ROOT))
+
+    from pymongo import AsyncMongoClient
+
+    from core.config import settings  # type: ignore
+    from core.index_contract import validate_index_contract  # type: ignore
+
+    client = AsyncMongoClient(settings.mongodb_uri)
+    try:
+        await validate_index_contract(client["superin"])
+    finally:
+        await client.close()
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Superin developer CLI")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -475,6 +518,11 @@ def build_parser() -> argparse.ArgumentParser:
     plugin_sync.add_argument("app_id", nargs="?")
     plugin_sync.add_argument("--all", action="store_true")
     plugin_sync.add_argument("--force-widgets", action="store_true")
+
+    db = subparsers.add_parser("db", help="Database workflows")
+    db_sub = db.add_subparsers(dest="db_command", required=True)
+    db_sub.add_parser("check-indexes", help="Validate core Mongo index contract")
+    db_sub.add_parser("migrate-indexes", help="Reconcile and create core Mongo indexes")
 
     dev = subparsers.add_parser("dev", help="Run backend then frontend dev servers")
     dev.add_argument("--frontend-delay", type=float, default=1.5)
@@ -520,6 +568,16 @@ def main() -> None:
             fail("plugin sync-fe requires <app_id> or --all")
         sync_frontend_app(args.app_id, force_widgets=args.force_widgets)
         print(f"synced frontend app scaffolding for {args.app_id}")
+        return
+
+    if args.command == "db" and args.db_command == "check-indexes":
+        asyncio.run(check_core_indexes())
+        print("core index contract is valid")
+        return
+
+    if args.command == "db" and args.db_command == "migrate-indexes":
+        asyncio.run(migrate_core_indexes())
+        print("core indexes migrated successfully")
         return
 
     if args.command == "dev":

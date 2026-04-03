@@ -288,7 +288,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/apps__catalog__CreateCategoryRequest"
+                "$ref": "#/components/schemas/CreateCategoryRequest"
               }
             }
           },
@@ -734,6 +734,33 @@
         ]
       }
     },
+    "/api/workspace/bootstrap": {
+      "get": {
+        "tags": [
+          "workspace"
+        ],
+        "summary": "Get Workspace Bootstrap",
+        "description": "Return installed apps and widget preferences for the authenticated user.",
+        "operationId": "get_workspace_bootstrap_api_workspace_bootstrap_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceBootstrap"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/apps/calendar/widgets": {
       "get": {
         "tags": [
@@ -750,7 +777,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/apps/calendar/events": {
@@ -1617,7 +1649,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/apps/finance/wallets": {
@@ -1861,7 +1898,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateCategoryRequest"
+                "$ref": "#/components/schemas/apps__finance__schemas__CreateCategoryRequest"
               }
             }
           },
@@ -1967,7 +2004,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateCategoryRequest"
+                "$ref": "#/components/schemas/apps__finance__schemas__CreateCategoryRequest"
               }
             }
           }
@@ -2769,7 +2806,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/apps/todo/tasks": {
@@ -4006,6 +4048,62 @@
         ],
         "title": "AppInstallRequest"
       },
+      "AppRuntimeEntry": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "icon": {
+            "type": "string",
+            "title": "Icon"
+          },
+          "color": {
+            "type": "string",
+            "title": "Color"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "author": {
+            "type": "string",
+            "title": "Author"
+          },
+          "widgets": {
+            "items": {
+              "$ref": "#/components/schemas/WidgetManifestSchema"
+            },
+            "type": "array",
+            "title": "Widgets"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "description",
+          "icon",
+          "color",
+          "category",
+          "version",
+          "author"
+        ],
+        "title": "AppRuntimeEntry",
+        "description": "Installed app entry returned in the authenticated workspace runtime."
+      },
       "AppUninstallRequest": {
         "properties": {
           "app_id": {
@@ -4165,19 +4263,20 @@
           },
           "icon": {
             "type": "string",
+            "maxLength": 30,
             "title": "Icon",
-            "default": "Tag"
+            "default": "Folder"
           },
           "color": {
             "type": "string",
+            "maxLength": 50,
             "title": "Color",
             "default": "oklch(0.65 0.21 280)"
           },
-          "budget": {
-            "type": "number",
-            "minimum": 0.0,
-            "title": "Budget",
-            "default": 0.0
+          "order": {
+            "type": "integer",
+            "title": "Order",
+            "default": 0
           }
         },
         "type": "object",
@@ -5302,7 +5401,28 @@
         "title": "WidgetPreferenceSchema",
         "description": "User-specific widget state stored in DB."
       },
-      "apps__catalog__CreateCategoryRequest": {
+      "WorkspaceBootstrap": {
+        "properties": {
+          "installed_apps": {
+            "items": {
+              "$ref": "#/components/schemas/AppRuntimeEntry"
+            },
+            "type": "array",
+            "title": "Installed Apps"
+          },
+          "widget_preferences": {
+            "items": {
+              "$ref": "#/components/schemas/WidgetPreferenceSchema"
+            },
+            "type": "array",
+            "title": "Widget Preferences"
+          }
+        },
+        "type": "object",
+        "title": "WorkspaceBootstrap",
+        "description": "Authenticated workspace runtime bootstrap payload."
+      },
+      "apps__finance__schemas__CreateCategoryRequest": {
         "properties": {
           "name": {
             "type": "string",
@@ -5312,20 +5432,19 @@
           },
           "icon": {
             "type": "string",
-            "maxLength": 30,
             "title": "Icon",
-            "default": "Folder"
+            "default": "Tag"
           },
           "color": {
             "type": "string",
-            "maxLength": 50,
             "title": "Color",
             "default": "oklch(0.65 0.21 280)"
           },
-          "order": {
-            "type": "integer",
-            "title": "Order",
-            "default": 0
+          "budget": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Budget",
+            "default": 0.0
           }
         },
         "type": "object",

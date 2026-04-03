@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import { STORAGE_KEYS } from "@/constants";
 import { useAuth } from "@/hooks/useAuth";
-import { useToast } from "@/components/providers/AppProviders";
+import { useToast } from "@/components/providers/ToastProvider";
 import { updateUserSettings } from "@/api/auth";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -348,8 +348,8 @@ export default function SettingsPage() {
         try {
           const newSettings = JSON.parse(e.newValue);
           setSettings((prev) => ({ ...prev, ...newSettings }));
-        } catch {
-          // Ignore parse errors
+        } catch (error: unknown) {
+          console.error("Failed to parse settings from storage event", error);
         }
       }
     };
@@ -370,8 +370,8 @@ export default function SettingsPage() {
       if (newSettings.timezone) {
         try {
           await updateUserSettings({ settings: { timezone: newSettings.timezone } });
-        } catch {
-          // Silent fail - localStorage already has the value
+        } catch (error: unknown) {
+          console.error("Failed to sync timezone setting to backend", error);
         }
       }
 

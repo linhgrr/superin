@@ -46,8 +46,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     getMe()
       .then((u) => setUser(u))
-      .catch(() => {
-        // Auth failed - logout and redirect (handled by triggerLogout)
+      .catch((error: unknown) => {
+        console.error("Failed to restore authenticated user session", error);
         triggerLogout();
       })
       .finally(() => setIsLoading(false));

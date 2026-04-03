@@ -54,6 +54,10 @@ uuid-utils==0.10.0
 # Timezone
 pytz==2024.2
 
+# Security & Sanitization
+nh3==0.3.4
+confusables==1.2.0
+
 # Type Hints (for older Python)
 typing-extensions==4.12.2
 

@@ -10,10 +10,10 @@
 import { memo, useMemo } from "react";
 import { NavLink } from "react-router-dom";
 import { LayoutDashboard, Store, Sparkles, Settings } from "lucide-react";
-import { useAppCatalog } from "@/components/providers/AppProviders";
+import { useWorkspace } from "@/components/providers/WorkspaceProvider";
 import { DynamicIcon } from "@/lib/icon-resolver";
 import { prefetchHandlers } from "@/apps";
-import type { AppCatalogEntry } from "@/types/generated/api";
+import type { AppRuntimeEntry } from "@/types/generated/api";
 
 /**
  * Generate a gradient from an oklch color string.
@@ -48,7 +48,7 @@ function generateGradient(color: string | undefined | null): string {
   return `linear-gradient(135deg, ${color} 0%, ${color}dd 100%)`;
 }
 
-function AppIcon({ entry }: { entry: AppCatalogEntry }) {
+function AppIcon({ entry }: { entry: AppRuntimeEntry }) {
   const gradient = useMemo(() => generateGradient(entry.color), [entry.color]);
 
   return (
@@ -79,7 +79,7 @@ function AppIcon({ entry }: { entry: AppCatalogEntry }) {
 }
 
 function Sidebar() {
-  const { installedApps } = useAppCatalog();
+  const { installedApps } = useWorkspace();
 
   return (
     <aside className="sidebar">

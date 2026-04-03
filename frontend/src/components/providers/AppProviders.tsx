@@ -3,26 +3,21 @@
  *
  * Providers hierarchy (outer to inner):
  * 1. ToastProvider — notifications
- * 2. AppCatalogProvider — app registry
- * 3. ChatRuntimeProvider — AI chat
+ * 2. Protected-route providers (workspace/chat) are mounted closer to the shell
  */
 
 "use client";
 
 import { ReactNode } from "react";
-import { AppCatalogProvider, ChatRuntimeProvider, ToastProvider, OnboardingProvider } from "./";
+import { OnboardingProvider } from "./OnboardingProvider";
+import { ToastProvider } from "./ToastProvider";
 
 export function AppProviders({ children }: { children: ReactNode }) {
   return (
     <OnboardingProvider>
       <ToastProvider>
-        <AppCatalogProvider>
-          <ChatRuntimeProvider>{children}</ChatRuntimeProvider>
-        </AppCatalogProvider>
+        {children}
       </ToastProvider>
     </OnboardingProvider>
   );
 }
-
-export { useAppCatalog, useToast, useOnboarding, type Toast, type ToastVariant, type ToastAction } from "./";
-export { CommandPalette, type CommandItem } from "./CommandPalette";

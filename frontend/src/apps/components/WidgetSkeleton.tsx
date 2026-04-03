@@ -2,15 +2,11 @@
  * WidgetSkeleton - Loading state cho widget
  */
 
-import { WIDGET_SIZES } from "@/lib/widget-sizes";
-
 interface WidgetSkeletonProps {
   size?: string;
 }
 
-export default function WidgetSkeleton({ size = "standard" }: WidgetSkeletonProps) {
-  const config = WIDGET_SIZES[size as keyof typeof WIDGET_SIZES] ?? WIDGET_SIZES.standard;
-
+export default function WidgetSkeleton({ size: _size = "standard" }: WidgetSkeletonProps) {
   return (
     <div
       style={{

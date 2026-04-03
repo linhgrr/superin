@@ -3,6 +3,7 @@
 from pymongo import AsyncMongoClient
 
 from core.config import settings
+from core.index_contract import validate_index_contract
 
 # ─── Global client (set during lifespan) ──────────────────────────────────────
 
@@ -31,8 +32,11 @@ async def init_db() -> None:
     )
     from core.registry import get_plugin_models
 
+    database = _client["superin"]
+    await validate_index_contract(database)
+
     await init_beanie(
-        database=_client["superin"],
+        database=database,
         document_models=[
             User,
             UserAppInstallation,
@@ -49,7 +53,7 @@ async def close_db() -> None:
     """Close the MongoDB client. Call once at server shutdown."""
     global _client
     if _client is not None:
-        _client.close()
+        await _client.close()
         _client = None
 
 

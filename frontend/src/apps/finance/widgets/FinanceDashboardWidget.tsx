@@ -10,7 +10,8 @@ const WIDGET_COMPONENTS = {
   "finance.recent-transactions": RecentTransactionsWidget,
 } as const satisfies Record<string, ComponentType<DashboardWidgetRendererProps>>;
 
-export default function FinanceDashboardWidget({ widgetId, widget }: DashboardWidgetProps) {
+export default function FinanceDashboardWidget(props: DashboardWidgetProps) {
+  const { widgetId, widget } = props;
   const Component = WIDGET_COMPONENTS[widgetId as keyof typeof WIDGET_COMPONENTS];
 
   if (Component) {

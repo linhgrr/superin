@@ -1,37 +1,51 @@
-import type { FrontendAppDefinition, FrontendAppManifest } from "./types";
 import type { DashboardWidgetProps } from "./types";
 import type { LazyExoticComponent, ComponentType } from "react";
 import {
+  clearActiveApps,
+  clearLazyCache,
+  getAppMetadata,
+  getLoadedAppView,
+  getLoadedWidget,
+  getRegisteredAppIds,
+  hasAppMetadata,
+  isAppActive,
+  isAppViewLoaded,
+  isWidgetLoaded,
   lazyLoadAppView,
   lazyLoadDashboardWidget,
-  getAppMetadata,
-  hasAppMetadata,
-  getRegisteredAppIds,
-  isAppViewLoaded,
-  getLoadedAppView,
-  isWidgetLoaded,
-  getLoadedWidget,
+  loadAppViewComponent,
+  loadDashboardWidgetComponent,
+  setActiveApps,
   type AppMetadata,
 } from "./lazy-registry";
 import { discoverAndRegisterApps } from "./discovery";
 
 // Re-export tất cả từ lazy-registry và discovery
 export {
+  clearActiveApps,
+  clearLazyCache,
+  discoverAndRegisterApps,
+  getAppMetadata,
+  getLoadedAppView,
+  getLoadedWidget,
+  getRegisteredAppIds,
+  hasAppMetadata,
+  isAppActive,
+  isAppViewLoaded,
+  isWidgetLoaded,
   lazyLoadAppView,
   lazyLoadDashboardWidget,
-  getAppMetadata,
-  hasAppMetadata,
-  getRegisteredAppIds,
-  discoverAndRegisterApps,
-  isAppViewLoaded,
-  getLoadedAppView,
-  isWidgetLoaded,
-  getLoadedWidget,
+  loadAppViewComponent,
+  loadDashboardWidgetComponent,
+  setActiveApps,
   type AppMetadata,
 };
 
 // Re-export prefetch utilities
 export {
+  primeApp,
+  primeWidget,
+  primeAppAndWidget,
   prefetchApp,
   prefetchWidget,
   prefetchAppAndWidget,
@@ -45,7 +59,6 @@ export {
  * Interface này giống FrontendAppDefinition nhưng với lazy components.
  */
 export interface LazyAppDefinition {
-  manifest: FrontendAppManifest;
   AppView: LazyExoticComponent<ComponentType> | null;
   DashboardWidget: LazyExoticComponent<ComponentType<DashboardWidgetProps>> | null;
 }
@@ -59,7 +72,6 @@ export function getLazyApp(appId: string): LazyAppDefinition | null {
   if (!metadata) return null;
 
   return {
-    manifest: metadata.manifest,
     AppView: lazyLoadAppView(appId),
     DashboardWidget: lazyLoadDashboardWidget(appId),
   };

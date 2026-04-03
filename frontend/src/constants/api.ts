@@ -39,6 +39,10 @@ export const CHAT_ROUTES = {
   STREAM: "/chat/stream",
 } as const;
 
+export const WORKSPACE_ROUTES = {
+  BOOTSTRAP: "/workspace/bootstrap",
+} as const;
+
 // ─── Full API Paths ───────────────────────────────────────────────────────────
 
 export const API_PATHS = {
@@ -53,13 +57,16 @@ export const API_PATHS = {
   // Catalog
   CATALOG_APPS: `/api${CATALOG_ROUTES.APPS}`,
   CATALOG_CATEGORIES: `/api${CATALOG_ROUTES.CATEGORIES}`,
-  CATALOG_INSTALL: (appId: string) => `/api${CATALOG_ROUTES.INSTALL}/${appId}`,
-  CATALOG_UNINSTALL: (appId: string) => `/api${CATALOG_ROUTES.UNINSTALL}/${appId}`,
+  CATALOG_INSTALL: `/api${CATALOG_ROUTES.INSTALL}`,
+  CATALOG_UNINSTALL: `/api${CATALOG_ROUTES.UNINSTALL}`,
   CATALOG_ALL_PREFERENCES: `/api/catalog/preferences`,
   CATALOG_PREFERENCES: (appId: string) => `/api${CATALOG_ROUTES.PREFERENCES(appId)}`,
 
   // Chat
   CHAT_STREAM: `/api${CHAT_ROUTES.STREAM}`,
+
+  // Workspace
+  WORKSPACE_BOOTSTRAP: `/api${WORKSPACE_ROUTES.BOOTSTRAP}`,
 } as const;
 
 // ─── App API Helper ─────────────────────────────────────────────────────────────

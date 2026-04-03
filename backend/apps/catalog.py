@@ -12,10 +12,11 @@ from beanie.operators import In
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from core.auth import get_current_user, get_current_user_optional
+from core.auth import get_current_admin_user, get_current_user, get_current_user_optional
 from core.models import AppCategory, UserAppInstallation, WidgetPreference
 from core.registry import list_categories as list_registry_categories
 from core.registry import list_plugins
+from core.workspace import list_installed_app_ids
 from shared.preference_utils import (
     preference_to_schema,
     update_multiple_preferences,
@@ -95,7 +96,7 @@ async def list_categories() -> list[dict]:
 @router.post("/categories")
 async def create_category(
     request: CreateCategoryRequest,
-    user_id: str = Depends(get_current_user),
+    admin_user_id: str = Depends(get_current_admin_user),
 ) -> dict:
     """Create a new app category. Requires auth."""
     existing = await AppCategory.find_one(AppCategory.name == request.name)
@@ -114,7 +115,7 @@ async def create_category(
 async def update_category(
     category_id: str,
     request: UpdateCategoryRequest,
-    user_id: str = Depends(get_current_user),
+    admin_user_id: str = Depends(get_current_admin_user),
 ) -> dict:
     """Update an app category."""
     cat = await AppCategory.find_one(AppCategory.id == PydanticObjectId(category_id))
@@ -135,7 +136,7 @@ async def update_category(
 @router.delete("/categories/{category_id}")
 async def delete_category(
     category_id: str,
-    user_id: str = Depends(get_current_user),
+    admin_user_id: str = Depends(get_current_admin_user),
 ) -> dict:
     """Delete an app category."""
     cat = await AppCategory.find_one(AppCategory.id == PydanticObjectId(category_id))
@@ -208,6 +209,11 @@ async def install_app(
         UserAppInstallation.user_id == PydanticObjectId(user_id),
         UserAppInstallation.app_id == request.app_id,
     )
+    if existing and existing.status == "active":
+        return {"status": "already_installed", "app_id": request.app_id}
+
+    await plugin["agent"].on_install(user_id)
+
     if existing:
         existing.status = "active"
         await existing.save()
@@ -218,31 +224,28 @@ async def install_app(
             status="active",
         ).insert()
 
-    # Batch: fetch all existing widget prefs in one query
-    widget_ids = [w.id for w in plugin["manifest"].widgets]
+    widget_ids = [widget.id for widget in plugin["manifest"].widgets]
     existing_prefs = await WidgetPreference.find(
         WidgetPreference.user_id == PydanticObjectId(user_id),
         In(WidgetPreference.widget_id, widget_ids),
     ).to_list()
-    existing_ids = {p.widget_id for p in existing_prefs}
+    existing_ids = {pref.widget_id for pref in existing_prefs}
 
-    # Insert only missing ones
     to_insert = [
         WidgetPreference(
             user_id=PydanticObjectId(user_id),
-            widget_id=w.id,
+            widget_id=widget.id,
             app_id=request.app_id,
             enabled=True,
-            position=0,
+            sort_order=index,
             config={},
         )
-        for w in plugin["manifest"].widgets
-        if w.id not in existing_ids
+        for index, widget in enumerate(plugin["manifest"].widgets)
+        if widget.id not in existing_ids
     ]
     if to_insert:
         await WidgetPreference.insert_many(to_insert)
 
-    await plugin["agent"].on_install(user_id)
     return {"status": "installed", "app_id": request.app_id}
 
 
@@ -255,17 +258,18 @@ async def uninstall_app(
     installation = await UserAppInstallation.find_one(
         UserAppInstallation.user_id == PydanticObjectId(user_id),
         UserAppInstallation.app_id == request.app_id,
+        UserAppInstallation.status == "active",
     )
     if not installation:
-        raise HTTPException(status_code=404, detail="App not installed")
-
-    installation.status = "disabled"
-    await installation.save()
+        return {"status": "already_uninstalled", "app_id": request.app_id}
 
     from core.registry import get_plugin
     plugin = get_plugin(request.app_id)
     if plugin:
         await plugin["agent"].on_uninstall(user_id)
+
+    installation.status = "disabled"
+    await installation.save()
 
     return {"status": "uninstalled", "app_id": request.app_id}
 
@@ -284,8 +288,13 @@ async def get_all_preferences(
     user_id: str = Depends(get_current_user),
 ) -> list[WidgetPreferenceSchema]:
     """Get all widget preferences for the authenticated user across all apps."""
+    installed_app_ids = await list_installed_app_ids(user_id)
+    if not installed_app_ids:
+        return []
+
     prefs = await WidgetPreference.find(
         WidgetPreference.user_id == PydanticObjectId(user_id),
+        In(WidgetPreference.app_id, installed_app_ids),
     ).to_list()
     return [_pref_to_schema(p) for p in prefs]
 
@@ -296,6 +305,10 @@ async def get_preferences(
     user_id: str = Depends(get_current_user),
 ) -> list[WidgetPreferenceSchema]:
     """Get all widget preferences for the authenticated user in a given app."""
+    installed_app_ids = await list_installed_app_ids(user_id)
+    if app_id not in installed_app_ids:
+        raise HTTPException(status_code=403, detail=f"App '{app_id}' is not installed")
+
     prefs = await WidgetPreference.find(
         WidgetPreference.user_id == PydanticObjectId(user_id),
         WidgetPreference.app_id == app_id,
@@ -310,5 +323,9 @@ async def update_preferences(
     user_id: str = Depends(get_current_user),
 ) -> list[WidgetPreferenceSchema]:
     """Batch-update widget preferences using shared utility."""
+    installed_app_ids = await list_installed_app_ids(user_id)
+    if app_id not in installed_app_ids:
+        raise HTTPException(status_code=403, detail=f"App '{app_id}' is not installed")
+
     await update_multiple_preferences(user_id, updates, app_id)
     return await get_preferences(app_id, user_id)

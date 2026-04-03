@@ -1,98 +1,165 @@
-import * as Lucide from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
-/**
- * Dynamic Lucide icon resolver.
- *
- * Maps icon names (from backend manifest) to Lucide icon components.
- * This allows the backend to specify icons and frontend renders them dynamically
- * without needing to hardcode imports.
- *
- * Usage:
- *   const Icon = resolveIcon("Wallet");
- *   return <Icon size={18} />;
- */
+import type { LucideIcon, LucideProps } from "lucide-react";
+import {
+  BarChart3,
+  Calendar,
+  CheckSquare,
+  Circle,
+  Home,
+  Search,
+  Settings,
+  Sparkles,
+  User,
+  Wallet,
+} from "lucide-react";
+import dynamicIconImports from "lucide-react/dynamicIconImports";
 
-// Cache for resolved icons
+type IconModuleLoader = () => Promise<{ default: LucideIcon }>;
+
 const iconCache = new Map<string, LucideIcon>();
+const iconLoadCache = new Map<string, Promise<LucideIcon | null>>();
 
-/**
- * Resolve an icon name to a Lucide icon component.
- * Returns a fallback icon if the name is not found.
- */
+const dynamicIconMap = dynamicIconImports as Record<string, IconModuleLoader | undefined>;
+
+function normalizeIconName(iconName: string): string {
+  return iconName
+    .trim()
+    .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+    .replace(/[_\s]+/g, "-")
+    .replace(/-+/g, "-")
+    .toLowerCase();
+}
+
+function fallbackIconFor(iconName: string | undefined | null): LucideIcon {
+  const normalized = normalizeIconName(iconName ?? "");
+
+  if (!iconName) {
+    return Circle;
+  }
+  if (normalized.includes("money") || normalized.includes("wallet") || normalized.includes("dollar")) {
+    return Wallet;
+  }
+  if (normalized.includes("check") || normalized.includes("task")) {
+    return CheckSquare;
+  }
+  if (normalized.includes("calendar") || normalized.includes("date") || normalized.includes("clock")) {
+    return Calendar;
+  }
+  if (normalized.includes("chart") || normalized.includes("graph")) {
+    return BarChart3;
+  }
+  if (normalized.includes("setting") || normalized.includes("config")) {
+    return Settings;
+  }
+  if (normalized.includes("user") || normalized.includes("person")) {
+    return User;
+  }
+  if (normalized.includes("home") || normalized.includes("house")) {
+    return Home;
+  }
+  if (normalized.includes("search") || normalized.includes("find")) {
+    return Search;
+  }
+
+  return Sparkles;
+}
+
+async function loadIconComponent(iconName: string | undefined | null): Promise<LucideIcon | null> {
+  if (!iconName) {
+    return null;
+  }
+
+  const normalized = normalizeIconName(iconName);
+  const cached = iconCache.get(normalized);
+  if (cached) {
+    return cached;
+  }
+
+  const inFlight = iconLoadCache.get(normalized);
+  if (inFlight) {
+    return inFlight;
+  }
+
+  const loader = dynamicIconMap[normalized];
+  if (!loader) {
+    return null;
+  }
+
+  const request = loader()
+    .then((module) => {
+      const icon = module.default;
+      iconCache.set(normalized, icon);
+      return icon;
+    })
+    .catch(() => null)
+    .finally(() => {
+      iconLoadCache.delete(normalized);
+    });
+
+  iconLoadCache.set(normalized, request);
+  return request;
+}
+
 export function resolveIcon(iconName: string | undefined | null): LucideIcon {
   if (!iconName) {
-    return Lucide.Circle;
+    return Circle;
   }
 
-  // Check cache first
-  if (iconCache.has(iconName)) {
-    return iconCache.get(iconName)!;
-  }
-
-  // Try to get icon from Lucide namespace
-  const icon = (Lucide as Record<string, LucideIcon | undefined>)[iconName];
-
-  if (icon) {
-    iconCache.set(iconName, icon);
-    return icon;
-  }
-
-  // Fallback to generic icons
-  console.warn(`[IconResolver] Icon "${iconName}" not found in Lucide, using fallback`);
-
-  // Try common fallbacks based on name patterns
-  if (iconName.toLowerCase().includes("money") || iconName.toLowerCase().includes("wallet") || iconName.toLowerCase().includes("dollar")) {
-    return Lucide.Wallet;
-  }
-  if (iconName.toLowerCase().includes("check") || iconName.toLowerCase().includes("task")) {
-    return Lucide.CheckSquare;
-  }
-  if (iconName.toLowerCase().includes("calendar") || iconName.toLowerCase().includes("date") || iconName.toLowerCase().includes("clock")) {
-    return Lucide.Calendar;
-  }
-  if (iconName.toLowerCase().includes("chart") || iconName.toLowerCase().includes("graph")) {
-    return Lucide.BarChart3;
-  }
-  if (iconName.toLowerCase().includes("setting") || iconName.toLowerCase().includes("config")) {
-    return Lucide.Settings;
-  }
-  if (iconName.toLowerCase().includes("user") || iconName.toLowerCase().includes("person")) {
-    return Lucide.User;
-  }
-  if (iconName.toLowerCase().includes("home") || iconName.toLowerCase().includes("house")) {
-    return Lucide.Home;
-  }
-  if (iconName.toLowerCase().includes("search") || iconName.toLowerCase().includes("find")) {
-    return Lucide.Search;
-  }
-
-  // Generic fallback
-  return Lucide.Sparkles;
+  return iconCache.get(normalizeIconName(iconName)) ?? fallbackIconFor(iconName);
 }
 
-/**
- * Component wrapper that dynamically renders an icon by name.
- * Use this when you need JSX element directly.
- */
-export interface DynamicIconProps {
+export interface DynamicIconProps extends Omit<LucideProps, "ref"> {
   name: string | undefined | null;
-  size?: number;
   className?: string;
-  strokeWidth?: number;
 }
 
-export function DynamicIcon({ name, size = 18, className, strokeWidth = 2 }: DynamicIconProps) {
-  const Icon = resolveIcon(name);
-  return <Icon size={size} className={className} strokeWidth={strokeWidth} />;
+export function DynamicIcon({ name, ...props }: DynamicIconProps) {
+  const fallbackIcon = useMemo(() => fallbackIconFor(name), [name]);
+  const normalized = useMemo(() => (name ? normalizeIconName(name) : null), [name]);
+  const [Icon, setIcon] = useState<LucideIcon>(() => {
+    if (!normalized) {
+      return fallbackIcon;
+    }
+    return iconCache.get(normalized) ?? fallbackIcon;
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!normalized) {
+      setIcon(() => fallbackIcon);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const cached = iconCache.get(normalized);
+    if (cached) {
+      setIcon(() => cached);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setIcon(() => fallbackIcon);
+
+    void loadIconComponent(name).then((loadedIcon) => {
+      if (!cancelled && loadedIcon) {
+        setIcon(() => loadedIcon);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fallbackIcon, name, normalized]);
+
+  return <Icon {...props} />;
 }
 
-/**
- * Preload common icons to avoid runtime resolution overhead.
- * Call this in your app initialization if needed.
- */
 export function preloadIcons(iconNames: string[]): void {
-  for (const name of iconNames) {
-    resolveIcon(name);
+  for (const iconName of iconNames) {
+    void loadIconComponent(iconName);
   }
 }

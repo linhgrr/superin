@@ -1,30 +1,15 @@
 /**
- * Inner Providers — internal implementation details
- * These are split out to avoid circular dependencies
+ * Inner providers — internal implementation details.
  */
 
-import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import {
-  AssistantRuntimeProvider,
-} from "@assistant-ui/react";
+import { useRef, type ReactNode } from "react";
+
+import { AssistantRuntimeProvider } from "@assistant-ui/react";
 import { useDataStreamRuntime, type DataStreamRuntime } from "@assistant-ui/react-data-stream";
 
-import { getCatalog } from "@/api/catalog";
 import { getAccessToken } from "@/api/client";
 import { API_BASE_URL } from "@/config";
 import { API_PATHS } from "@/constants";
-import type { AppCatalogEntry } from "@/types/generated/api";
-
-interface AppCatalogContextValue {
-  catalog: AppCatalogEntry[];
-  installedApps: AppCatalogEntry[];
-  isCatalogLoading: boolean;
-  refreshCatalog: () => Promise<void>;
-  setAppInstalled: (appId: string, isInstalled: boolean) => void;
-  isReady: boolean;  // True khi catalog loading xong
-}
-
-const AppCatalogContext = createContext<AppCatalogContextValue | null>(null);
 
 function ChatRuntimeProvider({ children }: { children: ReactNode }) {
   const runtimeRef = useRef<DataStreamRuntime | null>(null);
@@ -41,7 +26,6 @@ function ChatRuntimeProvider({ children }: { children: ReactNode }) {
       // Composer is automatically reset by assistant-ui primitives after successful send
     },
     onError: (error: Error) => {
-      // Ignore AbortError - expected when component unmounts during streaming
       if (error.name === "AbortError" || error.message?.includes("BodyStreamBuffer")) {
         return;
       }
@@ -49,7 +33,6 @@ function ChatRuntimeProvider({ children }: { children: ReactNode }) {
     },
   });
 
-  // Store runtime reference for potential external access
   runtimeRef.current = runtime;
 
   return (
@@ -59,56 +42,4 @@ function ChatRuntimeProvider({ children }: { children: ReactNode }) {
   );
 }
 
-function AppCatalogProvider({ children }: { children: ReactNode }) {
-  const [catalog, setCatalog] = useState<AppCatalogEntry[]>([]);
-  const [isCatalogLoading, setIsCatalogLoading] = useState(true);
-
-  const refreshCatalog = useCallback(async () => {
-    setIsCatalogLoading(true);
-    try {
-      setCatalog(await getCatalog());
-    } finally {
-      setIsCatalogLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void refreshCatalog();
-  }, [refreshCatalog]);
-
-  const setAppInstalled = useCallback((appId: string, isInstalled: boolean) => {
-    setCatalog((prev) =>
-      prev.map((app) =>
-        app.id === appId ? { ...app, is_installed: isInstalled } : app
-      )
-    );
-  }, []);
-
-  const value = useMemo<AppCatalogContextValue>(
-    () => ({
-      catalog,
-      installedApps: catalog.filter((app) => app.is_installed),
-      isCatalogLoading,
-      refreshCatalog,
-      setAppInstalled,
-      isReady: !isCatalogLoading,
-    }),
-    [catalog, isCatalogLoading, refreshCatalog, setAppInstalled]
-  );
-
-  return (
-    <AppCatalogContext.Provider value={value}>
-      {children}
-    </AppCatalogContext.Provider>
-  );
-}
-
-function useAppCatalog() {
-  const context = useContext(AppCatalogContext);
-  if (!context) {
-    throw new Error("useAppCatalog must be used within <AppCatalogProvider>");
-  }
-  return context;
-}
-
-export { AppCatalogProvider, ChatRuntimeProvider, AppCatalogContext, useAppCatalog };
+export { ChatRuntimeProvider };

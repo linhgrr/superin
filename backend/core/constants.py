@@ -33,6 +33,7 @@ API_ROOT = "/api"
 API_AUTH = f"{API_ROOT}/auth"
 API_CATALOG = f"{API_ROOT}/catalog"
 API_CHAT = f"{API_ROOT}/chat"
+API_WORKSPACE = f"{API_ROOT}/workspace"
 
 # Auth endpoints
 AUTH_LOGIN = f"{API_AUTH}/login"
@@ -63,4 +64,3 @@ def app_api_path(app_id: str, endpoint: str = "") -> str:
     """
     base = f"{API_ROOT}/apps/{app_id}"
     return f"{base}/{endpoint}" if endpoint else base
-

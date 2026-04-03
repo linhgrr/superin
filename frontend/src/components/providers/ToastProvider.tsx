@@ -83,6 +83,11 @@ function ToastItem({
   const startTimeRef = useRef(Date.now());
   const remainingRef = useRef(duration);
 
+  const handleDismiss = useCallback(() => {
+    setIsExiting(true);
+    setTimeout(() => onDismiss(toast.id), 300);
+  }, [onDismiss, toast.id]);
+
   useEffect(() => {
     if (isPaused) return;
 
@@ -100,12 +105,7 @@ function ToastItem({
     }, 16); // ~60fps
 
     return () => clearInterval(interval);
-  }, [isPaused, duration]);
-
-  const handleDismiss = () => {
-    setIsExiting(true);
-    setTimeout(() => onDismiss(toast.id), 300);
-  };
+  }, [duration, handleDismiss, isPaused]);
 
   const handleMouseEnter = () => {
     setIsPaused(true);

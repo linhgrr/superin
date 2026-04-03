@@ -293,6 +293,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/workspace/bootstrap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Workspace Bootstrap
+         * @description Return installed apps and widget preferences for the authenticated user.
+         */
+        get: operations["get_workspace_bootstrap_api_workspace_bootstrap_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/apps/calendar/widgets": {
         parameters: {
             query?: never;
@@ -1263,6 +1283,30 @@ export interface components {
             /** App Id */
             app_id: string;
         };
+        /**
+         * AppRuntimeEntry
+         * @description Installed app entry returned in the authenticated workspace runtime.
+         */
+        AppRuntimeEntry: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string;
+            /** Icon */
+            icon: string;
+            /** Color */
+            color: string;
+            /** Category */
+            category: string;
+            /** Version */
+            version: string;
+            /** Author */
+            author: string;
+            /** Widgets */
+            widgets?: components["schemas"]["WidgetManifestSchema"][];
+        };
         /** AppUninstallRequest */
         AppUninstallRequest: {
             /** App Id */
@@ -1321,7 +1365,7 @@ export interface components {
             name: string;
             /**
              * Icon
-             * @default Tag
+             * @default Folder
              */
             icon: string;
             /**
@@ -1330,10 +1374,10 @@ export interface components {
              */
             color: string;
             /**
-             * Budget
+             * Order
              * @default 0
              */
-            budget: number;
+            order: number;
         };
         /** CreateEventRequest */
         CreateEventRequest: {
@@ -1707,13 +1751,23 @@ export interface components {
             /** Size H */
             size_h?: number | null;
         };
+        /**
+         * WorkspaceBootstrap
+         * @description Authenticated workspace runtime bootstrap payload.
+         */
+        WorkspaceBootstrap: {
+            /** Installed Apps */
+            installed_apps?: components["schemas"]["AppRuntimeEntry"][];
+            /** Widget Preferences */
+            widget_preferences?: components["schemas"]["WidgetPreferenceSchema"][];
+        };
         /** CreateCategoryRequest */
-        apps__catalog__CreateCategoryRequest: {
+        apps__finance__schemas__CreateCategoryRequest: {
             /** Name */
             name: string;
             /**
              * Icon
-             * @default Folder
+             * @default Tag
              */
             icon: string;
             /**
@@ -1722,10 +1776,10 @@ export interface components {
              */
             color: string;
             /**
-             * Order
+             * Budget
              * @default 0
              */
-            order: number;
+            budget: number;
         };
     };
     responses: never;
@@ -1946,7 +2000,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["apps__catalog__CreateCategoryRequest"];
+                "application/json": components["schemas"]["CreateCategoryRequest"];
             };
         };
         responses: {
@@ -2234,6 +2288,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+        };
+    };
+    get_workspace_bootstrap_api_workspace_bootstrap_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceBootstrap"];
                 };
             };
         };
@@ -2977,7 +3051,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CreateCategoryRequest"];
+                "application/json": components["schemas"]["apps__finance__schemas__CreateCategoryRequest"];
             };
         };
         responses: {
@@ -3074,7 +3148,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CreateCategoryRequest"];
+                "application/json": components["schemas"]["apps__finance__schemas__CreateCategoryRequest"];
             };
         };
         responses: {

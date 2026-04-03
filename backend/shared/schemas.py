@@ -185,12 +185,33 @@ class AppCatalogEntry(BaseModel):
     widgets: list[WidgetManifestSchema] = Field(default_factory=list)
 
 
+class AppRuntimeEntry(BaseModel):
+    """Installed app entry returned in the authenticated workspace runtime."""
+
+    id: str
+    name: str
+    description: str
+    icon: str
+    color: str
+    category: str
+    version: str
+    author: str
+    widgets: list[WidgetManifestSchema] = Field(default_factory=list)
+
+
 class AppInstallRequest(BaseModel):
     app_id: str
 
 
 class AppUninstallRequest(BaseModel):
     app_id: str
+
+
+class WorkspaceBootstrap(BaseModel):
+    """Authenticated workspace runtime bootstrap payload."""
+
+    installed_apps: list[AppRuntimeEntry] = Field(default_factory=list)
+    widget_preferences: list[WidgetPreferenceSchema] = Field(default_factory=list)
 
 
 # ─── Chat / Agent ──────────────────────────────────────────────────────────────

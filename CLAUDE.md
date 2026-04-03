@@ -166,6 +166,12 @@ python scripts/superin.py codegen
 # Validate manifests
 python scripts/superin.py manifests validate
 
+# Validate core Mongo index contract
+python scripts/superin.py db check-indexes
+
+# Reconcile core Mongo indexes (run once when index names/uniqueness change)
+python scripts/superin.py db migrate-indexes
+
 # Tạo plugin mới
 python scripts/superin.py plugin create {app_id}
 
@@ -181,6 +187,7 @@ npm run dev                            # Frontend only
 
 # Verify (trước khi commit contract-sensitive changes)
 python scripts/superin.py codegen
+python scripts/superin.py db check-indexes
 python scripts/superin.py manifests validate
 ruff check backend
 npm run build:frontend
@@ -197,6 +204,7 @@ npm run build:frontend
 3. **Apps có thể import từ nhau** — Cross-app integration được phép (vd: calendar import từ todo)
 4. **Shared code ở `src/lib/` hoặc `src/components/`** — Không bao giờ để app-specific logic ở đây
 5. **Backend là source of truth** — manifest (icon, color, name, widgets), schemas, types đều bắt nguồn từ đây
+6. **TUYỆT ĐỐI KHÔNG silent catch** — Không bao giờ dùng `.catch(() => {})`, `except: pass`, hoặc bất kỳ nhánh bắt lỗi nào nuốt lỗi im lặng. Mọi lỗi phải được log rõ ràng (`console.error`, logger) hoặc chuyển thành error/result có cấu trúc.
 
 ### Plugin Development
 

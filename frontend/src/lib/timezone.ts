@@ -59,8 +59,8 @@ export function getUserTimezone(): string {
   try {
     const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
     if (browserTz) return browserTz;
-  } catch {
-    // Intl not supported, fall through
+  } catch (error: unknown) {
+    console.error("Failed to resolve browser timezone", error);
   }
 
   return DEFAULT_TIMEZONE;
@@ -93,7 +93,8 @@ export function utcToLocalDate(utcString: string | null | undefined): Date | nul
     const date = new Date(utcString);
     if (isNaN(date.getTime())) return null;
     return date;
-  } catch {
+  } catch (error: unknown) {
+    console.error("Failed to convert UTC string to local date", error);
     return null;
   }
 }

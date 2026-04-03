@@ -1,17 +1,19 @@
 /**
- * LazyWidget - Lazy load widget component với Suspense
- * Kiểm tra nếu đã prefetch thì render trực tiếp, không qua Suspense.
+ * LazyWidget - Lazy load widget component with a small skeleton delay
+ * to avoid flicker when the chunk is already warm in browser cache.
  */
 
-import { Suspense, memo } from "react";
-import { lazyLoadDashboardWidget, isWidgetLoaded, getLoadedWidget } from "@/apps";
-import type { AppCatalogEntry } from "@/types/generated/api";
+import { memo, useEffect, useState, type ComponentType } from "react";
+import { getAppMetadata, getLoadedWidget, loadDashboardWidgetComponent } from "@/apps";
+import type { WidgetManifestSchema } from "@/types/generated/api";
 import WidgetSkeleton from "./WidgetSkeleton";
+
+const SKELETON_DELAY_MS = 120;
 
 interface LazyWidgetProps {
   appId: string;
   widgetId: string;
-  widget: AppCatalogEntry["widgets"][number];
+  widget: WidgetManifestSchema;
   fallback?: React.ReactNode;
 }
 
@@ -26,21 +28,53 @@ export default function LazyWidget({
   widget,
   fallback,
 }: LazyWidgetProps) {
-  // Kiểm tra nếu widget đã được prefetch
-  const isPrefetched = isWidgetLoaded(appId);
+  const [loadedComponent, setLoadedComponent] = useState<ComponentType<LazyWidgetProps> | null>(null);
+  const [hasLoadError, setHasLoadError] = useState(false);
+  const [showSkeleton, setShowSkeleton] = useState(false);
+  const appMetadata = getAppMetadata(appId);
 
-  // Nếu đã prefetch, render trực tiếp component
-  if (isPrefetched) {
-    const LoadedComponent = getLoadedWidget(appId);
-    if (LoadedComponent) {
-      return <LoadedComponent widgetId={widgetId} widget={widget} />;
+  useEffect(() => {
+    if (!appMetadata) {
+      setLoadedComponent(null);
+      setHasLoadError(false);
+      setShowSkeleton(false);
+      return;
     }
-  }
 
-  // Chưa prefetch - dùng lazy loading
-  const LazyComponent = lazyLoadDashboardWidget(appId);
+    let cancelled = false;
+    const cached = getLoadedWidget(appId);
+    setLoadedComponent(() => cached as ComponentType<LazyWidgetProps> | null);
+    setHasLoadError(false);
+    setShowSkeleton(false);
 
-  if (!LazyComponent) {
+    if (cached) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      if (!cancelled) {
+        setShowSkeleton(true);
+      }
+    }, SKELETON_DELAY_MS);
+
+    void loadDashboardWidgetComponent(appId).then((component) => {
+      if (cancelled) {
+        return;
+      }
+      if (!component) {
+        setHasLoadError(true);
+        return;
+      }
+      setLoadedComponent(() => component as ComponentType<LazyWidgetProps>);
+    });
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [appId, appMetadata]);
+
+  if (!appMetadata || hasLoadError) {
     return (
       <div style={{ padding: "1rem", color: "var(--color-foreground-muted)" }}>
         Widget not available
@@ -50,9 +84,10 @@ export default function LazyWidget({
 
   const skeleton = fallback ?? <StaticWidgetSkeleton size={widget.size} />;
 
-  return (
-    <Suspense fallback={skeleton}>
-      <LazyComponent widgetId={widgetId} widget={widget} />
-    </Suspense>
-  );
+  if (loadedComponent) {
+    const LoadedComponent = loadedComponent;
+    return <LoadedComponent appId={appId} widgetId={widgetId} widget={widget} />;
+  }
+
+  return showSkeleton ? skeleton : null;
 }

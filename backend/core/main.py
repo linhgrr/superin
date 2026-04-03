@@ -3,13 +3,13 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from core.config import settings
-from core.constants import API_AUTH, API_CATALOG, API_CHAT, API_ROOT
+from core.constants import API_AUTH, API_CATALOG, API_CHAT, API_ROOT, API_WORKSPACE
 from core.db import close_db, init_db
 from core.discovery import discover_apps
 from core.exceptions import (
@@ -116,6 +116,10 @@ def create_app() -> FastAPI:
     from apps.chat import router as chat_router
     app.include_router(chat_router, prefix=API_CHAT, tags=["chat"])
 
+    from core.workspace import require_installed_app
+    from core.workspace import router as workspace_router
+    app.include_router(workspace_router, prefix=API_WORKSPACE, tags=["workspace"])
+
     # ── Plugin routers — discover and mount immediately for OpenAPI spec ──
     # Safe to call multiple times; plugin modules are already imported.
     discover_apps()
@@ -125,6 +129,7 @@ def create_app() -> FastAPI:
             plugin["router"],
             prefix=f"{API_ROOT}/apps/{app_id}",
             tags=[app_id],
+            dependencies=[Depends(require_installed_app(app_id))],
         )
 
     # ── Health check ───────────────────────────────────────────────────────

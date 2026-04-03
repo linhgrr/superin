@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Pencil } from "lucide-react";
 import type { CreateWalletRequest } from "@/types/generated/api";
-import { createWallet, deleteWallet, getWallets, type WalletRead } from "../../api";
+import { createWallet, getWallets, type WalletRead } from "../../api";
 import Modal from "../../components/Modal";
 import SimpleForm from "../../components/SimpleForm";
 import WalletEditForm from "../../components/WalletEditForm";
@@ -17,7 +17,9 @@ export default function WalletsTab() {
     setLoading(true);
     getWallets()
       .then(setWallets)
-      .catch(() => {})
+      .catch((error: unknown) => {
+        console.error("Failed to load wallets", error);
+      })
       .finally(() => setLoading(false));
   }
 

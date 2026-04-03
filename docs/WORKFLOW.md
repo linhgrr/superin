@@ -178,6 +178,25 @@ backend/core/
     └── root.py     ← LangGraph RootAgent
 ```
 
+### 5.4 Database index workflow
+
+Core Mongo indexes có contract riêng trong:
+
+```
+backend/core/index_contract.py
+```
+
+Quy tắc:
+
+- Startup chỉ **validate** contract index và fail-fast nếu DB chưa đúng.
+- Không sửa schema DB âm thầm lúc app boot trong production.
+- Khi đổi tên index hoặc đổi `unique`, chạy migration explicit:
+
+```bash
+python scripts/superin.py db check-indexes
+python scripts/superin.py db migrate-indexes
+```
+
 ### 5.2 Khi thêm plugin mới
 
 ```

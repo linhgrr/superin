@@ -5,48 +5,71 @@
  * Follows vercel-react-best-practices: bundle-preload
  */
 
-import { getAppMetadata, markAppViewLoaded, markWidgetLoaded } from "./lazy-registry";
+import { loadAppViewComponent, loadDashboardWidgetComponent } from "./lazy-registry";
 
 // Track which apps have been prefetched
 const prefetchedApps = new Set<string>();
 const prefetchedWidgets = new Set<string>();
+
+function scheduleIdle(callback: () => void): void {
+  const runner =
+    typeof window !== "undefined" && "requestIdleCallback" in window
+      ? window.requestIdleCallback.bind(window)
+      : (cb: IdleRequestCallback) => window.setTimeout(cb, 1);
+
+  runner(() => callback());
+}
+
+function loadApp(appId: string, eager: boolean): void {
+  if (prefetchedApps.has(appId)) {
+    return;
+  }
+
+  prefetchedApps.add(appId);
+
+  const run = async () => {
+    const component = await loadAppViewComponent(appId);
+    if (!component) {
+      prefetchedApps.delete(appId);
+    }
+  };
+
+  if (eager) {
+    void Promise.resolve().then(run);
+    return;
+  }
+
+  scheduleIdle(run);
+}
+
+function loadWidget(appId: string, eager: boolean): void {
+  if (prefetchedWidgets.has(appId)) {
+    return;
+  }
+
+  prefetchedWidgets.add(appId);
+
+  const run = async () => {
+    const component = await loadDashboardWidgetComponent(appId);
+    if (!component) {
+      prefetchedWidgets.delete(appId);
+    }
+  };
+
+  if (eager) {
+    void Promise.resolve().then(run);
+    return;
+  }
+
+  scheduleIdle(run);
+}
 
 /**
  * Prefetch an app's chunk in the background.
  * Safe to call multiple times - only prefetches once per app.
  */
 export function prefetchApp(appId: string): void {
-  if (prefetchedApps.has(appId)) {
-    return;
-  }
-
-  const metadata = getAppMetadata(appId);
-  if (!metadata) {
-    return;
-  }
-
-  // Mark as prefetched immediately to prevent duplicate requests
-  prefetchedApps.add(appId);
-
-  // Use requestIdleCallback for non-critical prefetching
-  const schedulePrefetch =
-    typeof window !== "undefined" && "requestIdleCallback" in window
-      ? window.requestIdleCallback
-      : (cb: () => void) => setTimeout(cb, 1);
-
-  schedulePrefetch(() => {
-    // Trigger the dynamic import to load the chunk
-    metadata
-      .loadAppView()
-      .then((result) => {
-        // Đánh dấu component đã load để có thể render trực tiếp
-        markAppViewLoaded(appId, result.default);
-      })
-      .catch(() => {
-        // Reset on error so we can retry later
-        prefetchedApps.delete(appId);
-      });
-  });
+  loadApp(appId, false);
 }
 
 /**
@@ -54,33 +77,15 @@ export function prefetchApp(appId: string): void {
  * Widgets share the same chunk with AppView nên thường đã được load cùng.
  */
 export function prefetchWidget(appId: string): void {
-  if (prefetchedWidgets.has(appId)) {
-    return;
-  }
+  loadWidget(appId, false);
+}
 
-  const metadata = getAppMetadata(appId);
-  if (!metadata) {
-    return;
-  }
+export function primeApp(appId: string): void {
+  loadApp(appId, true);
+}
 
-  prefetchedWidgets.add(appId);
-
-  const schedulePrefetch =
-    typeof window !== "undefined" && "requestIdleCallback" in window
-      ? window.requestIdleCallback
-      : (cb: () => void) => setTimeout(cb, 1);
-
-  schedulePrefetch(() => {
-    metadata
-      .loadDashboardWidget()
-      .then((result) => {
-        // Đánh dấu widget đã load
-        markWidgetLoaded(appId, result.default);
-      })
-      .catch(() => {
-        prefetchedWidgets.delete(appId);
-      });
-  });
+export function primeWidget(appId: string): void {
+  loadWidget(appId, true);
 }
 
 /**
@@ -91,6 +96,11 @@ export function prefetchAppAndWidget(appId: string): void {
   prefetchWidget(appId);
 }
 
+export function primeAppAndWidget(appId: string): void {
+  primeApp(appId);
+  primeWidget(appId);
+}
+
 /**
  * Create hover handlers for prefetching on mouse enter.
  * Usage: <Link {...prefetchHandlers(appId)} to={`/apps/${appId}`}>
@@ -99,6 +109,8 @@ export function prefetchHandlers(appId: string) {
   return {
     onMouseEnter: () => prefetchApp(appId),
     onFocus: () => prefetchApp(appId),
+    onPointerDown: () => primeAppAndWidget(appId),
+    onTouchStart: () => primeAppAndWidget(appId),
   };
 }
 
@@ -106,13 +118,16 @@ export function prefetchHandlers(appId: string) {
  * Prefetch multiple apps at once (e.g., installed apps on dashboard).
  * Bao gồm cả widgets.
  */
-export function prefetchApps(appIds: string[]): void {
-  // Stagger prefetches to avoid network congestion
-  appIds.forEach((appId, index) => {
-    setTimeout(() => {
+export function prefetchApps(appIds: string[]): () => void {
+  const handles = appIds.map((appId, index) =>
+    window.setTimeout(() => {
       prefetchAppAndWidget(appId);
-    }, index * 100);
-  });
+    }, index * 100)
+  );
+
+  return () => {
+    handles.forEach((handle) => window.clearTimeout(handle));
+  };
 }
 
 /**

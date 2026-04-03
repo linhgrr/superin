@@ -293,6 +293,10 @@ class TaskService:
         return {"success": True, "id": task_id}
 
     async def on_install(self, user_id: str) -> None:
+        existing_tasks = await self.repo.find_by_user(user_id, limit=1)
+        if existing_tasks:
+            return
+
         await self.repo.create(
             user_id,
             title="Welcome to To-Do!",

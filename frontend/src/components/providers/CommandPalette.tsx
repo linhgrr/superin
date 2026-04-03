@@ -14,23 +14,23 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Search,
+  ChevronRight,
   Command,
   LayoutDashboard,
-  Store,
   LogOut,
   Moon,
-  Sun,
   Plus,
-  Sparkles,
-  ChevronRight,
-  User,
+  Search,
   Settings,
+  Sparkles,
+  Store,
+  Sun,
+  User,
 } from "lucide-react";
 import { STORAGE_KEYS } from "@/constants";
-import { useAppCatalog } from "./AppProviders";
 import { useAuth } from "@/hooks/useAuth";
 import { DynamicIcon } from "@/lib/icon-resolver";
+import { useWorkspace } from "./WorkspaceProvider";
 
 interface CommandItem {
   id: string;
@@ -43,9 +43,17 @@ interface CommandItem {
   keywords: string[];
 }
 
+const CATEGORY_ORDER = ["apps", "actions", "settings", "help"] as const;
+const CATEGORY_LABELS: Record<string, string> = {
+  apps: "Apps",
+  actions: "Actions",
+  settings: "Settings",
+  help: "Help",
+};
+
 function CommandPalette({ onClose }: { onClose: () => void }) {
   const navigate = useNavigate();
-  const { installedApps } = useAppCatalog();
+  const { installedApps } = useWorkspace();
   const { logout } = useAuth();
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -138,8 +146,8 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
               const settings = JSON.parse(saved);
               settings.theme = newTheme;
               localStorage.setItem(STORAGE_KEYS.USER_SETTINGS, JSON.stringify(settings));
-            } catch {
-              // Ignore parse errors
+            } catch (error: unknown) {
+              console.error("Failed to update stored user settings", error);
             }
           } else {
             // No existing settings, create minimal one
@@ -241,20 +249,12 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
     return groups;
   }, [filteredCommands]);
 
-  const categoryOrder = ["apps", "actions", "settings", "help"];
-  const categoryLabels: Record<string, string> = {
-    apps: "Apps",
-    actions: "Actions",
-    settings: "Settings",
-    help: "Help",
-  };
-
   // Build flat commands list and grouped display data
   const { flatCommands, groupedDisplay, totalCount } = useMemo(() => {
     const flat: CommandItem[] = [];
     const grouped: Record<string, CommandItem[]> = {};
 
-    for (const category of categoryOrder) {
+    for (const category of CATEGORY_ORDER) {
       const cmds = groupedCommands[category];
       if (cmds?.length) {
         grouped[category] = cmds;
@@ -337,7 +337,7 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
   const commandIndexMap = useMemo(() => {
     const map = new Map<string, number>();
     let idx = 0;
-    for (const category of categoryOrder) {
+    for (const category of CATEGORY_ORDER) {
       const cmds = groupedDisplay[category];
       if (cmds?.length) {
         for (const cmd of cmds) {
@@ -466,7 +466,7 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
                       color: "var(--color-foreground-muted)",
                     }}
                   >
-                    {categoryLabels[category]}
+              {CATEGORY_LABELS[category]}
                   </div>
                   {cmds.map((cmd) => {
                     const index = commandIndexMap.get(cmd.id)!;

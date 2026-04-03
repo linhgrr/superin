@@ -267,8 +267,11 @@ class CalendarService:
 
     async def on_install(self, user_id: str) -> None:
         """Create default calendars for new user."""
-        await self.calendars.create(user_id, "Personal", DEFAULT_CALENDAR_COLOR, True)
-        await self.calendars.create(user_id, "Work", WORK_CALENDAR_COLOR, False)
+        existing_names = {calendar.name for calendar in await self.calendars.find_by_user(user_id)}
+        if "Personal" not in existing_names:
+            await self.calendars.create(user_id, "Personal", DEFAULT_CALENDAR_COLOR, True)
+        if "Work" not in existing_names:
+            await self.calendars.create(user_id, "Work", WORK_CALENDAR_COLOR, False)
 
     async def on_uninstall(self, user_id: str) -> None:
         """Clean up all user data."""

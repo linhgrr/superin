@@ -14,6 +14,8 @@ export const STORAGE_KEYS = {
   // App state
   RECENT_COMMANDS: "shin_recent_commands",
   ONBOARDING_STATE: "shin_onboarding",
+  WORKSPACE_SNAPSHOT: "shin_workspace_snapshot",
+  STORE_CATALOG_SNAPSHOT: "shin_store_catalog_snapshot",
 } as const;
 
 /** @deprecated Use STORAGE_KEYS.ACCESS_TOKEN directly */

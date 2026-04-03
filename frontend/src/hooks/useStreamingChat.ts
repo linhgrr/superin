@@ -60,8 +60,8 @@ async function* readSSEStream(stream: ReadableStream<Uint8Array>): AsyncGenerato
         try {
           const event = JSON.parse(raw) as ChatStreamEvent;
           yield event;
-        } catch {
-          // Ignore malformed JSON lines
+        } catch (error: unknown) {
+          console.error("Failed to parse streaming chat event line", error);
         }
       }
     }
@@ -74,8 +74,8 @@ async function* readSSEStream(stream: ReadableStream<Uint8Array>): AsyncGenerato
           try {
             const event = JSON.parse(raw) as ChatStreamEvent;
             yield event;
-          } catch {
-            // Ignore malformed JSON
+          } catch (error: unknown) {
+            console.error("Failed to parse trailing streaming chat event", error);
           }
         }
       }

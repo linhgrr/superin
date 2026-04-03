@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { CreateTaskRequest } from "@/types/generated/api";
-import { createTask, deleteTask, getTasks, toggleTask, type TaskRead, getSubtasks, createSubtask, completeSubtask, uncompleteSubtask, deleteSubtask, type SubTask, createRecurringRule, type RecurringRule } from "../../api";
+import { completeSubtask, createRecurringRule, createSubtask, createTask, deleteSubtask, deleteTask, getSubtasks, getTasks, toggleTask, type SubTask, type TaskRead, uncompleteSubtask } from "../../api";
 import NewTaskForm from "../../components/NewTaskForm";
 import TaskRow from "../../components/TaskRow";
 import Modal from "../../components/Modal";
@@ -22,7 +22,9 @@ export default function TasksPanel() {
     setLoading(true);
     getTasks()
       .then(setTasks)
-      .catch(() => {})
+      .catch((error: unknown) => {
+        console.error("Failed to load tasks", error);
+      })
       .finally(() => setLoading(false));
   }
 
@@ -35,7 +37,7 @@ export default function TasksPanel() {
       const updated = await toggleTask(id);
       setTasks((current) => current.map((task) => (task.id === id ? updated : task)));
     } catch {
-      // Silently ignore errors - UI will remain unchanged
+      console.error("Failed to toggle task", id);
     }
   }
 
@@ -44,7 +46,7 @@ export default function TasksPanel() {
       await deleteTask(id);
       setTasks((current) => current.filter((task) => task.id !== id));
     } catch {
-      // Silently ignore errors - UI will remain unchanged
+      console.error("Failed to delete task", id);
     }
   }
 
@@ -66,6 +68,7 @@ export default function TasksPanel() {
       const data = await getSubtasks(task.id);
       setSubtasks(data);
     } catch {
+      console.error("Failed to load subtasks", task.id);
       setSubtasks([]);
     } finally {
       setSubtasksLoading(false);

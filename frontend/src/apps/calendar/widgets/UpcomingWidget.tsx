@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { listEvents, type Event } from "../api";
 import { Calendar } from "lucide-react";
 import { useTimezone } from "@/hooks/useTimezone";
@@ -14,11 +14,7 @@ export default function UpcomingWidget({ maxItems = 3, calendarFilter }: Upcomin
   const [isLoading, setIsLoading] = useState(true);
   const { timezone, formatDate, formatTime, isToday } = useTimezone();
 
-  useEffect(() => {
-    loadEvents();
-  }, [calendarFilter]);
-
-  async function loadEvents() {
+  const loadEvents = useCallback(async () => {
     try {
       setIsLoading(true);
       const now = new Date().toISOString();
@@ -29,7 +25,11 @@ export default function UpcomingWidget({ maxItems = 3, calendarFilter }: Upcomin
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [calendarFilter, maxItems]);
+
+  useEffect(() => {
+    void loadEvents();
+  }, [loadEvents]);
 
   const formatEventDate = (dateStr: string) => {
     // Use centralized isToday utility

@@ -10,6 +10,7 @@ from typing import Literal
 import pytz
 from beanie import Document, PydanticObjectId
 from pydantic import Field
+from pymongo import IndexModel
 
 
 def utc_now() -> datetime:
@@ -44,7 +45,9 @@ class User(Document):
 
     class Settings:
         name = "users"
-        indexes = [["email"]]
+        indexes = [
+            IndexModel([("email", 1)], name="users_email_unique", unique=True),
+        ]
 
 
 class UserAppInstallation(Document):
@@ -58,7 +61,11 @@ class UserAppInstallation(Document):
     class Settings:
         name = "user_app_installations"
         indexes = [
-            [("user_id", 1), ("app_id", 1)],  # unique
+            IndexModel(
+                [("user_id", 1), ("app_id", 1)],
+                name="user_app_installations_user_id_app_id_unique",
+                unique=True,
+            ),
         ]
 
 
@@ -78,7 +85,11 @@ class WidgetPreference(Document):
     class Settings:
         name = "widget_preferences"
         indexes = [
-            [("user_id", 1), ("widget_id", 1)],  # unique
+            IndexModel(
+                [("user_id", 1), ("widget_id", 1)],
+                name="widget_preferences_user_id_widget_id_unique",
+                unique=True,
+            ),
         ]
 
 
@@ -88,6 +99,13 @@ class TokenBlacklist(Document):
     jti: str  # JWT ID — unique per token
     revoked_at: datetime = Field(default_factory=utc_now)
     expires_at: datetime
+
+    class Settings:
+        name = "token_blacklist"
+        indexes = [
+            IndexModel([("jti", 1)], name="token_blacklist_jti_unique", unique=True),
+            IndexModel([("expires_at", 1)], name="token_blacklist_expires_at"),
+        ]
 
 
 class AppCategory(Document):
@@ -100,7 +118,9 @@ class AppCategory(Document):
 
     class Settings:
         name = "app_categories"
-        indexes = [[("name", 1)]]
+        indexes = [
+            IndexModel([("name", 1)], name="app_categories_name_unique", unique=True),
+        ]
 
 
 class ConversationMessage(Document):
@@ -115,6 +135,12 @@ class ConversationMessage(Document):
     class Settings:
         name = "conversation_messages"
         indexes = [
-            [("user_id", 1), ("thread_id", 1), ("created_at", 1)],
-            [("thread_id", 1), ("created_at", 1)],
+            IndexModel(
+                [("user_id", 1), ("thread_id", 1), ("created_at", 1)],
+                name="conversation_messages_user_thread_created_at",
+            ),
+            IndexModel(
+                [("thread_id", 1), ("created_at", 1)],
+                name="conversation_messages_thread_created_at",
+            ),
         ]

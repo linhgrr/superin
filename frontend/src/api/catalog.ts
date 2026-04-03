@@ -36,11 +36,11 @@ export async function getCategories(): Promise<Category[]> {
 // ─── Install / Uninstall ────────────────────────────────────────────────────────
 
 export async function installApp(payload: AppInstallRequest): Promise<void> {
-  return api.post<void>(API_PATHS.CATALOG_INSTALL(payload.app_id), payload);
+  return api.post<void>(API_PATHS.CATALOG_INSTALL, payload);
 }
 
 export async function uninstallApp(payload: AppUninstallRequest): Promise<void> {
-  return api.post<void>(API_PATHS.CATALOG_UNINSTALL(payload.app_id), payload);
+  return api.post<void>(API_PATHS.CATALOG_UNINSTALL, payload);
 }
 
 // ─── Preferences ───────────────────────────────────────────────────────────────

@@ -8,7 +8,9 @@ export function useFinanceSummary() {
   useEffect(() => {
     getFinanceSummary()
       .then(setSummary)
-      .catch(() => {})
+      .catch((error: unknown) => {
+        console.error("Failed to load finance summary", error);
+      })
       .finally(() => setLoading(false));
   }, []);
 

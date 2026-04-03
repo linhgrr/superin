@@ -2,6 +2,40 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 
+function manualChunks(id: string): string | undefined {
+  if (!id.includes("node_modules")) {
+    return undefined;
+  }
+
+  if (
+    id.includes("@assistant-ui/react") ||
+    id.includes("@assistant-ui/react-data-stream") ||
+    id.includes("assistant-stream") ||
+    id.includes("react-markdown") ||
+    id.includes("remark-gfm")
+  ) {
+    return "chat";
+  }
+
+  if (id.includes("lucide-react/dynamicIconImports")) {
+    return "dynamic-icons";
+  }
+
+  if (id.includes("react-grid-layout") || id.includes("react-resizable")) {
+    return "dashboard-grid";
+  }
+
+  if (id.includes("driver.js")) {
+    return "onboarding";
+  }
+
+  if (id.includes("axios") || id.includes("jwt-decode")) {
+    return "client";
+  }
+
+  return undefined;
+}
+
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -23,14 +57,7 @@ export default defineConfig({
     sourcemap: true,
     rollupOptions: {
       output: {
-        // Code splitting strategy cho plug-n-play apps
-        manualChunks: {
-          // Core vendor libs - preload
-          vendor: ["react", "react-dom", "react-router-dom"],
-          // UI libs
-          ui: ["@assistant-ui/react", "@assistant-ui/react-data-stream", "lucide-react"],
-        },
-        // Đảm bảo mỗi dynamic import tạo chunk riêng
+        manualChunks,
         chunkFileNames: "assets/[name]-[hash].js",
         entryFileNames: "assets/[name]-[hash].js",
       },

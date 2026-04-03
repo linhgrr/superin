@@ -540,9 +540,14 @@ class FinanceService:
 
     async def on_install(self, user_id: str) -> None:
         """Seed default data for a new user."""
-        await self.wallets.create(user_id, "Main Wallet", "USD")
+        wallets = await self.wallets.find_by_user(user_id)
+        if not wallets:
+            await self.wallets.create(user_id, "Main Wallet", "USD")
+
+        existing_categories = {category.name for category in await self.categories.find_by_user(user_id)}
         for name in ["Food", "Transport", "Entertainment", "Shopping", "Salary"]:
-            await self.categories.create(user_id, name)
+            if name not in existing_categories:
+                await self.categories.create(user_id, name)
 
     async def on_uninstall(self, user_id: str) -> None:
         await self.wallets.delete_all_by_user(user_id)

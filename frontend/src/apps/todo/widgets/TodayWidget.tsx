@@ -2,7 +2,7 @@ import type { DashboardWidgetRendererProps } from "../types";
 import { useTodoSummary } from "./useTodoSummary";
 import { CalendarClock, AlertCircle } from "lucide-react";
 
-export default function TodayWidget({ widget }: DashboardWidgetRendererProps) {
+export default function TodayWidget({ widget: _widget }: DashboardWidgetRendererProps) {
   const { summary, loading } = useTodoSummary();
 
   return (

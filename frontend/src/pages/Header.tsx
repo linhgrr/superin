@@ -8,7 +8,7 @@
 
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { useOnboarding } from "@/components/providers/AppProviders";
+import { useOnboarding } from "@/components/providers/OnboardingProvider";
 import { LogOut, Settings, Command, HelpCircle, PlayCircle } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 

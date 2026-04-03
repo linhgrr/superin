@@ -22,9 +22,7 @@
  */
 
 import { createContext, ReactNode, useContext, useCallback, useState, useEffect, useRef } from "react";
-import { driver } from "driver.js";
 import type { Driver, DriveStep } from "driver.js";
-import "driver.js/dist/driver.css";
 import { STORAGE_KEYS } from "@/constants";
 
 type TourId = "welcome" | "dashboard" | "apps" | "chat" | "store";
@@ -329,83 +327,84 @@ function OnboardingProvider({ children }: { children: ReactNode }) {
     const steps = TOURS[tourId];
     if (!steps || steps.length === 0) return;
 
-    // End any existing tour
-    const currentDriver = driverObjRef.current;
-    if (currentDriver) {
-      currentDriver.destroy();
-    }
+    const run = async () => {
+      const [{ driver }] = await Promise.all([
+        import("driver.js"),
+        import("driver.js/dist/driver.css"),
+      ]);
 
-    setState((prev) => ({ ...prev, currentTour: tourId, stepIndex: 0 }));
+      const currentDriver = driverObjRef.current;
+      if (currentDriver) {
+        currentDriver.destroy();
+      }
 
-    const d = driver({
-      showProgress: true,
-      showButtons: ["next", "previous", "close"],
-      allowClose: true,
-      keyboardControl: true,
-      overlayClickNext: false,
-      stagePadding: 4,
-      stageRadius: 12,
-      popoverClass: "shin-onboarding-popover",
-      nextBtnText: "Next →",
-      prevBtnText: "← Previous",
-      doneBtnText: "Finish",
-      closeBtnText: "Skip",
-      onHighlighted: (element, step, options) => {
-        setState((prev) => ({ ...prev, stepIndex: options.state?.activeStep || 0 }));
-      },
-      onDeselected: () => {
-        // Step transition
-      },
-      onDestroyed: () => {
-        // Called when tour is closed/skipped/destroyed
-        setState((prev) => ({
-          ...prev,
-          // Mark as completed if there was an active tour
-          completedTours: prev.currentTour
-            ? [...prev.completedTours, prev.currentTour]
-            : prev.completedTours,
-          currentTour: null,
-          stepIndex: 0,
-        }));
-        setDriverObj(null);
-      },
-      onPopoverRender: (popover, { state }) => {
-        // Add custom class to wrapper
-        popover.wrapper.classList.add("shin-tour-step");
+      setState((prev) => ({ ...prev, currentTour: tourId, stepIndex: 0 }));
 
-        // Get or create progress container
-        let progressContainer = popover.wrapper.querySelector(".driver-popover-progress") as HTMLElement | null;
-        if (!progressContainer) {
-          progressContainer = document.createElement("div");
-          progressContainer.className = "driver-popover-progress shin-tour-progress";
-        }
+      const d = driver({
+        showProgress: true,
+        showButtons: ["next", "previous", "close"],
+        allowClose: true,
+        keyboardControl: true,
+        overlayClickNext: false,
+        stagePadding: 4,
+        stageRadius: 12,
+        popoverClass: "shin-onboarding-popover",
+        nextBtnText: "Next →",
+        prevBtnText: "← Previous",
+        doneBtnText: "Finish",
+        closeBtnText: "Skip",
+        onHighlighted: (_element, _step, options) => {
+          setState((prev) => ({ ...prev, stepIndex: options.state?.activeStep || 0 }));
+        },
+        onDeselected: () => {
+          // Step transition
+        },
+        onDestroyed: () => {
+          setState((prev) => ({
+            ...prev,
+            completedTours: prev.currentTour
+              ? [...prev.completedTours, prev.currentTour]
+              : prev.completedTours,
+            currentTour: null,
+            stepIndex: 0,
+          }));
+          setDriverObj(null);
+        },
+        onPopoverRender: (popover, { state }) => {
+          popover.wrapper.classList.add("shin-tour-step");
 
-        // Safely extract values with defaults
-        const stepsArray = Array.isArray(state?.steps) ? state!.steps : [];
-        const activeStepNum = typeof state?.activeStep === "number" ? state!.activeStep : 0;
-        const currentStep = activeStepNum + 1;
-        const totalSteps = stepsArray.length > 0 ? stepsArray.length : 1;
-        const percent = Math.round((currentStep / totalSteps) * 100);
+          let progressContainer = popover.wrapper.querySelector(".driver-popover-progress") as HTMLElement | null;
+          if (!progressContainer) {
+            progressContainer = document.createElement("div");
+            progressContainer.className = "driver-popover-progress shin-tour-progress";
+          }
 
-        // Update progress content with explicit string conversion
-        progressContainer.innerHTML = `
-          <div class="shin-tour-progress-bar">
-            <div class="shin-tour-progress-fill" style="width: ${percent}%"></div>
-          </div>
-          <span class="shin-tour-progress-text">${String(currentStep)} / ${String(totalSteps)}</span>
-        `;
+          const stepsArray = Array.isArray(state?.steps) ? state.steps : [];
+          const activeStepNum = typeof state?.activeStep === "number" ? state.activeStep : 0;
+          const currentStep = activeStepNum + 1;
+          const totalSteps = stepsArray.length > 0 ? stepsArray.length : 1;
+          const percent = Math.round((currentStep / totalSteps) * 100);
 
-        // Insert progress before title
-        const title = popover.title;
-        if (title?.parentNode && progressContainer.parentNode !== title.parentNode) {
-          title.parentNode.insertBefore(progressContainer, title);
-        }
-      },
-    });
+          progressContainer.innerHTML = `
+            <div class="shin-tour-progress-bar">
+              <div class="shin-tour-progress-fill" style="width: ${percent}%"></div>
+            </div>
+            <span class="shin-tour-progress-text">${String(currentStep)} / ${String(totalSteps)}</span>
+          `;
 
-    setDriverObj(d);
-    d.setSteps(steps);
-    d.drive();
+          const title = popover.title;
+          if (title?.parentNode && progressContainer.parentNode !== title.parentNode) {
+            title.parentNode.insertBefore(progressContainer, title);
+          }
+        },
+      });
+
+      setDriverObj(d);
+      d.setSteps(steps);
+      d.drive();
+    };
+
+    void run();
   }, []);
 
   const resetTours = useCallback(() => {

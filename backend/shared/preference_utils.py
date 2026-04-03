@@ -5,9 +5,36 @@ across multiple app routes.
 """
 
 from beanie import PydanticObjectId
+from beanie.operators import In
 
 from core.models import WidgetPreference
 from shared.schemas import PreferenceUpdate
+
+
+def _apply_update_to_preference(
+    pref: WidgetPreference,
+    update: PreferenceUpdate,
+) -> None:
+    update_payload = update.model_dump(exclude_unset=True)
+
+    if update.enabled is not None:
+        pref.enabled = update.enabled
+
+    if update.sort_order is not None:
+        pref.sort_order = update.sort_order
+
+    if update.config is not None:
+        pref.config = update.config
+
+    if update.size_w is not None:
+        pref.size_w = update.size_w
+    elif "size_w" in update_payload:
+        pref.size_w = None
+
+    if update.size_h is not None:
+        pref.size_h = update.size_h
+    elif "size_h" in update_payload:
+        pref.size_h = None
 
 
 async def update_widget_preference(
@@ -15,19 +42,7 @@ async def update_widget_preference(
     update: PreferenceUpdate,
     app_id: str,
 ) -> WidgetPreference | None:
-    """Update a single widget preference for a user.
-
-    This is a shared utility to avoid code duplication across app routes.
-    Handles all fields including sort_order, config, size_w, and size_h.
-
-    Args:
-        user_id: The user ID
-        update: The preference update payload
-        app_id: The app ID (e.g. 'finance', 'todo')
-
-    Returns:
-        The updated WidgetPreference document, or None if not found
-    """
+    """Update a single widget preference for a user."""
     pref = await WidgetPreference.find_one(
         WidgetPreference.user_id == PydanticObjectId(user_id),
         WidgetPreference.app_id == app_id,
@@ -37,32 +52,7 @@ async def update_widget_preference(
     if not pref:
         return None
 
-    # Update enabled status
-    if update.enabled is not None:
-        pref.enabled = update.enabled
-
-    # Update sort order (renamed from position)
-    if update.sort_order is not None:
-        pref.sort_order = update.sort_order
-
-    # Update config dict
-    if update.config is not None:
-        pref.config = update.config
-
-    # Update size_w: explicit None means reset to default
-    if update.size_w is not None:
-        pref.size_w = update.size_w
-    else:
-        # Check if size_w was explicitly provided (even as null)
-        if "size_w" in update.model_dump(exclude_unset=True):
-            pref.size_w = None
-
-    # Update size_h: explicit None means reset to default
-    if update.size_h is not None:
-        pref.size_h = update.size_h
-    else:
-        if "size_h" in update.model_dump(exclude_unset=True):
-            pref.size_h = None
+    _apply_update_to_preference(pref, update)
 
     await pref.save()
     return pref
@@ -73,21 +63,30 @@ async def update_multiple_preferences(
     updates: list[PreferenceUpdate],
     app_id: str,
 ) -> list[WidgetPreference]:
-    """Update multiple widget preferences for a user.
+    """Update multiple widget preferences for a user with one read and batched writes."""
+    if not updates:
+        return []
 
-    Args:
-        user_id: The user ID
-        updates: List of preference update payloads
-        app_id: The app ID
+    widget_ids = [update.widget_id for update in updates]
+    prefs = await WidgetPreference.find(
+        WidgetPreference.user_id == PydanticObjectId(user_id),
+        WidgetPreference.app_id == app_id,
+        In(WidgetPreference.widget_id, widget_ids),
+    ).to_list()
 
-    Returns:
-        List of updated WidgetPreference documents
-    """
-    results = []
-    for update in updates:
-        pref = await update_widget_preference(user_id, update, app_id)
-        if pref:
+    pref_by_widget_id = {pref.widget_id: pref for pref in prefs}
+    results: list[WidgetPreference] = []
+
+    async with WidgetPreference.bulk_writer() as bulk_writer:
+        for update in updates:
+            pref = pref_by_widget_id.get(update.widget_id)
+            if not pref:
+                continue
+
+            _apply_update_to_preference(pref, update)
+            await pref.replace(bulk_writer=bulk_writer)
             results.append(pref)
+
     return results
 
 

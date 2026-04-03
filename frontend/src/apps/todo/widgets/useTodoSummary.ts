@@ -8,7 +8,9 @@ export function useTodoSummary() {
   useEffect(() => {
     getTodoSummary()
       .then(setSummary)
-      .catch(() => {})
+      .catch((error: unknown) => {
+        console.error("Failed to load todo summary", error);
+      })
       .finally(() => setLoading(false));
   }, []);
 

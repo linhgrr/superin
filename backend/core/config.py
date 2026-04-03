@@ -40,6 +40,7 @@ class Settings(BaseSettings):
 
     # ─── CORS (JSON array in .env file) ──────────────────────────────────────
     cors_origins: list[str] = ["http://localhost:5173"]
+    admin_emails: list[str] = []
 
     # ─── Deployment ──────────────────────────────────────────────────────────
     hf_space: bool = False

@@ -15,11 +15,21 @@ import {
   Search,
   Trash2,
 } from "lucide-react";
-import { getCategories, installApp, uninstallApp } from "@/api/catalog";
-import { useAppCatalog, useToast } from "@/components/providers/AppProviders";
+import { getCatalog, getCategories, installApp, uninstallApp } from "@/api/catalog";
+import { useToast } from "@/components/providers/ToastProvider";
+import { useWorkspace } from "@/components/providers/WorkspaceProvider";
+import { ROUTES, STORAGE_KEYS } from "@/constants";
 import { DynamicIcon } from "@/lib/icon-resolver";
 import type { AppCatalogEntry } from "@/types/generated/api";
 import type { Category } from "@/api/catalog";
+
+interface PersistedCatalogSnapshot {
+  catalog: AppCatalogEntry[];
+  storedAt: number;
+  version: 1;
+}
+
+const STORE_CATALOG_CACHE_VERSION = 1;
 
 /**
  * Generate a gradient from an oklch color string.
@@ -58,9 +68,43 @@ function formatCategoryLabel(category: string): string {
   return category.charAt(0).toUpperCase() + category.slice(1).toLowerCase();
 }
 
+function readCatalogSnapshot(): AppCatalogEntry[] {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEYS.STORE_CATALOG_SNAPSHOT);
+    if (!raw) {
+      return [];
+    }
+
+    const parsed = JSON.parse(raw) as PersistedCatalogSnapshot;
+    if (parsed.version !== STORE_CATALOG_CACHE_VERSION || !Array.isArray(parsed.catalog)) {
+      return [];
+    }
+
+    return parsed.catalog;
+  } catch (error: unknown) {
+    console.error("Failed to read catalog snapshot", error);
+    return [];
+  }
+}
+
+function writeCatalogSnapshot(catalog: AppCatalogEntry[]): void {
+  try {
+    const payload: PersistedCatalogSnapshot = {
+      catalog,
+      storedAt: Date.now(),
+      version: STORE_CATALOG_CACHE_VERSION,
+    };
+    sessionStorage.setItem(STORAGE_KEYS.STORE_CATALOG_SNAPSHOT, JSON.stringify(payload));
+  } catch (error: unknown) {
+    console.error("Failed to write catalog snapshot", error);
+  }
+}
+
 export default function StorePage() {
-  const { catalog, isCatalogLoading, refreshCatalog, setAppInstalled } = useAppCatalog();
+  const { installedAppIds, refreshWorkspace, setAppInstalled } = useWorkspace();
   const toast = useToast();
+  const [catalog, setCatalog] = useState<AppCatalogEntry[]>(() => readCatalogSnapshot());
+  const [isCatalogLoading, setIsCatalogLoading] = useState(() => readCatalogSnapshot().length === 0);
   const [installing, setInstalling] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -68,7 +112,20 @@ export default function StorePage() {
 
   // Categories from API
   const [categories, setCategories] = useState<Category[]>([]);
-  const [isLoadingCategories] = useState(true);
+
+  useEffect(() => {
+    async function loadCatalog() {
+      try {
+        const nextCatalog = await getCatalog();
+        setCatalog(nextCatalog);
+        writeCatalogSnapshot(nextCatalog);
+      } finally {
+        setIsCatalogLoading(false);
+      }
+    }
+
+    void loadCatalog();
+  }, []);
 
   // Fetch categories on mount
   useEffect(() => {
@@ -76,14 +133,21 @@ export default function StorePage() {
       try {
         const cats = await getCategories();
         setCategories(cats);
-      } catch {
-        // Silently fail - categories are for UI enhancement only
-      } finally {
-        setIsLoadingCategories(false);
+      } catch (error: unknown) {
+        console.error("Failed to load catalog categories", error);
       }
     }
     void loadCategories();
   }, []);
+
+  const mergedCatalog = useMemo(
+    () =>
+      catalog.map((app) => ({
+        ...app,
+        is_installed: installedAppIds.has(app.id),
+      })),
+    [catalog, installedAppIds]
+  );
 
   // Build category lookup map
   const categoryMap = useMemo(() => {
@@ -111,28 +175,30 @@ export default function StorePage() {
 
   // Extract unique category IDs from catalog, merged with API categories
   const availableCategories = useMemo(() => {
-    const catIds = new Set(catalog.map((a) => a.category.toLowerCase()));
+    const catIds = new Set(mergedCatalog.map((a) => a.category.toLowerCase()));
     const merged = new Set([...categories.map((c) => c.name.toLowerCase()), ...catIds]);
     return ["all", ...Array.from(merged).sort()];
-  }, [catalog, categories]);
+  }, [categories, mergedCatalog]);
 
   async function handleToggle(app: AppCatalogEntry) {
     if (installing.has(app.id)) return;
     setInstalling((s) => new Set([...s, app.id]));
     const nextInstalled = !app.is_installed;
-    setAppInstalled(app.id, nextInstalled);
+    setAppInstalled(app, nextInstalled);
     try {
       if (app.is_installed) {
         await uninstallApp({ app_id: app.id });
         toast.success(`${app.name} uninstalled`, { description: "The app has been removed from your workspace" });
       } else {
         await installApp({ app_id: app.id });
-        toast.success(`${app.name} installed`, { description: "The app is now available in your workspace", action: { label: "Open", onClick: () => window.location.href = `/apps/${app.id}` } });
+        toast.success(`${app.name} installed`, { description: "The app is now available in your workspace", action: { label: "Open", onClick: () => window.location.href = ROUTES.APP_DETAIL(app.id) } });
       }
-    } catch {
-      setAppInstalled(app.id, app.is_installed);
+      await refreshWorkspace();
+    } catch (error: unknown) {
+      console.error(`Failed to toggle app installation for ${app.id}`, error);
+      setAppInstalled(app, app.is_installed);
       toast.error(`Failed to ${app.is_installed ? "uninstall" : "install"} ${app.name}`, { description: "Please try again later" });
-      await refreshCatalog();
+      await refreshWorkspace();
     } finally {
       setInstalling((s) => {
         const next = new Set(s);
@@ -142,7 +208,7 @@ export default function StorePage() {
     }
   }
 
-  const filtered = catalog.filter((app) => {
+  const filtered = mergedCatalog.filter((app) => {
     const matchesCategory = filter === "all" || app.category.toLowerCase() === filter.toLowerCase();
     const matchesSearch =
       searchQuery === "" ||
@@ -151,7 +217,7 @@ export default function StorePage() {
     return matchesCategory && matchesSearch;
   });
 
-  if (isCatalogLoading) {
+  if (isCatalogLoading && catalog.length === 0) {
     return (
       <div
         style={{

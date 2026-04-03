@@ -5,12 +5,13 @@
  * Handles responsive collapse.
  */
 
-import { ReactNode, useMemo } from "react";
+import { lazy, ReactNode, Suspense, useEffect, useMemo, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
-import { useAppCatalog } from "@/components/providers/AppProviders";
+import { useWorkspace } from "@/components/providers/WorkspaceProvider";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
-import ChatThread from "@/components/chat/ChatThread";
+
+const ChatPanel = lazy(() => import("@/components/chat/ChatPanel"));
 
 interface AppShellProps {
   children?: ReactNode;
@@ -25,7 +26,7 @@ interface AppShellProps {
  * Falls back to sentence-cased path segments.
  */
 function usePageTitles(): Record<string, string> {
-  const { installedApps } = useAppCatalog();
+  const { installedApps } = useWorkspace();
 
   return useMemo(() => {
     const titles: Record<string, string> = {
@@ -60,6 +61,20 @@ export default function AppShell({
 }: AppShellProps) {
   const location = useLocation();
   const pageTitles = usePageTitles();
+  const [isChatReady, setIsChatReady] = useState(false);
+
+  useEffect(() => {
+    if (!showChat) {
+      setIsChatReady(false);
+      return;
+    }
+
+    const schedule = window.requestIdleCallback ?? ((callback: IdleRequestCallback) => window.setTimeout(callback, 150));
+    const cancel = window.cancelIdleCallback ?? window.clearTimeout;
+    const handle = schedule(() => setIsChatReady(true));
+
+    return () => cancel(handle);
+  }, [showChat]);
 
   const resolvedTitle = useMemo(() => {
     if (title) return title;
@@ -99,7 +114,11 @@ export default function AppShell({
       </div>
 
       {/* Right: Chat panel */}
-      {showChat && <ChatThread />}
+      {showChat && (
+        <Suspense fallback={<div className="chat-container" />}>
+          {isChatReady ? <ChatPanel /> : <div className="chat-container" />}
+        </Suspense>
+      )}
     </div>
   );
 }

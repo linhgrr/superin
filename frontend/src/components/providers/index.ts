@@ -2,9 +2,8 @@
  * Providers barrel export
  */
 
-export { AppCatalogProvider, ChatRuntimeProvider, AppCatalogContext, useAppCatalog } from "./InnerProviders";
-export { ToastProvider, useToast, type Toast, type ToastVariant, type ToastAction } from "./ToastProvider";
-export { CommandPalette, type CommandItem } from "./CommandPalette";
-export { OnboardingProvider, useOnboarding, type TourId, type OnboardingState } from "./OnboardingProvider";
-export { DiscoveryInitializer } from "./DiscoveryInitializer";
 export { AppProviders } from "./AppProviders";
+export { DiscoveryInitializer } from "./DiscoveryInitializer";
+export { OnboardingProvider, useOnboarding, type OnboardingState, type TourId } from "./OnboardingProvider";
+export { ToastProvider, useToast, type Toast, type ToastAction, type ToastVariant } from "./ToastProvider";
+export { WorkspaceProvider, useWorkspace } from "./WorkspaceProvider";

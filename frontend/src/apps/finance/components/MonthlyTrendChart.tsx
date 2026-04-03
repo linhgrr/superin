@@ -52,8 +52,6 @@ export default function MonthlyTrendChart({ months = 6 }: MonthlyTrendChartProps
   }
 
   const maxValue = Math.max(...monthData.map((m) => Math.max(m.income ?? 0, m.expense ?? 0)), 1);
-  const maxNet = Math.max(...monthData.map((m) => Math.abs(m.net ?? 0)), 1);
-
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
       {/* Legend */}
@@ -84,7 +82,6 @@ export default function MonthlyTrendChart({ months = 6 }: MonthlyTrendChartProps
         {monthData.map((month) => {
           const incomeHeight = (month.income / maxValue) * 100;
           const expenseHeight = (month.expense / maxValue) * 100;
-          const netHeight = (Math.abs(month.net) / maxNet) * 100;
           const netPositive = month.net >= 0;
 
           return (

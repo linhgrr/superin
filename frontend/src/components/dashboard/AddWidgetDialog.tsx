@@ -6,13 +6,13 @@
  * Now uses dynamic icon resolution from backend-provided icon names.
  */
 
-import { ArrowLeft, Eye, EyeOff, Grid3X3, LayoutGrid, X } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, LayoutGrid, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { DynamicIcon } from "@/lib/icon-resolver";
-import type { AppCatalogEntry } from "@/types/generated/api";
+import type { AppRuntimeEntry } from "@/types/generated/api";
 
 export interface AddWidgetDialogProps {
-  catalog: AppCatalogEntry[];
+  catalog: AppRuntimeEntry[];
   enabledWidgetIds: ReadonlySet<string>;
   busyWidgetId?: string | null;
   onToggleWidget: (widgetId: string, enabled: boolean) => Promise<void> | void;
@@ -37,11 +37,9 @@ const SIZE_BADGE_COLORS: Record<string, { bg: string; text: string }> = {
 
 function IconGlyph({
   iconName,
-  fallback,
   size = 18,
 }: {
   iconName?: string | null;
-  fallback: string;
   size?: number;
 }) {
   // Use DynamicIcon for any icon name - no more hardcoded mapping needed
@@ -79,7 +77,7 @@ export default function AddWidgetDialog({
   onToggleWidget,
   onClose,
 }: AddWidgetDialogProps) {
-  const [selectedApp, setSelectedApp] = useState<AppCatalogEntry | null>(null);
+  const [selectedApp, setSelectedApp] = useState<AppRuntimeEntry | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -159,7 +157,7 @@ export default function AddWidgetDialog({
                           border: app.color ? `1px solid ${app.color}33` : undefined,
                         }}
                       >
-                        <IconGlyph iconName={app.icon} fallback={app.name} size={18} />
+                        <IconGlyph iconName={app.icon} size={18} />
                       </div>
 
                       <div className="option-info">

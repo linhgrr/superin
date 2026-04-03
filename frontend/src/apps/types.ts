@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import type { AppCatalogEntry } from "@/types/generated/api";
+import type { WidgetManifestSchema } from "@/types/generated/api";
 import type { WidgetSizeName } from "@/lib/widget-sizes";
 
 export interface FrontendWidgetManifest {
@@ -15,11 +15,11 @@ export interface FrontendAppManifest {
 
 export interface DashboardWidgetProps {
   widgetId: string;
-  widget: AppCatalogEntry["widgets"][number];
+  widget: WidgetManifestSchema;
 }
 
 export interface DashboardWidgetRendererProps {
-  widget: AppCatalogEntry["widgets"][number];
+  widget: WidgetManifestSchema;
 }
 
 export interface FrontendAppDefinition {

@@ -61,11 +61,8 @@ export function DiscoveryInitializer({
   useEffect(() => {
     // Chỉ chạy discovery khi component mount
     // Điều này đảm bảo discovery không chạy ở login page
-    const apps = discoverAndRegisterApps();
+    discoverAndRegisterApps();
     setIsComplete(true);
-    if (import.meta.env.DEV) {
-      console.log("[Discovery] Apps registered:", apps.map((a) => a.id));
-    }
   }, []);
 
   if (!isComplete) {
