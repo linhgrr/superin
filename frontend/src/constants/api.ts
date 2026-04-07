@@ -2,15 +2,10 @@
  * API Routes - Core platform only.
  *
  * Plug-n-play rule: Core constants must NOT know about specific apps.
- * App-specific paths are defined in each app's own api.ts file.
+ * App-specific paths are consumed through each app-local generated `api.ts` facade.
  *
  * Example:
- *   // apps/finance/api.ts
- *   const BASE = "/api/apps/finance";
- *   export const financeApi = {
- *     wallets: `${BASE}/wallets`,
- *     transactions: (id: string) => `${BASE}/transactions/${id}`,
- *   };
+ *   import { getTransactions } from "@/apps/finance/api";
  */
 
 // ─── Core Routes ──────────────────────────────────────────────────────────────
@@ -71,9 +66,9 @@ export const API_PATHS = {
 
 // ─── App API Helper ─────────────────────────────────────────────────────────────
 /**
- * Build base path for an app API. Apps should use this or define their own BASE.
+ * Build base path for an app API.
  *
- * Usage in app api.ts:
+ * Used by generated app-local `api.ts` facades:
  *   const BASE = appApiBase("finance"); // → "/api/apps/finance"
  */
 export const appApiBase = (appId: string): string => `/api/apps/${appId}`;

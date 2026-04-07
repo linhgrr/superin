@@ -8,6 +8,11 @@ import SubtaskList from "../../components/SubtaskList";
 import RecurringRuleForm from "../../components/RecurringRuleForm";
 import type { RecurringFrequency } from "../../api";
 
+type TaskStatus = TaskRead["status"];
+type TaskFilter = "all" | TaskStatus;
+
+const TASK_FILTER_VALUES = ["all", "pending", "completed"] as const satisfies readonly TaskFilter[];
+
 type TaskListItem = TaskRead & {
   subtask_count?: number;
   subtask_completed?: number;
@@ -21,7 +26,7 @@ export default function TasksPanel() {
   const [tasks, setTasks] = useState<TaskListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [filter, setFilter] = useState<"all" | "pending" | "completed">("all");
+  const [filter, setFilter] = useState<TaskFilter>("all");
   const [selectedTask, setSelectedTask] = useState<TaskListItem | null>(null);
   const [subtasks, setSubtasks] = useState<SubTaskRead[]>([]);
   const [subtasksLoading, setSubtasksLoading] = useState(false);
@@ -173,7 +178,7 @@ export default function TasksPanel() {
           marginBottom: "1.5rem",
         }}
       >
-        {(["all", "pending", "completed"] as const).map((value) => (
+        {TASK_FILTER_VALUES.map((value) => (
           <button
             key={value}
             onClick={() => setFilter(value)}

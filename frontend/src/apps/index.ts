@@ -1,8 +1,9 @@
 /**
- * App registry — thin re-export from platform lib.
+ * App discovery compatibility facade.
  *
- * plugins/ can import from here (apps/ is the discovery hub,
- * not a plugin). Platform code uses @/lib/* directly.
+ * `src/apps` is not a handwritten registry. This module only re-exports the
+ * platform discovery/lazy-loading helpers so app code can import from a stable
+ * app-local surface when needed.
  */
 import { discoverAndRegisterApps, type AppMetadata } from "@/lib/discovery";
 import type { DashboardWidgetProps } from "@/lib/types";

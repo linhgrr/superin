@@ -8,6 +8,12 @@ import TransactionEditForm from "../../components/TransactionEditForm";
 import { formatCurrency } from "../../lib/formatCurrency";
 import { useTimezone } from "@/shared/hooks/useTimezone";
 
+const TRANSACTION_TYPE_VALUES = ["income", "expense"] as const satisfies readonly CreateTransactionRequest["type"][];
+
+function isTransactionType(value: string): value is CreateTransactionRequest["type"] {
+  return TRANSACTION_TYPE_VALUES.some((candidate) => candidate === value);
+}
+
 export default function TransactionsTab() {
   const { formatDate } = useTimezone();
   const [transactions, setTransactions] = useState<TransactionRead[]>([]);
@@ -137,10 +143,11 @@ export default function TransactionsTab() {
             ]}
             submitLabel="Add Transaction"
             onSubmit={async (values) => {
+              const transactionType = isTransactionType(values.type) ? values.type : "expense";
               const request: CreateTransactionRequest = {
                 wallet_id: values.wallet_id,
                 category_id: values.category_id,
-                type: values.type as "income" | "expense",
+                type: transactionType,
                 amount: parseFloat(values.amount),
                 date: new Date(values.date).toISOString(),
                 note: values.note || undefined,

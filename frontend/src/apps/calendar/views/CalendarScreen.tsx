@@ -15,6 +15,7 @@ import { filterEventsByCalendar, groupEventsByDate } from "../utils/eventHelpers
 import { useTimezone } from "@/shared/hooks/useTimezone";
 
 type ViewMode = "list" | "week";
+const CALENDAR_EVENT_TYPE: CreateEventRequest["type"] = "event";
 
 export default function CalendarScreen() {
   const { timezone } = useTimezone();
@@ -99,7 +100,7 @@ export default function CalendarScreen() {
         end_datetime: end.toISOString(),
         calendar_id: defaultCalendar.id,
         is_all_day: false,
-        type: "event",
+        type: CALENDAR_EVENT_TYPE,
       };
       await createEvent(request);
       await loadData();

@@ -8,7 +8,7 @@ const PRIORITY_STYLE = {
   high: { color: "var(--color-danger)", bg: "oklch(0.63 0.24 25 / 0.15)" },
   medium: { color: "var(--color-warning)", bg: "oklch(0.75 0.18 85 / 0.15)" },
   low: { color: "var(--color-success)", bg: "oklch(0.72 0.19 145 / 0.15)" },
-} as const;
+} as const satisfies Record<TaskRead["priority"], { bg: string; color: string }>;
 
 interface TaskRowProps {
   task: TaskRead & {

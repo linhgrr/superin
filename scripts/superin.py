@@ -108,10 +108,10 @@ def load_backend_manifests() -> list[Any]:
 
 
 def sync_frontend_registry() -> None:
-    """Update frontend registry index for auto-discovery.
+    """Compatibility no-op for frontend app auto-discovery.
 
-    Note: With auto-discovery via Vite glob imports, this is now a no-op.
-    Frontend app folders are discovered from AppView.tsx and DashboardWidget.tsx.
+    Frontend apps are discovered from file structure via Vite glob imports,
+    so there is no handwritten registry file to update anymore.
     """
     print("[sync_frontend_registry] Auto-discovery is enabled via Vite glob import.")
     print("[sync_frontend_registry] No manual registry update needed.")
@@ -154,7 +154,7 @@ def sync_frontend_app(app_id: str, *, force_widgets: bool = False) -> None:
                 "  return (\n"
                 "    <div>\n"
                 f'      <h2 style={{{{ fontSize: "1.5rem", fontWeight: 700, margin: 0 }}}}>{app_name}</h2>\n'
-                f'      <p style={{{{ color: "var(--color-muted)", marginTop: "0.5rem" }}}}>TODO: compose the {app_name} app page from features and components.</p>\n'
+                f'      <p style={{{{ color: "var(--color-foreground-muted)", marginTop: "0.5rem" }}}}>TODO: compose the {app_name} app page from features and components.</p>\n'
                 "    </div>\n"
                 "  );\n"
                 "}\n"
@@ -174,7 +174,7 @@ def sync_frontend_app(app_id: str, *, force_widgets: bool = False) -> None:
                     "  return (\n"
                     "    <div>\n"
                     '      <p className="section-label">{widget.name}</p>\n'
-                    '      <p style={{ fontSize: "0.875rem", color: "var(--color-muted)", margin: "0.25rem 0 0" }}>\n'
+                    '      <p style={{ fontSize: "0.875rem", color: "var(--color-foreground-muted)", margin: "0.25rem 0 0" }}>\n'
                     "        {widget.description}\n"
                     "      </p>\n"
                     "    </div>\n"

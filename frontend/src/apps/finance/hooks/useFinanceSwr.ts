@@ -32,6 +32,7 @@ import type {
   CreateCategoryRequest,
   CreateTransactionRequest,
   CreateWalletRequest,
+  GetTransactionsParams,
   MonthlyTrendResponse,
   SummaryResponse,
   TransactionRead,
@@ -61,7 +62,9 @@ export function useCategories() {
   return useSWR<CategoryRead[]>("finance/categories", apiGetCategories, swrConfig);
 }
 
-export function useTransactions(params?: { wallet_id?: string; type?: "income" | "expense"; limit?: number }) {
+type UseTransactionsParams = Pick<GetTransactionsParams, "limit" | "type" | "wallet_id">;
+
+export function useTransactions(params?: UseTransactionsParams) {
   const key = params ? ["finance/transactions", params] : "finance/transactions";
   return useSWR<TransactionRead[]>(
     key,
