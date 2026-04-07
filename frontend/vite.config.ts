@@ -1,8 +1,15 @@
-import { defineConfig } from "vite";
+/// <reference types="vitest" />
 import react from "@vitejs/plugin-react";
 import path from "path";
+import { defineConfig, loadEnv } from "vite";
 
-const HARDCODED_API_BASE_URL = "https://linhdzqua148-superin-be.hf.space";
+function getRequiredEnv(env: Record<string, string>, name: string): string {
+  const value = env[name];
+  if (!value) {
+    throw new Error(`Missing required frontend env: ${name}`);
+  }
+  return value;
+}
 
 function manualChunks(id: string): string | undefined {
   if (!id.includes("node_modules")) {
@@ -38,31 +45,42 @@ function manualChunks(id: string): string | undefined {
   return undefined;
 }
 
-export default defineConfig({
-  plugins: [react()],
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
-    },
-  },
-  server: {
-    port: 5173,
-    proxy: {
-      "/api": {
-        target: HARDCODED_API_BASE_URL,
-        changeOrigin: true,
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, __dirname, "");
+  const apiBaseUrl = getRequiredEnv(env, "VITE_API_URL");
+
+  return {
+    plugins: [react()],
+    resolve: {
+      alias: {
+        "@": path.resolve(__dirname, "./src"),
       },
     },
-  },
-  build: {
-    outDir: "dist",
-    sourcemap: true,
-    rollupOptions: {
-      output: {
-        manualChunks,
-        chunkFileNames: "assets/[name]-[hash].js",
-        entryFileNames: "assets/[name]-[hash].js",
+    server: {
+      port: 5173,
+      proxy: {
+        "/api": {
+          target: apiBaseUrl,
+          changeOrigin: true,
+        },
       },
     },
-  },
+    build: {
+      outDir: "dist",
+      sourcemap: true,
+      rollupOptions: {
+        output: {
+          manualChunks,
+          chunkFileNames: "assets/[name]-[hash].js",
+          entryFileNames: "assets/[name]-[hash].js",
+        },
+      },
+    },
+    test: {
+      globals: true,
+      environment: "jsdom",
+      setupFiles: ["./src/test-setup.ts"],
+      include: ["src/**/*.{test,spec}.{ts,tsx}"],
+    },
+  };
 });

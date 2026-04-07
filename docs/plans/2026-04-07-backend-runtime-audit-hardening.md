@@ -48,7 +48,7 @@
 - [x] Add regression tests for new invariants and concurrency-sensitive service behavior.
 - [x] Update `CLAUDE.md` with precise rules for DB invariants / transactions / generated boundaries.
 - [x] Re-check runtime access flow for uninstalled apps and note any remaining gaps.
-- [ ] Re-check repo tooling/docs for drift exposed by this audit and fix high-value items in the same pass.
+- [x] Re-check repo tooling/docs for drift exposed by this audit and fix high-value items in the same pass.
 - [x] Run targeted tests/checks and record outcomes.
 - [ ] Commit final hardening changes with clear scope.
 
@@ -61,6 +61,7 @@
 - Calendar default selection is now enforced by a partial unique index so one user cannot have multiple default calendars concurrently.
 - Calendar delete flow now promotes another calendar to default when deleting the current default and another calendar still exists.
 - Root runtime access for uninstalled apps remains fail-closed: plugin routers require installation, workspace bootstrap filters to installed apps, and root-agent tool scoping now fails closed.
+- Local DB cleanup workflow now uses disposable reset semantics (`db reset --yes`) instead of keeping ad hoc migration/backfill commands for stale dev data.
 
 ## Residual Note
 - `scripts/superin.py` still contains older frontend assumptions outside the runtime/concurrency path. This is tooling drift, not a production runtime integrity bug, so it should be cleaned in a separate pass if that workflow is still active.

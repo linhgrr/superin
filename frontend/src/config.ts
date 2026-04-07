@@ -1,6 +1,11 @@
 /** Frontend-wide constants — single source of truth. */
-
-const HARDCODED_API_BASE_URL = "https://linhdzqua148-superin-be.hf.space";
+function getRequiredEnv(name: keyof ImportMetaEnv): string {
+  const value = import.meta.env[name];
+  if (!value) {
+    throw new Error(`Missing required frontend env: ${name}`);
+  }
+  return value;
+}
 
 // ─── Auth / Tokens ──────────────────────────────────────────────────────────
 
@@ -11,7 +16,7 @@ export const ACCESS_TOKEN_REFRESH_AHEAD_SECONDS = 60; // 1 minute
 
 // ─── API ────────────────────────────────────────────────────────────────────
 
-export const API_BASE_URL = HARDCODED_API_BASE_URL;
+export const API_BASE_URL = getRequiredEnv("VITE_API_URL");
 
 /** Time in ms before an API request times out. */
 export const API_TIMEOUT_MS = 15_000; // 15 seconds

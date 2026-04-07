@@ -6,6 +6,7 @@ warnings → server starts but logs to console.
 
 import inspect
 
+from core.constants import API_ROOT
 from core.registry import PLUGIN_REGISTRY
 from shared.enums import VALID_WIDGET_SIZES
 
@@ -160,7 +161,7 @@ def verify_plugins() -> tuple[list[str], list[str]]:
     seen_routes: dict[str, str] = {}  # (method, path) -> app_id
     for app_id, plugin in PLUGIN_REGISTRY.items():
         for route in plugin["router"].routes:
-            path = route.path  # FastAPI guarantees APIRoute.path is never None
+            path = f"{API_ROOT}/apps/{app_id}{route.path}"
             methods = getattr(route, "methods", None) or {"GET"}
             for method in methods:
                 key = f"{method.upper()} {path}"

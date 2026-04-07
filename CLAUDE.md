@@ -172,14 +172,8 @@ python scripts/superin.py manifests validate
 # Validate core Mongo index contract
 python scripts/superin.py db check-indexes
 
-# Backfill derived DB fields required before some index migrations
-python scripts/superin.py db backfill-derived-fields
-
-# Audit duplicate values blocking unique index migrations
-python scripts/superin.py db audit-index-duplicates
-
-# Reconcile core Mongo indexes (run once when index names/uniqueness change)
-python scripts/superin.py db migrate-indexes
+# Reset local Mongo DB sạch theo model/index hiện tại
+python scripts/superin.py db reset --yes
 
 # Tạo plugin mới
 python scripts/superin.py plugin create {app_id}
@@ -217,6 +211,7 @@ npm run build:frontend
 7. **BẮT BUỘC annotate API đầy đủ** — Mọi route plugin trong `backend/apps/{app_id}/routes.py` phải có `response_model` rõ ràng; mọi request/response body phải có schema trong `apps/{app_id}/schemas.py`. Không để OpenAPI trả về `unknown` cho endpoint chính.
 8. **DB invariants phải nằm ở DB** — Mọi uniqueness/correctness invariant của dữ liệu thật (`name` unique theo user, chỉ một default, một installation duy nhất, v.v.) phải được enforce bằng Mongo index/constraint. Check ở service chỉ được dùng để cải thiện UX/message, không được là lớp bảo vệ duy nhất.
 9. **Multi-document mutate phải dùng transaction** — Bất kỳ flow mutate nào chạm nhiều document/collection hoặc có read-check-write cần tính atomic phải chạy trong Mongo session/transaction. Không dùng read-modify-write trên object Beanie cho balance/counter nếu có thể bị concurrent requests đè nhau.
+10. **Local DB phải disposable** — Khi Mongo index/schema contract thay đổi không tương thích ngược trong local/dev, chuẩn xử lý là dùng DB mới hoặc `python scripts/superin.py db reset --yes`. Không thiết kế thêm workflow migration/backfill tạm chỉ để cứu state local cũ.
 
 ### Backend `shared/` Conventions
 

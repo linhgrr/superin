@@ -355,16 +355,6 @@ def run_dev(frontend_delay: float) -> None:
                 child.terminate()
 
 
-class CliLogger:
-    @staticmethod
-    def warning(message: str, *args: object) -> None:
-        print(message % args if args else message)
-
-    @staticmethod
-    def info(message: str, *args: object) -> None:
-        print(message % args if args else message)
-
-
 def _db_connection() -> tuple[object, str]:
     if str(BACKEND_ROOT) not in sys.path:
         sys.path.insert(0, str(BACKEND_ROOT))
@@ -374,19 +364,6 @@ def _db_connection() -> tuple[object, str]:
     from core.config import settings  # type: ignore
 
     return AsyncMongoClient(settings.mongodb_uri), settings.mongodb_database
-
-
-async def migrate_core_indexes() -> None:
-    if str(BACKEND_ROOT) not in sys.path:
-        sys.path.insert(0, str(BACKEND_ROOT))
-
-    from core.index_contract import migrate_index_contract  # type: ignore
-
-    client, database_name = _db_connection()
-    try:
-        await migrate_index_contract(client[database_name], logger=CliLogger())
-    finally:
-        await client.close()
 
 
 async def check_core_indexes() -> None:
@@ -402,103 +379,67 @@ async def check_core_indexes() -> None:
         await client.close()
 
 
-async def audit_core_index_duplicates() -> int:
+async def initialize_clean_database() -> None:
     if str(BACKEND_ROOT) not in sys.path:
         sys.path.insert(0, str(BACKEND_ROOT))
 
-    from core.index_contract import INDEX_REQUIREMENTS, find_duplicate_values  # type: ignore
+    from beanie import init_beanie
+
+    from core.discovery import discover_apps  # type: ignore
+    from core.models import (  # type: ignore
+        AppCategory,
+        ConversationMessage,
+        TokenBlacklist,
+        User,
+        UserAppInstallation,
+        WidgetPreference,
+    )
+    from core.registry import get_plugin_models  # type: ignore
 
     client, database_name = _db_connection()
     try:
         database = client[database_name]
-        found_duplicates = 0
-        for requirement in INDEX_REQUIREMENTS:
-            if not requirement.unique:
-                continue
+        discover_apps()
+        await init_beanie(
+            database=database,
+            document_models=[
+                User,
+                UserAppInstallation,
+                AppCategory,
+                WidgetPreference,
+                TokenBlacklist,
+                ConversationMessage,
+                *get_plugin_models(),
+            ],
+        )
+    finally:
+        await client.close()
 
-            duplicates = await find_duplicate_values(
-                database[requirement.collection],
-                requirement.key,
-                partial_filter_expression=requirement.partial_filter_expression,
-            )
-            if not duplicates:
-                continue
 
-            found_duplicates += 1
+async def reset_database() -> None:
+    from pymongo.errors import OperationFailure
+
+    client, database_name = _db_connection()
+    try:
+        try:
+            await client.drop_database(database_name)
+            print(f"dropped database `{database_name}`")
+        except OperationFailure as exc:
+            if exc.code != 8000:
+                raise
+
+            database = client[database_name]
+            collection_names = await database.list_collection_names()
+            for collection_name in collection_names:
+                await database.drop_collection(collection_name)
             print(
-                "duplicate values block unique index "
-                f"{requirement.index_name} on {requirement.collection}:"
+                "dropDatabase permission unavailable; "
+                f"dropped {len(collection_names)} collection(s) in `{database_name}` instead"
             )
-            for duplicate in duplicates:
-                print(f"  - {duplicate}")
-
-        if found_duplicates == 0:
-            print("no duplicate values found for unique index requirements")
-        return found_duplicates
     finally:
         await client.close()
-
-
-async def backfill_runtime_derived_fields() -> None:
-    client, database_name = _db_connection()
-    try:
-        database = client[database_name]
-
-        wallet_result = await database["finance_wallets"].update_many(
-            {},
-            [
-                {
-                    "$set": {
-                        "name_key": {
-                            "$cond": [
-                                {"$ifNull": ["$name", False]},
-                                {"$toLower": {"$trim": {"input": "$name"}}},
-                                None,
-                            ]
-                        }
-                    }
-                }
-            ],
-        )
-        print(f"backfilled finance_wallets.name_key on {wallet_result.modified_count} documents")
-
-        category_result = await database["finance_categories"].update_many(
-            {},
-            [
-                {
-                    "$set": {
-                        "name_key": {
-                            "$cond": [
-                                {"$ifNull": ["$name", False]},
-                                {"$toLower": {"$trim": {"input": "$name"}}},
-                                None,
-                            ]
-                        }
-                    }
-                }
-            ],
-        )
-        print(f"backfilled finance_categories.name_key on {category_result.modified_count} documents")
-
-        calendar_result = await database["calendar_calendars"].update_many(
-            {},
-            [
-                {
-                    "$set": {
-                        "name_key": {
-                            "$cond": [
-                                {"$ifNull": ["$name", False]},
-                                {"$toLower": {"$trim": {"input": "$name"}}},
-                                None,
-                            ]
-                        }
-                    }
-                }
-            ],
-        )
-        print(f"backfilled calendar_calendars.name_key on {calendar_result.modified_count} documents")
-    finally:
-        await client.close()
+    await initialize_clean_database()
+    print(f"reinitialized database `{database_name}` from current Beanie models")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -527,9 +468,8 @@ def build_parser() -> argparse.ArgumentParser:
     db = subparsers.add_parser("db", help="Database workflows")
     db_sub = db.add_subparsers(dest="db_command", required=True)
     db_sub.add_parser("check-indexes", help="Validate core Mongo index contract")
-    db_sub.add_parser("migrate-indexes", help="Reconcile and create core Mongo indexes")
-    db_sub.add_parser("audit-index-duplicates", help="Report duplicate values blocking unique index migration")
-    db_sub.add_parser("backfill-derived-fields", help="Backfill derived DB fields required by new runtime invariants")
+    db_reset = db_sub.add_parser("reset", help="Drop the configured Mongo database and recreate indexes from models")
+    db_reset.add_argument("--yes", action="store_true", help="Confirm destructive reset")
 
     dev = subparsers.add_parser("dev", help="Run backend then frontend dev servers")
     dev.add_argument("--frontend-delay", type=float, default=1.5)
@@ -582,18 +522,10 @@ def main() -> None:
         print("core index contract is valid")
         return
 
-    if args.command == "db" and args.db_command == "migrate-indexes":
-        asyncio.run(migrate_core_indexes())
-        print("core indexes migrated successfully")
-        return
-
-    if args.command == "db" and args.db_command == "audit-index-duplicates":
-        duplicate_groups = asyncio.run(audit_core_index_duplicates())
-        raise SystemExit(1 if duplicate_groups else 0)
-
-    if args.command == "db" and args.db_command == "backfill-derived-fields":
-        asyncio.run(backfill_runtime_derived_fields())
-        print("derived runtime fields backfilled successfully")
+    if args.command == "db" and args.db_command == "reset":
+        if not args.yes:
+            fail("db reset is destructive. Re-run with --yes to drop the configured Mongo database.")
+        asyncio.run(reset_database())
         return
 
     if args.command == "dev":

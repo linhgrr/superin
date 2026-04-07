@@ -190,11 +190,11 @@ Quy tắc:
 
 - Startup chỉ **validate** contract index và fail-fast nếu DB chưa đúng.
 - Không sửa schema DB âm thầm lúc app boot trong production.
-- Khi đổi tên index hoặc đổi `unique`, chạy migration explicit:
+- Với local/dev, khi index contract đổi không tương thích thì reset DB sạch theo config hiện tại:
 
 ```bash
 python scripts/superin.py db check-indexes
-python scripts/superin.py db migrate-indexes
+python scripts/superin.py db reset --yes
 ```
 
 ### 5.2 Khi thêm plugin mới
