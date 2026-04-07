@@ -10,6 +10,11 @@ A complete plugin has two matching halves:
 
 The backend manifest is the source of truth.
 
+`app_id` rule:
+- use lowercase letters and digits only: `^[a-z][a-z0-9]*$`
+- valid: `finance`, `todo`, `health2`
+- invalid: `health-tracker`, `health_tracker`, `HealthTracker`
+
 ## Current Protocol
 
 ### Backend files
@@ -34,7 +39,7 @@ Responsibilities:
 - `manifest.py`: declares `AppManifestSchema` and `WidgetManifestSchema`
 - `agent.py`: child LangGraph agent, must subclass `BaseAppAgent`
 - `prompts.py`: app-specific prompt text, kept separate from `agent.py`
-- `tools.py`: app domain tools, usually named `{app_id}_{action}`
+- `tools.py`: app domain tools; every public tool name must follow `{app_id}_{action}` and be declared explicitly via `@tool("...")`
 - `repository.py`: Beanie queries only
 - `service.py`: business logic only
 - `routes.py`: FastAPI router
@@ -154,6 +159,7 @@ Rules:
 - every LLM-facing app tool must wrap its domain execution with `safe_tool_call()`
 - app tools should convert domain failures into structured `{ ok, data/error }` results
 - app-specific tools must enforce user scoping
+- public tool names must be pinned explicitly with `@tool("...")`; do not rely on function-name inference
 - startup verification fails if an app tool does not use `safe_tool_call()`
 
 ### Registration

@@ -23,7 +23,7 @@ FRONTEND_ROOT = ROOT / "frontend"
 FRONTEND_APPS = FRONTEND_ROOT / "src" / "apps"
 SCRIPT_PATH = Path(__file__).resolve()
 
-APP_ID_RE = re.compile(r"^[a-z][a-z0-9-]*[a-z0-9]$|^[a-z]$")
+APP_ID_RE = re.compile(r"^[a-z][a-z0-9]*$")
 RESERVED = {"auth", "catalog", "chat", "core", "shared", "apps"}
 REQUIRES_LINHDZ = {"codegen", "db", "manifests", "plugin"}
 
@@ -34,8 +34,14 @@ def fail(message: str) -> None:
 
 
 def to_pascal_case(value: str) -> str:
-    # Remove hyphens first, then capitalize
-    return "".join(part.capitalize() for part in value.replace("-", "").split(" "))
+    parts = [part for part in re.split(r"[\s_-]+", value) if part]
+    return "".join(part[:1].upper() + part[1:] for part in parts)
+
+
+def to_snake_case(value: str) -> str:
+    normalized = value.replace("-", "_")
+    snake = re.sub(r"(?<!^)(?=[A-Z])", "_", normalized).lower()
+    return re.sub(r"_+", "_", snake).strip("_")
 
 
 def widget_suffix(widget_id: str) -> str:
@@ -254,7 +260,7 @@ def run_codegen() -> None:
 def validate_app_id(app_id: str) -> str:
     if not APP_ID_RE.match(app_id):
         raise ValueError(
-            f"app_id '{app_id}' is invalid. Use kebab-case, e.g. 'finance' or 'health-tracker'.",
+            f"app_id '{app_id}' is invalid. Use lowercase letters and digits only, e.g. 'finance' or 'health2'.",
         )
     if len(app_id) > 30:
         raise ValueError(f"app_id '{app_id}' exceeds 30 chars.")
@@ -267,58 +273,408 @@ def validate_app_id(app_id: str) -> str:
 
 def scaffold_backend(app_id: str, model_name: str) -> None:
     app_name = to_pascal_case(app_id)
-    plural = f"{model_name.lower()}s"
+    entity_name = model_name
+    entity_snake = to_snake_case(model_name)
+    entity_plural_snake = f"{entity_snake}s"
+    schema_prefix = app_name if model_name == app_name else f"{app_name}{model_name}"
     manifest_var = f"{app_id}_manifest"
+    create_request_schema = f"{schema_prefix}CreateRequest"
+    read_schema = f"{schema_prefix}Read"
+    action_response_schema = f"{schema_prefix}ActionResponse"
+    list_tool_name = f"{app_id}_list_{entity_plural_snake}"
+    create_tool_name = f"{app_id}_create_{entity_snake}"
+    delete_tool_name = f"{app_id}_delete_{entity_snake}"
     backend_dir = BACKEND_APPS / app_id
+    collection_name = f"{app_id}_{entity_plural_snake}"
+    list_path = f"/{entity_plural_snake}"
+    detail_path = f"/{entity_plural_snake}/{{item_id}}"
 
     write_file(
         backend_dir / "__init__.py",
-        f'''"""Auto-register the {app_name} plugin."""\n\nfrom core.registry import register_plugin\n\nfrom .agent import {app_name}Agent\nfrom .manifest import {manifest_var}\nfrom .models import {model_name}\nfrom .routes import router\n\nregister_plugin(\n    manifest={manifest_var},\n    agent={app_name}Agent(),\n    router=router,\n    models=[{model_name}],\n)\n''',
+        f'''"""Auto-register the {app_name} plugin."""
+
+from core.registry import register_plugin
+
+from .agent import {app_name}Agent
+from .manifest import {manifest_var}
+from .models import {entity_name}
+from .routes import router
+
+register_plugin(
+    manifest={manifest_var},
+    agent={app_name}Agent(),
+    router=router,
+    models=[{entity_name}],
+)
+''',
         overwrite=False,
     )
     write_file(
         backend_dir / "manifest.py",
-        f'''"""Manifest for the {app_name} plugin."""\n\nfrom shared.schemas import AppManifestSchema, WidgetManifestSchema\n\nsummary_widget = WidgetManifestSchema(\n    id="{app_id}.summary",\n    name="{app_name} Summary",\n    description="Shows a quick summary for the {app_name} app.",\n    icon="Box",\n    size="medium",\n)\n\n{manifest_var} = AppManifestSchema(\n    id="{app_id}",\n    name="{app_name}",\n    version="1.0.0",\n    description="TODO: describe what the {app_name} app does.",\n    icon="Box",\n    color="oklch(0.65 0.21 280)",\n    widgets=[summary_widget],\n    agent_description="Handles {app_name.lower()} questions and actions.",\n    tools=["{app_id}_list_{plural}", "{app_id}_create_{model_name.lower()}", "{app_id}_delete_{model_name.lower()}"],\n    models=["{model_name}"],\n    category="other",\n    tags=["{app_id}"],\n    author="Shin Team",\n)\n''',
+        f'''"""Manifest for the {app_name} plugin."""
+
+from shared.schemas import AppManifestSchema, WidgetManifestSchema
+
+summary_widget = WidgetManifestSchema(
+    id="{app_id}.summary",
+    name="{app_name} Summary",
+    description="Shows a quick summary for the {app_name} app.",
+    icon="Box",
+    size="standard",
+)
+
+{manifest_var} = AppManifestSchema(
+    id="{app_id}",
+    name="{app_name}",
+    version="1.0.0",
+    description="TODO: describe what the {app_name} app does.",
+    icon="Box",
+    color="oklch(0.65 0.21 280)",
+    widgets=[summary_widget],
+    agent_description="Handles {app_name.lower()} questions and actions.",
+    tools=["{list_tool_name}", "{create_tool_name}", "{delete_tool_name}"],
+    models=["{entity_name}"],
+    category="other",
+    tags=["{app_id}"],
+    author="Shin Team",
+)
+''',
         overwrite=False,
     )
     write_file(
         backend_dir / "models.py",
-        f'''"""Beanie models for the {app_name} plugin."""\n\nfrom datetime import datetime\n\nfrom beanie import Document, PydanticObjectId\nfrom pydantic import Field\n\n\nclass {model_name}(Document):\n    user_id: PydanticObjectId\n    title: str\n    description: str | None = None\n    created_at: datetime = Field(default_factory=datetime.utcnow)\n\n    class Settings:\n        name = "{app_id}_{plural}"\n        indexes = [[("user_id", 1)]]\n''',
+        f'''"""Beanie models for the {app_name} plugin."""
+
+from __future__ import annotations
+
+from datetime import datetime
+
+from beanie import Document, PydanticObjectId
+from pydantic import Field
+from pymongo import IndexModel
+
+from core.models import utc_now
+
+
+class {entity_name}(Document):
+    user_id: PydanticObjectId
+    title: str
+    description: str | None = None
+    created_at: datetime = Field(default_factory=utc_now)
+
+    class Settings:
+        name = "{collection_name}"
+        indexes = [
+            IndexModel([('user_id', 1)], name="{collection_name}_user_id"),
+        ]
+''',
         overwrite=False,
     )
     write_file(
         backend_dir / "repository.py",
-        f'''"""Repository layer for the {app_name} plugin."""\n\nfrom beanie import PydanticObjectId\n\nfrom .models import {model_name}\n\n\nclass {model_name}Repository:\n    async def list_for_user(self, user_id: str, limit: int = 50) -> list[{model_name}]:\n        return await {model_name}.find(\n            {model_name}.user_id == PydanticObjectId(user_id),\n        ).sort("-created_at").limit(limit).to_list()\n\n    async def find_by_id(self, item_id: str, user_id: str) -> {model_name} | None:\n        return await {model_name}.find_one(\n            {model_name}.id == PydanticObjectId(item_id),\n            {model_name}.user_id == PydanticObjectId(user_id),\n        )\n\n    async def create(self, user_id: str, title: str, description: str | None = None) -> {model_name}:\n        item = {model_name}(\n            user_id=PydanticObjectId(user_id),\n            title=title,\n            description=description,\n        )\n        await item.insert()\n        return item\n\n    async def delete(self, item: {model_name}) -> None:\n        await item.delete()\n\n    async def delete_all_by_user(self, user_id: str) -> int:\n        count = 0\n        async for item in {model_name}.find({model_name}.user_id == PydanticObjectId(user_id)):\n            await item.delete()\n            count += 1\n        return count\n\n\n{model_name.lower()}_repository = {model_name}Repository()\n''',
-        overwrite=False,
-    )
-    write_file(
-        backend_dir / "service.py",
-        f'''"""Service layer for the {app_name} plugin."""\n\nfrom .models import {model_name}\nfrom .repository import {model_name}Repository, {model_name.lower()}_repository\n\n\nclass {model_name}Service:\n    def __init__(self) -> None:\n        self.repo: {model_name}Repository = {model_name.lower()}_repository\n\n    async def list_items(self, user_id: str, limit: int = 50) -> list[dict]:\n        items = await self.repo.list_for_user(user_id, limit)\n        return [_to_dict(item) for item in items]\n\n    async def create_item(self, user_id: str, title: str, description: str | None = None) -> dict:\n        if not title.strip():\n            raise ValueError("Title cannot be empty")\n        item = await self.repo.create(user_id, title, description)\n        return _to_dict(item)\n\n    async def delete_item(self, item_id: str, user_id: str) -> dict:\n        item = await self.repo.find_by_id(item_id, user_id)\n        if not item:\n            raise ValueError("{model_name} not found")\n        await self.repo.delete(item)\n        return {{"success": True, "id": item_id}}\n\n    async def on_install(self, user_id: str) -> None:\n        await self.create_item(user_id, "Welcome to {app_name}!", "Replace this seeded item with your real default data.")\n\n    async def on_uninstall(self, user_id: str) -> None:\n        await self.repo.delete_all_by_user(user_id)\n\n\ndef _to_dict(item: {model_name}) -> dict:\n    return {{"id": str(item.id), "title": item.title, "description": item.description, "created_at": item.created_at.isoformat()}}\n\n\n{model_name.lower()}_service = {model_name}Service()\n''',
+        f'''"""Repository layer for the {app_name} plugin."""
+
+from __future__ import annotations
+
+from beanie import PydanticObjectId
+
+from .models import {entity_name}
+
+
+class {entity_name}Repository:
+    async def list_for_user(self, user_id: str, limit: int = 50) -> list[{entity_name}]:
+        return await {entity_name}.find(
+            {entity_name}.user_id == PydanticObjectId(user_id),
+        ).sort("-created_at").limit(limit).to_list()
+
+    async def find_by_id(self, item_id: str, user_id: str) -> {entity_name} | None:
+        return await {entity_name}.find_one(
+            {entity_name}.id == PydanticObjectId(item_id),
+            {entity_name}.user_id == PydanticObjectId(user_id),
+        )
+
+    async def create(self, user_id: str, title: str, description: str | None = None) -> {entity_name}:
+        item = {entity_name}(
+            user_id=PydanticObjectId(user_id),
+            title=title,
+            description=description,
+        )
+        await item.insert()
+        return item
+
+    async def delete(self, item: {entity_name}) -> None:
+        await item.delete()
+
+    async def delete_all_by_user(self, user_id: str) -> int:
+        collection = {entity_name}.get_pymongo_collection()
+        result = await collection.delete_many({{"user_id": PydanticObjectId(user_id)}})
+        return result.deleted_count
+
+
+{entity_snake}_repository = {entity_name}Repository()
+''',
         overwrite=False,
     )
     write_file(
         backend_dir / "schemas.py",
-        f'''"""Request schemas for the {app_name} plugin."""\n\nfrom pydantic import BaseModel, Field\n\n\nclass Create{model_name}Request(BaseModel):\n    title: str = Field(min_length=1, max_length=200)\n    description: str | None = None\n''',
+        f'''"""Request/response schemas for the {app_name} plugin."""
+
+from __future__ import annotations
+
+from datetime import datetime
+
+from pydantic import BaseModel, Field
+
+
+class {create_request_schema}(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    description: str | None = None
+
+
+class {read_schema}(BaseModel):
+    id: str
+    title: str
+    description: str | None = None
+    created_at: datetime
+
+
+class {action_response_schema}(BaseModel):
+    success: bool
+    id: str
+    message: str | None = None
+''',
+        overwrite=False,
+    )
+    write_file(
+        backend_dir / "service.py",
+        f'''"""Service layer for the {app_name} plugin."""
+
+from __future__ import annotations
+
+from .models import {entity_name}
+from .repository import {entity_name}Repository, {entity_snake}_repository
+from .schemas import {action_response_schema}, {read_schema}
+
+
+class {entity_name}Service:
+    def __init__(self) -> None:
+        self.repo: {entity_name}Repository = {entity_snake}_repository
+
+    async def list_items(self, user_id: str, limit: int = 50) -> list[{read_schema}]:
+        items = await self.repo.list_for_user(user_id, limit)
+        return [_to_read(item) for item in items]
+
+    async def create_item(self, user_id: str, title: str, description: str | None = None) -> {read_schema}:
+        if not title.strip():
+            raise ValueError("Title cannot be empty")
+        item = await self.repo.create(user_id, title.strip(), description)
+        return _to_read(item)
+
+    async def delete_item(self, item_id: str, user_id: str) -> {action_response_schema}:
+        item = await self.repo.find_by_id(item_id, user_id)
+        if not item:
+            raise ValueError("{entity_name} not found")
+        await self.repo.delete(item)
+        return {action_response_schema}(success=True, id=item_id)
+
+    async def on_install(self, user_id: str) -> None:
+        existing_items = await self.repo.list_for_user(user_id, limit=1)
+        if existing_items:
+            return
+        await self.repo.create(
+            user_id,
+            "Welcome to {app_name}!",
+            "Replace this seeded item with your real default data.",
+        )
+
+    async def on_uninstall(self, user_id: str) -> None:
+        await self.repo.delete_all_by_user(user_id)
+
+
+def _to_read(item: {entity_name}) -> {read_schema}:
+    return {read_schema}(
+        id=str(item.id),
+        title=item.title,
+        description=item.description,
+        created_at=item.created_at,
+    )
+
+
+{entity_snake}_service = {entity_name}Service()
+''',
         overwrite=False,
     )
     write_file(
         backend_dir / "tools.py",
-        f'''"""LangGraph tools for the {app_name} plugin."""\n\nfrom langchain_core.tools import tool\n\nfrom .service import {model_name.lower()}_service\nfrom shared.agent_context import get_user_context\n\n\n@tool\nasync def {app_id}_list_{plural}(limit: int = 20) -> list[dict]:\n    """List {app_name.lower()} items for the current user."""\n    user_id = get_user_context()\n    return await {model_name.lower()}_service.list_items(user_id, limit)\n\n\n@tool\nasync def {app_id}_create_{model_name.lower()}(title: str, description: str | None = None) -> dict:\n    """Create a new {app_name.lower()} item."""\n    user_id = get_user_context()\n    return await {model_name.lower()}_service.create_item(user_id, title, description)\n\n\n@tool\nasync def {app_id}_delete_{model_name.lower()}(item_id: str) -> dict:\n    """Delete a {app_name.lower()} item by id."""\n    user_id = get_user_context()\n    return await {model_name.lower()}_service.delete_item(item_id, user_id)\n''',
+        f'''"""LangGraph tools for the {app_name} plugin."""
+
+from __future__ import annotations
+
+from typing import Any
+
+from langchain_core.tools import tool
+
+from shared.agent_context import get_user_context
+from shared.tool_results import safe_tool_call
+
+from .service import {entity_snake}_service
+
+
+@tool("{list_tool_name}")
+async def {list_tool_name}(limit: int = 20) -> dict[str, Any]:
+    """List {app_name.lower()} items for the current user."""
+
+    async def operation() -> list[dict[str, Any]]:
+        user_id = get_user_context()
+        items = await {entity_snake}_service.list_items(user_id, limit)
+        return [item.model_dump() for item in items]
+
+    return await safe_tool_call(operation, action="listing {entity_plural_snake}")
+
+
+@tool("{create_tool_name}")
+async def {create_tool_name}(title: str, description: str | None = None) -> dict[str, Any]:
+    """Create a new {app_name.lower()} item."""
+
+    async def operation() -> dict[str, Any]:
+        user_id = get_user_context()
+        item = await {entity_snake}_service.create_item(user_id, title, description)
+        return item.model_dump()
+
+    return await safe_tool_call(operation, action="creating a {entity_snake}")
+
+
+@tool("{delete_tool_name}")
+async def {delete_tool_name}(item_id: str) -> dict[str, Any]:
+    """Delete a {app_name.lower()} item by id."""
+
+    async def operation() -> dict[str, Any]:
+        user_id = get_user_context()
+        result = await {entity_snake}_service.delete_item(item_id, user_id)
+        return result.model_dump()
+
+    return await safe_tool_call(operation, action="deleting a {entity_snake}")
+''',
         overwrite=False,
     )
     write_file(
         backend_dir / "prompts.py",
-        f'''"""Prompt helpers for the {app_name} child agent."""\n\n\ndef get_{app_id.replace("-", "_")}_prompt() -> str:\n    return """You are the {app_name} app assistant.\nHelp the user with {app_name.lower()}-related tasks.\nUse tools when needed and keep responses concise."""\n''',
+        f'''"""Prompt helpers for the {app_name} child agent."""
+
+
+def get_{app_id}_prompt() -> str:
+    return """You are the {app_name} app assistant.
+Help the user with {app_name.lower()}-related tasks.
+Use tools when needed and keep responses concise.
+Ask for confirmation before destructive deletes."""
+''',
         overwrite=False,
     )
     write_file(
         backend_dir / "agent.py",
-        f'''"""Child LangGraph agent for the {app_name} plugin."""\n\nfrom langchain_core.tools import BaseTool\n\nfrom core.agents.base_app import BaseAppAgent\nfrom shared.agent_context import set_user_context\n\nfrom .prompts import get_{app_id.replace("-", "_")}_prompt\nfrom .service import {model_name.lower()}_service\nfrom .tools import {app_id}_create_{model_name.lower()}, {app_id}_delete_{model_name.lower()}, {app_id}_list_{plural}\n\n\nclass {app_name}Agent(BaseAppAgent):\n    app_id = "{app_id}"\n\n    def tools(self) -> list[BaseTool]:\n        return [{app_id}_list_{plural}, {app_id}_create_{model_name.lower()}, {app_id}_delete_{model_name.lower()}]\n\n    def build_prompt(self) -> str:\n        return get_{app_id.replace("-", "_")}_prompt()\n\n    async def on_install(self, user_id: str) -> None:\n        set_user_context(user_id)\n        await {model_name.lower()}_service.on_install(user_id)\n\n    async def on_uninstall(self, user_id: str) -> None:\n        set_user_context(user_id)\n        await {model_name.lower()}_service.on_uninstall(user_id)\n''',
+        f'''"""Child LangGraph agent for the {app_name} plugin."""
+
+from langchain_core.tools import BaseTool
+
+from core.agents.base_app import BaseAppAgent
+from shared.agent_context import set_user_context
+
+from .prompts import get_{app_id}_prompt
+from .service import {entity_snake}_service
+from .tools import {create_tool_name}, {delete_tool_name}, {list_tool_name}
+
+
+class {app_name}Agent(BaseAppAgent):
+    app_id = "{app_id}"
+
+    def tools(self) -> list[BaseTool]:
+        return [{list_tool_name}, {create_tool_name}, {delete_tool_name}]
+
+    def build_prompt(self) -> str:
+        return get_{app_id}_prompt()
+
+    async def on_install(self, user_id: str) -> None:
+        set_user_context(user_id)
+        await {entity_snake}_service.on_install(user_id)
+
+    async def on_uninstall(self, user_id: str) -> None:
+        set_user_context(user_id)
+        await {entity_snake}_service.on_uninstall(user_id)
+''',
         overwrite=False,
     )
     write_file(
         backend_dir / "routes.py",
-        f'''"""FastAPI routes for the {app_name} plugin."""\n\nfrom fastapi import APIRouter, Depends, HTTPException, Query\nfrom beanie import PydanticObjectId\n\nfrom core.auth import get_current_user\nfrom core.models import WidgetPreference\nfrom shared.schemas import PreferenceUpdate, WidgetPreferenceSchema\n\nfrom .manifest import {manifest_var}\nfrom .schemas import Create{model_name}Request\nfrom .service import {model_name.lower()}_service\n\nrouter = APIRouter()\n\n\n@router.get("/widgets")\nasync def list_widgets():\n    return {manifest_var}.widgets\n\n\n@router.get("/{model_name.lower()}s")\nasync def list_items(user_id: str = Depends(get_current_user), limit: int = Query(20, le=100)):\n    return await {model_name.lower()}_service.list_items(user_id, limit)\n\n\n@router.post("/{model_name.lower()}s")\nasync def create_item(request: Create{model_name}Request, user_id: str = Depends(get_current_user)):\n    try:\n        return await {model_name.lower()}_service.create_item(user_id, request.title, request.description)\n    except ValueError as exc:\n        raise HTTPException(status_code=400, detail=str(exc)) from exc\n\n\n@router.delete("/{model_name.lower()}s/{{item_id}}")\nasync def delete_item(item_id: str, user_id: str = Depends(get_current_user)):\n    try:\n        return await {model_name.lower()}_service.delete_item(item_id, user_id)\n    except ValueError as exc:\n        raise HTTPException(status_code=404, detail=str(exc)) from exc\n\n\n@router.get("/preferences")\nasync def get_preferences(user_id: str = Depends(get_current_user)) -> list[WidgetPreferenceSchema]:\n    prefs = await WidgetPreference.find(\n        WidgetPreference.user_id == PydanticObjectId(user_id),\n        WidgetPreference.app_id == "{app_id}",\n    ).to_list()\n    return [WidgetPreferenceSchema(id=str(pref.id), user_id=str(pref.user_id), widget_id=pref.widget_id, app_id=pref.app_id, enabled=pref.enabled, position=pref.position, config=pref.config) for pref in prefs]\n\n\n@router.put("/preferences")\nasync def update_preferences(updates: list[PreferenceUpdate], user_id: str = Depends(get_current_user)) -> list[WidgetPreferenceSchema]:\n    for update in updates:\n        pref = await WidgetPreference.find_one(\n            WidgetPreference.user_id == PydanticObjectId(user_id),\n            WidgetPreference.app_id == "{app_id}",\n            WidgetPreference.widget_id == update.widget_id,\n        )\n        if pref:\n            if update.enabled is not None:\n                pref.enabled = update.enabled\n            if update.position is not None:\n                pref.position = update.position\n            if update.config is not None:\n                pref.config = update.config\n            await pref.save()\n    return await get_preferences(user_id)\n''',
+        f'''"""FastAPI routes for the {app_name} plugin."""
+
+from __future__ import annotations
+
+from beanie import PydanticObjectId
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from core.auth import get_current_user
+from core.models import WidgetPreference
+from shared.preference_utils import preference_to_schema, update_multiple_preferences
+from shared.schemas import PreferenceUpdate, WidgetManifestSchema, WidgetPreferenceSchema
+
+from .manifest import {manifest_var}
+from .schemas import {action_response_schema}, {create_request_schema}, {read_schema}
+from .service import {entity_snake}_service
+
+router = APIRouter()
+
+
+@router.get("/widgets", response_model=list[WidgetManifestSchema])
+async def list_widgets() -> list[WidgetManifestSchema]:
+    return {manifest_var}.widgets
+
+
+@router.get("{list_path}", response_model=list[{read_schema}])
+async def list_items(
+    user_id: str = Depends(get_current_user),
+    limit: int = Query(20, le=100),
+) -> list[{read_schema}]:
+    return await {entity_snake}_service.list_items(user_id, limit)
+
+
+@router.post("{list_path}", response_model={read_schema})
+async def create_item(
+    request: {create_request_schema},
+    user_id: str = Depends(get_current_user),
+) -> {read_schema}:
+    try:
+        return await {entity_snake}_service.create_item(user_id, request.title, request.description)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.delete("{detail_path}", response_model={action_response_schema})
+async def delete_item(item_id: str, user_id: str = Depends(get_current_user)) -> {action_response_schema}:
+    try:
+        return await {entity_snake}_service.delete_item(item_id, user_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/preferences", response_model=list[WidgetPreferenceSchema])
+async def get_preferences(
+    user_id: str = Depends(get_current_user),
+) -> list[WidgetPreferenceSchema]:
+    prefs = await WidgetPreference.find(
+        WidgetPreference.user_id == PydanticObjectId(user_id),
+        WidgetPreference.app_id == "{app_id}",
+    ).to_list()
+    return [preference_to_schema(pref) for pref in prefs]
+
+
+@router.put("/preferences", response_model=list[WidgetPreferenceSchema])
+async def update_preferences(
+    updates: list[PreferenceUpdate],
+    user_id: str = Depends(get_current_user),
+) -> list[WidgetPreferenceSchema]:
+    await update_multiple_preferences(user_id, updates, "{app_id}")
+    return await get_preferences(user_id)
+''',
         overwrite=False,
     )
 

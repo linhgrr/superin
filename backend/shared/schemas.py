@@ -139,7 +139,7 @@ class AppManifestSchema(BaseModel):
     """The manifest that every plugin MUST provide."""
 
     id: str = Field(
-        description="Unique app ID, kebab-case, e.g. 'finance', 'todo'",
+        description="Unique app ID, lowercase letters and digits only, e.g. 'finance', 'todo', 'health2'",
     )
     name: str
     version: str = Field(pattern=r"^\d+\.\d+\.\d+$")

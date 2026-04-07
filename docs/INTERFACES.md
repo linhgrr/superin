@@ -126,7 +126,9 @@ class RegisterRequest(BaseModel):
 ```python
 class AppManifestSchema(BaseModel):
     """The manifest that every plugin MUST provide."""
-    id: str = Field(description="Unique app ID, kebab-case, e.g. 'finance', 'todo'")
+    id: str = Field(
+        description="Unique app ID, lowercase letters and digits only, e.g. 'finance', 'todo', 'health2'"
+    )
     name: str
     version: str = Field(pattern=r"^\d+\.\d+\.\d+$")
     description: str
@@ -166,7 +168,11 @@ class AppManifestSchema(BaseModel):
                 "color": "oklch(0.72 0.19 145)",
                 "widgets": [...],
                 "agent_description": "Helps users track expenses, manage budgets, and analyze spending patterns.",
-                "tools": ["add_transaction", "query_spending", "analyze_budget"],
+                "tools": [
+                    "finance_add_transaction",
+                    "finance_query_spending",
+                    "finance_analyze_budget",
+                ],
                 "models": ["Wallet", "Transaction", "Category"],
             }
         }
@@ -180,7 +186,7 @@ class WidgetManifestSchema(BaseModel):
     name: str
     description: str
     icon: str = Field(description="Lucide icon name")
-    size: Literal["small", "medium", "large", "full-width"] = "medium"
+    size: Literal["compact", "standard", "wide", "tall", "full"] = "standard"
     config_fields: list["ConfigFieldSchema"] = Field(default_factory=list)
     requires_auth: bool = True
 
@@ -191,7 +197,7 @@ class WidgetManifestSchema(BaseModel):
                 "name": "Total Balance",
                 "description": "Shows total balance across all wallets",
                 "icon": "DollarSign",
-                "size": "medium",
+                "size": "standard",
                 "config_fields": [
                     {
                         "name": "accountId",
@@ -235,8 +241,10 @@ class WidgetPreferenceSchema(BaseModel):
     widget_id: str
     app_id: str
     enabled: bool = False
-    position: int = 0
+    sort_order: int = 0
     config: dict = Field(default_factory=dict)
+    size_w: Optional[int] = Field(default=None, ge=2, le=12)
+    size_h: Optional[int] = Field(default=None, ge=1, le=6)
 
     class Config:
         populate_by_name = True
@@ -330,7 +338,7 @@ export interface WidgetManifestSchema {
   name: string;
   description: string;
   icon: string;
-  size: "small" | "medium" | "large" | "full-width";
+  size: "compact" | "standard" | "wide" | "tall" | "full";
   config_fields: ConfigFieldSchema[];
   requires_auth: boolean;
 }
@@ -360,8 +368,10 @@ export interface WidgetPreferenceSchema {
   widget_id: string;
   app_id: string;
   enabled: boolean;
-  position: number;
+  sort_order: number;
   config: Record<string, unknown>;
+  size_w?: number | null;
+  size_h?: number | null;
 }
 
 export interface ConfigFieldSchema {
@@ -519,7 +529,7 @@ wallet_widget = WidgetManifestSchema(
     name="Total Balance",
     description="Shows total balance across all wallets",
     icon="DollarSign",
-    size="medium",
+    size="standard",
     config_fields=[
         ConfigFieldSchema(
             name="accountId",
@@ -540,7 +550,11 @@ finance_manifest = AppManifestSchema(
     color="oklch(0.72 0.19 145)",
     widgets=[wallet_widget, budget_widget, recent_tx_widget],
     agent_description="...",
-    tools=["add_transaction", "query_spending", "analyze_budget"],
+    tools=[
+        "finance_add_transaction",
+        "finance_query_spending",
+        "finance_analyze_budget",
+    ],
     models=["Wallet", "Transaction", "Category"],
 )
 ```
@@ -548,29 +562,21 @@ finance_manifest = AppManifestSchema(
 ### Widget Component (React / Frontend)
 
 ```typescript
-// frontend/src/apps/finance/widgets/TotalBalance.tsx
+// frontend/src/apps/finance/widgets/TotalBalanceWidget.tsx
 
-import type { WidgetComponentProps } from "@/types/widget";
+import type { DashboardWidgetRendererProps } from "../types";
 
 /**
  * MUST export default function.
  * Props are typed by the platform — widget never receives unexpected data.
  */
 export default function TotalBalance({
-  appId,
-  widgetId,
-  userId,
-  config,
-}: WidgetComponentProps) {
-  // Self-fetch pattern: widget calls its own API endpoint
-  const wallets = useSWR(
-    `/api/apps/${appId}/wallets?user_id=${userId}`,
-    fetcher
-  );
+  widget,
+}: DashboardWidgetRendererProps) {
+  // Self-fetch pattern: widget uses runtime widget metadata plus its own app API client
+  const wallets = useSWR("/api/apps/finance/wallets", fetcher);
 
-  const targetWallet = config.accountId
-    ? wallets.data?.find((w: Wallet) => w.id === config.accountId)
-    : wallets.data?.[0];
+  const targetWallet = wallets.data?.[0];
 
   return (
     <Card>
@@ -603,22 +609,15 @@ const widgetComponents = {
 export default createDashboardWidgetRenderer(widgetComponents);
 ```
 
-### WidgetComponentProps
+### DashboardWidgetRendererProps
 
 ```typescript
-// frontend/src/types/widget.ts (generated or hand-written)
+// frontend/src/lib/types.ts
 
-export interface WidgetComponentProps {
-  /** e.g. 'finance' */
-  appId: string;
-  /** e.g. 'finance.total-balance' */
-  widgetId: string;
-  /** Current user ID from JWT */
-  userId: string;
-  /** User-specific config from WidgetPreference.config */
-  config: Record<string, unknown>;
-  /** Optional: API client bound to current user */
-  api?: ApiClient;
+import type { WidgetManifestSchema } from "@/types/generated";
+
+export interface DashboardWidgetRendererProps {
+  widget: WidgetManifestSchema;
 }
 ```
 
@@ -710,6 +709,11 @@ Examples:
 - `todo_list_tasks`
 - `calendar_create_event`
 
+Rules:
+- `app_id` itself must match `^[a-z][a-z0-9]*$`
+- widget ids may still use `{app_id}.{kebab-name}`, but `app_id` is not kebab-case
+- every public tool name must be bound explicitly with `@tool("...")` or an equivalent wrapper
+
 ---
 
 ## 7. Route Contract
@@ -754,19 +758,8 @@ async def update_preferences(
     updates: list[PreferenceUpdate],
     user_id: str = Depends(get_current_user),
 ) -> list[WidgetPreferenceSchema]:
-    for u in updates:
-        pref = await WidgetPreference.find_one(
-            WidgetPreference.user_id == user_id,
-            WidgetPreference.widget_id == u.widget_id,
-        )
-        if pref:
-            pref.enabled = u.enabled
-            pref.position = u.position
-            pref.config = u.config
-            await pref.save()
-    return await WidgetPreference.find(
-        WidgetPreference.user_id == user_id
-    ).to_list()
+    await update_multiple_preferences(user_id, updates, "finance")
+    return await get_preferences(user_id)
 
 @router.get("/config-options")
 async def get_config_options(
@@ -840,7 +833,7 @@ Every PR that touches plugins MUST verify:
 
 - [ ] Plugin `__init__.py` calls `register_plugin()` with all required fields
 - [ ] Plugin has a `manifest.py` with a valid `AppManifestSchema`
-- [ ] Every tool function is named `{app_id}_{action}`
+- [ ] Every public tool name follows `{app_id}_{action}` and is declared explicitly with `@tool("...")`
 - [ ] All Beanie queries filter by `user_id`
 - [ ] All schemas are in `shared/schemas.py` or app-specific `schemas.py`
 - [ ] Every backend widget id maps to one frontend `widgets/{PascalCase}Widget.tsx` file

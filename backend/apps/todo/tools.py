@@ -12,7 +12,7 @@ from shared.tool_results import safe_tool_call
 
 # ─── Core Task Tools ──────────────────────────────────────────────────────────
 
-@tool
+@tool("todo_add_task")
 async def todo_add_task(
     title: str,
     description: str | None = None,
@@ -57,7 +57,7 @@ async def todo_add_task(
     return await safe_tool_call(operation, action="adding a task")
 
 
-@tool
+@tool("todo_list_tasks")
 async def todo_list_tasks(
     status: TaskStatus | None = None,
     priority: TaskPriority | None = None,
@@ -93,7 +93,7 @@ async def todo_list_tasks(
     return await safe_tool_call(operation, action="listing tasks")
 
 
-@tool
+@tool("todo_search_tasks")
 async def todo_search_tasks(
     query: str,
     include_archived: bool = False,
@@ -126,7 +126,7 @@ async def todo_search_tasks(
     return await safe_tool_call(operation, action="searching tasks")
 
 
-@tool
+@tool("todo_get_task")
 async def todo_get_task(task_id: str) -> dict:
     """
     Get a single task by ID, including subtasks.
@@ -155,7 +155,7 @@ async def todo_get_task(task_id: str) -> dict:
     return await safe_tool_call(operation, action="getting a task")
 
 
-@tool
+@tool("todo_update_task")
 async def todo_update_task(
     task_id: str,
     title: str | None = None,
@@ -205,7 +205,7 @@ async def todo_update_task(
     return await safe_tool_call(operation, action="updating a task")
 
 
-@tool
+@tool("todo_toggle_task")
 async def todo_toggle_task(task_id: str) -> dict:
     """
     Toggle task status between pending and completed.
@@ -228,7 +228,7 @@ async def todo_toggle_task(task_id: str) -> dict:
     return await safe_tool_call(operation, action="toggling a task")
 
 
-@tool
+@tool("todo_complete_task")
 async def todo_complete_task(task_id: str) -> dict:
     """
     Mark a task as completed.
@@ -251,7 +251,7 @@ async def todo_complete_task(task_id: str) -> dict:
     return await safe_tool_call(operation, action="completing a task")
 
 
-@tool
+@tool("todo_delete_task")
 async def todo_delete_task(task_id: str) -> dict:
     """
     Delete a task permanently (including all subtasks).
@@ -281,7 +281,7 @@ async def todo_delete_task(task_id: str) -> dict:
 
 # ─── Archive / Soft Delete ────────────────────────────────────────────────────
 
-@tool
+@tool("todo_archive_task")
 async def todo_archive_task(task_id: str) -> dict:
     """
     Archive (soft delete) a task - hides from normal lists but can be restored.
@@ -307,7 +307,7 @@ async def todo_archive_task(task_id: str) -> dict:
     return await safe_tool_call(operation, action="archiving a task")
 
 
-@tool
+@tool("todo_restore_task")
 async def todo_restore_task(task_id: str) -> dict:
     """
     Restore an archived task back to active status.
@@ -330,7 +330,7 @@ async def todo_restore_task(task_id: str) -> dict:
     return await safe_tool_call(operation, action="restoring a task")
 
 
-@tool
+@tool("todo_list_archived")
 async def todo_list_archived(limit: int = 20) -> list[dict]:
     """
     List archived (soft deleted) tasks.
@@ -355,7 +355,7 @@ async def todo_list_archived(limit: int = 20) -> list[dict]:
 
 # ─── Tag Management ────────────────────────────────────────────────────────────
 
-@tool
+@tool("todo_add_tag")
 async def todo_add_tag(task_id: str, tag: str) -> dict:
     """
     Add a tag/label to a task.
@@ -383,7 +383,7 @@ async def todo_add_tag(task_id: str, tag: str) -> dict:
     return await safe_tool_call(operation, action="adding tag to task")
 
 
-@tool
+@tool("todo_remove_tag")
 async def todo_remove_tag(task_id: str, tag: str) -> dict:
     """
     Remove a tag/label from a task.
@@ -409,7 +409,7 @@ async def todo_remove_tag(task_id: str, tag: str) -> dict:
 
 # ─── Subtasks ─────────────────────────────────────────────────────────────────
 
-@tool
+@tool("todo_add_subtask")
 async def todo_add_subtask(parent_task_id: str, title: str) -> dict:
     """
     Add a subtask to a parent task.
@@ -437,7 +437,7 @@ async def todo_add_subtask(parent_task_id: str, title: str) -> dict:
     return await safe_tool_call(operation, action="adding subtask")
 
 
-@tool
+@tool("todo_complete_subtask")
 async def todo_complete_subtask(subtask_id: str) -> dict:
     """
     Mark a subtask as completed.
@@ -462,7 +462,7 @@ async def todo_complete_subtask(subtask_id: str) -> dict:
     return await safe_tool_call(operation, action="completing subtask")
 
 
-@tool
+@tool("todo_uncomplete_subtask")
 async def todo_uncomplete_subtask(subtask_id: str) -> dict:
     """
     Mark a completed subtask as not completed (reopen).
@@ -485,7 +485,7 @@ async def todo_uncomplete_subtask(subtask_id: str) -> dict:
     return await safe_tool_call(operation, action="uncompleting subtask")
 
 
-@tool
+@tool("todo_delete_subtask")
 async def todo_delete_subtask(subtask_id: str) -> dict:
     """
     Delete a subtask permanently.
@@ -512,7 +512,7 @@ async def todo_delete_subtask(subtask_id: str) -> dict:
 
 # ─── Recurring Tasks ──────────────────────────────────────────────────────────
 
-@tool
+@tool("todo_create_recurring_task")
 async def todo_create_recurring_task(
     task_template_id: str,
     frequency: RecurrenceFrequency,
@@ -557,7 +557,7 @@ async def todo_create_recurring_task(
     return await safe_tool_call(operation, action="creating recurring task")
 
 
-@tool
+@tool("todo_list_recurring_tasks")
 async def todo_list_recurring_tasks() -> list[dict]:
     """
     List all recurring task patterns.
@@ -577,7 +577,7 @@ async def todo_list_recurring_tasks() -> list[dict]:
     return await safe_tool_call(operation, action="listing recurring tasks")
 
 
-@tool
+@tool("todo_stop_recurring_task")
 async def todo_stop_recurring_task(rule_id: str) -> dict:
     """
     Stop a task from recurring (deactivate the recurring rule).
@@ -604,7 +604,7 @@ async def todo_stop_recurring_task(rule_id: str) -> dict:
 
 # ─── Summary ───────────────────────────────────────────────────────────────────
 
-@tool
+@tool("todo_get_summary")
 async def todo_get_summary() -> dict:
     """
     Get a comprehensive summary of all tasks.

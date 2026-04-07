@@ -20,7 +20,7 @@ from shared.tool_results import safe_tool_call
 # EVENT MANAGEMENT - CONSOLIDATED
 # ═══════════════════════════════════════════════════════════════════════════════
 
-@tool
+@tool("calendar_schedule_event")
 async def calendar_schedule_event(
     title: str,
     start: str,
@@ -124,7 +124,7 @@ async def calendar_schedule_event(
     return await safe_tool_call(operation, action="scheduling event")
 
 
-@tool
+@tool("calendar_reschedule_event")
 async def calendar_reschedule_event(
     event_id: str,
     new_start: str,
@@ -201,7 +201,7 @@ async def calendar_reschedule_event(
     return await safe_tool_call(operation, action="rescheduling event")
 
 
-@tool
+@tool("calendar_edit_event")
 async def calendar_edit_event(
     event_id: str,
     title: str | None = None,
@@ -262,7 +262,7 @@ async def calendar_edit_event(
     return await safe_tool_call(operation, action="editing event")
 
 
-@tool
+@tool("calendar_cancel_event")
 async def calendar_cancel_event(
     event_id: str,
     permanent: bool = True,
@@ -304,7 +304,7 @@ async def calendar_cancel_event(
 # EVENT SEARCH & LISTING
 # ═══════════════════════════════════════════════════════════════════════════════
 
-@tool
+@tool("calendar_find_events")
 async def calendar_find_events(
     query: str | None = None,
     start: str | None = None,
@@ -368,7 +368,7 @@ async def calendar_find_events(
 # CALENDAR MANAGEMENT
 # ═══════════════════════════════════════════════════════════════════════════════
 
-@tool
+@tool("calendar_list_calendars")
 async def calendar_list_calendars() -> list[dict]:
     """
     List all user's calendars.
@@ -397,7 +397,7 @@ async def calendar_list_calendars() -> list[dict]:
 # RECURRING EVENTS
 # ═══════════════════════════════════════════════════════════════════════════════
 
-@tool
+@tool("calendar_make_recurring")
 async def calendar_make_recurring(
     event_id: str,
     frequency: RecurrenceFrequency,
@@ -452,7 +452,7 @@ async def calendar_make_recurring(
     return await safe_tool_call(operation, action="making event recurring")
 
 
-@tool
+@tool("calendar_stop_recurring")
 async def calendar_stop_recurring(
     rule_id: str,
     keep_past: bool = True,
@@ -493,7 +493,7 @@ async def calendar_stop_recurring(
 # TODO INTEGRATION
 # ═══════════════════════════════════════════════════════════════════════════════
 
-@tool
+@tool("calendar_block_task_time")
 async def calendar_block_task_time(
     task_id: str,
     start: str,

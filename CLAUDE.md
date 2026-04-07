@@ -252,10 +252,11 @@ npm run build:frontend
 1. **Backend là source of truth** — manifest (icon, color, name, widgets), schemas, types đều bắt nguồn từ đây
 2. **Frontend tự động** — Không cần đăng ký thủ công, chỉ cần tạo folder trong `src/apps/{app_id}/`
 3. **Categories tự động đăng ký** — App đăng ký category qua `manifest.category`, metadata lấy từ app (color, icon). API `/api/catalog/categories` trả về tất cả categories đã đăng ký.
-4. **Tool naming:** `{app_id}_{action}` (vd: `finance_add_transaction`)
-5. **Widget ID:** `{app_id}.{kebab-name}` (vd: `finance.total-balance`)
-6. **Folder name phải khớp manifest.id**
-7. **Phải có:** `register_plugin()` trong `__init__.py` (backend)
+4. **App ID format:** `app_id` chỉ được dùng lowercase letters + digits theo regex `^[a-z][a-z0-9]*$` (vd: `finance`, `todo`, `health2`). Không dùng `-`, `_`, khoảng trắng, hoặc PascalCase.
+5. **Tool public naming:** mọi public tool name phải theo mẫu `{app_id}_{action}` (vd: `finance_add_transaction`) và phải được khai báo explicit bằng `@tool("...")` hoặc wrapper tương đương. Không dựa vào Python function name để suy ra public tool name.
+6. **Widget ID:** `{app_id}.{kebab-name}` (vd: `finance.total-balance`)
+7. **Folder name phải khớp manifest.id**
+8. **Phải có:** `register_plugin()` trong `__init__.py` (backend)
 
 ### API Schema Naming
 
@@ -265,6 +266,7 @@ npm run build:frontend
 - Với plugin/subapp, schema phải globally unique theo mẫu `{App}{Entity}{Suffix}`.
 - Ví dụ đúng: `TodoTaskRead`, `CalendarEventRead`, `FinanceWalletRead`, `FinanceCreateTransactionRequest`.
 - Không để generator phải tạo tên fallback kiểu `apps__foo__...`; nếu thấy xuất hiện, phải đổi tên schema ở BE rồi regenerate.
+- Với scaffold/plugin mới, chọn `app_id` trước rồi dẫn xuất tên public khác từ đó; không cố encode punctuation vào `app_id` để rồi phải sanitize ở tool/schema/function name.
 
 ### Frontend
 
@@ -294,6 +296,8 @@ npm run build:frontend
 - Route plugin phải khai báo `response_model` rõ ràng và dùng request/response schema đầy đủ để OpenAPI sinh contract chính xác.
 - `PATCH`/`PUT` endpoint phải nhận request schema rõ ràng; không encode request body thành query params rời cho domain update chính.
 - Mọi BE schema public phải có tên globally unique theo mẫu `{App}{Entity}{Suffix}`.
+- `app_id` chuẩn của platform là lowercase alnum không dấu phân tách: `^[a-z][a-z0-9]*$`.
+- Public tool names phải được pin explicit bằng `@tool("...")`; Python function name chỉ là implementation detail.
 - FE app code phải lấy contract type từ generated sources (`@/types/generated` hoặc `src/apps/{app_id}/api.ts`).
 - Local type viết tay trong FE chỉ dành cho UI-only props/state/view-model không thuộc contract BE.
 - `frontend/src/apps/{app_id}/api.ts` là generated app-local contract facade; mọi thay đổi signature phải xuất phát từ BE schema/routes rồi regenerate.

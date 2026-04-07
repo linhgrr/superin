@@ -14,7 +14,7 @@ from shared.tool_results import safe_tool_call
 
 # ─── Wallets ───────────────────────────────────────────────────────────────────
 
-@tool
+@tool("finance_list_wallets")
 async def finance_list_wallets() -> list[dict]:
     """
     List all wallets of the current user.
@@ -39,7 +39,7 @@ async def finance_list_wallets() -> list[dict]:
     return await safe_tool_call(operation, action="listing wallets")
 
 
-@tool
+@tool("finance_get_wallet")
 async def finance_get_wallet(wallet_id: str) -> dict:
     """
     Get a single wallet by ID.
@@ -68,7 +68,7 @@ async def finance_get_wallet(wallet_id: str) -> dict:
     return await safe_tool_call(operation, action="getting a wallet")
 
 
-@tool
+@tool("finance_create_wallet")
 async def finance_create_wallet(name: str, currency: str = "USD") -> dict:
     """
     Create a new wallet for the current user.
@@ -95,7 +95,7 @@ async def finance_create_wallet(name: str, currency: str = "USD") -> dict:
     return await safe_tool_call(operation, action="creating a wallet")
 
 
-@tool
+@tool("finance_update_wallet")
 async def finance_update_wallet(wallet_id: str, name: str | None = None) -> dict:
     """
     Update a wallet's name.
@@ -121,7 +121,7 @@ async def finance_update_wallet(wallet_id: str, name: str | None = None) -> dict
     return await safe_tool_call(operation, action="updating a wallet")
 
 
-@tool
+@tool("finance_delete_wallet")
 async def finance_delete_wallet(wallet_id: str) -> dict:
     """
     Delete a wallet permanently.
@@ -152,7 +152,7 @@ async def finance_delete_wallet(wallet_id: str) -> dict:
 
 # ─── Categories ────────────────────────────────────────────────────────────────
 
-@tool
+@tool("finance_list_categories")
 async def finance_list_categories() -> list[dict]:
     """
     List all categories of the current user.
@@ -176,7 +176,7 @@ async def finance_list_categories() -> list[dict]:
     return await safe_tool_call(operation, action="listing categories")
 
 
-@tool
+@tool("finance_get_category")
 async def finance_get_category(category_id: str) -> dict:
     """
     Get a single category by ID.
@@ -204,7 +204,7 @@ async def finance_get_category(category_id: str) -> dict:
     return await safe_tool_call(operation, action="getting a category")
 
 
-@tool
+@tool("finance_create_category")
 async def finance_create_category(
     name: str,
     icon: str = "Tag",
@@ -238,7 +238,7 @@ async def finance_create_category(
     return await safe_tool_call(operation, action="creating a category")
 
 
-@tool
+@tool("finance_update_category")
 async def finance_update_category(
     category_id: str,
     name: str | None = None,
@@ -276,7 +276,7 @@ async def finance_update_category(
     return await safe_tool_call(operation, action="updating a category")
 
 
-@tool
+@tool("finance_delete_category")
 async def finance_delete_category(category_id: str) -> dict:
     """
     Delete a category permanently.
@@ -306,7 +306,7 @@ async def finance_delete_category(category_id: str) -> dict:
 
 # ─── Transactions ──────────────────────────────────────────────────────────────
 
-@tool
+@tool("finance_list_transactions")
 async def finance_list_transactions(
     type_: TransactionType | None = None,
     wallet_id: str | None = None,
@@ -344,7 +344,7 @@ async def finance_list_transactions(
     return await safe_tool_call(operation, action="listing transactions")
 
 
-@tool
+@tool("finance_get_transaction")
 async def finance_get_transaction(transaction_id: str) -> dict:
     """
     Get a single transaction by ID.
@@ -372,7 +372,7 @@ async def finance_get_transaction(transaction_id: str) -> dict:
     return await safe_tool_call(operation, action="getting a transaction")
 
 
-@tool
+@tool("finance_add_transaction")
 async def finance_add_transaction(
     wallet_id: str,
     category_id: str,
@@ -424,7 +424,7 @@ async def finance_add_transaction(
     return await safe_tool_call(operation, action="adding a transaction")
 
 
-@tool
+@tool("finance_update_transaction")
 async def finance_update_transaction(
     transaction_id: str,
     wallet_id: str | None = None,
@@ -467,7 +467,7 @@ async def finance_update_transaction(
     return await safe_tool_call(operation, action="updating a transaction")
 
 
-@tool
+@tool("finance_delete_transaction")
 async def finance_delete_transaction(transaction_id: str) -> dict:
     """
     Delete a transaction permanently.
@@ -496,7 +496,7 @@ async def finance_delete_transaction(transaction_id: str) -> dict:
 
 # ─── Transfer ──────────────────────────────────────────────────────────────────
 
-@tool
+@tool("finance_transfer")
 async def finance_transfer(
     from_wallet_id: str,
     to_wallet_id: str,
@@ -539,7 +539,7 @@ async def finance_transfer(
 
 # ─── Summary ───────────────────────────────────────────────────────────────────
 
-@tool
+@tool("finance_get_summary")
 async def finance_get_summary() -> dict:
     """
     Get a financial summary for the current user.
@@ -572,7 +572,7 @@ async def finance_get_summary() -> dict:
 
 # ─── Budget Monitoring ─────────────────────────────────────────────────────────
 
-@tool
+@tool("finance_check_budget")
 async def finance_check_budget(category_id: str | None = None) -> dict:
     """
     Check spending vs budget for categories.
@@ -608,7 +608,7 @@ async def finance_check_budget(category_id: str | None = None) -> dict:
 
 # ─── Transaction Search ────────────────────────────────────────────────────────
 
-@tool
+@tool("finance_search_transactions")
 async def finance_search_transactions(
     query: str | None = None,
     start_date: str | None = None,
@@ -651,7 +651,7 @@ async def finance_search_transactions(
 
 # ─── Statistics & Analytics ────────────────────────────────────────────────────
 
-@tool
+@tool("finance_get_category_breakdown")
 async def finance_get_category_breakdown(
     month: int | None = None,
     year: int | None = None,
@@ -685,7 +685,7 @@ async def finance_get_category_breakdown(
     return await safe_tool_call(operation, action="getting category breakdown")
 
 
-@tool
+@tool("finance_get_monthly_trend")
 async def finance_get_monthly_trend(months: int = 6) -> dict:
     """
     Get income and expense trend over recent months.
