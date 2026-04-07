@@ -24,7 +24,7 @@ const AppSkeleton = memo(function AppSkeleton() {
         alignItems: "center",
         justifyContent: "center",
         height: "50vh",
-        color: "var(--color-muted)",
+        color: "var(--color-foreground-muted)",
       }}
     >
       <Loader2 size={32} style={{ animation: "spin 1s linear infinite" }} />
@@ -43,10 +43,10 @@ const AppNotAvailable = memo(function AppNotAvailable({ appId }: { appId: string
         justifyContent: "center",
         height: "50vh",
         gap: "0.5rem",
-        color: "var(--color-muted)",
+        color: "var(--color-foreground-muted)",
       }}
     >
-      <Construction size={48} style={{ color: "var(--color-muted)" }} />
+      <Construction size={48} style={{ color: "var(--color-foreground-muted)" }} />
       <p>
         App <strong>"{appId}"</strong> is not available.
       </p>

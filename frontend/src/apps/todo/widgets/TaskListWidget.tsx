@@ -8,7 +8,7 @@ export default function TaskListWidget({ widget: _widget }: DashboardWidgetRende
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", justifyContent: "center" }}>
       {loading ? (
-        <div className="stat-value" style={{ color: "var(--color-muted)" }}>—</div>
+        <div className="stat-value" style={{ color: "var(--color-foreground-muted)" }}>—</div>
       ) : (
         <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
           {/* Pending */}
@@ -29,7 +29,7 @@ export default function TaskListWidget({ widget: _widget }: DashboardWidgetRende
               <Circle size={16} />
             </div>
             <div>
-              <div style={{ fontSize: "0.625rem", color: "var(--color-muted)", textTransform: "uppercase" }}>
+              <div style={{ fontSize: "0.625rem", color: "var(--color-foreground-muted)", textTransform: "uppercase" }}>
                 Pending
               </div>
               <div style={{ fontSize: "1.125rem", fontWeight: 600, color: "var(--color-foreground)" }}>
@@ -56,7 +56,7 @@ export default function TaskListWidget({ widget: _widget }: DashboardWidgetRende
               <CheckCircle2 size={16} />
             </div>
             <div>
-              <div style={{ fontSize: "0.625rem", color: "var(--color-muted)", textTransform: "uppercase" }}>
+              <div style={{ fontSize: "0.625rem", color: "var(--color-foreground-muted)", textTransform: "uppercase" }}>
                 Done
               </div>
               <div style={{ fontSize: "1.125rem", fontWeight: 600, color: "var(--color-success)" }}>

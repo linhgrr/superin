@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { listEvents, listCalendars, type Event, type Calendar } from "../api";
-import { useTimezone } from "@/hooks/useTimezone";
+import { useTimezone } from "@/shared/hooks/useTimezone";
 import Widget from "./Widget";
 
 interface MonthViewWidgetProps {

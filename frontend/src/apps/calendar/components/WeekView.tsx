@@ -1,7 +1,7 @@
 import { HOURS, HOUR_HEIGHT, DAY_NAMES, isSameDay, isSameDayInTimezone } from "../utils/dateHelpers";
 import { calculateEventStyle } from "../utils/eventHelpers";
 import type { Calendar, Event } from "../api";
-import { useTimezone } from "@/hooks/useTimezone";
+import { useTimezone } from "@/shared/hooks/useTimezone";
 
 interface WeekViewProps {
   weekDates: Date[];

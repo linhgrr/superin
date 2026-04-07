@@ -1,5 +1,5 @@
 import type { Calendar, Event } from "../api";
-import { useTimezone } from "@/hooks/useTimezone";
+import { useTimezone } from "@/shared/hooks/useTimezone";
 
 interface ListViewProps {
   calendars: Calendar[];

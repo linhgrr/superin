@@ -489,7 +489,7 @@ export default function SettingsPage() {
               ))}
             </select>
           </div>
-          <p style={{ fontSize: "0.75rem", color: "var(--color-muted)", marginTop: "0.5rem" }}>
+          <p style={{ fontSize: "0.75rem", color: "var(--color-foreground-muted)", marginTop: "0.5rem" }}>
             Used for scheduling and AI time awareness
           </p>
         </div>

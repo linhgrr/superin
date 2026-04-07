@@ -42,9 +42,9 @@ export default function WalletsTab() {
       </div>
 
       {loading ? (
-        <p style={{ color: "var(--color-muted)" }}>Loading…</p>
+        <p style={{ color: "var(--color-foreground-muted)" }}>Loading…</p>
       ) : wallets.length === 0 ? (
-        <p style={{ color: "var(--color-muted)" }}>No wallets yet. Create one to get started.</p>
+        <p style={{ color: "var(--color-foreground-muted)" }}>No wallets yet. Create one to get started.</p>
       ) : (
         <div
           style={{
@@ -84,7 +84,7 @@ export default function WalletsTab() {
               >
                 {formatCurrency(wallet.balance, wallet.currency)}
               </p>
-              <p style={{ fontSize: "0.75rem", color: "var(--color-muted)", margin: "0.25rem 0 0" }}>
+              <p style={{ fontSize: "0.75rem", color: "var(--color-foreground-muted)", margin: "0.25rem 0 0" }}>
                 {wallet.currency}
               </p>
             </div>

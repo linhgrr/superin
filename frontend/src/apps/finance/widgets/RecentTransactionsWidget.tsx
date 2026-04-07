@@ -9,7 +9,7 @@ export default function RecentTransactionsWidget({ widget: _widget }: DashboardW
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", justifyContent: "center" }}>
       {loading ? (
-        <div style={{ color: "var(--color-muted)", fontSize: "0.875rem" }}>Loading…</div>
+        <div style={{ color: "var(--color-foreground-muted)", fontSize: "0.875rem" }}>Loading…</div>
       ) : (
         <div style={{ display: "flex", gap: "1rem" }}>
           {/* Income */}
@@ -30,7 +30,7 @@ export default function RecentTransactionsWidget({ widget: _widget }: DashboardW
               <ArrowUpRight size={16} />
             </div>
             <div>
-              <div style={{ fontSize: "0.625rem", color: "var(--color-muted)", textTransform: "uppercase" }}>
+              <div style={{ fontSize: "0.625rem", color: "var(--color-foreground-muted)", textTransform: "uppercase" }}>
                 Income
               </div>
               <div className="amount-positive" style={{ fontSize: "0.9375rem", fontWeight: 600 }}>
@@ -57,7 +57,7 @@ export default function RecentTransactionsWidget({ widget: _widget }: DashboardW
               <ArrowDownRight size={16} />
             </div>
             <div>
-              <div style={{ fontSize: "0.625rem", color: "var(--color-muted)", textTransform: "uppercase" }}>
+              <div style={{ fontSize: "0.625rem", color: "var(--color-foreground-muted)", textTransform: "uppercase" }}>
                 Expense
               </div>
               <div className="amount-negative" style={{ fontSize: "0.9375rem", fontWeight: 600 }}>

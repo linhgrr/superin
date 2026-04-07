@@ -1,6 +1,6 @@
 import { AlertTriangle, Trash2, ListTodo } from "lucide-react";
 import type { TaskRead } from "../api";
-import { useTimezone } from "@/hooks/useTimezone";
+import { useTimezone } from "@/shared/hooks/useTimezone";
 import RecurringBadge from "./RecurringBadge";
 import type { RecurringFrequency } from "../api";
 
@@ -52,7 +52,7 @@ export default function TaskRow({ task, onToggle, onDelete, onClick, selected }:
         <span
           style={{
             textDecoration: task.status === "completed" ? "line-through" : "none",
-            color: task.status === "completed" ? "var(--color-muted)" : "var(--color-foreground)",
+            color: task.status === "completed" ? "var(--color-foreground-muted)" : "var(--color-foreground)",
             fontSize: "0.875rem",
           }}
         >
@@ -60,7 +60,7 @@ export default function TaskRow({ task, onToggle, onDelete, onClick, selected }:
         </span>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.25rem" }}>
           {task.description && (
-            <span style={{ fontSize: "0.75rem", color: "var(--color-muted)" }}>
+            <span style={{ fontSize: "0.75rem", color: "var(--color-foreground-muted)" }}>
               {task.description}
             </span>
           )}
@@ -71,7 +71,7 @@ export default function TaskRow({ task, onToggle, onDelete, onClick, selected }:
                 alignItems: "center",
                 gap: "0.25rem",
                 fontSize: "0.6875rem",
-                color: allSubtasksDone ? "var(--color-success)" : "var(--color-muted)",
+                color: allSubtasksDone ? "var(--color-success)" : "var(--color-foreground-muted)",
                 fontWeight: 500,
               }}
             >
@@ -102,7 +102,7 @@ export default function TaskRow({ task, onToggle, onDelete, onClick, selected }:
           {task.priority}
         </span>
       </td>
-      <td style={{ fontSize: "0.8125rem", color: overdue ? "var(--color-danger)" : "var(--color-muted)" }}>
+      <td style={{ fontSize: "0.8125rem", color: overdue ? "var(--color-danger)" : "var(--color-foreground-muted)" }}>
         {task.due_date ? formatDate(task.due_date, { month: "short", day: "numeric" }) : "—"}
         {overdue && <AlertTriangle size={12} style={{ display: "inline", color: "var(--color-danger)", marginLeft: "0.25rem" }} />}
       </td>

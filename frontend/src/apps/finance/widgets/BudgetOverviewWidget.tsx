@@ -8,7 +8,7 @@ export default function BudgetOverviewWidget({ widget: _widget }: DashboardWidge
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", justifyContent: "center" }}>
       {loading ? (
-        <div style={{ color: "var(--color-muted)", fontSize: "0.875rem" }}>Loading…</div>
+        <div style={{ color: "var(--color-foreground-muted)", fontSize: "0.875rem" }}>Loading…</div>
       ) : (
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
           <div
@@ -30,7 +30,7 @@ export default function BudgetOverviewWidget({ widget: _widget }: DashboardWidge
             <div className="stat-value" style={{ color: "var(--color-foreground)", fontSize: "1.75rem" }}>
               {summary?.transaction_count ?? 0}
             </div>
-            <div style={{ fontSize: "0.75rem", color: "var(--color-muted)", marginTop: "0.125rem" }}>
+            <div style={{ fontSize: "0.75rem", color: "var(--color-foreground-muted)", marginTop: "0.125rem" }}>
               Transactions this month
             </div>
           </div>

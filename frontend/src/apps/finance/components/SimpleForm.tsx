@@ -46,7 +46,7 @@ export default function SimpleForm({
               fontSize: "0.875rem",
               fontWeight: 500,
               marginBottom: "0.25rem",
-              color: "var(--color-muted)",
+              color: "var(--color-foreground-muted)",
             }}
           >
             {field.label}

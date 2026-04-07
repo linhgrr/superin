@@ -35,9 +35,9 @@ export default function CategoriesTab() {
       </div>
 
       {loading ? (
-        <p style={{ color: "var(--color-muted)" }}>Loading…</p>
+        <p style={{ color: "var(--color-foreground-muted)" }}>Loading…</p>
       ) : categories.length === 0 ? (
-        <p style={{ color: "var(--color-muted)" }}>No categories yet.</p>
+        <p style={{ color: "var(--color-foreground-muted)" }}>No categories yet.</p>
       ) : (
         <div
           style={{
@@ -79,11 +79,11 @@ export default function CategoriesTab() {
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <p style={{ fontWeight: 500, margin: 0, fontSize: "0.875rem" }}>{category.name}</p>
-                <p style={{ fontSize: "0.75rem", color: "var(--color-muted)", margin: 0 }}>
+                <p style={{ fontSize: "0.75rem", color: "var(--color-foreground-muted)", margin: 0 }}>
                   Budget: ${category.budget.toLocaleString()}
                 </p>
               </div>
-              <Pencil size={14} style={{ color: "var(--color-muted)", flexShrink: 0 }} />
+              <Pencil size={14} style={{ color: "var(--color-foreground-muted)", flexShrink: 0 }} />
             </div>
           ))}
         </div>

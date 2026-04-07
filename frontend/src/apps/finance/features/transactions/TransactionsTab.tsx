@@ -6,7 +6,7 @@ import Modal from "../../components/Modal";
 import SimpleForm from "../../components/SimpleForm";
 import TransactionEditForm from "../../components/TransactionEditForm";
 import { formatCurrency } from "../../lib/formatCurrency";
-import { useTimezone } from "@/hooks/useTimezone";
+import { useTimezone } from "@/shared/hooks/useTimezone";
 
 export default function TransactionsTab() {
   const { formatDate } = useTimezone();
@@ -54,9 +54,9 @@ export default function TransactionsTab() {
       </div>
 
       {loading ? (
-        <p style={{ color: "var(--color-muted)" }}>Loading…</p>
+        <p style={{ color: "var(--color-foreground-muted)" }}>Loading…</p>
       ) : transactions.length === 0 ? (
-        <p style={{ color: "var(--color-muted)" }}>No transactions yet.</p>
+        <p style={{ color: "var(--color-foreground-muted)" }}>No transactions yet.</p>
       ) : (
         <div style={{ overflowX: "auto" }}>
           <table>
@@ -107,12 +107,12 @@ export default function TransactionsTab() {
                     {transaction.type === "income" ? "+" : "-"}
                     {formatCurrency(transaction.amount)}
                   </td>
-                  <td style={{ color: "var(--color-muted)", maxWidth: "200px" }}>
+                  <td style={{ color: "var(--color-foreground-muted)", maxWidth: "200px" }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem" }}>
                       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {transaction.note ?? "—"}
                       </span>
-                      <Pencil size={14} style={{ color: "var(--color-muted)", flexShrink: 0 }} />
+                      <Pencil size={14} style={{ color: "var(--color-foreground-muted)", flexShrink: 0 }} />
                     </div>
                   </td>
                 </tr>

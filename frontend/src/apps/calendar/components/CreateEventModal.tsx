@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { TIME_OPTIONS, formatDuration } from "../utils/dateHelpers";
-import { useTimezone } from "@/hooks/useTimezone";
+import { useTimezone } from "@/shared/hooks/useTimezone";
 
 interface CreateEventModalProps {
   date: Date;

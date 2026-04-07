@@ -50,7 +50,7 @@ export default function SubtaskList({
               display: "flex",
               justifyContent: "space-between",
               fontSize: "0.75rem",
-              color: "var(--color-muted)",
+              color: "var(--color-foreground-muted)",
               marginBottom: "0.25rem",
             }}
           >
@@ -145,7 +145,7 @@ export default function SubtaskList({
               background: "var(--color-surface-elevated)",
               border: "1px solid var(--color-border)",
               borderRadius: "0.5rem",
-              color: "var(--color-muted)",
+              color: "var(--color-foreground-muted)",
               cursor: isAdding ? "not-allowed" : "pointer",
             }}
           >
@@ -164,7 +164,7 @@ export default function SubtaskList({
             background: "transparent",
             border: "1px dashed var(--color-border)",
             borderRadius: "0.5rem",
-            color: "var(--color-muted)",
+            color: "var(--color-foreground-muted)",
             fontSize: "0.875rem",
             cursor: disabled ? "not-allowed" : "pointer",
             opacity: disabled ? 0.5 : 1,
@@ -176,7 +176,7 @@ export default function SubtaskList({
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.borderColor = "var(--color-border)";
-            e.currentTarget.style.color = "var(--color-muted)";
+            e.currentTarget.style.color = "var(--color-foreground-muted)";
           }}
         >
           <Plus size={14} />

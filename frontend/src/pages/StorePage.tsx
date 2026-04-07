@@ -36,7 +36,7 @@ const STORE_CATALOG_CACHE_VERSION = 1;
  */
 function generateGradient(color: string | undefined | null): string {
   if (!color) {
-    return "linear-gradient(135deg, var(--color-muted) 0%, var(--color-border) 100%)";
+    return "linear-gradient(135deg, var(--color-foreground-muted) 0%, var(--color-border) 100%)";
   }
 
   // If it's already a gradient, return as-is

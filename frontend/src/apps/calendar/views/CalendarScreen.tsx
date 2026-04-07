@@ -12,7 +12,7 @@ import { ListView } from "../components/ListView";
 import { CreateEventModal } from "../components/CreateEventModal";
 import { getWeekDatesInTimezone } from "../utils/dateHelpers";
 import { filterEventsByCalendar, groupEventsByDate } from "../utils/eventHelpers";
-import { useTimezone } from "@/hooks/useTimezone";
+import { useTimezone } from "@/shared/hooks/useTimezone";
 
 type ViewMode = "list" | "week";
 

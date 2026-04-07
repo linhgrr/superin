@@ -39,7 +39,7 @@ export default function WalletEditForm({ wallet, onSave, onCancel }: WalletEditF
             fontSize: "0.875rem",
             fontWeight: 500,
             marginBottom: "0.25rem",
-            color: "var(--color-muted)",
+            color: "var(--color-foreground-muted)",
           }}
         >
           Wallet Name
@@ -62,7 +62,7 @@ export default function WalletEditForm({ wallet, onSave, onCancel }: WalletEditF
           fontSize: "0.875rem",
         }}
       >
-        <div style={{ color: "var(--color-muted)", marginBottom: "0.25rem" }}>Currency</div>
+        <div style={{ color: "var(--color-foreground-muted)", marginBottom: "0.25rem" }}>Currency</div>
         <div style={{ fontWeight: 500 }}>{wallet.currency}</div>
       </div>
 
@@ -74,7 +74,7 @@ export default function WalletEditForm({ wallet, onSave, onCancel }: WalletEditF
           fontSize: "0.875rem",
         }}
       >
-        <div style={{ color: "var(--color-muted)", marginBottom: "0.25rem" }}>Balance</div>
+        <div style={{ color: "var(--color-foreground-muted)", marginBottom: "0.25rem" }}>Balance</div>
         <div style={{ fontWeight: 500 }}>
           {wallet.balance.toLocaleString()} {wallet.currency}
         </div>

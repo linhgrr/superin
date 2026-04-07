@@ -29,7 +29,7 @@ export default function BudgetCheckPanel({ categoryId }: BudgetCheckPanelProps) 
   if (loading) {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "2rem" }}>
-        <Loader2 size={24} style={{ animation: "spin 1s linear infinite", color: "var(--color-muted)" }} />
+        <Loader2 size={24} style={{ animation: "spin 1s linear infinite", color: "var(--color-foreground-muted)" }} />
       </div>
     );
   }
@@ -48,7 +48,7 @@ export default function BudgetCheckPanel({ categoryId }: BudgetCheckPanelProps) 
 
   if (categories.length === 0) {
     return (
-      <div style={{ padding: "1.5rem", textAlign: "center", color: "var(--color-muted)" }}>
+      <div style={{ padding: "1.5rem", textAlign: "center", color: "var(--color-foreground-muted)" }}>
         No budget set. Create categories with budgets to track your spending.
       </div>
     );
@@ -68,7 +68,7 @@ export default function BudgetCheckPanel({ categoryId }: BudgetCheckPanelProps) 
         }}
       >
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: "0.75rem", color: "var(--color-muted)", marginBottom: "0.25rem" }}>
+          <div style={{ fontSize: "0.75rem", color: "var(--color-foreground-muted)", marginBottom: "0.25rem" }}>
             Total Budget
           </div>
           <div style={{ fontSize: "1.25rem", fontWeight: 600 }}>
@@ -76,7 +76,7 @@ export default function BudgetCheckPanel({ categoryId }: BudgetCheckPanelProps) 
           </div>
         </div>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: "0.75rem", color: "var(--color-muted)", marginBottom: "0.25rem" }}>
+          <div style={{ fontSize: "0.75rem", color: "var(--color-foreground-muted)", marginBottom: "0.25rem" }}>
             Total Spent
           </div>
           <div
@@ -90,7 +90,7 @@ export default function BudgetCheckPanel({ categoryId }: BudgetCheckPanelProps) 
           </div>
         </div>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: "0.75rem", color: "var(--color-muted)", marginBottom: "0.25rem" }}>
+          <div style={{ fontSize: "0.75rem", color: "var(--color-foreground-muted)", marginBottom: "0.25rem" }}>
             Remaining
           </div>
           <div
@@ -132,7 +132,7 @@ export default function BudgetCheckPanel({ categoryId }: BudgetCheckPanelProps) 
                   >
                     {category.spent.toLocaleString()}
                   </span>
-                  <span style={{ color: "var(--color-muted)", fontSize: "0.875rem" }}>
+                  <span style={{ color: "var(--color-foreground-muted)", fontSize: "0.875rem" }}>
                     {" "}
                     / {category.budget.toLocaleString()}
                   </span>
@@ -159,7 +159,7 @@ export default function BudgetCheckPanel({ categoryId }: BudgetCheckPanelProps) 
               </div>
 
               <div style={{ display: "flex", justifyContent: "space-between", marginTop: "0.25rem" }}>
-                <span style={{ fontSize: "0.75rem", color: "var(--color-muted)" }}>
+                <span style={{ fontSize: "0.75rem", color: "var(--color-foreground-muted)" }}>
                   {Math.round(category.percentage)}%
                 </span>
                 {isOver && (

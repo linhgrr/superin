@@ -31,7 +31,7 @@ export default function FinanceScreen() {
               padding: "0.5rem 1rem",
               border: "none",
               background: "transparent",
-              color: tab === value ? "var(--color-primary)" : "var(--color-muted)",
+              color: tab === value ? "var(--color-primary)" : "var(--color-foreground-muted)",
               fontWeight: tab === value ? 600 : 400,
               fontSize: "0.875rem",
               cursor: "pointer",

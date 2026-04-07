@@ -48,7 +48,7 @@ export default function SubtaskItem({
         {subtask.completed ? (
           <Check size={16} style={{ color: "var(--color-success)" }} />
         ) : (
-          <Circle size={16} style={{ color: "var(--color-muted)" }} />
+          <Circle size={16} style={{ color: "var(--color-foreground-muted)" }} />
         )}
       </button>
 
@@ -58,7 +58,7 @@ export default function SubtaskItem({
           fontSize: "0.875rem",
           textDecoration: subtask.completed ? "line-through" : "none",
           color: subtask.completed
-            ? "var(--color-muted)"
+            ? "var(--color-foreground-muted)"
             : "var(--color-foreground)",
           transition: "color 0.15s",
         }}
@@ -79,7 +79,7 @@ export default function SubtaskItem({
           background: "transparent",
           border: "none",
           cursor: disabled ? "not-allowed" : "pointer",
-          color: "var(--color-muted)",
+          color: "var(--color-foreground-muted)",
           opacity: disabled ? 0.5 : 0,
           transition: "opacity 0.15s, color 0.15s",
         }}
@@ -88,7 +88,7 @@ export default function SubtaskItem({
           e.currentTarget.style.opacity = "1";
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.color = "var(--color-muted)";
+          e.currentTarget.style.color = "var(--color-foreground-muted)";
           e.currentTarget.style.opacity = "0";
         }}
         title="Delete subtask"

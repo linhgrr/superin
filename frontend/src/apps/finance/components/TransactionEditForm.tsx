@@ -59,7 +59,7 @@ export default function TransactionEditForm({
               fontSize: "0.875rem",
               fontWeight: 500,
               marginBottom: "0.25rem",
-              color: "var(--color-muted)",
+              color: "var(--color-foreground-muted)",
             }}
           >
             Amount
@@ -81,7 +81,7 @@ export default function TransactionEditForm({
               fontSize: "0.875rem",
               fontWeight: 500,
               marginBottom: "0.25rem",
-              color: "var(--color-muted)",
+              color: "var(--color-foreground-muted)",
             }}
           >
             Date
@@ -98,7 +98,7 @@ export default function TransactionEditForm({
               fontSize: "0.875rem",
               fontWeight: 500,
               marginBottom: "0.25rem",
-              color: "var(--color-muted)",
+              color: "var(--color-foreground-muted)",
             }}
           >
             Wallet
@@ -119,7 +119,7 @@ export default function TransactionEditForm({
               fontSize: "0.875rem",
               fontWeight: 500,
               marginBottom: "0.25rem",
-              color: "var(--color-muted)",
+              color: "var(--color-foreground-muted)",
             }}
           >
             Category
@@ -141,7 +141,7 @@ export default function TransactionEditForm({
             fontSize: "0.875rem",
             fontWeight: 500,
             marginBottom: "0.25rem",
-            color: "var(--color-muted)",
+            color: "var(--color-foreground-muted)",
           }}
         >
           Note
@@ -160,7 +160,7 @@ export default function TransactionEditForm({
           background: "var(--color-surface-elevated)",
           borderRadius: "0.5rem",
           fontSize: "0.875rem",
-          color: "var(--color-muted)",
+          color: "var(--color-foreground-muted)",
         }}
       >
         Type: <strong>{transaction.type}</strong>

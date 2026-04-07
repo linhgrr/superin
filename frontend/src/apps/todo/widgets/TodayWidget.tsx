@@ -8,7 +8,7 @@ export default function TodayWidget({ widget: _widget }: DashboardWidgetRenderer
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", justifyContent: "center" }}>
       {loading ? (
-        <div className="stat-value" style={{ color: "var(--color-muted)" }}>—</div>
+        <div className="stat-value" style={{ color: "var(--color-foreground-muted)" }}>—</div>
       ) : (
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
           <div
@@ -46,7 +46,7 @@ export default function TodayWidget({ widget: _widget }: DashboardWidgetRenderer
                 </span>
               )}
             </div>
-            <div style={{ fontSize: "0.75rem", color: "var(--color-muted)", marginTop: "0.125rem" }}>
+            <div style={{ fontSize: "0.75rem", color: "var(--color-foreground-muted)", marginTop: "0.125rem" }}>
               Tasks due today
             </div>
           </div>

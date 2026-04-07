@@ -29,14 +29,14 @@ export default function MonthlyTrendChart({ months = 6 }: MonthlyTrendChartProps
   if (loading) {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "2rem" }}>
-        <Loader2 size={24} style={{ animation: "spin 1s linear infinite", color: "var(--color-muted)" }} />
+        <Loader2 size={24} style={{ animation: "spin 1s linear infinite", color: "var(--color-foreground-muted)" }} />
       </div>
     );
   }
 
   if (error || !data || !data.months || data.months.length === 0) {
     return (
-      <div style={{ padding: "1.5rem", textAlign: "center", color: "var(--color-muted)" }}>
+      <div style={{ padding: "1.5rem", textAlign: "center", color: "var(--color-foreground-muted)" }}>
         {error || "No trend data available"}
       </div>
     );
@@ -45,7 +45,7 @@ export default function MonthlyTrendChart({ months = 6 }: MonthlyTrendChartProps
   const monthData = data?.months ?? [];
   if (monthData.length === 0) {
     return (
-      <div style={{ padding: "1.5rem", textAlign: "center", color: "var(--color-muted)" }}>
+      <div style={{ padding: "1.5rem", textAlign: "center", color: "var(--color-foreground-muted)" }}>
         No trend data available
       </div>
     );
@@ -132,7 +132,7 @@ export default function MonthlyTrendChart({ months = 6 }: MonthlyTrendChartProps
               <div
                 style={{
                   fontSize: "0.625rem",
-                  color: "var(--color-muted)",
+                  color: "var(--color-foreground-muted)",
                   textAlign: "center",
                   marginTop: "0.25rem",
                 }}
@@ -164,9 +164,9 @@ export default function MonthlyTrendChart({ months = 6 }: MonthlyTrendChartProps
           return (
             <>
               <span style={{ color: "var(--color-success)" }}>+{totalIncome.toLocaleString()}</span>
-              <span style={{ color: "var(--color-muted)" }}>/</span>
+              <span style={{ color: "var(--color-foreground-muted)" }}>/</span>
               <span style={{ color: "var(--color-danger)" }}>-{totalExpense.toLocaleString()}</span>
-              <span style={{ color: "var(--color-muted)" }}>=</span>
+              <span style={{ color: "var(--color-foreground-muted)" }}>=</span>
               <span style={{ color: totalNet >= 0 ? "var(--color-primary)" : "var(--color-danger)" }}>
                 {totalNet >= 0 ? "+" : ""}
                 {totalNet.toLocaleString()}

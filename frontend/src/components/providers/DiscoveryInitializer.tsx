@@ -23,7 +23,7 @@ const DefaultLoadingFallback = memo(function DefaultLoadingFallback() {
         alignItems: "center",
         justifyContent: "center",
         background: "var(--color-background)",
-        color: "var(--color-muted)",
+        color: "var(--color-foreground-muted)",
       }}
     >
       <div

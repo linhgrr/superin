@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { listEvents, type Event } from "../api";
 import { Calendar } from "lucide-react";
-import { useTimezone } from "@/hooks/useTimezone";
-import { getUserTimezone } from "@/lib/timezone";
+import { useTimezone } from "@/shared/hooks/useTimezone";
+import { getUserTimezone } from "@/shared/utils/timezone";
 
 interface UpcomingWidgetProps {
   maxItems?: number;
@@ -53,7 +53,7 @@ export default function UpcomingWidget({ maxItems = 3, calendarFilter }: Upcomin
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", justifyContent: "center" }}>
       {isLoading ? (
-        <div style={{ color: "var(--color-muted)", fontSize: "0.875rem" }}>Loading…</div>
+        <div style={{ color: "var(--color-foreground-muted)", fontSize: "0.875rem" }}>Loading…</div>
       ) : events.length === 0 ? (
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
           <div
@@ -65,13 +65,13 @@ export default function UpcomingWidget({ maxItems = 3, calendarFilter }: Upcomin
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              color: "var(--color-muted)",
+              color: "var(--color-foreground-muted)",
               flexShrink: 0,
             }}
           >
             <Calendar size={20} />
           </div>
-          <div style={{ fontSize: "0.875rem", color: "var(--color-muted)" }}>
+          <div style={{ fontSize: "0.875rem", color: "var(--color-foreground-muted)" }}>
             No upcoming events
           </div>
         </div>
@@ -110,7 +110,7 @@ export default function UpcomingWidget({ maxItems = 3, calendarFilter }: Upcomin
                 >
                   {event.title}
                 </div>
-                <div style={{ fontSize: "0.6875rem", color: "var(--color-muted)" }}>
+                <div style={{ fontSize: "0.6875rem", color: "var(--color-foreground-muted)" }}>
                   {formatEventDate(event.start_datetime)} · {formatTime(event.start_datetime)}
                 </div>
               </div>

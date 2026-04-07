@@ -30,14 +30,14 @@ export default function CategoryBreakdownChart({ month, year }: CategoryBreakdow
   if (loading) {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "2rem" }}>
-        <Loader2 size={24} style={{ animation: "spin 1s linear infinite", color: "var(--color-muted)" }} />
+        <Loader2 size={24} style={{ animation: "spin 1s linear infinite", color: "var(--color-foreground-muted)" }} />
       </div>
     );
   }
 
   if (error || !data || !data.categories || data.categories.length === 0) {
     return (
-      <div style={{ padding: "1.5rem", textAlign: "center", color: "var(--color-muted)" }}>
+      <div style={{ padding: "1.5rem", textAlign: "center", color: "var(--color-foreground-muted)" }}>
         {error || "No spending data available"}
       </div>
     );
@@ -48,7 +48,7 @@ export default function CategoryBreakdownChart({ month, year }: CategoryBreakdow
 
   if (categories.length === 0) {
     return (
-      <div style={{ padding: "1.5rem", textAlign: "center", color: "var(--color-muted)" }}>
+      <div style={{ padding: "1.5rem", textAlign: "center", color: "var(--color-foreground-muted)" }}>
         No spending data available
       </div>
     );
@@ -58,7 +58,7 @@ export default function CategoryBreakdownChart({ month, year }: CategoryBreakdow
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-      <div style={{ fontSize: "0.875rem", color: "var(--color-muted)", textAlign: "center" }}>
+      <div style={{ fontSize: "0.875rem", color: "var(--color-foreground-muted)", textAlign: "center" }}>
         Total: <strong>{total.toLocaleString()}</strong> in {month}/{year}
       </div>
 
@@ -101,7 +101,7 @@ export default function CategoryBreakdownChart({ month, year }: CategoryBreakdow
               <div
                 style={{
                   fontSize: "0.75rem",
-                  color: "var(--color-muted)",
+                  color: "var(--color-foreground-muted)",
                   textAlign: "center",
                   whiteSpace: "nowrap",
                   overflow: "hidden",
@@ -111,7 +111,7 @@ export default function CategoryBreakdownChart({ month, year }: CategoryBreakdow
               >
                 {category.name}
               </div>
-              <div style={{ fontSize: "0.625rem", color: "var(--color-muted)" }}>
+              <div style={{ fontSize: "0.625rem", color: "var(--color-foreground-muted)" }}>
                 {category.percentage.toFixed(0)}%
               </div>
             </div>

@@ -101,7 +101,7 @@ export default function CategoryEditForm({ category, onSave, onCancel, onDelete 
             fontSize: "0.875rem",
             fontWeight: 500,
             marginBottom: "0.25rem",
-            color: "var(--color-muted)",
+            color: "var(--color-foreground-muted)",
           }}
         >
           Category Name
@@ -123,7 +123,7 @@ export default function CategoryEditForm({ category, onSave, onCancel, onDelete 
             fontSize: "0.875rem",
             fontWeight: 500,
             marginBottom: "0.25rem",
-            color: "var(--color-muted)",
+            color: "var(--color-foreground-muted)",
           }}
         >
           Icon (Lucide icon name)
@@ -143,7 +143,7 @@ export default function CategoryEditForm({ category, onSave, onCancel, onDelete 
             fontSize: "0.875rem",
             fontWeight: 500,
             marginBottom: "0.25rem",
-            color: "var(--color-muted)",
+            color: "var(--color-foreground-muted)",
           }}
         >
           Color
@@ -163,7 +163,7 @@ export default function CategoryEditForm({ category, onSave, onCancel, onDelete 
             fontSize: "0.875rem",
             fontWeight: 500,
             marginBottom: "0.25rem",
-            color: "var(--color-muted)",
+            color: "var(--color-foreground-muted)",
           }}
         >
           Monthly Budget (0 for no budget)

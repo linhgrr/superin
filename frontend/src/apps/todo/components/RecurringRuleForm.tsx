@@ -75,7 +75,7 @@ export default function RecurringRuleForm({ onSubmit, onCancel }: RecurringRuleF
               fontSize: "0.75rem",
               fontWeight: 500,
               marginBottom: "0.25rem",
-              color: "var(--color-muted)",
+              color: "var(--color-foreground-muted)",
             }}
           >
             Frequency
@@ -99,7 +99,7 @@ export default function RecurringRuleForm({ onSubmit, onCancel }: RecurringRuleF
               fontSize: "0.75rem",
               fontWeight: 500,
               marginBottom: "0.25rem",
-              color: "var(--color-muted)",
+              color: "var(--color-foreground-muted)",
             }}
           >
             Every
@@ -123,7 +123,7 @@ export default function RecurringRuleForm({ onSubmit, onCancel }: RecurringRuleF
               fontSize: "0.75rem",
               fontWeight: 500,
               marginBottom: "0.5rem",
-              color: "var(--color-muted)",
+              color: "var(--color-foreground-muted)",
             }}
           >
             On days
@@ -146,7 +146,7 @@ export default function RecurringRuleForm({ onSubmit, onCancel }: RecurringRuleF
                     : "var(--color-surface)",
                   color: daysOfWeek.includes(day.value)
                     ? "var(--color-primary-foreground)"
-                    : "var(--color-muted)",
+                    : "var(--color-foreground-muted)",
                   fontSize: "0.75rem",
                   cursor: "pointer",
                   transition: "all 0.15s",
@@ -167,7 +167,7 @@ export default function RecurringRuleForm({ onSubmit, onCancel }: RecurringRuleF
               fontSize: "0.75rem",
               fontWeight: 500,
               marginBottom: "0.25rem",
-              color: "var(--color-muted)",
+              color: "var(--color-foreground-muted)",
             }}
           >
             End date (optional)
@@ -187,7 +187,7 @@ export default function RecurringRuleForm({ onSubmit, onCancel }: RecurringRuleF
               fontSize: "0.75rem",
               fontWeight: 500,
               marginBottom: "0.25rem",
-              color: "var(--color-muted)",
+              color: "var(--color-foreground-muted)",
             }}
           >
             Max times (optional)

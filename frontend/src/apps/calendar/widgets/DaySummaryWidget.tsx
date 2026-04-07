@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { listEvents, type Event } from "../api";
 import { Sun, Sunrise } from "lucide-react";
-import { useTimezone } from "@/hooks/useTimezone";
-import { getTodayRange } from "@/lib/timezone";
+import { useTimezone } from "@/shared/hooks/useTimezone";
+import { getTodayRange } from "@/shared/utils/timezone";
 
 export default function DaySummaryWidget() {
   const [todayCount, setTodayCount] = useState(0);
@@ -41,7 +41,7 @@ export default function DaySummaryWidget() {
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", justifyContent: "center" }}>
       {isLoading ? (
-        <div style={{ color: "var(--color-muted)", fontSize: "0.875rem" }}>Loading…</div>
+        <div style={{ color: "var(--color-foreground-muted)", fontSize: "0.875rem" }}>Loading…</div>
       ) : (
         <div style={{ display: "flex", gap: "1rem" }}>
           {/* Today count */}
@@ -62,7 +62,7 @@ export default function DaySummaryWidget() {
               <Sun size={16} />
             </div>
             <div>
-              <div style={{ fontSize: "0.625rem", color: "var(--color-muted)", textTransform: "uppercase" }}>
+              <div style={{ fontSize: "0.625rem", color: "var(--color-foreground-muted)", textTransform: "uppercase" }}>
                 Today
               </div>
               <div style={{ fontSize: "1.125rem", fontWeight: 600, color: "var(--color-foreground)" }}>
@@ -90,7 +90,7 @@ export default function DaySummaryWidget() {
                 <Sunrise size={16} />
               </div>
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: "0.625rem", color: "var(--color-muted)", textTransform: "uppercase" }}>
+                <div style={{ fontSize: "0.625rem", color: "var(--color-foreground-muted)", textTransform: "uppercase" }}>
                   Next · {formatTime(nextEvent.start_datetime)}
                 </div>
                 <div
@@ -118,13 +118,13 @@ export default function DaySummaryWidget() {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  color: "var(--color-muted)",
+                  color: "var(--color-foreground-muted)",
                   flexShrink: 0,
                 }}
               >
                 <Sunrise size={16} />
               </div>
-              <div style={{ fontSize: "0.75rem", color: "var(--color-muted)" }}>
+              <div style={{ fontSize: "0.75rem", color: "var(--color-foreground-muted)" }}>
                 No upcoming events
               </div>
             </div>

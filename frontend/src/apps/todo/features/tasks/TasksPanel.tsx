@@ -201,7 +201,7 @@ export default function TasksPanel() {
                 textTransform: "capitalize",
                 color: filter === value
                   ? "oklch(0.98 0 0 / 0.7)"
-                  : "var(--color-muted)",
+                  : "var(--color-foreground-muted)",
               }}
             >
               {value}
@@ -223,9 +223,9 @@ export default function TasksPanel() {
       )}
 
       {loading ? (
-        <p style={{ color: "var(--color-muted)" }}>Loading…</p>
+        <p style={{ color: "var(--color-foreground-muted)" }}>Loading…</p>
       ) : filtered.length === 0 ? (
-        <p style={{ color: "var(--color-muted)", textAlign: "center", padding: "2rem 0" }}>
+        <p style={{ color: "var(--color-foreground-muted)", textAlign: "center", padding: "2rem 0" }}>
           {filter === "all" ? "No tasks yet." : `No ${filter} tasks.`}
         </p>
       ) : (

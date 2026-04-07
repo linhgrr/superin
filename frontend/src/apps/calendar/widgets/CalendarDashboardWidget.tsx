@@ -20,7 +20,7 @@ export default function CalendarDashboardWidget({ widgetId, widget }: DashboardW
   return (
     <div>
       <p className="section-label">{widget.name}</p>
-      <p style={{ fontSize: "0.875rem", color: "var(--color-muted)", margin: "0.25rem 0 0" }}>
+      <p style={{ fontSize: "0.875rem", color: "var(--color-foreground-muted)", margin: "0.25rem 0 0" }}>
         {widget.description}
       </p>
     </div>
