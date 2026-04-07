@@ -70,19 +70,21 @@ Hệ thống hỗ trợ true plug-n-play cho plugins:
 
 ---
 
-## 3. Key Documentation Files
+## 2. Repository Structure
 
-| File | Purpose | Đọc khi nào |
-|------|---------|-------------|
-| `docs/ARCHITECTURE.md` | System overview | Bắt đầu task mới |
-| `docs/IMPLEMENTATION_PLAN.md` | Master task list | Tìm file cần sửa |
-| `docs/PLUGIN_DEVELOPMENT_GUIDE.md` | Làm app mới | Tạo plugin mới |
-| `docs/INTERFACES.md` | Type contracts | Schema/API changes |
-| `docs/API_CONVENTIONS.md` | REST patterns | Backend routes |
-| `docs/PAGE_ARCHITECTURE.md` | Frontend structure | UI/page changes |
-| `docs/COMPONENT_STANDARDS.md` | React patterns | Component work |
-| `docs/WORKFLOW.md` | Dev workflow | Tra cứu kỹ thuật |
-| `docs/ASSISTANT_UI_INTEGRATION.md` | Chat streaming | Chat/SSE work |
+**3 repo độc lập** — mỗi repo có Git history, branch, và remote riêng.
+
+| Repo | Remote | Chứa |
+|------|--------|------|
+| `backend/` | HF Space: `linhdzqua148/superin-be` | FastAPI + Beanie + LangGraph |
+| `frontend/` | GitHub: `linhgrr/superin-fe` | React + Vite + Tailwind |
+| root (`/`) | Khác (project config/docs) | Scripts + CLAUDE.md + docs |
+
+**Lưu ý quan trọng:**
+- **Backend:** `cd backend && git push origin main:main`
+- **Frontend:** `cd frontend && git push origin main:main` (hoặc push từ root nếu FE remote đã set)
+- Root là nơi chứa `CLAUDE.md`, `scripts/`, `docs/` — không phải monorepo
+- Khi chạy BE scripts: `cd backend && python ../scripts/superin.py ...`
 
 ---
 
