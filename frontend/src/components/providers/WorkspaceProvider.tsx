@@ -1,7 +1,9 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { getWorkspaceBootstrap } from "@/api/workspace";
-import { clearActiveApps, discoverAndRegisterApps, prefetchApps, primeAppAndWidget, setActiveApps } from "@/apps";
+import { clearActiveApps, setActiveApps } from "@/lib/lazy-registry";
+import { discoverAndRegisterApps } from "@/lib/discovery";
+import { prefetchApps, primeAppAndWidget } from "@/lib/prefetch";
 import { STORAGE_KEYS } from "@/constants";
 import { useAuth } from "@/hooks/useAuth";
 import { preloadIcons } from "@/lib/icon-resolver";
@@ -12,15 +14,9 @@ import type {
   WidgetPreferenceSchema,
   WorkspaceBootstrap,
 } from "@/types/generated/api";
+import { WorkspaceContext } from "./workspace-context";
 
-interface PersistedWorkspaceSnapshot {
-  storedAt: number;
-  userId: string;
-  version: 1;
-  workspace: WorkspaceBootstrap;
-}
-
-interface WorkspaceContextValue {
+export interface WorkspaceContextValue {
   installedApps: AppRuntimeEntry[];
   widgetPreferences: WidgetPreferenceSchema[];
   installedAppIds: Set<string>;
@@ -34,8 +30,6 @@ interface WorkspaceContextValue {
 }
 
 const WORKSPACE_CACHE_VERSION = 1;
-
-const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
 
 function toRuntimeApp(app: AppCatalogEntry): AppRuntimeEntry {
   return {
@@ -362,12 +356,4 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       {children}
     </WorkspaceContext.Provider>
   );
-}
-
-export function useWorkspace(): WorkspaceContextValue {
-  const context = useContext(WorkspaceContext);
-  if (!context) {
-    throw new Error("useWorkspace must be used within <WorkspaceProvider>");
-  }
-  return context;
 }

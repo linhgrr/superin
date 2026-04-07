@@ -1,5 +1,11 @@
-import type { DashboardWidgetProps } from "./types";
-import type { LazyExoticComponent, ComponentType } from "react";
+/**
+ * App registry — thin re-export from platform lib.
+ *
+ * plugins/ can import from here (apps/ is the discovery hub,
+ * not a plugin). Platform code uses @/lib/* directly.
+ */
+import { discoverAndRegisterApps, type AppMetadata } from "@/lib/discovery";
+import type { DashboardWidgetProps } from "@/lib/types";
 import {
   clearActiveApps,
   clearLazyCache,
@@ -16,15 +22,25 @@ import {
   loadAppViewComponent,
   loadDashboardWidgetComponent,
   setActiveApps,
-  type AppMetadata,
-} from "./lazy-registry";
-import { discoverAndRegisterApps } from "./discovery";
+} from "@/lib/lazy-registry";
+import {
+  isAppPrefetched,
+  prefetchApp,
+  prefetchApps,
+  prefetchAppAndWidget,
+  prefetchHandlers,
+  prefetchWidget,
+  primeApp,
+  primeAppAndWidget,
+  primeWidget,
+} from "@/lib/prefetch";
 
-// Re-export tất cả từ lazy-registry và discovery
+// Re-export all platform functions
 export {
+  discoverAndRegisterApps,
+  type AppMetadata,
   clearActiveApps,
   clearLazyCache,
-  discoverAndRegisterApps,
   getAppMetadata,
   getLoadedAppView,
   getLoadedWidget,
@@ -38,70 +54,29 @@ export {
   loadAppViewComponent,
   loadDashboardWidgetComponent,
   setActiveApps,
-  type AppMetadata,
-};
-
-// Re-export prefetch utilities
-export {
-  primeApp,
-  primeWidget,
-  primeAppAndWidget,
+  isAppPrefetched,
   prefetchApp,
-  prefetchWidget,
+  prefetchApps,
   prefetchAppAndWidget,
   prefetchHandlers,
-  prefetchApps,
-  isAppPrefetched,
-} from "./prefetch";
+  prefetchWidget,
+  primeApp,
+  primeAppAndWidget,
+  primeWidget,
+};
+
+export type { DashboardWidgetProps };
 
 /**
- * Kết hợp metadata + lazy component cho backwards compatibility.
- * Interface này giống FrontendAppDefinition nhưng với lazy components.
+ * @deprecated Use getAppMetadata from @/lib/lazy-registry
  */
-export interface LazyAppDefinition {
-  AppView: LazyExoticComponent<ComponentType> | null;
-  DashboardWidget: LazyExoticComponent<ComponentType<DashboardWidgetProps>> | null;
+export function getLazyApp(_appId: string): null {
+  return null;
 }
 
 /**
- * Lấy lazy app definition cho một app ID.
- * Returns null nếu app chưa được register.
- */
-export function getLazyApp(appId: string): LazyAppDefinition | null {
-  const metadata = getAppMetadata(appId);
-  if (!metadata) return null;
-
-  return {
-    AppView: lazyLoadAppView(appId),
-    DashboardWidget: lazyLoadDashboardWidget(appId),
-  };
-}
-
-/**
- * Check if a lazy app is available (metadata registered).
- */
-export function hasLazyApp(appId: string): boolean {
-  return hasAppMetadata(appId);
-}
-
-/**
- * Legacy compatibility - giữ lại để các file cũ không break.
- * @deprecated Dùng discoverAndRegisterApps() và getLazyApp() thay thế
- */
-export const FRONTEND_APPS: Record<string, never> = {};
-
-/**
- * Legacy compatibility.
- * @deprecated Dùng getLazyApp() thay thế
- */
-export function getFrontendApp(_appId: string): undefined {
-  return undefined;
-}
-
-/**
- * Legacy compatibility.
- * @deprecated Dùng hasLazyApp() thay thế
+ * @deprecated Use hasAppMetadata from @/lib/lazy-registry
  */
 export function hasFrontendApp(appId: string): boolean {
-  return hasLazyApp(appId);
+  return hasAppMetadata(appId);
 }

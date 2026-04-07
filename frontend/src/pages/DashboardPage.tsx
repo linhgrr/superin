@@ -19,9 +19,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AddWidgetDialog from "@/components/dashboard/AddWidgetDialog";
 import { updatePreferences } from "@/api/catalog";
 import { useOnboarding } from "@/components/providers/OnboardingProvider";
-import { useWorkspace } from "@/components/providers/WorkspaceProvider";
+import { useWorkspace } from "@/hooks/useWorkspace";
 import { WIDGET_SIZES } from "@/lib/widget-sizes";
-import LazyWidget from "@/apps/components/LazyWidget";
+import LazyWidget from "@/components/LazyWidget";
 import type {
   AppRuntimeEntry,
   PreferenceUpdate,

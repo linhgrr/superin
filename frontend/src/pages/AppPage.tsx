@@ -9,8 +9,8 @@
 import { memo, useEffect, useState, type ComponentType } from "react";
 import { useParams, Navigate } from "react-router-dom";
 import { Construction, Loader2 } from "lucide-react";
-import { getAppMetadata, getLoadedAppView, loadAppViewComponent } from "@/apps";
-import { useWorkspace } from "@/components/providers/WorkspaceProvider";
+import { getAppMetadata, getLoadedAppView, loadAppViewComponent } from "@/lib/lazy-registry";
+import { useWorkspace } from "@/hooks/useWorkspace";
 import { ROUTES } from "@/constants";
 
 const SKELETON_DELAY_MS = 120;

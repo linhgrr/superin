@@ -30,7 +30,7 @@ import {
 import { STORAGE_KEYS } from "@/constants";
 import { useAuth } from "@/hooks/useAuth";
 import { DynamicIcon } from "@/lib/icon-resolver";
-import { useWorkspace } from "./WorkspaceProvider";
+import { useWorkspace } from "@/hooks/useWorkspace";
 
 interface CommandItem {
   id: string;

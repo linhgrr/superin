@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { getCatalog, getCategories, installApp, uninstallApp } from "@/api/catalog";
 import { useToast } from "@/components/providers/ToastProvider";
-import { useWorkspace } from "@/components/providers/WorkspaceProvider";
+import { useWorkspace } from "@/hooks/useWorkspace";
 import { ROUTES, STORAGE_KEYS } from "@/constants";
 import { DynamicIcon } from "@/lib/icon-resolver";
 import type { AppCatalogEntry } from "@/types/generated/api";

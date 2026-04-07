@@ -9,7 +9,7 @@
  */
 
 import { useCallback } from "react";
-import { prefetchApp, prefetchHandlers } from "@/apps/prefetch";
+import { prefetchApp, prefetchHandlers } from "@/lib/prefetch";
 
 /**
  * Hook trả về prefetch function.

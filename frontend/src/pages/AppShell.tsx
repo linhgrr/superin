@@ -7,7 +7,7 @@
 
 import { lazy, ReactNode, Suspense, useEffect, useMemo, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
-import { useWorkspace } from "@/components/providers/WorkspaceProvider";
+import { useWorkspace } from "@/hooks/useWorkspace";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
 

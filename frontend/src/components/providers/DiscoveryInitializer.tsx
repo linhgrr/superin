@@ -6,7 +6,7 @@
  */
 
 import { ReactNode, useEffect, useState, memo } from "react";
-import { discoverAndRegisterApps } from "@/apps";
+import { discoverAndRegisterApps } from "@/lib/discovery";
 
 interface DiscoveryInitializerProps {
   children: ReactNode;

@@ -10,9 +10,9 @@
 import { memo, useMemo } from "react";
 import { NavLink } from "react-router-dom";
 import { LayoutDashboard, Store, Sparkles, Settings } from "lucide-react";
-import { useWorkspace } from "@/components/providers/WorkspaceProvider";
+import { useWorkspace } from "@/hooks/useWorkspace";
 import { DynamicIcon } from "@/lib/icon-resolver";
-import { prefetchHandlers } from "@/apps";
+import { prefetchHandlers } from "@/lib/prefetch";
 import type { AppRuntimeEntry } from "@/types/generated/api";
 
 /**
