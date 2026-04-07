@@ -5,8 +5,8 @@ import UpcomingWidget from "./UpcomingWidget";
 import DaySummaryWidget from "./DaySummaryWidget";
 
 const WIDGET_COMPONENTS = {
-  "calendar.month-view": MonthViewWidget,
-  "calendar.upcoming": UpcomingWidget,
+  "calendar.month-view": (_props: DashboardWidgetRendererProps) => <MonthViewWidget />,
+  "calendar.upcoming": (_props: DashboardWidgetRendererProps) => <UpcomingWidget />,
   "calendar.day-summary": DaySummaryWidget,
 } as const satisfies Record<string, ComponentType<DashboardWidgetRendererProps>>;
 

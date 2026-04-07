@@ -31,15 +31,15 @@ export interface UseTimezoneReturn {
   /** Update the timezone setting */
   setTimezone: (tz: string) => void;
   /** Format UTC datetime string for display */
-  formatDateTime: (utcString: string | null | undefined) => string;
+  formatDateTime: (utcString: string | Date | null | undefined, options?: Intl.DateTimeFormatOptions) => string;
   /** Format date only (no time) */
-  formatDate: (utcString: string | null | undefined, options?: Intl.DateTimeFormatOptions) => string;
+  formatDate: (utcString: string | Date | null | undefined, options?: Intl.DateTimeFormatOptions) => string;
   /** Format time only (no date) */
-  formatTime: (utcString: string | null | undefined) => string;
+  formatTime: (utcString: string | Date | null | undefined, options?: Intl.DateTimeFormatOptions) => string;
   /** Check if datetime is today in user's timezone */
-  isToday: (utcString: string | null | undefined) => boolean;
+  isToday: (utcString: string | Date | null | undefined) => boolean;
   /** Check if datetime is in the past */
-  isPast: (utcString: string | null | undefined) => boolean;
+  isPast: (utcString: string | Date | null | undefined) => boolean;
   /** Get current date/time strings in user's timezone */
   getNow: () => [string, string];
 }
@@ -55,9 +55,10 @@ export function useTimezone(): UseTimezoneReturn {
 
   // Sync with user settings when available
   useEffect(() => {
-    if (user?.settings?.timezone) {
-      setUserTimezone(user.settings.timezone);
-      setTimezoneState(user.settings.timezone);
+    const timezone = user?.settings?.timezone;
+    if (typeof timezone === "string" && timezone.length > 0) {
+      setUserTimezone(timezone);
+      setTimezoneState(timezone);
     }
   }, [user?.settings?.timezone]);
 
@@ -67,28 +68,30 @@ export function useTimezone(): UseTimezoneReturn {
   }, []);
 
   const formatDateTime = useCallback(
-    (utcString: string | null | undefined) => formatDateTimeUtil(utcString),
+    (utcString: string | Date | null | undefined, options?: Intl.DateTimeFormatOptions) =>
+      formatDateTimeUtil(utcString, options),
     []
   );
 
   const formatDate = useCallback(
-    (utcString: string | null | undefined, options?: Intl.DateTimeFormatOptions) =>
+    (utcString: string | Date | null | undefined, options?: Intl.DateTimeFormatOptions) =>
       formatDateUtil(utcString, options),
     []
   );
 
   const formatTime = useCallback(
-    (utcString: string | null | undefined) => formatTimeUtil(utcString),
+    (utcString: string | Date | null | undefined, options?: Intl.DateTimeFormatOptions) =>
+      formatTimeUtil(utcString, options),
     []
   );
 
   const isToday = useCallback(
-    (utcString: string | null | undefined) => isTodayUtil(utcString),
+    (utcString: string | Date | null | undefined) => isTodayUtil(utcString),
     []
   );
 
   const isPast = useCallback(
-    (utcString: string | null | undefined) => isPastUtil(utcString),
+    (utcString: string | Date | null | undefined) => isPastUtil(utcString),
     []
   );
 

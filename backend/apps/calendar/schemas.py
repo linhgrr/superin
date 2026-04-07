@@ -6,10 +6,10 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from apps.calendar.enums import EventType, RecurrenceFrequency
+from apps.calendar.enums import AttendeeStatus, EventType, RecurrenceFrequency
 
 
-class CreateEventRequest(BaseModel):
+class CalendarCreateEventRequest(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     start_datetime: datetime
     end_datetime: datetime
@@ -23,7 +23,7 @@ class CreateEventRequest(BaseModel):
     reminders: list[int] = Field(default_factory=list)
 
 
-class UpdateEventRequest(BaseModel):
+class CalendarUpdateEventRequest(BaseModel):
     title: str | None = Field(None, min_length=1, max_length=200)
     start_datetime: datetime | None = None
     end_datetime: datetime | None = None
@@ -35,19 +35,19 @@ class UpdateEventRequest(BaseModel):
     reminders: list[int] | None = None
 
 
-class CreateCalendarRequest(BaseModel):
+class CalendarCreateCalendarRequest(BaseModel):
     name: str = Field(min_length=1, max_length=50)
     color: str | None = None
 
 
-class UpdateCalendarRequest(BaseModel):
+class CalendarUpdateCalendarRequest(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=50)
     color: str | None = None
     is_visible: bool | None = None
     is_default: bool | None = None
 
 
-class CreateRecurringRuleRequest(BaseModel):
+class CalendarCreateRecurringRuleRequest(BaseModel):
     frequency: RecurrenceFrequency
     interval: int = Field(default=1, ge=1, le=52)
     days_of_week: list[int] | None = None  # 0=Monday, 6=Sunday
@@ -55,8 +55,61 @@ class CreateRecurringRuleRequest(BaseModel):
     max_occurrences: int | None = Field(None, ge=1, le=1000)
 
 
-class ScheduleTaskRequest(BaseModel):
-    task_id: str
+class CalendarScheduleTaskRequest(BaseModel):
     start_datetime: datetime
     duration_minutes: int = Field(ge=15, le=480)  # 15 min to 8 hours
     calendar_id: str | None = None
+
+
+class CalendarEventAttendeeRead(BaseModel):
+    email: str
+    name: str | None = None
+    status: AttendeeStatus
+
+
+class CalendarEventRead(BaseModel):
+    id: str
+    title: str
+    description: str | None = None
+    location: str | None = None
+    start_datetime: datetime
+    end_datetime: datetime
+    is_all_day: bool
+    timezone: str
+    calendar_id: str
+    type: EventType
+    task_id: str | None = None
+    color: str | None = None
+    is_recurring: bool
+    reminders: list[int] = Field(default_factory=list)
+    attendees: list[CalendarEventAttendeeRead] = Field(default_factory=list)
+    created_at: datetime
+    updated_at: datetime
+
+
+class CalendarCalendarRead(BaseModel):
+    id: str
+    name: str
+    color: str
+    is_visible: bool
+    is_default: bool
+    created_at: datetime
+
+
+class CalendarRecurringRuleRead(BaseModel):
+    id: str
+    event_template_id: str
+    frequency: RecurrenceFrequency
+    interval: int
+    days_of_week: list[int] | None = None
+    end_date: datetime | None = None
+    max_occurrences: int | None = None
+    occurrence_count: int
+    is_active: bool
+    created_at: datetime
+
+
+class CalendarActionResponse(BaseModel):
+    success: bool
+    id: str
+    message: str | None = None

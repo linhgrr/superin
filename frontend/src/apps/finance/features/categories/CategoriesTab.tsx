@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Pencil } from "lucide-react";
-import type { CreateCategoryRequest } from "@/types/generated/api";
 import { createCategory, getCategories, type CategoryRead } from "../../api";
+import type { CreateCategoryRequest } from "../../api";
 import Modal from "../../components/Modal";
 import SimpleForm from "../../components/SimpleForm";
 import CategoryEditForm from "../../components/CategoryEditForm";

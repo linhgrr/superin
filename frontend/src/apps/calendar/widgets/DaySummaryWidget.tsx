@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
-import { listEvents, type Event } from "../api";
+import { listEvents, type EventRead } from "../api";
 import { Sun, Sunrise } from "lucide-react";
 import { useTimezone } from "@/shared/hooks/useTimezone";
 import { getTodayRange } from "@/shared/utils/timezone";
 
 export default function DaySummaryWidget() {
   const [todayCount, setTodayCount] = useState(0);
-  const [nextEvent, setNextEvent] = useState<Event | null>(null);
+  const [nextEvent, setNextEvent] = useState<EventRead | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { formatTime } = useTimezone();
 
@@ -27,8 +27,8 @@ export default function DaySummaryWidget() {
 
       // Fetch in parallel
       const [todayEvents, upcoming] = await Promise.all([
-        listEvents(todayStart, todayEnd, undefined, 100),
-        listEvents(now.toISOString(), tomorrowEnd.toISOString(), undefined, 1),
+        listEvents({ start: todayStart, end: todayEnd, limit: 100 }),
+        listEvents({ start: now.toISOString(), end: tomorrowEnd.toISOString(), limit: 1 }),
       ]);
 
       setTodayCount(todayEvents.length);

@@ -41,6 +41,8 @@ export const COMMON_TIMEZONES = {
 
 export const DEFAULT_TIMEZONE = 'UTC';
 
+type DateInput = string | Date | null | undefined;
+
 // ─── User Timezone ───────────────────────────────────────────────────────────
 
 /**
@@ -85,11 +87,11 @@ export function clearUserTimezone(): void {
  * Convert UTC ISO string to Date object.
  * Returns null if input is null/undefined or invalid.
  */
-export function utcToLocalDate(utcString: string | null | undefined): Date | null {
-  if (!utcString) return null;
+export function utcToLocalDate(value: DateInput): Date | null {
+  if (!value) return null;
 
   try {
-    const date = new Date(utcString);
+    const date = value instanceof Date ? value : new Date(value);
     if (isNaN(date.getTime())) return null;
     return date;
   } catch (error: unknown) {
@@ -104,7 +106,7 @@ export function utcToLocalDate(utcString: string | null | undefined): Date | nul
  * Format a UTC datetime string for display in user's local timezone.
  */
 export function formatDateTime(
-  utcString: string | null | undefined,
+  utcString: DateInput,
   options: Intl.DateTimeFormatOptions = {
     year: 'numeric',
     month: 'short',
@@ -124,7 +126,7 @@ export function formatDateTime(
  * Format only the date portion (no time).
  */
 export function formatDate(
-  utcString: string | null | undefined,
+  utcString: DateInput,
   options: Intl.DateTimeFormatOptions = {
     year: 'numeric',
     month: 'short',
@@ -142,7 +144,7 @@ export function formatDate(
  * Format only the time portion (no date).
  */
 export function formatTime(
-  utcString: string | null | undefined,
+  utcString: DateInput,
   options: Intl.DateTimeFormatOptions = {
     hour: '2-digit',
     minute: '2-digit',
@@ -160,7 +162,7 @@ export function formatTime(
 /**
  * Check if a UTC datetime string is "today" in user's local timezone.
  */
-export function isToday(utcString: string | null | undefined): boolean {
+export function isToday(utcString: DateInput): boolean {
   const date = utcToLocalDate(utcString);
   if (!date) return false;
 
@@ -187,7 +189,7 @@ export function isToday(utcString: string | null | undefined): boolean {
 /**
  * Check if a UTC datetime string is in the past.
  */
-export function isPast(utcString: string | null | undefined): boolean {
+export function isPast(utcString: DateInput): boolean {
   const date = utcToLocalDate(utcString);
   if (!date) return false;
   return date.getTime() < Date.now();

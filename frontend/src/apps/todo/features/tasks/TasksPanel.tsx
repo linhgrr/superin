@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import type { CreateTaskRequest } from "@/types/generated/api";
-import { completeSubtask, createRecurringRule, createSubtask, createTask, deleteSubtask, deleteTask, getSubtasks, getTasks, toggleTask, type SubTask, type TaskRead, uncompleteSubtask } from "../../api";
+import { completeSubtask, createRecurringRule, createSubtask, createTask, deleteSubtask, deleteTask, getSubtasks, getTasks, toggleTask, type SubTaskRead, type TaskRead, uncompleteSubtask } from "../../api";
+import type { CreateRecurringRuleRequest, CreateTaskRequest } from "../../api";
 import NewTaskForm from "../../components/NewTaskForm";
 import TaskRow from "../../components/TaskRow";
 import Modal from "../../components/Modal";
@@ -8,13 +8,22 @@ import SubtaskList from "../../components/SubtaskList";
 import RecurringRuleForm from "../../components/RecurringRuleForm";
 import type { RecurringFrequency } from "../../api";
 
+type TaskListItem = TaskRead & {
+  subtask_count?: number;
+  subtask_completed?: number;
+  recurring_rule?: {
+    frequency: RecurringFrequency;
+    is_active: boolean;
+  } | null;
+};
+
 export default function TasksPanel() {
-  const [tasks, setTasks] = useState<TaskRead[]>([]);
+  const [tasks, setTasks] = useState<TaskListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [filter, setFilter] = useState<"all" | "pending" | "completed">("all");
-  const [selectedTask, setSelectedTask] = useState<TaskRead | null>(null);
-  const [subtasks, setSubtasks] = useState<SubTask[]>([]);
+  const [selectedTask, setSelectedTask] = useState<TaskListItem | null>(null);
+  const [subtasks, setSubtasks] = useState<SubTaskRead[]>([]);
   const [subtasksLoading, setSubtasksLoading] = useState(false);
   const [showRecurringForm, setShowRecurringForm] = useState(false);
 
@@ -56,7 +65,7 @@ export default function TasksPanel() {
     setShowForm(false);
   }
 
-  async function handleSelectTask(task: TaskRead) {
+  async function handleSelectTask(task: TaskListItem) {
     if (selectedTask?.id === task.id) {
       setSelectedTask(null);
       setSubtasks([]);
@@ -77,7 +86,7 @@ export default function TasksPanel() {
 
   async function handleCreateSubtask(title: string) {
     if (!selectedTask) return;
-    const created = await createSubtask(selectedTask.id, title);
+    const created = await createSubtask(selectedTask.id, { title });
     setSubtasks((current) => [...current, created]);
     setTasks((current) =>
       current.map((t) =>
@@ -129,13 +138,7 @@ export default function TasksPanel() {
     }
   }
 
-  async function handleCreateRecurring(data: {
-    frequency: RecurringFrequency;
-    interval: number;
-    days_of_week?: number[];
-    end_date?: string;
-    max_occurrences?: number;
-  }) {
+  async function handleCreateRecurring(data: CreateRecurringRuleRequest) {
     if (!selectedTask) return;
     const rule = await createRecurringRule(selectedTask.id, data);
     setTasks((current) =>

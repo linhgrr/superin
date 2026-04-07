@@ -1,9 +1,9 @@
-import type { Calendar, Event } from "../api";
+import type { CalendarRead, EventRead } from "../api";
 import { useTimezone } from "@/shared/hooks/useTimezone";
 
 interface ListViewProps {
-  calendars: Calendar[];
-  eventsByDate: Record<string, { label: string; events: Event[] }>;
+  calendars: CalendarRead[];
+  eventsByDate: Record<string, { label: string; events: EventRead[] }>;
 }
 
 export function ListView({ calendars, eventsByDate }: ListViewProps) {

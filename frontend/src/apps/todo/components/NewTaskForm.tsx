@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import type { CreateTaskRequest } from "@/types/generated/api";
+import type { CreateTaskRequest } from "../api";
 
 interface NewTaskFormProps {
   onSubmit: (data: CreateTaskRequest) => Promise<void>;
@@ -66,7 +66,7 @@ export default function NewTaskForm({ onSubmit, onCancel }: NewTaskFormProps) {
           onChange={(event) =>
             setForm((current) => ({
               ...current,
-              due_date: event.target.value ? new Date(event.target.value) : null,
+              due_date: event.target.value ? new Date(event.target.value).toISOString() : null,
             }))
           }
         />

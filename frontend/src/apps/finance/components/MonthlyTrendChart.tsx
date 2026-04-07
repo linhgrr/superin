@@ -15,7 +15,7 @@ export default function MonthlyTrendChart({ months = 6 }: MonthlyTrendChartProps
   useEffect(() => {
     async function fetchData() {
       try {
-        const result = await getMonthlyTrend(months);
+        const result = await getMonthlyTrend({ months });
         setData(result);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load data");
@@ -34,7 +34,9 @@ export default function MonthlyTrendChart({ months = 6 }: MonthlyTrendChartProps
     );
   }
 
-  if (error || !data || !data.months || data.months.length === 0) {
+  const monthData = data?.trend ?? [];
+
+  if (error || !data || monthData.length === 0) {
     return (
       <div style={{ padding: "1.5rem", textAlign: "center", color: "var(--color-foreground-muted)" }}>
         {error || "No trend data available"}
@@ -42,7 +44,6 @@ export default function MonthlyTrendChart({ months = 6 }: MonthlyTrendChartProps
     );
   }
 
-  const monthData = data?.months ?? [];
   if (monthData.length === 0) {
     return (
       <div style={{ padding: "1.5rem", textAlign: "center", color: "var(--color-foreground-muted)" }}>
@@ -86,7 +87,7 @@ export default function MonthlyTrendChart({ months = 6 }: MonthlyTrendChartProps
 
           return (
             <div
-              key={month.month}
+              key={`${month.year}-${month.month}`}
               style={{
                 flex: 1,
                 display: "flex",
@@ -95,7 +96,7 @@ export default function MonthlyTrendChart({ months = 6 }: MonthlyTrendChartProps
                 gap: "0.25rem",
                 minWidth: "50px",
               }}
-              title={`${month.month} ${month.year}: Income ${month.income.toLocaleString()}, Expense ${month.expense.toLocaleString()}, Net ${month.net.toLocaleString()}`}
+              title={`${month.month}/${month.year}: Income ${month.income.toLocaleString()}, Expense ${month.expense.toLocaleString()}, Net ${month.net.toLocaleString()}`}
             >
               {/* Income bar */}
               <div
@@ -137,7 +138,7 @@ export default function MonthlyTrendChart({ months = 6 }: MonthlyTrendChartProps
                   marginTop: "0.25rem",
                 }}
               >
-                {month.month.slice(0, 3)}
+                {String(month.month).padStart(2, "0")}
               </div>
             </div>
           );

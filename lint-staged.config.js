@@ -1,10 +1,29 @@
+const GENERATED_FRONTEND_FILE_PATTERNS = [
+  /^frontend\/src\/types\/generated\//,
+  /^frontend\/src\/apps\/[^/]+\/api\.ts$/,
+];
+
+function isGeneratedFrontendFile(file) {
+  return GENERATED_FRONTEND_FILE_PATTERNS.some((pattern) => pattern.test(file));
+}
+
+function buildFrontendTasks(files) {
+  const lintableFiles = files.filter((file) => !isGeneratedFrontendFile(file));
+
+  if (lintableFiles.length === 0) {
+    return "echo 'Frontend: generated files skipped'";
+  }
+
+  return [
+    `sh -c 'cd frontend && npx eslint --fix --max-warnings 0 ${lintableFiles.join(" ")}'`,
+    "sh -c 'cd frontend && npx tsc --noEmit'",
+  ];
+}
+
 /** @type {import('lint-staged').Configuration} */
 module.exports = {
-  // TypeScript / React — sh -c needed because lint-staged runs from repo root
-  "frontend/**/*.{ts,tsx}": [
-    (files) => `sh -c 'cd frontend && npx eslint --fix --max-warnings 0 ${files.join(" ")}'`,
-    (files) => `sh -c 'cd frontend && npx tsc --noEmit'`,
-  ],
+  // TypeScript / React — generated contracts are skipped because they are auto-generated.
+  "frontend/**/*.{ts,tsx}": buildFrontendTasks,
 
   // Python
   "**/*.py": [

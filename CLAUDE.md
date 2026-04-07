@@ -210,6 +210,7 @@ npm run build:frontend
 4. **`src/shared/` là cầu nối hợp lệ** — `shared/utils/` và `shared/hooks/` dành cho pure utilities (timezone, formatters). Apps được phép import từ đây. Không bao giờ để app-specific logic ở `shared/`.
 5. **Backend là source of truth** — manifest (icon, color, name, widgets), schemas, types đều bắt nguồn từ đây
 6. **TUYỆT ĐỐI KHÔNG silent catch** — Không bao giờ dùng `.catch(() => {})`, `except: pass`, hoặc bất kỳ nhánh bắt lỗi nào nuốt lỗi im lặng. Mọi lỗi phải được log rõ ràng (`console.error`, logger) hoặc chuyển thành error/result có cấu trúc.
+7. **BẮT BUỘC annotate API đầy đủ** — Mọi route plugin trong `backend/apps/{app_id}/routes.py` phải có `response_model` rõ ràng; mọi request/response body phải có schema trong `apps/{app_id}/schemas.py`. Không để OpenAPI trả về `unknown` cho endpoint chính.
 
 ### Backend `shared/` Conventions
 
@@ -255,6 +256,15 @@ npm run build:frontend
 6. **Folder name phải khớp manifest.id**
 7. **Phải có:** `register_plugin()` trong `__init__.py` (backend)
 
+### API Schema Naming
+
+- `*Request` = request body gửi từ FE lên BE.
+- `*Read` = resource DTO trả về từ API cho một entity/domain object.
+- `*Response` = response object tổng hợp/envelope/KPI payload, không phải một entity thuần.
+- Với plugin/subapp, schema phải globally unique theo mẫu `{App}{Entity}{Suffix}`.
+- Ví dụ đúng: `TodoTaskRead`, `CalendarEventRead`, `FinanceWalletRead`, `FinanceCreateTransactionRequest`.
+- Không để generator phải tạo tên fallback kiểu `apps__foo__...`; nếu thấy xuất hiện, phải đổi tên schema ở BE rồi regenerate.
+
 ### Frontend
 
 1. **Auto-discovery** — `src/apps/index.ts` dùng Vite glob import để tự động phát hiện tất cả apps trong `src/apps/*/index.ts`. Không cần import thủ công.
@@ -272,6 +282,24 @@ npm run build:frontend
 9. **SWR Hooks** — Mỗi app tự tạo hooks trong `hooks/` folder, import shared config từ `@/lib/swr`
 10. **Platform code KHÔNG import từ apps** — `src/lib/`, `src/components/`, `src/hooks/` (trừ `useAuth`) không được import từ `src/apps/`. Chỉ `src/shared/` được phép.
 11. **`src/shared/` structure:** `shared/utils/` cho pure functions, `shared/hooks/` cho React hooks. Chỉ chứa code hoàn toàn không có app-specific logic.
+12. **Generated type access pattern** — FE app code phải import type qua facade `@/types/generated` (index ổn định), không import trực tiếp `@/types/generated/api` trừ khi đang sửa codegen.
+13. **Subapp API facade là generated** — `frontend/src/apps/{app_id}/api.ts` là file auto-generated từ OpenAPI qua `scripts/codegen.py`. Không edit tay file này. Nếu thiếu route/type/sai signature, sửa BE annotation/schema rồi regenerate.
+14. **Không code tay contract type** — FE không được tự định nghĩa lại BE contract dưới dạng `interface/type` thủ công trong app code. Request/response/resource DTO phải lấy từ generated sources (`src/apps/{app_id}/api.ts` hoặc `@/types/generated`).
+15. **Chỉ cho phép local UI-only types** — Type viết tay trong app chỉ được dùng cho props/state/view-model/computed data không tồn tại ở BE. Nếu shape đó đã có trong OpenAPI thì phải dùng generated type.
+16. **Operation params cũng đi theo codegen** — Query/path/body contract của subapp phải đi qua generated app API client; không tự dựng shape request rời rạc ở component/hook nếu có thể import từ generated facade.
+
+### Anti-Regression Notes (Cập nhật bắt buộc)
+
+- Khi gặp lỗi kiến trúc/contract, phải thêm note ngắn vào section này để tránh lặp lại.
+- 2026-04-07:
+  - Đã gặp case subapp routes thiếu `response_model` nên OpenAPI sinh `unknown`; từ nay route plugin phải annotate đầy đủ request/response.
+  - Đã gặp mismatch FE gửi body nhưng BE route nhận query (ví dụ update wallet); từ nay PATCH/PUT phải dùng request schema thay vì query params rời.
+  - Subapp FE từng tự viết tay response types lệch BE; từ nay ưu tiên generated types + facade `@/types/generated`.
+  - Khi naming schema plugin không globally unique, OpenAPI generator sinh tên xấu kiểu `apps__...`; chuẩn repo là đổi tên schema ngay ở BE theo `{App}{Entity}{Suffix}`, không vá alias thủ công ở FE/platform.
+  - Discovery key từ `import.meta.glob` có thể khác prefix (`./` vs `../apps/`); regex registry phải chấp nhận cả hai dạng.
+  - `frontend/src/apps/{app_id}/api.ts` từng là file viết tay; từ nay đây là generated file và là app-local contract facade chuẩn. Không sửa tay để “vá nhanh”.
+  - Khi FE cần type như `TaskRead`, `SummaryResponse`, `UpdateWalletRequest`, phải import từ generated subapp facade thay vì tự alias rải rác trong component/hook.
+  - Nếu một local type không phải UI-only, coi đó là lỗi kiến trúc: phải đưa về BE/OpenAPI/codegen thay vì giữ ở FE.
 
 ### Chat/Agent
 
@@ -326,6 +354,8 @@ npm run build:frontend
 - [ ] Backend/frontend widget sizes khớp nhau
 - [ ] Shared constants → đã vào `shared/enums.py` (platform-wide) hoặc `apps/{app_id}/enums.py` (plugin-specific) chưa? (xem section 7)
 - [ ] Module-level constants → đặt sau imports và `logger` chưa?
+- [ ] Mọi plugin route có `response_model` + request/response schema đầy đủ chưa (không để OpenAPI `unknown`)?
+- [ ] FE type import đã đi qua `@/types/generated` facade chưa (không import trực tiếp `@/types/generated/api`)?
 - [ ] `git commit --no-verify` chỉ dùng khi lint-staged/ESLint config bị lỗi — KHÔNG dùng để skip tất cả hooks
 
 ---

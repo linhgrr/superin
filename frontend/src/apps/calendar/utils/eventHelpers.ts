@@ -1,8 +1,8 @@
-import type { Event } from "../api";
+import type { EventRead } from "../api";
 import { isSameDayInTimezone } from "../utils/dateHelpers";
 
 interface FilterEventsProps {
-  events: Event[];
+  events: EventRead[];
   selectedCalendar: string | null;
 }
 
@@ -16,7 +16,7 @@ interface GroupEventsOptions {
   timezone?: string;
 }
 
-export function groupEventsByDate(events: Event[], options: GroupEventsOptions = {}) {
+export function groupEventsByDate(events: EventRead[], options: GroupEventsOptions = {}) {
   const { timezone } = options;
   return events.reduce((acc, event) => {
     const dateObj = new Date(event.start_datetime);
@@ -40,19 +40,19 @@ export function groupEventsByDate(events: Event[], options: GroupEventsOptions =
     }
     acc[dateKey].events.push(event);
     return acc;
-  }, {} as Record<string, { label: string; events: Event[] }>);
+  }, {} as Record<string, { label: string; events: EventRead[] }>);
 }
 
 interface GetEventsOptions {
   timezone?: string;
 }
 
-export function getEventsForDay(events: Event[], date: Date, options: GetEventsOptions = {}) {
+export function getEventsForDay(events: EventRead[], date: Date, options: GetEventsOptions = {}) {
   const { timezone } = options;
   return events.filter((e) => isSameDayInTimezone(new Date(e.start_datetime), date, timezone));
 }
 
-export function calculateEventStyle(event: Event, hourHeight: number = 60) {
+export function calculateEventStyle(event: EventRead, hourHeight: number = 60) {
   const start = new Date(event.start_datetime);
   const end = new Date(event.end_datetime);
   const startHour = start.getHours() + start.getMinutes() / 60;

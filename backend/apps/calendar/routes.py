@@ -6,12 +6,16 @@ from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from apps.calendar.schemas import (
-    CreateCalendarRequest,
-    CreateEventRequest,
-    CreateRecurringRuleRequest,
-    ScheduleTaskRequest,
-    UpdateCalendarRequest,
-    UpdateEventRequest,
+    CalendarActionResponse,
+    CalendarCalendarRead,
+    CalendarCreateCalendarRequest,
+    CalendarCreateEventRequest,
+    CalendarCreateRecurringRuleRequest,
+    CalendarEventRead,
+    CalendarRecurringRuleRead,
+    CalendarScheduleTaskRequest,
+    CalendarUpdateCalendarRequest,
+    CalendarUpdateEventRequest,
 )
 from apps.calendar.service import calendar_service
 from core.auth import get_current_user
@@ -20,22 +24,22 @@ from shared.preference_utils import (
     preference_to_schema,
     update_multiple_preferences,
 )
-from shared.schemas import PreferenceUpdate, WidgetPreferenceSchema
+from shared.schemas import PreferenceUpdate, WidgetManifestSchema, WidgetPreferenceSchema
 
 router = APIRouter()
 
 
 # ─── Widgets ──────────────────────────────────────────────────────────────────
 
-@router.get("/widgets")
-async def list_widgets():
+@router.get("/widgets", response_model=list[WidgetManifestSchema])
+async def list_widgets() -> list[WidgetManifestSchema]:
     from apps.calendar.manifest import calendar_manifest
     return calendar_manifest.widgets
 
 
 # ─── Events ───────────────────────────────────────────────────────────────────
 
-@router.get("/events")
+@router.get("/events", response_model=list[CalendarEventRead])
 async def list_events(
     user_id: str = Depends(get_current_user),
     start: datetime | None = Query(None),
@@ -47,7 +51,7 @@ async def list_events(
     return await calendar_service.list_events(user_id, start, end, calendar_id, limit)
 
 
-@router.get("/events/search")
+@router.get("/events/search", response_model=list[CalendarEventRead])
 async def search_events(
     q: str,
     user_id: str = Depends(get_current_user),
@@ -57,7 +61,7 @@ async def search_events(
     return await calendar_service.search_events(user_id, q, limit)
 
 
-@router.get("/events/{event_id}")
+@router.get("/events/{event_id}", response_model=CalendarEventRead)
 async def get_event(event_id: str, user_id: str = Depends(get_current_user)):
     """Get single event."""
     event = await calendar_service.get_event(event_id, user_id)
@@ -66,9 +70,9 @@ async def get_event(event_id: str, user_id: str = Depends(get_current_user)):
     return event
 
 
-@router.post("/events")
+@router.post("/events", response_model=CalendarEventRead)
 async def create_event(
-    request: CreateEventRequest,
+    request: CalendarCreateEventRequest,
     user_id: str = Depends(get_current_user),
 ):
     """Create new event."""
@@ -91,10 +95,10 @@ async def create_event(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.patch("/events/{event_id}")
+@router.patch("/events/{event_id}", response_model=CalendarEventRead)
 async def update_event(
     event_id: str,
-    request: UpdateEventRequest,
+    request: CalendarUpdateEventRequest,
     user_id: str = Depends(get_current_user),
 ):
     """Update event."""
@@ -121,7 +125,7 @@ async def update_event(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.delete("/events/{event_id}")
+@router.delete("/events/{event_id}", response_model=CalendarActionResponse)
 async def delete_event(event_id: str, user_id: str = Depends(get_current_user)):
     """Delete event."""
     try:
@@ -132,7 +136,7 @@ async def delete_event(event_id: str, user_id: str = Depends(get_current_user)):
 
 # ─── Conflicts ────────────────────────────────────────────────────────────────
 
-@router.get("/conflicts/check")
+@router.get("/conflicts/check", response_model=list[CalendarEventRead])
 async def check_conflicts(
     start: datetime,
     end: datetime,
@@ -145,15 +149,15 @@ async def check_conflicts(
 
 # ─── Calendars ──────────────────────────────────────────────────────────────
 
-@router.get("/calendars")
+@router.get("/calendars", response_model=list[CalendarCalendarRead])
 async def list_calendars(user_id: str = Depends(get_current_user)):
     """List all calendars."""
     return await calendar_service.list_calendars(user_id)
 
 
-@router.post("/calendars")
+@router.post("/calendars", response_model=CalendarCalendarRead)
 async def create_calendar(
-    request: CreateCalendarRequest,
+    request: CalendarCreateCalendarRequest,
     user_id: str = Depends(get_current_user),
 ):
     """Create new calendar."""
@@ -163,10 +167,10 @@ async def create_calendar(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.patch("/calendars/{calendar_id}")
+@router.patch("/calendars/{calendar_id}", response_model=CalendarCalendarRead)
 async def update_calendar(
     calendar_id: str,
-    request: UpdateCalendarRequest,
+    request: CalendarUpdateCalendarRequest,
     user_id: str = Depends(get_current_user),
 ):
     """Update calendar."""
@@ -185,7 +189,7 @@ async def update_calendar(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.delete("/calendars/{calendar_id}")
+@router.delete("/calendars/{calendar_id}", response_model=CalendarActionResponse)
 async def delete_calendar(calendar_id: str, user_id: str = Depends(get_current_user)):
     """Delete calendar and all its events."""
     try:
@@ -196,10 +200,10 @@ async def delete_calendar(calendar_id: str, user_id: str = Depends(get_current_u
 
 # ─── Recurring ────────────────────────────────────────────────────────────────
 
-@router.post("/events/{event_id}/recurring")
+@router.post("/events/{event_id}/recurring", response_model=CalendarRecurringRuleRead)
 async def create_recurring(
     event_id: str,
-    request: CreateRecurringRuleRequest,
+    request: CalendarCreateRecurringRuleRequest,
     user_id: str = Depends(get_current_user),
 ):
     """Make event recurring."""
@@ -212,13 +216,13 @@ async def create_recurring(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/recurring")
+@router.get("/recurring", response_model=list[CalendarRecurringRuleRead])
 async def list_recurring_rules(user_id: str = Depends(get_current_user)):
     """List recurring rules."""
     return await calendar_service.list_recurring_rules(user_id)
 
 
-@router.patch("/recurring/{rule_id}/stop")
+@router.patch("/recurring/{rule_id}/stop", response_model=CalendarRecurringRuleRead)
 async def stop_recurring(
     rule_id: str,
     user_id: str = Depends(get_current_user),
@@ -232,10 +236,10 @@ async def stop_recurring(
 
 # ─── Todo Integration ─────────────────────────────────────────────────────────
 
-@router.post("/tasks/{task_id}/schedule")
+@router.post("/tasks/{task_id}/schedule", response_model=CalendarEventRead)
 async def schedule_task(
     task_id: str,
-    request: ScheduleTaskRequest,
+    request: CalendarScheduleTaskRequest,
     user_id: str = Depends(get_current_user),
 ):
     """Schedule Todo task as time-blocked event."""

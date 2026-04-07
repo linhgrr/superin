@@ -31,7 +31,7 @@ export default function CategoryEditForm({ category, onSave, onCancel, onDelete 
         name: name.trim(),
         icon: icon.trim() || "Tag",
         color: color.trim() || "var(--color-primary)",
-        budget: budget ? Number(budget) : undefined,
+        ...(budget ? { budget: Number(budget) } : {}),
       });
       onSave(updated);
     } catch (err) {

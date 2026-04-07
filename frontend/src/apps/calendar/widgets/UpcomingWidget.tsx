@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { listEvents, type Event } from "../api";
+import { listEvents, type EventRead } from "../api";
 import { Calendar } from "lucide-react";
 import { useTimezone } from "@/shared/hooks/useTimezone";
 import { getUserTimezone } from "@/shared/utils/timezone";
@@ -10,7 +10,7 @@ interface UpcomingWidgetProps {
 }
 
 export default function UpcomingWidget({ maxItems = 3, calendarFilter }: UpcomingWidgetProps) {
-  const [events, setEvents] = useState<Event[]>([]);
+  const [events, setEvents] = useState<EventRead[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { timezone, formatDate, formatTime, isToday } = useTimezone();
 
@@ -20,7 +20,12 @@ export default function UpcomingWidget({ maxItems = 3, calendarFilter }: Upcomin
       const now = new Date().toISOString();
       const end = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
-      const evts = await listEvents(now, end, calendarFilter || undefined, maxItems);
+      const evts = await listEvents({
+        start: now,
+        end,
+        calendar_id: calendarFilter || undefined,
+        limit: maxItems,
+      });
       setEvents(evts.slice(0, maxItems));
     } finally {
       setIsLoading(false);

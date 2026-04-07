@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { getTodoSummary, type TodoSummary } from "../api";
+import { getTodoSummary, type SummaryResponse } from "../api";
 
 export function useTodoSummary() {
-  const [summary, setSummary] = useState<TodoSummary | null>(null);
+  const [summary, setSummary] = useState<SummaryResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

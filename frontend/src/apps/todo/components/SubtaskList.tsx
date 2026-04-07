@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { Plus, Loader2 } from "lucide-react";
-import type { SubTask } from "../api";
+import type { SubTaskRead } from "../api";
 import SubtaskItem from "./SubtaskItem";
 
 interface SubtaskListProps {
-  subtasks: SubTask[];
+  subtasks: SubTaskRead[];
   onToggle: (id: string, completed: boolean) => void;
   onDelete: (id: string) => void;
   onCreate: (title: string) => Promise<void>;

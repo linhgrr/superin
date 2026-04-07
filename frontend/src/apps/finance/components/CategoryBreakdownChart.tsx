@@ -16,7 +16,7 @@ export default function CategoryBreakdownChart({ month, year }: CategoryBreakdow
   useEffect(() => {
     async function fetchData() {
       try {
-        const result = await getCategoryBreakdown(month, year);
+        const result = await getCategoryBreakdown({ month, year });
         setData(result);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load data");
@@ -35,7 +35,9 @@ export default function CategoryBreakdownChart({ month, year }: CategoryBreakdow
     );
   }
 
-  if (error || !data || !data.categories || data.categories.length === 0) {
+  const categories = data?.breakdown ?? [];
+
+  if (error || !data || categories.length === 0) {
     return (
       <div style={{ padding: "1.5rem", textAlign: "center", color: "var(--color-foreground-muted)" }}>
         {error || "No spending data available"}
@@ -43,8 +45,7 @@ export default function CategoryBreakdownChart({ month, year }: CategoryBreakdow
     );
   }
 
-  const categories = data?.categories ?? [];
-  const total = data?.total ?? 0;
+  const total = data.total_spending;
 
   if (categories.length === 0) {
     return (
@@ -59,7 +60,7 @@ export default function CategoryBreakdownChart({ month, year }: CategoryBreakdow
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
       <div style={{ fontSize: "0.875rem", color: "var(--color-foreground-muted)", textAlign: "center" }}>
-        Total: <strong>{total.toLocaleString()}</strong> in {month}/{year}
+        Total: <strong>{total.toLocaleString()}</strong> in {data.month}/{data.year}
       </div>
 
       <div
@@ -77,7 +78,7 @@ export default function CategoryBreakdownChart({ month, year }: CategoryBreakdow
           const heightPercent = maxAmount > 0 ? (category.amount / maxAmount) * 100 : 0;
           return (
             <div
-              key={category.category_id}
+              key={category.category}
               style={{
                 flex: 1,
                 display: "flex",
@@ -86,14 +87,14 @@ export default function CategoryBreakdownChart({ month, year }: CategoryBreakdow
                 gap: "0.25rem",
                 minWidth: "60px",
               }}
-              title={`${category.name}: ${category.amount.toLocaleString()} (${category.percentage.toFixed(1)}%)`}
+              title={`${category.category}: ${category.amount.toLocaleString()} (${category.percentage.toFixed(1)}%)`}
             >
               <div
                 style={{
                   width: "100%",
                   height: `${heightPercent}%`,
                   minHeight: "4px",
-                  background: category.color || "var(--color-primary)",
+                  background: "var(--color-primary)",
                   borderRadius: "4px 4px 0 0",
                   transition: "height 0.3s ease",
                 }}
@@ -109,7 +110,7 @@ export default function CategoryBreakdownChart({ month, year }: CategoryBreakdow
                   maxWidth: "100%",
                 }}
               >
-                {category.name}
+                {category.category}
               </div>
               <div style={{ fontSize: "0.625rem", color: "var(--color-foreground-muted)" }}>
                 {category.percentage.toFixed(0)}%

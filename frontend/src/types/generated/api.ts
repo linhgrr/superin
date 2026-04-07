@@ -1315,6 +1315,234 @@ export interface components {
             /** App Id */
             app_id: string;
         };
+        /** CalendarActionResponse */
+        CalendarActionResponse: {
+            /** Success */
+            success: boolean;
+            /** Id */
+            id: string;
+            /** Message */
+            message?: string | null;
+        };
+        /** CalendarCalendarRead */
+        CalendarCalendarRead: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Color */
+            color: string;
+            /** Is Visible */
+            is_visible: boolean;
+            /** Is Default */
+            is_default: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** CalendarCreateCalendarRequest */
+        CalendarCreateCalendarRequest: {
+            /** Name */
+            name: string;
+            /** Color */
+            color?: string | null;
+        };
+        /** CalendarCreateEventRequest */
+        CalendarCreateEventRequest: {
+            /** Title */
+            title: string;
+            /**
+             * Start Datetime
+             * Format: date-time
+             */
+            start_datetime: string;
+            /**
+             * End Datetime
+             * Format: date-time
+             */
+            end_datetime: string;
+            /** Calendar Id */
+            calendar_id: string;
+            /** Description */
+            description?: string | null;
+            /** Location */
+            location?: string | null;
+            /**
+             * Is All Day
+             * @default false
+             */
+            is_all_day: boolean;
+            /**
+             * Type
+             * @default event
+             * @enum {string}
+             */
+            type: "event" | "time_blocked_task";
+            /** Task Id */
+            task_id?: string | null;
+            /** Color */
+            color?: string | null;
+            /** Reminders */
+            reminders?: number[];
+        };
+        /** CalendarCreateRecurringRuleRequest */
+        CalendarCreateRecurringRuleRequest: {
+            /**
+             * Frequency
+             * @enum {string}
+             */
+            frequency: "daily" | "weekly" | "monthly" | "yearly";
+            /**
+             * Interval
+             * @default 1
+             */
+            interval: number;
+            /** Days Of Week */
+            days_of_week?: number[] | null;
+            /** End Date */
+            end_date?: string | null;
+            /** Max Occurrences */
+            max_occurrences?: number | null;
+        };
+        /** CalendarEventAttendeeRead */
+        CalendarEventAttendeeRead: {
+            /** Email */
+            email: string;
+            /** Name */
+            name?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "accepted" | "declined" | "tentative";
+        };
+        /** CalendarEventRead */
+        CalendarEventRead: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Description */
+            description?: string | null;
+            /** Location */
+            location?: string | null;
+            /**
+             * Start Datetime
+             * Format: date-time
+             */
+            start_datetime: string;
+            /**
+             * End Datetime
+             * Format: date-time
+             */
+            end_datetime: string;
+            /** Is All Day */
+            is_all_day: boolean;
+            /** Timezone */
+            timezone: string;
+            /** Calendar Id */
+            calendar_id: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "event" | "time_blocked_task";
+            /** Task Id */
+            task_id?: string | null;
+            /** Color */
+            color?: string | null;
+            /** Is Recurring */
+            is_recurring: boolean;
+            /** Reminders */
+            reminders?: number[];
+            /** Attendees */
+            attendees?: components["schemas"]["CalendarEventAttendeeRead"][];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** CalendarRecurringRuleRead */
+        CalendarRecurringRuleRead: {
+            /** Id */
+            id: string;
+            /** Event Template Id */
+            event_template_id: string;
+            /**
+             * Frequency
+             * @enum {string}
+             */
+            frequency: "daily" | "weekly" | "monthly" | "yearly";
+            /** Interval */
+            interval: number;
+            /** Days Of Week */
+            days_of_week?: number[] | null;
+            /** End Date */
+            end_date?: string | null;
+            /** Max Occurrences */
+            max_occurrences?: number | null;
+            /** Occurrence Count */
+            occurrence_count: number;
+            /** Is Active */
+            is_active: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** CalendarScheduleTaskRequest */
+        CalendarScheduleTaskRequest: {
+            /**
+             * Start Datetime
+             * Format: date-time
+             */
+            start_datetime: string;
+            /** Duration Minutes */
+            duration_minutes: number;
+            /** Calendar Id */
+            calendar_id?: string | null;
+        };
+        /** CalendarUpdateCalendarRequest */
+        CalendarUpdateCalendarRequest: {
+            /** Name */
+            name?: string | null;
+            /** Color */
+            color?: string | null;
+            /** Is Visible */
+            is_visible?: boolean | null;
+            /** Is Default */
+            is_default?: boolean | null;
+        };
+        /** CalendarUpdateEventRequest */
+        CalendarUpdateEventRequest: {
+            /** Title */
+            title?: string | null;
+            /** Start Datetime */
+            start_datetime?: string | null;
+            /** End Datetime */
+            end_datetime?: string | null;
+            /** Calendar Id */
+            calendar_id?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Location */
+            location?: string | null;
+            /** Is All Day */
+            is_all_day?: boolean | null;
+            /** Color */
+            color?: string | null;
+            /** Reminders */
+            reminders?: number[] | null;
+        };
         /**
          * ConfigFieldSchema
          * @description A configuration field for a widget.
@@ -1355,15 +1583,107 @@ export interface components {
             /** Step */
             step?: number | null;
         };
-        /** CreateCalendarRequest */
-        CreateCalendarRequest: {
-            /** Name */
-            name: string;
-            /** Color */
-            color?: string | null;
-        };
         /** CreateCategoryRequest */
         CreateCategoryRequest: {
+            /** Name */
+            name: string;
+            /**
+             * Icon
+             * @default Folder
+             */
+            icon: string;
+            /**
+             * Color
+             * @default oklch(0.65 0.21 280)
+             */
+            color: string;
+            /**
+             * Order
+             * @default 0
+             */
+            order: number;
+        };
+        /** FinanceActionResponse */
+        FinanceActionResponse: {
+            /** Success */
+            success: boolean;
+            /** Id */
+            id: string;
+            /** Message */
+            message?: string | null;
+        };
+        /** FinanceBudgetCategoryStatus */
+        FinanceBudgetCategoryStatus: {
+            /** Category Id */
+            category_id: string;
+            /** Category Name */
+            category_name: string;
+            /** Budget */
+            budget: number;
+            /** Spent */
+            spent: number;
+            /** Remaining */
+            remaining?: number | null;
+            /** Percentage Used */
+            percentage_used?: number | null;
+            /** Over Budget */
+            over_budget: boolean;
+        };
+        /** FinanceBudgetOverviewResponse */
+        FinanceBudgetOverviewResponse: {
+            /** Categories */
+            categories?: components["schemas"]["FinanceBudgetCategoryStatus"][];
+            /** Total Budget */
+            total_budget: number;
+            /** Total Spent */
+            total_spent: number;
+            /** Month */
+            month: number;
+            /** Year */
+            year: number;
+        };
+        /** FinanceCategoryBreakdownItem */
+        FinanceCategoryBreakdownItem: {
+            /** Category */
+            category: string;
+            /** Amount */
+            amount: number;
+            /** Percentage */
+            percentage: number;
+        };
+        /** FinanceCategoryBreakdownResponse */
+        FinanceCategoryBreakdownResponse: {
+            /** Month */
+            month: number;
+            /** Year */
+            year: number;
+            /** Total Spending */
+            total_spending: number;
+            /** Breakdown */
+            breakdown?: components["schemas"]["FinanceCategoryBreakdownItem"][];
+            /** Category Count */
+            category_count: number;
+        };
+        /** FinanceCategoryRead */
+        FinanceCategoryRead: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Icon */
+            icon: string;
+            /** Color */
+            color: string;
+            /** Budget */
+            budget: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** FinanceCreateCategoryRequest */
+        FinanceCreateCategoryRequest: {
             /** Name */
             name: string;
             /**
@@ -1382,91 +1702,8 @@ export interface components {
              */
             budget: number;
         };
-        /** CreateEventRequest */
-        CreateEventRequest: {
-            /** Title */
-            title: string;
-            /**
-             * Start Datetime
-             * Format: date-time
-             */
-            start_datetime: string;
-            /**
-             * End Datetime
-             * Format: date-time
-             */
-            end_datetime: string;
-            /** Calendar Id */
-            calendar_id: string;
-            /** Description */
-            description?: string | null;
-            /** Location */
-            location?: string | null;
-            /**
-             * Is All Day
-             * @default false
-             */
-            is_all_day: boolean;
-            /**
-             * Type
-             * @default event
-             * @enum {string}
-             */
-            type: "event" | "time_blocked_task";
-            /** Task Id */
-            task_id?: string | null;
-            /** Color */
-            color?: string | null;
-            /** Reminders */
-            reminders?: number[];
-        };
-        /** CreateRecurringRuleRequest */
-        CreateRecurringRuleRequest: {
-            /**
-             * Frequency
-             * @enum {string}
-             */
-            frequency: "daily" | "weekly" | "monthly" | "yearly";
-            /**
-             * Interval
-             * @default 1
-             */
-            interval: number;
-            /** Days Of Week */
-            days_of_week?: number[] | null;
-            /** End Date */
-            end_date?: string | null;
-            /** Max Occurrences */
-            max_occurrences?: number | null;
-        };
-        /** CreateSubTaskRequest */
-        CreateSubTaskRequest: {
-            /** Title */
-            title: string;
-        };
-        /** CreateTaskRequest */
-        CreateTaskRequest: {
-            /** Title */
-            title: string;
-            /** Description */
-            description?: string | null;
-            /** Due Date */
-            due_date?: string | null;
-            /** Due Time */
-            due_time?: string | null;
-            /**
-             * Priority
-             * @default medium
-             * @enum {string}
-             */
-            priority: "low" | "medium" | "high";
-            /** Tags */
-            tags?: string[];
-            /** Reminder Minutes */
-            reminder_minutes?: number | null;
-        };
-        /** CreateTransactionRequest */
-        CreateTransactionRequest: {
+        /** FinanceCreateTransactionRequest */
+        FinanceCreateTransactionRequest: {
             /** Wallet Id */
             wallet_id: string;
             /** Category Id */
@@ -1486,8 +1723,8 @@ export interface components {
             /** Note */
             note?: string | null;
         };
-        /** CreateWalletRequest */
-        CreateWalletRequest: {
+        /** FinanceCreateWalletRequest */
+        FinanceCreateWalletRequest: {
             /** Name */
             name: string;
             /**
@@ -1495,6 +1732,136 @@ export interface components {
              * @default USD
              */
             currency: string;
+        };
+        /** FinanceMonthlyTrendItem */
+        FinanceMonthlyTrendItem: {
+            /** Year */
+            year: number;
+            /** Month */
+            month: number;
+            /** Income */
+            income: number;
+            /** Expense */
+            expense: number;
+            /** Net */
+            net: number;
+        };
+        /** FinanceMonthlyTrendResponse */
+        FinanceMonthlyTrendResponse: {
+            /** Trend */
+            trend?: components["schemas"]["FinanceMonthlyTrendItem"][];
+            /** Average Income */
+            average_income: number;
+            /** Average Expense */
+            average_expense: number;
+            /** Average Net */
+            average_net: number;
+        };
+        /** FinanceSummaryResponse */
+        FinanceSummaryResponse: {
+            /** Total Balance */
+            total_balance: number;
+            /** Income This Month */
+            income_this_month: number;
+            /** Expense This Month */
+            expense_this_month: number;
+            /** Transaction Count */
+            transaction_count: number;
+            /** Wallet Count */
+            wallet_count: number;
+        };
+        /** FinanceTransactionRead */
+        FinanceTransactionRead: {
+            /** Id */
+            id: string;
+            /** Wallet Id */
+            wallet_id: string;
+            /** Category Id */
+            category_id: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "income" | "expense";
+            /** Amount */
+            amount: number;
+            /**
+             * Date
+             * Format: date-time
+             */
+            date: string;
+            /** Note */
+            note?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** FinanceTransferRequest */
+        FinanceTransferRequest: {
+            /** From Wallet Id */
+            from_wallet_id: string;
+            /** To Wallet Id */
+            to_wallet_id: string;
+            /** Amount */
+            amount: number;
+            /** Note */
+            note?: string | null;
+        };
+        /** FinanceTransferResponse */
+        FinanceTransferResponse: {
+            from_wallet: components["schemas"]["FinanceWalletRead"];
+            to_wallet: components["schemas"]["FinanceWalletRead"];
+            /** Amount */
+            amount: number;
+            /** Note */
+            note?: string | null;
+        };
+        /** FinanceUpdateCategoryRequest */
+        FinanceUpdateCategoryRequest: {
+            /** Name */
+            name?: string | null;
+            /** Icon */
+            icon?: string | null;
+            /** Color */
+            color?: string | null;
+            /** Budget */
+            budget?: number | null;
+        };
+        /** FinanceUpdateTransactionRequest */
+        FinanceUpdateTransactionRequest: {
+            /** Wallet Id */
+            wallet_id?: string | null;
+            /** Category Id */
+            category_id?: string | null;
+            /** Amount */
+            amount?: number | null;
+            /** Date */
+            date?: string | null;
+            /** Note */
+            note?: string | null;
+        };
+        /** FinanceUpdateWalletRequest */
+        FinanceUpdateWalletRequest: {
+            /** Name */
+            name?: string | null;
+        };
+        /** FinanceWalletRead */
+        FinanceWalletRead: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Currency */
+            currency: string;
+            /** Balance */
+            balance: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -1543,20 +1910,6 @@ export interface components {
             /** Name */
             name: string;
         };
-        /** ScheduleTaskRequest */
-        ScheduleTaskRequest: {
-            /** Task Id */
-            task_id: string;
-            /**
-             * Start Datetime
-             * Format: date-time
-             */
-            start_datetime: string;
-            /** Duration Minutes */
-            duration_minutes: number;
-            /** Calendar Id */
-            calendar_id?: string | null;
-        };
         /** SelectOption */
         SelectOption: {
             /** Label */
@@ -1564,76 +1917,224 @@ export interface components {
             /** Value */
             value: string;
         };
-        /** TokenResponse */
-        TokenResponse: {
-            /** Access Token */
-            access_token: string;
-            /** Refresh Token */
-            refresh_token: string;
+        /** TodoActionResponse */
+        TodoActionResponse: {
+            /** Success */
+            success: boolean;
+            /** Id */
+            id: string;
+            /** Message */
+            message?: string | null;
+        };
+        /** TodoCreateRecurringRuleRequest */
+        TodoCreateRecurringRuleRequest: {
             /**
-             * Token Type
-             * @default bearer
-             * @constant
+             * Frequency
+             * @enum {string}
              */
-            token_type: "bearer";
-            user: components["schemas"]["UserPublic"];
+            frequency: "daily" | "weekly" | "monthly" | "yearly";
+            /**
+             * Interval
+             * @default 1
+             */
+            interval: number;
+            /** Days Of Week */
+            days_of_week?: number[] | null;
+            /** End Date */
+            end_date?: string | null;
+            /** Max Occurrences */
+            max_occurrences?: number | null;
         };
-        /** TransferRequest */
-        TransferRequest: {
-            /** From Wallet Id */
-            from_wallet_id: string;
-            /** To Wallet Id */
-            to_wallet_id: string;
-            /** Amount */
-            amount: number;
-            /** Note */
-            note?: string | null;
-        };
-        /** UpdateCalendarRequest */
-        UpdateCalendarRequest: {
-            /** Name */
-            name?: string | null;
-            /** Color */
-            color?: string | null;
-            /** Is Visible */
-            is_visible?: boolean | null;
-            /** Is Default */
-            is_default?: boolean | null;
-        };
-        /** UpdateCategoryRequest */
-        UpdateCategoryRequest: {
-            /** Name */
-            name?: string | null;
-            /** Icon */
-            icon?: string | null;
-            /** Color */
-            color?: string | null;
-            /** Order */
-            order?: number | null;
-        };
-        /** UpdateEventRequest */
-        UpdateEventRequest: {
+        /** TodoCreateSubTaskRequest */
+        TodoCreateSubTaskRequest: {
             /** Title */
-            title?: string | null;
-            /** Start Datetime */
-            start_datetime?: string | null;
-            /** End Datetime */
-            end_datetime?: string | null;
-            /** Calendar Id */
-            calendar_id?: string | null;
+            title: string;
+        };
+        /** TodoCreateTaskRequest */
+        TodoCreateTaskRequest: {
+            /** Title */
+            title: string;
             /** Description */
             description?: string | null;
-            /** Location */
-            location?: string | null;
-            /** Is All Day */
-            is_all_day?: boolean | null;
-            /** Color */
-            color?: string | null;
-            /** Reminders */
-            reminders?: number[] | null;
+            /** Due Date */
+            due_date?: string | null;
+            /** Due Time */
+            due_time?: string | null;
+            /**
+             * Priority
+             * @default medium
+             * @enum {string}
+             */
+            priority: "low" | "medium" | "high";
+            /** Tags */
+            tags?: string[];
+            /** Reminder Minutes */
+            reminder_minutes?: number | null;
         };
-        /** UpdateTaskRequest */
-        UpdateTaskRequest: {
+        /** TodoRecurringRuleRead */
+        TodoRecurringRuleRead: {
+            /** Id */
+            id: string;
+            /** Task Template Id */
+            task_template_id: string;
+            /**
+             * Frequency
+             * @enum {string}
+             */
+            frequency: "daily" | "weekly" | "monthly" | "yearly";
+            /** Interval */
+            interval: number;
+            /** Days Of Week */
+            days_of_week?: number[] | null;
+            /** End Date */
+            end_date?: string | null;
+            /** Max Occurrences */
+            max_occurrences?: number | null;
+            /** Occurrence Count */
+            occurrence_count: number;
+            /** Is Active */
+            is_active: boolean;
+            /** Last Generated Date */
+            last_generated_date?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** TodoSubTaskProgress */
+        TodoSubTaskProgress: {
+            /** Total */
+            total: number;
+            /** Completed */
+            completed: number;
+            /** Percentage */
+            percentage: number;
+        };
+        /** TodoSubTaskRead */
+        TodoSubTaskRead: {
+            /** Id */
+            id: string;
+            /** Parent Task Id */
+            parent_task_id: string;
+            /** Title */
+            title: string;
+            /** Completed */
+            completed: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Completed At */
+            completed_at?: string | null;
+        };
+        /** TodoSummaryResponse */
+        TodoSummaryResponse: {
+            /** Total */
+            total: number;
+            /** Pending */
+            pending: number;
+            /** Completed */
+            completed: number;
+            /** Overdue */
+            overdue: number;
+            /** Due Today */
+            due_today: number;
+            /** Archived */
+            archived: number;
+            /** Total Tags */
+            total_tags: number;
+            /** Tag List */
+            tag_list?: string[];
+        };
+        /** TodoTaskDetailRead */
+        TodoTaskDetailRead: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Description */
+            description?: string | null;
+            /** Due Date */
+            due_date?: string | null;
+            /** Due Time */
+            due_time?: string | null;
+            /** Reminder Minutes */
+            reminder_minutes?: number | null;
+            /**
+             * Priority
+             * @enum {string}
+             */
+            priority: "low" | "medium" | "high";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "completed";
+            /** Tags */
+            tags?: string[];
+            /**
+             * Is Archived
+             * @default false
+             */
+            is_archived: boolean;
+            /** Parent Task Id */
+            parent_task_id?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Completed At */
+            completed_at?: string | null;
+            /** Subtasks */
+            subtasks?: components["schemas"]["TodoSubTaskRead"][];
+            subtask_progress: components["schemas"]["TodoSubTaskProgress"];
+        };
+        /** TodoTaskRead */
+        TodoTaskRead: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Description */
+            description?: string | null;
+            /** Due Date */
+            due_date?: string | null;
+            /** Due Time */
+            due_time?: string | null;
+            /** Reminder Minutes */
+            reminder_minutes?: number | null;
+            /**
+             * Priority
+             * @enum {string}
+             */
+            priority: "low" | "medium" | "high";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "completed";
+            /** Tags */
+            tags?: string[];
+            /**
+             * Is Archived
+             * @default false
+             */
+            is_archived: boolean;
+            /** Parent Task Id */
+            parent_task_id?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Completed At */
+            completed_at?: string | null;
+        };
+        /** TodoUpdateTaskRequest */
+        TodoUpdateTaskRequest: {
             /** Title */
             title?: string | null;
             /** Description */
@@ -1650,6 +2151,31 @@ export interface components {
             tags?: string[] | null;
             /** Reminder Minutes */
             reminder_minutes?: number | null;
+        };
+        /** TokenResponse */
+        TokenResponse: {
+            /** Access Token */
+            access_token: string;
+            /** Refresh Token */
+            refresh_token: string;
+            /**
+             * Token Type
+             * @default bearer
+             * @constant
+             */
+            token_type: "bearer";
+            user: components["schemas"]["UserPublic"];
+        };
+        /** UpdateCategoryRequest */
+        UpdateCategoryRequest: {
+            /** Name */
+            name?: string | null;
+            /** Icon */
+            icon?: string | null;
+            /** Color */
+            color?: string | null;
+            /** Order */
+            order?: number | null;
         };
         /**
          * UpdateUserSettingsRequest
@@ -1763,26 +2289,6 @@ export interface components {
             installed_apps?: components["schemas"]["AppRuntimeEntry"][];
             /** Widget Preferences */
             widget_preferences?: components["schemas"]["WidgetPreferenceSchema"][];
-        };
-        /** CreateCategoryRequest */
-        apps__catalog__CreateCategoryRequest: {
-            /** Name */
-            name: string;
-            /**
-             * Icon
-             * @default Folder
-             */
-            icon: string;
-            /**
-             * Color
-             * @default oklch(0.65 0.21 280)
-             */
-            color: string;
-            /**
-             * Order
-             * @default 0
-             */
-            order: number;
         };
     };
     responses: never;
@@ -2003,7 +2509,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["apps__catalog__CreateCategoryRequest"];
+                "application/json": components["schemas"]["CreateCategoryRequest"];
             };
         };
         responses: {
@@ -2330,7 +2836,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["WidgetManifestSchema"][];
                 };
             };
         };
@@ -2355,7 +2861,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CalendarEventRead"][];
                 };
             };
             /** @description Validation Error */
@@ -2378,7 +2884,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CreateEventRequest"];
+                "application/json": components["schemas"]["CalendarCreateEventRequest"];
             };
         };
         responses: {
@@ -2388,7 +2894,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CalendarEventRead"];
                 };
             };
             /** @description Validation Error */
@@ -2420,7 +2926,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CalendarEventRead"][];
                 };
             };
             /** @description Validation Error */
@@ -2451,7 +2957,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CalendarEventRead"];
                 };
             };
             /** @description Validation Error */
@@ -2482,7 +2988,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CalendarActionResponse"];
                 };
             };
             /** @description Validation Error */
@@ -2507,7 +3013,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["UpdateEventRequest"];
+                "application/json": components["schemas"]["CalendarUpdateEventRequest"];
             };
         };
         responses: {
@@ -2517,7 +3023,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CalendarEventRead"];
                 };
             };
             /** @description Validation Error */
@@ -2550,7 +3056,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CalendarEventRead"][];
                 };
             };
             /** @description Validation Error */
@@ -2579,7 +3085,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CalendarCalendarRead"][];
                 };
             };
         };
@@ -2593,7 +3099,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CreateCalendarRequest"];
+                "application/json": components["schemas"]["CalendarCreateCalendarRequest"];
             };
         };
         responses: {
@@ -2603,7 +3109,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CalendarCalendarRead"];
                 };
             };
             /** @description Validation Error */
@@ -2634,7 +3140,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CalendarActionResponse"];
                 };
             };
             /** @description Validation Error */
@@ -2659,7 +3165,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["UpdateCalendarRequest"];
+                "application/json": components["schemas"]["CalendarUpdateCalendarRequest"];
             };
         };
         responses: {
@@ -2669,7 +3175,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CalendarCalendarRead"];
                 };
             };
             /** @description Validation Error */
@@ -2694,7 +3200,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CreateRecurringRuleRequest"];
+                "application/json": components["schemas"]["CalendarCreateRecurringRuleRequest"];
             };
         };
         responses: {
@@ -2704,7 +3210,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CalendarRecurringRuleRead"];
                 };
             };
             /** @description Validation Error */
@@ -2733,7 +3239,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CalendarRecurringRuleRead"][];
                 };
             };
         };
@@ -2755,7 +3261,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CalendarRecurringRuleRead"];
                 };
             };
             /** @description Validation Error */
@@ -2780,7 +3286,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ScheduleTaskRequest"];
+                "application/json": components["schemas"]["CalendarScheduleTaskRequest"];
             };
         };
         responses: {
@@ -2790,7 +3296,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CalendarEventRead"];
                 };
             };
             /** @description Validation Error */
@@ -2872,7 +3378,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["WidgetManifestSchema"][];
                 };
             };
         };
@@ -2892,7 +3398,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["FinanceWalletRead"][];
                 };
             };
         };
@@ -2906,7 +3412,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CreateWalletRequest"];
+                "application/json": components["schemas"]["FinanceCreateWalletRequest"];
             };
         };
         responses: {
@@ -2916,7 +3422,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["FinanceWalletRead"];
                 };
             };
             /** @description Validation Error */
@@ -2947,7 +3453,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["FinanceWalletRead"];
                 };
             };
             /** @description Validation Error */
@@ -2978,7 +3484,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["FinanceActionResponse"];
                 };
             };
             /** @description Validation Error */
@@ -2994,16 +3500,18 @@ export interface operations {
     };
     update_wallet_api_apps_finance_wallets__wallet_id__patch: {
         parameters: {
-            query: {
-                name: string;
-            };
+            query?: never;
             header?: never;
             path: {
                 wallet_id: string;
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FinanceUpdateWalletRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -3011,7 +3519,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["FinanceWalletRead"];
                 };
             };
             /** @description Validation Error */
@@ -3040,7 +3548,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["FinanceCategoryRead"][];
                 };
             };
         };
@@ -3054,7 +3562,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CreateCategoryRequest"];
+                "application/json": components["schemas"]["FinanceCreateCategoryRequest"];
             };
         };
         responses: {
@@ -3064,7 +3572,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["FinanceCategoryRead"];
                 };
             };
             /** @description Validation Error */
@@ -3095,7 +3603,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["FinanceCategoryRead"];
                 };
             };
             /** @description Validation Error */
@@ -3126,7 +3634,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["FinanceActionResponse"];
                 };
             };
             /** @description Validation Error */
@@ -3151,7 +3659,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CreateCategoryRequest"];
+                "application/json": components["schemas"]["FinanceUpdateCategoryRequest"];
             };
         };
         responses: {
@@ -3161,7 +3669,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["FinanceCategoryRead"];
                 };
             };
             /** @description Validation Error */
@@ -3196,7 +3704,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["FinanceTransactionRead"][];
                 };
             };
             /** @description Validation Error */
@@ -3219,7 +3727,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CreateTransactionRequest"];
+                "application/json": components["schemas"]["FinanceCreateTransactionRequest"];
             };
         };
         responses: {
@@ -3229,7 +3737,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["FinanceTransactionRead"];
                 };
             };
             /** @description Validation Error */
@@ -3260,7 +3768,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["FinanceTransactionRead"];
                 };
             };
             /** @description Validation Error */
@@ -3291,7 +3799,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["FinanceActionResponse"];
                 };
             };
             /** @description Validation Error */
@@ -3316,7 +3824,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CreateTransactionRequest"];
+                "application/json": components["schemas"]["FinanceUpdateTransactionRequest"];
             };
         };
         responses: {
@@ -3326,7 +3834,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["FinanceTransactionRead"];
                 };
             };
             /** @description Validation Error */
@@ -3360,7 +3868,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["FinanceTransactionRead"][];
                 };
             };
             /** @description Validation Error */
@@ -3391,7 +3899,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["FinanceBudgetCategoryStatus"] | components["schemas"]["FinanceBudgetOverviewResponse"];
                 };
             };
             /** @description Validation Error */
@@ -3423,7 +3931,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["FinanceCategoryBreakdownResponse"];
                 };
             };
             /** @description Validation Error */
@@ -3454,7 +3962,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["FinanceMonthlyTrendResponse"];
                 };
             };
             /** @description Validation Error */
@@ -3530,7 +4038,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["TransferRequest"];
+                "application/json": components["schemas"]["FinanceTransferRequest"];
             };
         };
         responses: {
@@ -3540,7 +4048,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["FinanceTransferResponse"];
                 };
             };
             /** @description Validation Error */
@@ -3569,7 +4077,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["FinanceSummaryResponse"];
                 };
             };
         };
@@ -3589,7 +4097,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["WidgetManifestSchema"][];
                 };
             };
         };
@@ -3614,7 +4122,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["TodoTaskRead"][];
                 };
             };
             /** @description Validation Error */
@@ -3637,7 +4145,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CreateTaskRequest"];
+                "application/json": components["schemas"]["TodoCreateTaskRequest"];
             };
         };
         responses: {
@@ -3647,7 +4155,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["TodoTaskRead"];
                 };
             };
             /** @description Validation Error */
@@ -3680,7 +4188,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["TodoTaskRead"][];
                 };
             };
             /** @description Validation Error */
@@ -3711,7 +4219,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["TodoTaskRead"][];
                 };
             };
             /** @description Validation Error */
@@ -3742,7 +4250,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["TodoTaskDetailRead"];
                 };
             };
             /** @description Validation Error */
@@ -3773,7 +4281,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["TodoActionResponse"];
                 };
             };
             /** @description Validation Error */
@@ -3798,7 +4306,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["UpdateTaskRequest"];
+                "application/json": components["schemas"]["TodoUpdateTaskRequest"];
             };
         };
         responses: {
@@ -3808,7 +4316,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["TodoTaskRead"];
                 };
             };
             /** @description Validation Error */
@@ -3839,7 +4347,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["TodoTaskRead"];
                 };
             };
             /** @description Validation Error */
@@ -3870,7 +4378,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["TodoTaskRead"];
                 };
             };
             /** @description Validation Error */
@@ -3901,7 +4409,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["TodoTaskRead"];
                 };
             };
             /** @description Validation Error */
@@ -3933,7 +4441,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["TodoTaskRead"];
                 };
             };
             /** @description Validation Error */
@@ -3965,7 +4473,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["TodoTaskRead"];
                 };
             };
             /** @description Validation Error */
@@ -3996,7 +4504,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["TodoSubTaskRead"][];
                 };
             };
             /** @description Validation Error */
@@ -4021,7 +4529,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CreateSubTaskRequest"];
+                "application/json": components["schemas"]["TodoCreateSubTaskRequest"];
             };
         };
         responses: {
@@ -4031,7 +4539,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["TodoSubTaskRead"];
                 };
             };
             /** @description Validation Error */
@@ -4062,7 +4570,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["TodoSubTaskRead"];
                 };
             };
             /** @description Validation Error */
@@ -4093,7 +4601,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["TodoSubTaskRead"];
                 };
             };
             /** @description Validation Error */
@@ -4124,7 +4632,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["TodoActionResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4149,7 +4657,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CreateRecurringRuleRequest"];
+                "application/json": components["schemas"]["TodoCreateRecurringRuleRequest"];
             };
         };
         responses: {
@@ -4159,7 +4667,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["TodoRecurringRuleRead"];
                 };
             };
             /** @description Validation Error */
@@ -4188,7 +4696,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["TodoRecurringRuleRead"][];
                 };
             };
         };
@@ -4210,7 +4718,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["TodoRecurringRuleRead"];
                 };
             };
             /** @description Validation Error */
@@ -4239,7 +4747,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["TodoSummaryResponse"];
                 };
             };
         };

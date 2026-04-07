@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { AlertCircle, Loader2 } from "lucide-react";
-import type { BudgetCheckResponse } from "../api";
+import type { BudgetCategoryStatus, CheckBudgetResponse } from "../api";
 import { checkBudget } from "../api";
 
 interface BudgetCheckPanelProps {
@@ -8,14 +8,14 @@ interface BudgetCheckPanelProps {
 }
 
 export default function BudgetCheckPanel({ categoryId }: BudgetCheckPanelProps) {
-  const [budgetData, setBudgetData] = useState<BudgetCheckResponse | null>(null);
+  const [budgetData, setBudgetData] = useState<CheckBudgetResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchBudget() {
       try {
-        const data = await checkBudget(categoryId);
+        const data = await checkBudget(categoryId ? { category_id: categoryId } : {});
         setBudgetData(data);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load budget");
@@ -42,9 +42,15 @@ export default function BudgetCheckPanel({ categoryId }: BudgetCheckPanelProps) 
     );
   }
 
-  const categories = budgetData?.categories ?? [];
-  const total_budget = budgetData?.total_budget ?? 0;
-  const total_spent = budgetData?.total_spent ?? 0;
+  const categories: BudgetCategoryStatus[] = isBudgetOverview(budgetData)
+    ? budgetData.categories ?? []
+    : [budgetData];
+  const totalBudget = isBudgetOverview(budgetData)
+    ? budgetData.total_budget
+    : budgetData.budget;
+  const totalSpent = isBudgetOverview(budgetData)
+    ? budgetData.total_spent
+    : budgetData.spent;
 
   if (categories.length === 0) {
     return (
@@ -72,7 +78,7 @@ export default function BudgetCheckPanel({ categoryId }: BudgetCheckPanelProps) 
             Total Budget
           </div>
           <div style={{ fontSize: "1.25rem", fontWeight: 600 }}>
-            {total_budget.toLocaleString()}
+            {totalBudget.toLocaleString()}
           </div>
         </div>
         <div style={{ flex: 1 }}>
@@ -83,10 +89,10 @@ export default function BudgetCheckPanel({ categoryId }: BudgetCheckPanelProps) 
             style={{
               fontSize: "1.25rem",
               fontWeight: 600,
-              color: total_spent > total_budget ? "var(--color-danger)" : "var(--color-foreground)",
+              color: totalSpent > totalBudget ? "var(--color-danger)" : "var(--color-foreground)",
             }}
           >
-            {total_spent.toLocaleString()}
+            {totalSpent.toLocaleString()}
           </div>
         </div>
         <div style={{ flex: 1 }}>
@@ -97,10 +103,10 @@ export default function BudgetCheckPanel({ categoryId }: BudgetCheckPanelProps) 
             style={{
               fontSize: "1.25rem",
               fontWeight: 600,
-              color: total_spent > total_budget ? "var(--color-danger)" : "var(--color-success)",
+              color: totalSpent > totalBudget ? "var(--color-danger)" : "var(--color-success)",
             }}
           >
-            {(total_budget - total_spent).toLocaleString()}
+            {(totalBudget - totalSpent).toLocaleString()}
           </div>
         </div>
       </div>
@@ -108,8 +114,8 @@ export default function BudgetCheckPanel({ categoryId }: BudgetCheckPanelProps) 
       {/* Category Breakdown */}
       <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
         {categories.map((category) => {
-          const percentage = Math.min(category.percentage, 100);
-          const isOver = category.is_over;
+          const percentage = Math.min(category.percentage_used ?? 0, 100);
+          const isOver = category.over_budget;
 
           return (
             <div
@@ -122,7 +128,7 @@ export default function BudgetCheckPanel({ categoryId }: BudgetCheckPanelProps) 
               }}
             >
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem" }}>
-                <span style={{ fontWeight: 500 }}>{category.name}</span>
+                    <span style={{ fontWeight: 500 }}>{category.category_name}</span>
                 <div style={{ textAlign: "right" }}>
                   <span
                     style={{
@@ -160,7 +166,7 @@ export default function BudgetCheckPanel({ categoryId }: BudgetCheckPanelProps) 
 
               <div style={{ display: "flex", justifyContent: "space-between", marginTop: "0.25rem" }}>
                 <span style={{ fontSize: "0.75rem", color: "var(--color-foreground-muted)" }}>
-                  {Math.round(category.percentage)}%
+                  {Math.round(category.percentage_used ?? 0)}%
                 </span>
                 {isOver && (
                   <span
@@ -172,9 +178,9 @@ export default function BudgetCheckPanel({ categoryId }: BudgetCheckPanelProps) 
                       color: "var(--color-danger)",
                       fontWeight: 500,
                     }}
-                  >
-                    <AlertCircle size={12} />
-                    Over budget by {Math.abs(category.remaining).toLocaleString()}
+                    >
+                      <AlertCircle size={12} />
+                    Over budget by {Math.abs(category.remaining ?? 0).toLocaleString()}
                   </span>
                 )}
               </div>
@@ -184,4 +190,8 @@ export default function BudgetCheckPanel({ categoryId }: BudgetCheckPanelProps) 
       </div>
     </div>
   );
+}
+
+function isBudgetOverview(data: CheckBudgetResponse): data is Extract<CheckBudgetResponse, { total_budget: number }> {
+  return "total_budget" in data;
 }

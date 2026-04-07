@@ -1,12 +1,12 @@
 import { HOURS, HOUR_HEIGHT, DAY_NAMES, isSameDay, isSameDayInTimezone } from "../utils/dateHelpers";
 import { calculateEventStyle } from "../utils/eventHelpers";
-import type { Calendar, Event } from "../api";
+import type { CalendarRead, EventRead } from "../api";
 import { useTimezone } from "@/shared/hooks/useTimezone";
 
 interface WeekViewProps {
   weekDates: Date[];
-  calendars: Calendar[];
-  events: Event[];
+  calendars: CalendarRead[];
+  events: EventRead[];
   onCellClick: (date: Date, hour: number) => void;
 }
 

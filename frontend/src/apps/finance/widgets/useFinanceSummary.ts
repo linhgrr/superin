@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { getFinanceSummary, type FinanceSummary } from "../api";
+import { getFinanceSummary, type SummaryResponse } from "../api";
 
 export function useFinanceSummary() {
-  const [summary, setSummary] = useState<FinanceSummary | null>(null);
+  const [summary, setSummary] = useState<SummaryResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

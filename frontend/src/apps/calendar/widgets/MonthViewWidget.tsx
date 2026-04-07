@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { listEvents, listCalendars, type Event, type Calendar } from "../api";
+import { listEvents, listCalendars, type CalendarRead, type EventRead } from "../api";
 import { useTimezone } from "@/shared/hooks/useTimezone";
 import Widget from "./Widget";
 
@@ -9,8 +9,8 @@ interface MonthViewWidgetProps {
 }
 
 export default function MonthViewWidget({ defaultCalendar, showTimeBlockedTasks = true }: MonthViewWidgetProps) {
-  const [events, setEvents] = useState<Event[]>([]);
-  const [calendars, setCalendars] = useState<Calendar[]>([]);
+  const [events, setEvents] = useState<EventRead[]>([]);
+  const [calendars, setCalendars] = useState<CalendarRead[]>([]);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isLoading, setIsLoading] = useState(true);
   const { getNow } = useTimezone();
@@ -25,7 +25,12 @@ export default function MonthViewWidget({ defaultCalendar, showTimeBlockedTasks 
       const end = new Date(year, month + 1, 0).toISOString();
 
       const [evts, cals] = await Promise.all([
-        listEvents(start, end, defaultCalendar || undefined, 100),
+        listEvents({
+          start,
+          end,
+          calendar_id: defaultCalendar || undefined,
+          limit: 100,
+        }),
         listCalendars(),
       ]);
 
@@ -66,7 +71,7 @@ export default function MonthViewWidget({ defaultCalendar, showTimeBlockedTasks 
     if (!acc[day]) acc[day] = [];
     acc[day].push(event);
     return acc;
-  }, {} as Record<number, Event[]>);
+  }, {} as Record<number, EventRead[]>);
 
   // Get "today" in user's timezone for highlighting
   const [todayDateStr] = getNow();

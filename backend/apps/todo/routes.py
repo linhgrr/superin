@@ -5,10 +5,16 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from apps.todo.enums import TaskPriority, TaskStatus
 from apps.todo.schemas import (
-    CreateRecurringRuleRequest,
-    CreateSubTaskRequest,
-    CreateTaskRequest,
-    UpdateTaskRequest,
+    TodoActionResponse,
+    TodoCreateRecurringRuleRequest,
+    TodoCreateSubTaskRequest,
+    TodoCreateTaskRequest,
+    TodoRecurringRuleRead,
+    TodoSubTaskRead,
+    TodoSummaryResponse,
+    TodoTaskDetailRead,
+    TodoTaskRead,
+    TodoUpdateTaskRequest,
 )
 from apps.todo.service import task_service
 from core.auth import get_current_user
@@ -17,15 +23,15 @@ from shared.preference_utils import (
     preference_to_schema,
     update_multiple_preferences,
 )
-from shared.schemas import PreferenceUpdate, WidgetPreferenceSchema
+from shared.schemas import PreferenceUpdate, WidgetManifestSchema, WidgetPreferenceSchema
 
 router = APIRouter()
 
 
 # ─── Widgets ──────────────────────────────────────────────────────────────────
 
-@router.get("/widgets")
-async def list_widgets():
+@router.get("/widgets", response_model=list[WidgetManifestSchema])
+async def list_widgets() -> list[WidgetManifestSchema]:
     from apps.todo.manifest import todo_manifest
 
     return todo_manifest.widgets
@@ -33,7 +39,7 @@ async def list_widgets():
 
 # ─── Tasks ────────────────────────────────────────────────────────────────────
 
-@router.get("/tasks")
+@router.get("/tasks", response_model=list[TodoTaskRead])
 async def list_tasks(
     user_id: str = Depends(get_current_user),
     status: TaskStatus | None = Query(None),
@@ -45,7 +51,7 @@ async def list_tasks(
     return await task_service.list_tasks(user_id, status, priority, tag, False, limit)
 
 
-@router.get("/tasks/search")
+@router.get("/tasks/search", response_model=list[TodoTaskRead])
 async def search_tasks(
     q: str,
     user_id: str = Depends(get_current_user),
@@ -56,7 +62,7 @@ async def search_tasks(
     return await task_service.search_tasks(user_id, q, include_archived, limit)
 
 
-@router.get("/tasks/archived/list")
+@router.get("/tasks/archived/list", response_model=list[TodoTaskRead])
 async def list_archived(
     user_id: str = Depends(get_current_user),
     limit: int = Query(20, le=100),
@@ -65,7 +71,7 @@ async def list_archived(
     return await task_service.list_archived(user_id, limit)
 
 
-@router.get("/tasks/{task_id}")
+@router.get("/tasks/{task_id}", response_model=TodoTaskDetailRead)
 async def get_task(task_id: str, user_id: str = Depends(get_current_user)):
     """Get a single task by ID with subtasks."""
     task = await task_service.get_task_with_subtasks(task_id, user_id)
@@ -74,9 +80,9 @@ async def get_task(task_id: str, user_id: str = Depends(get_current_user)):
     return task
 
 
-@router.post("/tasks")
+@router.post("/tasks", response_model=TodoTaskRead)
 async def create_task(
-    request: CreateTaskRequest,
+    request: TodoCreateTaskRequest,
     user_id: str = Depends(get_current_user),
 ):
     try:
@@ -94,10 +100,10 @@ async def create_task(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.patch("/tasks/{task_id}")
+@router.patch("/tasks/{task_id}", response_model=TodoTaskRead)
 async def update_task(
     task_id: str,
-    request: UpdateTaskRequest,
+    request: TodoUpdateTaskRequest,
     user_id: str = Depends(get_current_user),
 ):
     try:
@@ -117,7 +123,7 @@ async def update_task(
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@router.delete("/tasks/{task_id}")
+@router.delete("/tasks/{task_id}", response_model=TodoActionResponse)
 async def delete_task(task_id: str, user_id: str = Depends(get_current_user)):
     """Permanently delete a task and all its subtasks."""
     try:
@@ -126,7 +132,7 @@ async def delete_task(task_id: str, user_id: str = Depends(get_current_user)):
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@router.patch("/tasks/{task_id}/toggle")
+@router.patch("/tasks/{task_id}/toggle", response_model=TodoTaskRead)
 async def toggle_task(task_id: str, user_id: str = Depends(get_current_user)):
     """Flip task between pending and completed."""
     try:
@@ -137,7 +143,7 @@ async def toggle_task(task_id: str, user_id: str = Depends(get_current_user)):
 
 # ─── Archive ──────────────────────────────────────────────────────────────────
 
-@router.patch("/tasks/{task_id}/archive")
+@router.patch("/tasks/{task_id}/archive", response_model=TodoTaskRead)
 async def archive_task(task_id: str, user_id: str = Depends(get_current_user)):
     """Archive (soft delete) a task."""
     try:
@@ -146,7 +152,7 @@ async def archive_task(task_id: str, user_id: str = Depends(get_current_user)):
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@router.patch("/tasks/{task_id}/restore")
+@router.patch("/tasks/{task_id}/restore", response_model=TodoTaskRead)
 async def restore_task(task_id: str, user_id: str = Depends(get_current_user)):
     """Restore an archived task."""
     try:
@@ -157,7 +163,7 @@ async def restore_task(task_id: str, user_id: str = Depends(get_current_user)):
 
 # ─── Tags ─────────────────────────────────────────────────────────────────────
 
-@router.post("/tasks/{task_id}/tags/{tag}")
+@router.post("/tasks/{task_id}/tags/{tag}", response_model=TodoTaskRead)
 async def add_tag(
     task_id: str,
     tag: str,
@@ -170,7 +176,7 @@ async def add_tag(
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@router.delete("/tasks/{task_id}/tags/{tag}")
+@router.delete("/tasks/{task_id}/tags/{tag}", response_model=TodoTaskRead)
 async def remove_tag(
     task_id: str,
     tag: str,
@@ -185,16 +191,16 @@ async def remove_tag(
 
 # ─── Subtasks ─────────────────────────────────────────────────────────────────
 
-@router.get("/tasks/{task_id}/subtasks")
+@router.get("/tasks/{task_id}/subtasks", response_model=list[TodoSubTaskRead])
 async def get_subtasks(task_id: str, user_id: str = Depends(get_current_user)):
     """Get all subtasks for a parent task."""
     return await task_service.get_subtasks(task_id, user_id)
 
 
-@router.post("/tasks/{task_id}/subtasks")
+@router.post("/tasks/{task_id}/subtasks", response_model=TodoSubTaskRead)
 async def add_subtask(
     task_id: str,
-    request: CreateSubTaskRequest,
+    request: TodoCreateSubTaskRequest,
     user_id: str = Depends(get_current_user),
 ):
     """Add a subtask to a parent task."""
@@ -204,7 +210,7 @@ async def add_subtask(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.patch("/subtasks/{subtask_id}/complete")
+@router.patch("/subtasks/{subtask_id}/complete", response_model=TodoSubTaskRead)
 async def complete_subtask(
     subtask_id: str,
     user_id: str = Depends(get_current_user),
@@ -216,7 +222,7 @@ async def complete_subtask(
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@router.patch("/subtasks/{subtask_id}/uncomplete")
+@router.patch("/subtasks/{subtask_id}/uncomplete", response_model=TodoSubTaskRead)
 async def uncomplete_subtask(
     subtask_id: str,
     user_id: str = Depends(get_current_user),
@@ -228,7 +234,7 @@ async def uncomplete_subtask(
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@router.delete("/subtasks/{subtask_id}")
+@router.delete("/subtasks/{subtask_id}", response_model=TodoActionResponse)
 async def delete_subtask(
     subtask_id: str,
     user_id: str = Depends(get_current_user),
@@ -242,10 +248,10 @@ async def delete_subtask(
 
 # ─── Recurring Tasks ──────────────────────────────────────────────────────────
 
-@router.post("/tasks/{task_id}/recurring")
+@router.post("/tasks/{task_id}/recurring", response_model=TodoRecurringRuleRead)
 async def create_recurring_rule(
     task_id: str,
-    request: CreateRecurringRuleRequest,
+    request: TodoCreateRecurringRuleRequest,
     user_id: str = Depends(get_current_user),
 ):
     """Create a recurring rule based on a task template."""
@@ -263,13 +269,13 @@ async def create_recurring_rule(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/recurring")
+@router.get("/recurring", response_model=list[TodoRecurringRuleRead])
 async def list_recurring_rules(user_id: str = Depends(get_current_user)):
     """List all recurring task rules."""
     return await task_service.list_recurring_rules(user_id)
 
 
-@router.patch("/recurring/{rule_id}/stop")
+@router.patch("/recurring/{rule_id}/stop", response_model=TodoRecurringRuleRead)
 async def stop_recurring_rule(
     rule_id: str,
     user_id: str = Depends(get_current_user),
@@ -283,7 +289,7 @@ async def stop_recurring_rule(
 
 # ─── Summary ──────────────────────────────────────────────────────────────────
 
-@router.get("/summary")
+@router.get("/summary", response_model=TodoSummaryResponse)
 async def todo_summary(user_id: str = Depends(get_current_user)):
     # Fetch user to pass to service for timezone-aware calculations
     from core.models import User

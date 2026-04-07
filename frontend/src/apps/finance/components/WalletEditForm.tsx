@@ -21,7 +21,7 @@ export default function WalletEditForm({ wallet, onSave, onCancel }: WalletEditF
     setLoading(true);
     setError(null);
     try {
-      const updated = await updateWallet(wallet.id, name.trim());
+      const updated = await updateWallet(wallet.id, { name: name.trim() });
       onSave(updated);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update wallet");

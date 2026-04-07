@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Pencil } from "lucide-react";
-import type { CreateTransactionRequest } from "@/types/generated/api";
 import { createTransaction, getTransactions, type TransactionRead, getWallets, getCategories, type WalletRead, type CategoryRead } from "../../api";
+import type { CreateTransactionRequest } from "../../api";
 import Modal from "../../components/Modal";
 import SimpleForm from "../../components/SimpleForm";
 import TransactionEditForm from "../../components/TransactionEditForm";
@@ -44,6 +44,8 @@ export default function TransactionsTab() {
     load();
     loadWalletsAndCategories();
   }, []);
+
+  const categoryNameById = new Map(categories.map((category) => [category.id, category.name] as const));
 
   return (
     <div>
@@ -99,7 +101,7 @@ export default function TransactionsTab() {
                       {transaction.type}
                     </span>
                   </td>
-                  <td>{transaction.category?.name ?? "—"}</td>
+                  <td>{categoryNameById.get(transaction.category_id) ?? "—"}</td>
                   <td
                     className={transaction.type === "income" ? "amount-positive" : "amount-negative"}
                     style={{ fontWeight: 600, whiteSpace: "nowrap" }}
@@ -140,7 +142,7 @@ export default function TransactionsTab() {
                 category_id: values.category_id,
                 type: values.type as "income" | "expense",
                 amount: parseFloat(values.amount),
-                date: new Date(values.date),
+                date: new Date(values.date).toISOString(),
                 note: values.note || undefined,
               };
               await createTransaction(request);

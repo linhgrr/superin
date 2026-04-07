@@ -3,9 +3,9 @@ import {
   listCalendars,
   listEvents,
   createEvent,
-  type Calendar,
-  type Event,
+  type CalendarRead,
   type CreateEventRequest,
+  type EventRead,
 } from "../api";
 import { WeekView } from "../components/WeekView";
 import { ListView } from "../components/ListView";
@@ -18,8 +18,8 @@ type ViewMode = "list" | "week";
 
 export default function CalendarScreen() {
   const { timezone } = useTimezone();
-  const [calendars, setCalendars] = useState<Calendar[]>([]);
-  const [events, setEvents] = useState<Event[]>([]);
+  const [calendars, setCalendars] = useState<CalendarRead[]>([]);
+  const [events, setEvents] = useState<EventRead[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>("week");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedCalendar, setSelectedCalendar] = useState<string | null>(null);
@@ -44,7 +44,12 @@ export default function CalendarScreen() {
 
       const [cals, evts] = await Promise.all([
         listCalendars(),
-        listEvents(start, end, selectedCalendar || undefined, 200),
+        listEvents({
+          start,
+          end,
+          calendar_id: selectedCalendar || undefined,
+          limit: 200,
+        }),
       ]);
       setCalendars(cals);
       setEvents(evts);
@@ -93,6 +98,8 @@ export default function CalendarScreen() {
         start_datetime: start.toISOString(),
         end_datetime: end.toISOString(),
         calendar_id: defaultCalendar.id,
+        is_all_day: false,
+        type: "event",
       };
       await createEvent(request);
       await loadData();
@@ -159,7 +166,7 @@ export default function CalendarScreen() {
 // Header Component
 interface HeaderProps {
   weekDates: Date[];
-  calendars: Calendar[];
+  calendars: CalendarRead[];
   selectedCalendar: string | null;
   viewMode: ViewMode;
   onPreviousWeek: () => void;

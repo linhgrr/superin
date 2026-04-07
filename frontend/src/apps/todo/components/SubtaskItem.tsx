@@ -1,8 +1,8 @@
 import { Check, Circle, Trash2 } from "lucide-react";
-import type { SubTask } from "../api";
+import type { SubTaskRead } from "../api";
 
 interface SubtaskItemProps {
-  subtask: SubTask;
+  subtask: SubTaskRead;
   onToggle: (id: string, completed: boolean) => void;
   onDelete: (id: string) => void;
   disabled?: boolean;

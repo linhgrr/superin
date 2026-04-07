@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Pencil } from "lucide-react";
-import type { CreateWalletRequest } from "@/types/generated/api";
 import { createWallet, getWallets, type WalletRead } from "../../api";
+import type { CreateWalletRequest } from "../../api";
 import Modal from "../../components/Modal";
 import SimpleForm from "../../components/SimpleForm";
 import WalletEditForm from "../../components/WalletEditForm";

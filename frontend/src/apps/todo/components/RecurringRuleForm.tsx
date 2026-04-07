@@ -1,10 +1,10 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { Repeat, Loader2 } from "lucide-react";
-import type { CreateRecurringRuleData, RecurringFrequency } from "../api";
+import type { CreateRecurringRuleRequest, RecurringFrequency } from "../api";
 
 interface RecurringRuleFormProps {
-  onSubmit: (data: CreateRecurringRuleData) => Promise<void>;
+  onSubmit: (data: CreateRecurringRuleRequest) => Promise<void>;
   onCancel: () => void;
 }
 
@@ -30,7 +30,7 @@ export default function RecurringRuleForm({ onSubmit, onCancel }: RecurringRuleF
     event.preventDefault();
     setLoading(true);
     try {
-      const data: CreateRecurringRuleData = {
+      const data: CreateRecurringRuleRequest = {
         frequency,
         interval,
         days_of_week: frequency === "weekly" && daysOfWeek.length > 0 ? daysOfWeek : undefined,

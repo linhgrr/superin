@@ -15,7 +15,7 @@ export interface AppMetadata {
   loadDashboardWidget: () => Promise<{ default: ComponentType<DashboardWidgetProps> }>;
 }
 
-type AppModule = {
+export type AppModule = {
   default: {
     AppView: ComponentType;
     DashboardWidget: ComponentType<DashboardWidgetProps>;
@@ -80,7 +80,10 @@ export function registerAvailableApps(loadersByPath: Record<string, () => Promis
   const registeredApps: AppMetadata[] = [];
 
   for (const [path, loader] of Object.entries(loadersByPath)) {
-    const match = path.match(/^\.\/([^/]+)\/index\.ts$/);
+    // Vite import.meta.glob path keys can vary by caller path:
+    // - "./{appId}/index.ts"
+    // - "../apps/{appId}/index.ts"
+    const match = path.match(/^(?:\.\/|\.\.\/apps\/)([^/]+)\/index\.ts$/);
     if (!match) {
       continue;
     }

@@ -39,7 +39,6 @@ export default function TransactionEditForm({
         note: note.trim() || undefined,
         wallet_id: walletId,
         category_id: categoryId,
-        type: transaction.type,
       });
       onSave(updated);
     } catch (err) {
