@@ -370,6 +370,7 @@ npm run build:frontend
 - [ ] Mọi plugin route có `response_model` + request/response schema đầy đủ chưa (không để OpenAPI `unknown`)?
 - [ ] FE type import đã đi qua `@/types/generated` facade chưa (không import trực tiếp `@/types/generated/api`)?
 - [ ] `git commit --no-verify` chỉ dùng khi lint-staged/ESLint config bị lỗi — KHÔNG dùng để skip tất cả hooks
+- [ ] **Sau khi build success trên HF Space:** commit và push lên **cả 3 repo** (root, backend, frontend) nếu có thay đổi tương ứng
 
 ---
 
