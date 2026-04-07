@@ -250,37 +250,56 @@ class TaskService:
         today_range = ctx.today_range()
         now_utc = ctx.now_utc()
 
-        all_tasks = await self.repo.find_by_user(user_id, limit=10000)
-        pending = [t for t in all_tasks if t.status == "pending"]
-        completed = [t for t in all_tasks if t.status == "completed"]
+        from beanie import PydanticObjectId as _Oid
 
         now_naive = now_utc.replace(tzinfo=None)
-        overdue = [
-            t for t in pending
-            if t.due_date and t.due_date < now_naive
-        ]
-
         today_start_naive = today_range.start.replace(tzinfo=None)
         today_end_naive = today_range.end.replace(tzinfo=None)
-        due_today = [
-            t for t in pending
-            if t.due_date and today_start_naive <= t.due_date <= today_end_naive
-        ]
 
-        # Tag summary
-        all_tags = set()
-        for t in all_tasks:
-            all_tags.update(t.tags)
+        pipeline = [
+            {"$match": {"user_id": _Oid(user_id)}},
+            {"$facet": {
+                "total": [{"$count": "n"}],
+                "pending": [{"$match": {"status": "pending", "is_archived": False}}, {"$count": "n"}],
+                "completed": [{"$match": {"status": "completed", "is_archived": False}}, {"$count": "n"}],
+                "archived": [{"$match": {"is_archived": True}}, {"$count": "n"}],
+                "overdue": [
+                    {"$match": {"status": "pending", "is_archived": False, "due_date": {"$lt": now_naive}}},
+                    {"$count": "n"},
+                ],
+                "due_today": [
+                    {"$match": {
+                        "status": "pending",
+                        "is_archived": False,
+                        "due_date": {"$gte": today_start_naive, "$lte": today_end_naive},
+                    }},
+                    {"$count": "n"},
+                ],
+                "tags": [
+                    {"$match": {"is_archived": False}},
+                    {"$unwind": "$tags"},
+                    {"$group": {"_id": "$tags"}},
+                ],
+            }},
+        ]
+        results = await Task.aggregate(pipeline).to_list()
+        facets = results[0] if results else {}
+
+        def _count(key: str) -> int:
+            arr = facets.get(key, [])
+            return arr[0]["n"] if arr else 0
+
+        tag_list = sorted([t["_id"] for t in facets.get("tags", [])])
 
         return {
-            "total": len(all_tasks),
-            "pending": len(pending),
-            "completed": len(completed),
-            "overdue": len(overdue),
-            "due_today": len(due_today),
-            "archived": len([t for t in all_tasks if t.is_archived]),
-            "total_tags": len(all_tags),
-            "tag_list": sorted(list(all_tags)),
+            "total": _count("total"),
+            "pending": _count("pending"),
+            "completed": _count("completed"),
+            "overdue": _count("overdue"),
+            "due_today": _count("due_today"),
+            "archived": _count("archived"),
+            "total_tags": len(tag_list),
+            "tag_list": tag_list,
         }
 
     async def delete_task(self, task_id: str, user_id: str) -> dict:

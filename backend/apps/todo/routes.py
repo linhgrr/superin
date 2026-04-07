@@ -57,6 +57,15 @@ async def search_tasks(
     return await task_service.search_tasks(user_id, q, include_archived, limit)
 
 
+@router.get("/tasks/archived/list")
+async def list_archived(
+    user_id: str = Depends(get_current_user),
+    limit: int = Query(20, le=100),
+):
+    """List archived (soft deleted) tasks."""
+    return await task_service.list_archived(user_id, limit)
+
+
 @router.get("/tasks/{task_id}")
 async def get_task(task_id: str, user_id: str = Depends(get_current_user)):
     """Get a single task by ID with subtasks."""
@@ -145,15 +154,6 @@ async def restore_task(task_id: str, user_id: str = Depends(get_current_user)):
         return await task_service.restore_task(task_id, user_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
-
-
-@router.get("/tasks/archived/list")
-async def list_archived(
-    user_id: str = Depends(get_current_user),
-    limit: int = Query(20, le=100),
-):
-    """List archived (soft deleted) tasks."""
-    return await task_service.list_archived(user_id, limit)
 
 
 # ─── Tags ─────────────────────────────────────────────────────────────────────

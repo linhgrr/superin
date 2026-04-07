@@ -6,7 +6,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://your-space.hf.space/api/:path*"
+      "destination": "https://linhdzqua148-superin-be.hf.space/api/:path*"
     }
   ]
 }

@@ -4,6 +4,8 @@ import asyncio
 from datetime import UTC, datetime
 from typing import Literal
 
+from beanie import PydanticObjectId
+
 from apps.finance.models import Category, Transaction, Wallet
 from apps.finance.repository import CategoryRepository, TransactionRepository, WalletRepository
 from core.models import User
@@ -236,8 +238,8 @@ class FinanceService:
                 await self.wallets.update_balance(original_wallet, delta_change)
 
         # Update transaction fields
-        tx.wallet_id = new_wallet_id
-        tx.category_id = new_category_id
+        tx.wallet_id = PydanticObjectId(new_wallet_id)
+        tx.category_id = PydanticObjectId(new_category_id)
         tx.amount = new_amount
         if date:
             tx.date = date
@@ -495,19 +497,26 @@ class FinanceService:
         }
 
     async def get_monthly_trend(self, user_id: str, months: int = 6) -> dict:
-        """Get income/expense trend over recent months."""
-        txs = await self.transactions.find_by_user(user_id, skip=0, limit=10000)
+        """Get income/expense trend over recent months using MongoDB aggregation."""
+        from beanie import PydanticObjectId as _Oid
 
-        # Group by month
-        monthly_data = {}
-        for t in txs:
-            key = (t.date.year, t.date.month)
+        pipeline = [
+            {"$match": {"user_id": _Oid(user_id)}},
+            {"$group": {
+                "_id": {"year": {"$year": "$date"}, "month": {"$month": "$date"}, "type": "$type"},
+                "total": {"$sum": "$amount"},
+            }},
+            {"$sort": {"_id.year": -1, "_id.month": -1}},
+        ]
+        results = await Transaction.aggregate(pipeline).to_list()
+
+        # Merge income/expense per month
+        monthly_data: dict[tuple[int, int], dict[str, float]] = {}
+        for r in results:
+            key = (r["_id"]["year"], r["_id"]["month"])
             if key not in monthly_data:
-                monthly_data[key] = {"income": 0, "expense": 0}
-            if t.type == "income":
-                monthly_data[key]["income"] += t.amount
-            else:
-                monthly_data[key]["expense"] += t.amount
+                monthly_data[key] = {"income": 0.0, "expense": 0.0}
+            monthly_data[key][r["_id"]["type"]] += r["total"]
 
         # Get last N months
         sorted_months = sorted(monthly_data.keys(), reverse=True)[:months]

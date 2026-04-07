@@ -49,6 +49,8 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     openai_base_url: str = "https://api.fireworks.ai/inference/v1"
     openai_model: str = "accounts/fireworks/routers/kimi-k2p5-turbo"
+    llm_request_timeout_seconds: float = 60.0
+    llm_stream_idle_timeout_seconds: float = 90.0
 
 
 # Global singleton — imported everywhere in backend

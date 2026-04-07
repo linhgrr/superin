@@ -17,6 +17,7 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, System
 from langchain_core.tools import BaseTool, tool
 from langgraph.prebuilt import create_react_agent
 
+from core.config import settings
 from core.input_sanitizer import sanitize_for_memory_async, sanitize_user_content_async
 from core.models import ConversationMessage, User, get_user_local_time
 from core.registry import PLUGIN_REGISTRY
@@ -433,6 +434,20 @@ class RootAgent:
                 user_id, messages, thread, skip_db_load
             )
 
+            # Extract the last user message for persistence
+            last_user_content = ""
+            for msg in reversed(messages):
+                if msg.get("role") == "user":
+                    content = msg.get("content", "")
+                    if isinstance(content, list):
+                        last_user_content = " ".join(
+                            p.get("text", "") for p in content
+                            if isinstance(p, dict) and p.get("type") == "text"
+                        )
+                    else:
+                        last_user_content = str(content)
+                    break
+
             # Run graph and yield stream events
             async for event_dict in self._run_graph_stream(
                 graph, thread, event_handler, langchain_messages
@@ -441,7 +456,7 @@ class RootAgent:
 
             # Persist to MongoDB (fire-and-forget, don't block the stream end)
             pending_save = asyncio.create_task(
-                self._save_messages(user_id, thread, event_handler.assistant_buffer, "")
+                self._save_messages(user_id, thread, last_user_content, event_handler.assistant_buffer)
             )
 
             yield {"type": "done"}
@@ -509,11 +524,31 @@ class RootAgent:
             "recursion_limit": 50,
         }
 
-        async for event in graph.astream_events(
+        event_stream = graph.astream_events(
             {"messages": langchain_messages},
             config=config,
             version="v2",
-        ):
+        )
+        event_iterator = event_stream.__aiter__()
+
+        while True:
+            try:
+                event = await asyncio.wait_for(
+                    anext(event_iterator),
+                    timeout=settings.llm_stream_idle_timeout_seconds,
+                )
+            except StopAsyncIteration:
+                return
+            except TimeoutError as exc:
+                logger.error(
+                    "LLM stream idle timeout after %.1fs for thread %s",
+                    settings.llm_stream_idle_timeout_seconds,
+                    thread,
+                )
+                raise RuntimeError(
+                    "The language model timed out while streaming a response."
+                ) from exc
+
             stream_event = event_handler.handle(event)
             if stream_event:
                 yield stream_event.to_dict()

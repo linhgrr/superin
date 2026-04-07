@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from typing import Any, Literal
@@ -11,6 +12,7 @@ from langchain_core.tools import BaseTool
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import create_react_agent
 
+from core.config import settings
 from core.constants import AGENT_RECURSION_LIMIT, MAX_TOOL_CALLS_PER_DELEGATION
 from shared.agent_context import get_user_context, set_thread_context, set_user_context
 from shared.llm import get_llm
@@ -97,15 +99,35 @@ class BaseAppAgent:
         set_thread_context(child_thread_id)
 
         try:
-            result = await self.graph.ainvoke(
-                {"messages": [{"role": "user", "content": question}]},
-                config={
-                    "configurable": {"thread_id": child_thread_id},
-                    "recursion_limit": AGENT_RECURSION_LIMIT,
-                },
+            result = await asyncio.wait_for(
+                self.graph.ainvoke(
+                    {"messages": [{"role": "user", "content": question}]},
+                    config={
+                        "configurable": {"thread_id": child_thread_id},
+                        "recursion_limit": AGENT_RECURSION_LIMIT,
+                    },
+                ),
+                timeout=settings.llm_request_timeout_seconds,
             )
             messages = result.get("messages", [])
             return self._build_delegate_result(question, messages)
+        except TimeoutError:
+            logger.error(
+                "%s child agent timed out after %.1fs",
+                self.app_id,
+                settings.llm_request_timeout_seconds,
+            )
+            return {
+                "app": self.app_id,
+                "status": "failed",
+                "ok": False,
+                "message": (
+                    f"The {self.app_id} assistant timed out while waiting for the language model. "
+                    "Please try again."
+                ),
+                "question": question,
+                "tool_results": [],
+            }
         except Exception:
             logger.exception("%s child agent failed", self.app_id)
             return {

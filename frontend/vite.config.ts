@@ -2,6 +2,8 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 
+const HARDCODED_API_BASE_URL = "https://linhdzqua148-superin-be.hf.space";
+
 function manualChunks(id: string): string | undefined {
   if (!id.includes("node_modules")) {
     return undefined;
@@ -47,7 +49,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       "/api": {
-        target: process.env.VITE_API_URL || "http://localhost:8000",
+        target: HARDCODED_API_BASE_URL,
         changeOrigin: true,
       },
     },

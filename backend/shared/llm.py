@@ -28,5 +28,7 @@ def get_llm() -> Any:
             base_url=settings.openai_base_url,
             model=settings.openai_model,
             temperature=0,
+            timeout=settings.llm_request_timeout_seconds,
+            max_retries=1,
         )
     return _llm

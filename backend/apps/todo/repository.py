@@ -44,25 +44,21 @@ class TaskRepository:
         include_archived: bool = False,
         limit: int = 20,
     ) -> list[Task]:
-        """Search tasks by title or description."""
-        search_lower = query.lower()
-
-        # Get all non-archived tasks for the user
+        """Search tasks by title, description, or tags using server-side regex."""
         db_query: dict[str, object] = {"user_id": PydanticObjectId(user_id)}
         if not include_archived:
             db_query["is_archived"] = False
 
-        all_tasks = await Task.find(db_query).to_list()
-
-        # Filter by search term
-        filtered = [
-            t for t in all_tasks
-            if search_lower in t.title.lower()
-            or (t.description and search_lower in t.description.lower())
-            or any(search_lower in tag.lower() for tag in t.tags)
+        import re
+        pattern = re.escape(query)
+        regex = {"$regex": pattern, "$options": "i"}
+        db_query["$or"] = [
+            {"title": regex},
+            {"description": regex},
+            {"tags": regex},
         ]
 
-        return filtered[:limit]
+        return await Task.find(db_query).limit(limit).to_list()
 
     async def find_by_id(self, task_id: str, user_id: str) -> Task | None:
         return await Task.find_one(

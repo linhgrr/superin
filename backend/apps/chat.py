@@ -13,7 +13,7 @@ router = APIRouter()
 
 
 def _encode_ui_message_stream_chunk(chunk: dict[str, object]) -> bytes:
-    return f"data: {json.dumps(chunk, separators=(',', ':'))}\n\n".encode("utf-8")
+    return f"data: {json.dumps(chunk, separators=(',', ':'))}\n\n".encode()
 
 
 def _encode_done_marker() -> bytes:
