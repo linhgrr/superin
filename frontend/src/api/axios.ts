@@ -121,6 +121,15 @@ export const axiosInstance = axios.create({
 let isRefreshing = false;
 let refreshSubscribers: Array<(token: string) => void> = [];
 
+function isAuthRoute(url: string): boolean {
+  return (
+    url.includes(AUTH_ROUTES.LOGIN) ||
+    url.includes(AUTH_ROUTES.REGISTER) ||
+    url.includes(AUTH_ROUTES.LOGOUT) ||
+    url.includes(AUTH_ROUTES.REFRESH)
+  );
+}
+
 function subscribeToRefresh(callback: (token: string) => void): void {
   refreshSubscribers.push(callback);
 }
@@ -167,7 +176,7 @@ axiosInstance.interceptors.request.use(
   async (config: AuthConfig) => {
     // Skip auth for auth endpoints
     const url = config.url ?? "";
-    if (url.includes(AUTH_ROUTES.LOGIN) || url.includes(AUTH_ROUTES.REGISTER)) {
+    if (isAuthRoute(url)) {
       return config;
     }
 
@@ -221,7 +230,7 @@ axiosInstance.interceptors.response.use(
     if (
       error.response?.status !== 401 ||
       originalRequest._retry ||
-      originalRequest.url?.includes(AUTH_ROUTES.REFRESH)
+      isAuthRoute(originalRequest.url ?? "")
     ) {
       return Promise.reject(error);
     }

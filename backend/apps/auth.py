@@ -81,7 +81,7 @@ async def login(request: LoginRequest, response: Response) -> TokenResponse:
     if not user or not await verify_password(request.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password",
+            detail="Username or password incorrect",
         )
 
     resp = _token_response(user)
