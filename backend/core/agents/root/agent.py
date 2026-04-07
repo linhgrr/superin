@@ -348,19 +348,27 @@ class RootAgent:
         }
         self._graphs.clear()  # force rebuild on next request
 
+    @staticmethod
+    def _build_platform_info_tool() -> BaseTool:
+        @tool("get_platform_info", description="Get basic information about the Superin platform")
+        async def get_platform_info() -> str:
+            return "Superin is an AI platform with an app store. Users can install apps to add capabilities."
+
+        return get_platform_info
+
     async def _get_user_tools(self, user_id: str) -> list[BaseTool]:
         """Get tools available to the user based on installed apps."""
         try:
             installed_app_ids = set(await list_installed_app_ids(user_id))
         except Exception:
-            # DB unavailable — degrade gracefully by returning all tools.
-            # User loses per-app scoping but retains full functionality.
+            # Fail closed: if installed-app scoping cannot be resolved, never
+            # expose ask_* tools outside the verified installation set.
             logger.warning(
                 "Failed to load installed apps for tool scoping, "
-                "falling back to all tools",
+                "falling back to platform info only",
                 exc_info=True,
             )
-            return list(self._all_ask_tools.values())
+            return [self._build_platform_info_tool()]
 
         tools = [
             t for app_id, t in self._all_ask_tools.items()
@@ -369,10 +377,7 @@ class RootAgent:
 
         # Provide fallback tool if no apps installed
         if not tools:
-            @tool("get_platform_info", description="Get basic information about the Superin platform")
-            async def get_platform_info() -> str:
-                return "Superin is an AI platform with an app store. Users can install apps to add capabilities."
-            tools.append(get_platform_info)
+            tools.append(self._build_platform_info_tool())
 
         return tools
 
