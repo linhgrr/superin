@@ -271,8 +271,6 @@ class EventStreamHandler:
         """Handle tool execution start."""
         if tool_name not in self.visible_tool_names:
             return None
-        if self.active_delegations and run_id not in self.active_delegations:
-            return None
         if tool_name.startswith("ask_"):
             self.active_delegations.add(run_id)
 
@@ -288,8 +286,6 @@ class EventStreamHandler:
         """Handle tool execution completion."""
         if tool_name not in self.visible_tool_names:
             return None
-        if self.active_delegations and run_id not in self.active_delegations:
-            return None
 
         self.active_delegations.discard(run_id)
         return StreamEvent(
@@ -301,8 +297,6 @@ class EventStreamHandler:
     def _handle_tool_error(self, run_id: str, tool_name: str, data: dict) -> StreamEvent | None:
         """Handle tool execution error."""
         if tool_name not in self.visible_tool_names:
-            return None
-        if self.active_delegations and run_id not in self.active_delegations:
             return None
 
         self.active_delegations.discard(run_id)
@@ -402,14 +396,17 @@ class RootAgent:
 
         return graph
 
-    async def _load_history(self, thread_id: str) -> list[ConversationMessage]:
+    async def _load_history(self, user_id: str, thread_id: str) -> list[ConversationMessage]:
         """Load the most recent message history from MongoDB for a thread.
 
         Capped to MAX_HISTORY_MESSAGES to prevent OOM and context overflow.
         Messages are returned in chronological order (oldest-first).
         """
         return await ConversationMessage.find(
-            {"thread_id": thread_id},
+            {
+                "user_id": PydanticObjectId(user_id),
+                "thread_id": thread_id,
+            },
         ).sort("-created_at").limit(MAX_HISTORY_MESSAGES).to_list()
 
     async def _save_messages(
@@ -524,7 +521,7 @@ class RootAgent:
 
         # Load history from DB if not skipping
         if not skip_db_load:
-            history = await self._load_history(thread)
+            history = await self._load_history(user_id, thread)
             # _load_history returns newest-first (for efficient LIMIT),
             # reverse to chronological order for the LLM.
             for msg in reversed(history):
