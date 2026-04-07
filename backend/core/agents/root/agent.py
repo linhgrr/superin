@@ -26,7 +26,7 @@ from core.workspace import list_installed_app_ids
 from shared.agent_context import clear_agent_context, set_thread_context, set_user_context
 from shared.llm import get_llm
 
-from .prompts import build_system_prompt
+from .prompts import build_available_apps_context, build_system_prompt
 from .tools import _build_ask_tool, _build_install_app_tool, _build_uninstall_app_tool
 
 logger = logging.getLogger(__name__)
@@ -524,6 +524,17 @@ class RootAgent:
             langchain_messages.append(
                 SystemMessage(content=f"Current date: {current_date}, current time: {current_time}.")
             )
+        try:
+            installed_app_ids = set(await list_installed_app_ids(user_id))
+        except Exception:
+            installed_app_ids = set()
+            logger.warning(
+                "Failed to build user-specific app catalog context, defaulting to not-installed markers",
+                exc_info=True,
+            )
+        langchain_messages.append(
+            SystemMessage(content=build_available_apps_context(installed_app_ids))
+        )
 
         # Load history from DB if not skipping
         if not skip_db_load:

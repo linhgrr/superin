@@ -2,7 +2,7 @@ from beanie import PydanticObjectId
 from langchain_core.tools import tool
 
 from core.agents.root.agent import EventStreamHandler, RootAgent
-from core.agents.root.prompts import build_system_prompt
+from core.agents.root.prompts import build_available_apps_context, build_system_prompt
 from shared.schemas import AppManifestSchema
 
 
@@ -168,8 +168,8 @@ async def test_load_history_scopes_by_user_and_thread(monkeypatch) -> None:
     assert captured["limit"] == 50
 
 
-def test_build_system_prompt_includes_available_app_catalog(monkeypatch) -> None:
-    manifest = AppManifestSchema(
+def _finance_manifest() -> AppManifestSchema:
+    return AppManifestSchema(
         id="finance",
         name="Finance",
         version="1.0.0",
@@ -182,16 +182,73 @@ def test_build_system_prompt_includes_available_app_catalog(monkeypatch) -> None
         models=["Wallet"],
         category="finance",
     )
+
+
+def test_build_system_prompt_includes_catalog_guidance() -> None:
+    manifest = _finance_manifest()
+    from core.agents.root import prompts as root_prompts
+
+    original_registry = root_prompts.PLUGIN_REGISTRY.copy()
+    root_prompts.PLUGIN_REGISTRY.clear()
+    root_prompts.PLUGIN_REGISTRY["finance"] = {"manifest": manifest}
+
+    prompt = build_system_prompt()
+
+    try:
+        assert "A separate system message will list every available app" in prompt
+        assert "install_app_for_user" in prompt
+        assert "uninstall_app_for_user" in prompt
+        assert "next user message" in prompt
+    finally:
+        root_prompts.PLUGIN_REGISTRY.clear()
+        root_prompts.PLUGIN_REGISTRY.update(original_registry)
+
+
+def test_build_available_apps_context_marks_installed_apps(monkeypatch) -> None:
+    manifest = _finance_manifest()
     monkeypatch.setattr(
         "core.agents.root.prompts.PLUGIN_REGISTRY",
         {"finance": {"manifest": manifest}},
     )
 
-    prompt = build_system_prompt()
+    context = build_available_apps_context({"finance"})
 
-    assert "Finance (`finance`)" in prompt
-    assert "install_app_for_user" in prompt
-    assert "uninstall_app_for_user" in prompt
-    assert "next user message" in prompt
-    assert "Track spending and budgets." in prompt
-    assert "Helps users manage budgets and transactions." in prompt
+    assert "Finance (`finance`) (installed)" in context
+    assert "Track spending and budgets." in context
+    assert "Helps users manage budgets and transactions." in context
+
+
+async def test_build_message_list_includes_user_installed_status(monkeypatch) -> None:
+    agent = RootAgent()
+    manifest = _finance_manifest()
+
+    monkeypatch.setattr(
+        "core.agents.root.prompts.PLUGIN_REGISTRY",
+        {"finance": {"manifest": manifest}},
+    )
+
+    class FakeUserModel:
+        id = object()
+
+        @staticmethod
+        async def find_one(*_args, **_kwargs):
+            return None
+
+    async def fake_list_installed_app_ids(_user_id: str) -> list[str]:
+        return ["finance"]
+
+    monkeypatch.setattr("core.agents.root.agent.User", FakeUserModel)
+    monkeypatch.setattr(
+        "core.agents.root.agent.list_installed_app_ids",
+        fake_list_installed_app_ids,
+    )
+
+    messages = await agent._build_message_list(
+        "507f1f77bcf86cd799439011",
+        [],
+        "thread-1",
+        skip_db_load=True,
+    )
+
+    assert len(messages) == 1
+    assert "Finance (`finance`) (installed)" in messages[0].content
