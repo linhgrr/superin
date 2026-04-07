@@ -7,8 +7,8 @@
  */
 
 import { memo, useEffect, useState, type ComponentType } from "react";
-import { useParams, Navigate } from "react-router-dom";
-import { Construction, Loader2 } from "lucide-react";
+import { useNavigate, useParams } from "react-router-dom";
+import { Construction, Download, Loader2 } from "lucide-react";
 import { getAppMetadata, getLoadedAppView, loadAppViewComponent } from "@/lib/lazy-registry";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { ROUTES } from "@/constants";
@@ -16,7 +16,7 @@ import { ROUTES } from "@/constants";
 const SKELETON_DELAY_MS = 120;
 
 // Static component - không cần recreate mỗi render
-const AppSkeleton = memo(function AppSkeleton() {
+export const AppSkeleton = memo(function AppSkeleton() {
   return (
     <div
       style={{
@@ -32,7 +32,7 @@ const AppSkeleton = memo(function AppSkeleton() {
   );
 });
 
-// Error view - static component
+// Error view — app registered in FE but load failed (e.g. missing AppView.tsx)
 const AppNotAvailable = memo(function AppNotAvailable({ appId }: { appId: string }) {
   return (
     <div
@@ -50,6 +50,93 @@ const AppNotAvailable = memo(function AppNotAvailable({ appId }: { appId: string
       <p>
         App <strong>"{appId}"</strong> is not available.
       </p>
+    </div>
+  );
+});
+
+// Not-installed view — app exists in catalog but is NOT installed for this workspace.
+// User is NOT silently redirected; they see a clear message with a link to the store.
+export const AppNotInstalled = memo(function AppNotInstalled({
+  appId,
+  appName,
+}: {
+  appId: string;
+  appName: string | null;
+}) {
+  const navigate = useNavigate();
+  return (
+    <div
+      data-testid="not-installed-screen"
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        height: "50vh",
+        gap: "1rem",
+        color: "var(--color-foreground-muted)",
+        textAlign: "center",
+        padding: "2rem",
+      }}
+    >
+      <div
+        style={{
+          width: "64px",
+          height: "64px",
+          borderRadius: "16px",
+          background: "var(--color-surface)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          boxShadow: "0 4px 16px oklch(0 0 0 / 0.25)",
+        }}
+      >
+        <Download size={28} />
+      </div>
+      <div>
+        <h2
+          style={{
+            fontSize: "1.25rem",
+            fontWeight: 700,
+            color: "var(--color-foreground)",
+            margin: "0 0 0.5rem",
+          }}
+        >
+          {appName ?? appId} is not installed
+        </h2>
+        <p
+          style={{
+            color: "var(--color-foreground-muted)",
+            margin: 0,
+            maxWidth: "24rem",
+            lineHeight: 1.6,
+          }}
+        >
+          This app has not been activated for your workspace.
+          Visit the App Store to install it.
+        </p>
+      </div>
+      <button
+        data-testid="not-installed-store-btn"
+        onClick={() => navigate(ROUTES.STORE)}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "0.5rem",
+          padding: "0.5rem 1.25rem",
+          borderRadius: "8px",
+          background: "var(--color-primary)",
+          color: "white",
+          fontWeight: 600,
+          fontSize: "0.875rem",
+          border: "none",
+          cursor: "pointer",
+          boxShadow: "0 2px 8px oklch(0 0 0 / 0.2)",
+        }}
+      >
+        <Download size={16} />
+        Browse App Store
+      </button>
     </div>
   );
 });
@@ -105,9 +192,9 @@ export default function AppPage() {
     };
   }, [appId, canLoadApp]);
 
-  if (!appId) return <Navigate to={ROUTES.DASHBOARD} replace />;
+  if (!appId) return null; // Will be caught by route-level redirect
   if (isWorkspaceLoading) return <AppSkeleton />;
-  if (!isAppInstalled) return <Navigate to={ROUTES.DASHBOARD} replace />;
+  if (!isAppInstalled) return <AppNotInstalled appId={appId} appName={appMetadata?.name ?? null} />;
   if (!appMetadata || hasLoadError) return <AppNotAvailable appId={appId} />;
 
   if (loadedComponent) {
