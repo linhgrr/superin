@@ -47,11 +47,10 @@ Each frontend app should contain this protocol:
 
 ```text
 frontend/src/apps/{app_id}/
-  manifest.json
-  index.ts
   AppView.tsx
   DashboardWidget.tsx
   api.ts
+  types.ts
   components/
   features/
   views/
@@ -60,19 +59,19 @@ frontend/src/apps/{app_id}/
 ```
 
 Responsibilities:
-- `manifest.json`: frontend mirror used by manifest validation
-- `index.ts`: exports one `FrontendAppDefinition`
 - `AppView.tsx`: thin public entrypoint that delegates to `views/`
-- `DashboardWidget.tsx`: thin public entrypoint that delegates to `widgets/`
-- `api.ts`: app-specific frontend API client helpers
+- `DashboardWidget.tsx`: generated public entrypoint that maps backend widget ids to `widgets/*.tsx`
+- `api.ts`: generated app-specific frontend API client helpers and contract aliases
+- `types.ts`: app-local type bridge re-exporting shared dashboard widget types
 - `components/`: reusable app-local UI pieces
 - `features/`: domain slices with state and UI for the app page
 - `views/`: top-level screen composition for the app page
-- `widgets/`: dashboard widget dispatcher plus individual widget renderers
+- `widgets/`: individual dashboard widget renderers, one file per backend widget manifest entry
 - `lib/`: app-local helpers and constants
 
-Current registry:
-- [index.ts](/home/linh/Downloads/superin/frontend/src/apps/index.ts)
+Discovery:
+- platform auto-discovers apps from `src/apps/*/AppView.tsx` and `src/apps/*/DashboardWidget.tsx`
+- [index.ts](/home/linh/Downloads/superin/frontend/src/apps/index.ts) is only a thin compatibility re-export, not a handwritten registry
 
 ## Backend Contract
 
@@ -179,50 +178,39 @@ register_plugin(
 
 ## Frontend Contract
 
-### App definition
+### Auto-discovery contract
 
-Each app exports one `FrontendAppDefinition`:
+The platform does not read frontend app metadata. It only needs these app-local
+entrypoints to exist:
 
-```ts
-import manifest from "./manifest.json";
-import AppView from "./AppView";
-import DashboardWidget from "./DashboardWidget";
-import type { FrontendAppDefinition } from "../types";
-
-export const exampleApp: FrontendAppDefinition = {
-  manifest,
-  AppView,
-  DashboardWidget,
-};
+```text
+frontend/src/apps/{app_id}/AppView.tsx
+frontend/src/apps/{app_id}/DashboardWidget.tsx
+frontend/src/apps/{app_id}/api.ts
 ```
 
-The platform does **not** use side-effect widget registration anymore.
-
-Do not create:
-- `widgets/index.ts`
-- `registerWidget(...)`
-- root-level side-effect imports for app widget registration
-
-Frontend entrypoints should stay small:
-- `AppView.tsx` should be orchestration only
-- `DashboardWidget.tsx` should be dispatch/orchestration only
+Rules:
+- do not create `manifest.json`
+- do not create app-specific `index.ts`
+- do not export `FrontendAppDefinition`
+- do not create `widgets/index.ts`
+- do not use `registerWidget(...)`
+- `AppView.tsx` should stay orchestration-only and delegate to `views/`
+- `DashboardWidget.tsx` is generated and should not be edited by hand
 - heavy UI and state should live below `features/`, `components/`, `views/`, `widgets/`
-- each manifest widget should usually have its own file under `widgets/`
 
-### Manifest mirror
+### Widget file convention
 
-`frontend/src/apps/{app_id}/manifest.json` must mirror backend manifest fields
-needed by the frontend validator:
+Each backend widget id must map to exactly one frontend component file:
 
-```json
-{
-  "id": "example",
-  "name": "Example",
-  "widgets": [
-    { "id": "example.summary", "size": "standard" }
-  ]
-}
+```text
+widget id:      {app_id}.{kebab-name}
+component file: frontend/src/apps/{app_id}/widgets/{PascalCase(kebab-name)}Widget.tsx
 ```
+
+Examples:
+- `finance.total-balance` -> `widgets/TotalBalanceWidget.tsx`
+- `todo.recent-tasks` -> `widgets/RecentTasksWidget.tsx`
 
 ### Dashboard renderer
 
@@ -231,7 +219,7 @@ needed by the frontend validator:
 - `widget` metadata from catalog response
 
 The dashboard chooses the correct app module by `app_id`, then calls that app's
-single `DashboardWidget` component.
+single generated `DashboardWidget` component.
 
 ## Parent / Child-Agent Chat Protocol
 
@@ -267,8 +255,8 @@ npm run build:frontend
 ```
 
 What each command checks:
-- `python scripts/superin.py codegen`: regenerates OpenAPI and frontend generated types
-- `python scripts/superin.py manifests validate`: checks backend/frontend manifest integrity and required frontend app files
+- `python scripts/superin.py codegen`: regenerates OpenAPI types plus app-local generated files (`api.ts`, `DashboardWidget.tsx`)
+- `python scripts/superin.py manifests validate`: checks backend manifests against required frontend app files/directories and widget component file coverage
 - `npm run build:frontend`: catches frontend type/runtime build errors
 
 ## CLI
@@ -301,8 +289,8 @@ Behavior:
 
 1. Create backend manifest, models, repository, service, tools, routes, prompts, and agent.
 2. Register the plugin in backend `__init__.py`.
-3. Create frontend app module with `manifest.json`, `index.ts`, `AppView.tsx`, `DashboardWidget.tsx`, `api.ts`, plus the `components/`, `features/`, `views/`, `widgets/`, and `lib/` folders as needed.
-4. Add the frontend app to [index.ts](/home/linh/Downloads/superin/frontend/src/apps/index.ts).
+3. Create the app-local view/widget/component folders under `frontend/src/apps/{app_id}`. Keep `AppView.tsx` hand-written; let codegen own `DashboardWidget.tsx` and `api.ts`.
+4. Name each widget component file from the backend widget id using the required convention.
 5. Run codegen and manifest validation.
 6. Install the app through the app store and test:
    - sidebar install state
@@ -314,19 +302,19 @@ Behavior:
 
 - [ ] backend folder name matches `manifest.id`
 - [ ] frontend folder name matches `manifest.id`
-- [ ] backend widget ids match frontend widget ids exactly
-- [ ] backend widget sizes match frontend manifest sizes exactly
+- [ ] every backend widget id has exactly one matching frontend component file
 - [ ] app agent subclasses `BaseAppAgent`
 - [ ] `graph` is compiled and non-optional
 - [ ] prompts live in `prompts.py`
 - [ ] tools are user-scoped
 - [ ] routes call service, service calls repository
 - [ ] app is registered with `register_plugin(...)`
-- [ ] frontend exports one `FrontendAppDefinition`
 - [ ] `AppView.tsx` is thin and delegates to `views/`
-- [ ] `DashboardWidget.tsx` is thin and delegates to `widgets/`
+- [ ] `DashboardWidget.tsx` is generated and not hand-edited
+- [ ] `api.ts` is generated and not hand-edited
 - [ ] reusable app UI lives in `components/`
 - [ ] app page domain slices live in `features/`
+- [ ] no frontend manifest mirror or handwritten app registry
 - [ ] no side-effect `registerWidget()` pattern
 - [ ] `python scripts/superin.py codegen` ran if shared schema changed
 - [ ] `python scripts/superin.py manifests validate` passes
@@ -338,7 +326,9 @@ Behavior:
 scaffolds the current protocol by default:
 - backend `BaseAppAgent` child agent with `prompts.py`
 - frontend app module under `frontend/src/apps/{app_id}`
-- map-based widget dispatcher with one generated widget file
+- generated `DashboardWidget.tsx`
+- generated `api.ts`
+- widget component stubs following the manifest id -> file-name convention
 
 Generated code is only a starting point. Real app-specific feature logic still
 needs to be implemented manually.

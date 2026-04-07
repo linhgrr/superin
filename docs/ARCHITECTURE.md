@@ -97,20 +97,17 @@ frontend/
   src/
     api/
     apps/
-      index.ts
       types.ts
       finance/
-        manifest.json
-        index.ts
         AppView.tsx
         DashboardWidget.tsx
         api.ts
+        types.ts
       todo/
-        manifest.json
-        index.ts
         AppView.tsx
         DashboardWidget.tsx
         api.ts
+        types.ts
     components/
       chat/
       dashboard/
@@ -156,26 +153,30 @@ Rules:
 
 ## Frontend App Module Model
 
-Each frontend app module exports one `FrontendAppDefinition`:
+Frontend apps are discovered by file structure, not by a handwritten registry or
+frontend metadata mirror.
 
-```ts
-export interface FrontendAppDefinition {
-  manifest: {
-    id: string;
-    name: string;
-    widgets: { id: string; size: WidgetSizeName }[];
-  };
-  AppView: ComponentType;
-  DashboardWidget: ComponentType<DashboardWidgetProps>;
-}
+Required protocol for each app folder:
+
+```text
+frontend/src/apps/{app_id}/
+  AppView.tsx          # app page entrypoint, hand-written
+  DashboardWidget.tsx  # generated widget dispatcher
+  api.ts               # generated app-local contract facade
+  types.ts             # app-local type bridge
+  components/
+  features/
+  views/
+  widgets/
+  lib/
 ```
 
-Current registry:
-- [index.ts](/home/linh/Downloads/superin/frontend/src/apps/index.ts)
-
-Current live apps:
-- `finance`
-- `todo`
+Rules:
+- the platform auto-discovers apps from `src/apps/*/AppView.tsx` and `src/apps/*/DashboardWidget.tsx`
+- frontend does not export a `FrontendAppDefinition`
+- frontend does not keep `manifest.json` or any app metadata mirror
+- installed app metadata comes from the backend workspace bootstrap payload
+- generated files (`DashboardWidget.tsx`, `api.ts`) must not be edited by hand
 
 ## Manifest Source of Truth
 
@@ -189,10 +190,14 @@ backend/shared/schemas.py
   -> python scripts/superin.py codegen
   -> openapi.json
   -> frontend/src/types/generated/api.ts
+  -> frontend/src/types/generated/index.ts
 
 backend apps/*/manifest.py
+  -> python scripts/superin.py codegen
+  -> frontend/src/apps/{app_id}/api.ts
+  -> frontend/src/apps/{app_id}/DashboardWidget.tsx
   -> python scripts/superin.py manifests validate
-  -> checked against frontend/src/apps/*/manifest.json
+  -> checked against frontend app file structure + widget component files
 ```
 
 Developer commands:
@@ -210,8 +215,9 @@ Developer commands:
 The dashboard is manifest-driven:
 - app catalog returns each installed app with its widgets
 - widget preferences determine enabled state, position, and config
-- frontend chooses the correct app module via `getFrontendApp(appId)`
-- dashboard renders the app module's `DashboardWidget`
+- frontend activates only installed apps from the workspace bootstrap payload
+- frontend chooses the correct app module via discovered app metadata in `lazy-registry`
+- dashboard renders the generated app `DashboardWidget`, which maps manifest widget ids to app-local components
 
 Size contract:
 - `compact`

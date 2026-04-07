@@ -243,16 +243,26 @@ frontend/src/
 
 ```
 frontend/src/apps/{appId}/
-├── layout.tsx       ← AppLayout (AppShell + AppNav) — BẮT BUỘC
-├── AppNav.tsx       ← Navigation tabs
-├── pages/
-│   ├── {App}Overview.tsx
-│   ├── {Entity}Page.tsx
-│   └── ...
-└── widgets/
-    ├── {Widget}.tsx
-    └── index.ts     ← registerWidget() calls
+├── AppView.tsx          ← App page entrypoint — code tay, giữ mỏng
+├── DashboardWidget.tsx  ← Generated widget dispatcher — KHÔNG edit tay
+├── api.ts               ← Generated app-local API facade — KHÔNG edit tay
+├── types.ts             ← Shared app-facing type bridge
+├── views/               ← Màn hình app page
+├── widgets/             ← Widget components theo manifest widget id
+├── features/            ← Domain slices / hooks / app state
+├── components/          ← UI pieces tái sử dụng trong app
+└── lib/                 ← Helpers/constants nội bộ app
 ```
+
+App được platform tự discover qua:
+- `src/apps/*/AppView.tsx`
+- `src/apps/*/DashboardWidget.tsx`
+
+Không có:
+- `manifest.json`
+- app-specific `index.ts`
+- `widgets/index.ts`
+- `registerWidget()` side-effect registration
 
 ### 6.3 Shared components
 
@@ -316,7 +326,16 @@ Dùng `/` slash command hoặc `Skill` tool:
 ### 8.1 Pipeline
 
 ```
-FastAPI app → openapi.json → openapi-typescript → frontend/src/types/generated/api.ts
+FastAPI app
+  → openapi.json
+  → openapi-typescript
+  → frontend/src/types/generated/api.ts
+  → frontend/src/types/generated/index.ts
+  → frontend/src/apps/{app}/api.ts
+
+backend app manifests
+  → frontend/src/apps/{app}/DashboardWidget.tsx
+  → manifest validation vs frontend file structure + widget component files
 ```
 
 Codegen chạy tự động 2 bước:
@@ -354,7 +373,12 @@ Các biến sau được đọc tự động trong `scripts/codegen.py`:
 
 ```
 frontend/src/types/generated/
-└── api.ts     ← Auto-generated — KHÔNG edit tay
+├── api.ts     ← Auto-generated — KHÔNG edit tay
+└── index.ts   ← Auto-generated type barrel
+
+frontend/src/apps/{appId}/
+├── api.ts               ← Auto-generated per-app contract facade
+└── DashboardWidget.tsx  ← Auto-generated widget dispatcher
 ```
 
 Frontend import types từ đây:
@@ -364,6 +388,11 @@ import type {
   CreateTransactionRequest,
   TokenResponse,
 } from "@/types/generated/api";
+```
+
+Hoặc app-local facade:
+```typescript
+import { getTransactions, type TransactionRead } from "@/apps/finance/api";
 ```
 
 ### 8.6 Cài đặt dependencies (một lần)

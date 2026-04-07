@@ -442,15 +442,17 @@ const isActive = location.pathname === href;
 const { activeNav } = useAppContext();
 ```
 
-### R5: App page không re-export widget
+### R5: App page không điều phối widget binding
 
 Widgets (Dashboard) khác App Page. Widget dùng cho `/dashboard`. App page là trang đầy đủ.
 
 ```tsx
-// frontend/src/apps/finance/widgets/index.ts
-// Đăng ký widget cho dashboard
-registerWidget("finance.total-balance", TotalBalance);
+// frontend/src/apps/finance/DashboardWidget.tsx
+// File generated từ backend manifest để map widget id -> widget component
+export default createDashboardWidgetRenderer({
+  "finance.total-balance": TotalBalanceWidget,
+});
 
 // frontend/src/apps/finance/pages/FinanceOverview.tsx
-// Trang app — KHÔNG gọi registerWidget
+// Trang app — KHÔNG chứa widget binding cho dashboard
 ```
