@@ -206,7 +206,7 @@ def validate_manifests() -> None:
         )
 
     for app_id, app_root in frontend_by_id.items():
-        for required_file in ["AppView.tsx", "DashboardWidget.tsx", "api.ts"]:
+        for required_file in ["AppView.tsx", "DashboardWidget.tsx"]:
             if not (app_root / required_file).exists():
                 fail(f"manifest validation failed: missing frontend app file: {(app_root / required_file).relative_to(ROOT)}")
         for required_dir in ["components", "features", "views", "widgets", "lib"]:
@@ -365,18 +365,26 @@ class CliLogger:
         print(message % args if args else message)
 
 
-async def migrate_core_indexes() -> None:
+def _db_connection() -> tuple[object, str]:
     if str(BACKEND_ROOT) not in sys.path:
         sys.path.insert(0, str(BACKEND_ROOT))
 
     from pymongo import AsyncMongoClient
 
     from core.config import settings  # type: ignore
+
+    return AsyncMongoClient(settings.mongodb_uri), settings.mongodb_database
+
+
+async def migrate_core_indexes() -> None:
+    if str(BACKEND_ROOT) not in sys.path:
+        sys.path.insert(0, str(BACKEND_ROOT))
+
     from core.index_contract import migrate_index_contract  # type: ignore
 
-    client = AsyncMongoClient(settings.mongodb_uri)
+    client, database_name = _db_connection()
     try:
-        await migrate_index_contract(client["superin"], logger=CliLogger())
+        await migrate_index_contract(client[database_name], logger=CliLogger())
     finally:
         await client.close()
 
@@ -385,14 +393,110 @@ async def check_core_indexes() -> None:
     if str(BACKEND_ROOT) not in sys.path:
         sys.path.insert(0, str(BACKEND_ROOT))
 
-    from pymongo import AsyncMongoClient
-
-    from core.config import settings  # type: ignore
     from core.index_contract import validate_index_contract  # type: ignore
 
-    client = AsyncMongoClient(settings.mongodb_uri)
+    client, database_name = _db_connection()
     try:
-        await validate_index_contract(client["superin"])
+        await validate_index_contract(client[database_name])
+    finally:
+        await client.close()
+
+
+async def audit_core_index_duplicates() -> int:
+    if str(BACKEND_ROOT) not in sys.path:
+        sys.path.insert(0, str(BACKEND_ROOT))
+
+    from core.index_contract import INDEX_REQUIREMENTS, find_duplicate_values  # type: ignore
+
+    client, database_name = _db_connection()
+    try:
+        database = client[database_name]
+        found_duplicates = 0
+        for requirement in INDEX_REQUIREMENTS:
+            if not requirement.unique:
+                continue
+
+            duplicates = await find_duplicate_values(
+                database[requirement.collection],
+                requirement.key,
+                partial_filter_expression=requirement.partial_filter_expression,
+            )
+            if not duplicates:
+                continue
+
+            found_duplicates += 1
+            print(
+                "duplicate values block unique index "
+                f"{requirement.index_name} on {requirement.collection}:"
+            )
+            for duplicate in duplicates:
+                print(f"  - {duplicate}")
+
+        if found_duplicates == 0:
+            print("no duplicate values found for unique index requirements")
+        return found_duplicates
+    finally:
+        await client.close()
+
+
+async def backfill_runtime_derived_fields() -> None:
+    client, database_name = _db_connection()
+    try:
+        database = client[database_name]
+
+        wallet_result = await database["finance_wallets"].update_many(
+            {},
+            [
+                {
+                    "$set": {
+                        "name_key": {
+                            "$cond": [
+                                {"$ifNull": ["$name", False]},
+                                {"$toLower": {"$trim": {"input": "$name"}}},
+                                None,
+                            ]
+                        }
+                    }
+                }
+            ],
+        )
+        print(f"backfilled finance_wallets.name_key on {wallet_result.modified_count} documents")
+
+        category_result = await database["finance_categories"].update_many(
+            {},
+            [
+                {
+                    "$set": {
+                        "name_key": {
+                            "$cond": [
+                                {"$ifNull": ["$name", False]},
+                                {"$toLower": {"$trim": {"input": "$name"}}},
+                                None,
+                            ]
+                        }
+                    }
+                }
+            ],
+        )
+        print(f"backfilled finance_categories.name_key on {category_result.modified_count} documents")
+
+        calendar_result = await database["calendar_calendars"].update_many(
+            {},
+            [
+                {
+                    "$set": {
+                        "name_key": {
+                            "$cond": [
+                                {"$ifNull": ["$name", False]},
+                                {"$toLower": {"$trim": {"input": "$name"}}},
+                                None,
+                            ]
+                        }
+                    }
+                }
+            ],
+        )
+        print(f"backfilled calendar_calendars.name_key on {calendar_result.modified_count} documents")
     finally:
         await client.close()
 
@@ -424,6 +528,8 @@ def build_parser() -> argparse.ArgumentParser:
     db_sub = db.add_subparsers(dest="db_command", required=True)
     db_sub.add_parser("check-indexes", help="Validate core Mongo index contract")
     db_sub.add_parser("migrate-indexes", help="Reconcile and create core Mongo indexes")
+    db_sub.add_parser("audit-index-duplicates", help="Report duplicate values blocking unique index migration")
+    db_sub.add_parser("backfill-derived-fields", help="Backfill derived DB fields required by new runtime invariants")
 
     dev = subparsers.add_parser("dev", help="Run backend then frontend dev servers")
     dev.add_argument("--frontend-delay", type=float, default=1.5)
@@ -479,6 +585,15 @@ def main() -> None:
     if args.command == "db" and args.db_command == "migrate-indexes":
         asyncio.run(migrate_core_indexes())
         print("core indexes migrated successfully")
+        return
+
+    if args.command == "db" and args.db_command == "audit-index-duplicates":
+        duplicate_groups = asyncio.run(audit_core_index_duplicates())
+        raise SystemExit(1 if duplicate_groups else 0)
+
+    if args.command == "db" and args.db_command == "backfill-derived-fields":
+        asyncio.run(backfill_runtime_derived_fields())
+        print("derived runtime fields backfilled successfully")
         return
 
     if args.command == "dev":

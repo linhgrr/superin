@@ -172,6 +172,12 @@ python scripts/superin.py manifests validate
 # Validate core Mongo index contract
 python scripts/superin.py db check-indexes
 
+# Backfill derived DB fields required before some index migrations
+python scripts/superin.py db backfill-derived-fields
+
+# Audit duplicate values blocking unique index migrations
+python scripts/superin.py db audit-index-duplicates
+
 # Reconcile core Mongo indexes (run once when index names/uniqueness change)
 python scripts/superin.py db migrate-indexes
 
