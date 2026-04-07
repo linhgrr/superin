@@ -78,7 +78,7 @@ Hệ thống hỗ trợ true plug-n-play cho plugins:
 |------|--------|------|
 | `backend/` | HF Space: `linhdzqua148/superin-be` | FastAPI + Beanie + LangGraph |
 | `frontend/` | GitHub: `linhgrr/superin-fe` | React + Vite + Tailwind |
-| root (`/`) | Khác (project config/docs) | Scripts + CLAUDE.md + docs |
+| root (`/`) | GitHub: `linhgrr/superin` | Scripts + CLAUDE.md + docs |
 
 **Lưu ý quan trọng:**
 - **Backend:** `cd backend && git push origin main:main`
