@@ -298,8 +298,12 @@ function handleApiError(error: AxiosError): never {
   const status = error.response?.status || 0;
   const body = error.response?.data;
   const message =
-    body && typeof body === "object" && "detail" in body
-      ? String((body as { detail: unknown }).detail)
+    body && typeof body === "object"
+      ? "detail" in body
+        ? String((body as { detail: unknown }).detail)
+        : "error" in body
+          ? String((body as { error: unknown }).error)
+          : error.message || "Network error"
       : error.message || "Network error";
 
   throw new ApiError(message, status, body);
