@@ -32,7 +32,7 @@ def _normalize_name_key(name: str) -> str:
 async def calendar_transaction() -> AsyncIterator[AsyncClientSession]:
     """Yield a Mongo session with an active transaction for calendar mutations."""
     async with get_db().client.start_session() as session:
-        async with session.start_transaction():
+        async with await session.start_transaction():
             yield session
 
 
