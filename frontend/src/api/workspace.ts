@@ -1,4 +1,4 @@
-import type { WorkspaceBootstrap } from "@/types/generated/api";
+import type { WorkspaceBootstrap } from "@/types/generated";
 import { API_PATHS } from "@/constants";
 import { api } from "./client";
 

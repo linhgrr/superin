@@ -1,6 +1,6 @@
 const GENERATED_FRONTEND_FILE_PATTERNS = [
-  /^frontend\/src\/types\/generated\//,
-  /^frontend\/src\/apps\/[^/]+\/api\.ts$/,
+  /(^|\/)frontend\/src\/types\/generated\//,
+  /(^|\/)frontend\/src\/apps\/[^/]+\/api\.ts$/,
 ];
 
 function isGeneratedFrontendFile(file) {

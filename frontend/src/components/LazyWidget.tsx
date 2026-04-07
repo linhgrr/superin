@@ -5,7 +5,7 @@
 
 import { memo, useEffect, useState, type ComponentType } from "react";
 import { getAppMetadata, getLoadedWidget, loadDashboardWidgetComponent } from "@/lib/lazy-registry";
-import type { WidgetManifestSchema } from "@/types/generated/api";
+import type { WidgetManifestSchema } from "@/types/generated";
 import WidgetSkeleton from "./WidgetSkeleton";
 
 const SKELETON_DELAY_MS = 120;

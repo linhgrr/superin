@@ -17,7 +17,7 @@ import {
 
 import { getMe, login as apiLogin, logout as apiLogout, register as apiRegister } from "@/api/auth";
 import { isAuthenticated, triggerLogout } from "@/api/axios";
-import type { LoginRequest, RegisterRequest, UserPublic } from "@/types/generated/api";
+import type { LoginRequest, RegisterRequest, UserPublic } from "@/types/generated";
 
 interface AuthContextValue {
   user: UserPublic | null;
@@ -82,6 +82,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth(): AuthContextValue {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth must be used within <AuthProvider>");

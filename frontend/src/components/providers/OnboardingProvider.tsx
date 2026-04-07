@@ -344,17 +344,19 @@ function OnboardingProvider({ children }: { children: ReactNode }) {
         showProgress: true,
         showButtons: ["next", "previous", "close"],
         allowClose: true,
-        keyboardControl: true,
-        overlayClickNext: false,
+        allowKeyboardControl: true,
+        overlayClickBehavior: "close",
         stagePadding: 4,
         stageRadius: 12,
         popoverClass: "shin-onboarding-popover",
         nextBtnText: "Next →",
         prevBtnText: "← Previous",
         doneBtnText: "Finish",
-        closeBtnText: "Skip",
         onHighlighted: (_element, _step, options) => {
-          setState((prev) => ({ ...prev, stepIndex: options.state?.activeStep || 0 }));
+          setState((prev) => ({
+            ...prev,
+            stepIndex: typeof options.state?.activeIndex === "number" ? options.state.activeIndex : 0,
+          }));
         },
         onDeselected: () => {
           // Step transition
@@ -379,8 +381,8 @@ function OnboardingProvider({ children }: { children: ReactNode }) {
             progressContainer.className = "driver-popover-progress shin-tour-progress";
           }
 
-          const stepsArray = Array.isArray(state?.steps) ? state.steps : [];
-          const activeStepNum = typeof state?.activeStep === "number" ? state.activeStep : 0;
+          const stepsArray = d.getConfig().steps ?? [];
+          const activeStepNum = typeof state?.activeIndex === "number" ? state.activeIndex : 0;
           const currentStep = activeStepNum + 1;
           const totalSteps = stepsArray.length > 0 ? stepsArray.length : 1;
           const percent = Math.round((currentStep / totalSteps) * 100);
@@ -447,5 +449,6 @@ function useOnboarding() {
   return context;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export { OnboardingProvider, useOnboarding };
 export type { TourId, OnboardingState, OnboardingContextValue };

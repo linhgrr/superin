@@ -13,7 +13,7 @@ import { LayoutDashboard, Store, Sparkles, Settings } from "lucide-react";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { DynamicIcon } from "@/lib/icon-resolver";
 import { prefetchHandlers } from "@/lib/prefetch";
-import type { AppRuntimeEntry } from "@/types/generated/api";
+import type { AppRuntimeEntry } from "@/types/generated";
 
 /**
  * Generate a gradient from an oklch color string.

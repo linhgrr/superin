@@ -15,7 +15,7 @@ export const swrConfig: SWRConfiguration = {
   revalidateOnReconnect: true,
   dedupingInterval: 2000,
   errorRetryCount: 3,
-  errorRetryInterval: (retryCount: number) => Math.min(1000 * 2 ** retryCount, 30000),
+  errorRetryInterval: 3000,
   keepPreviousData: true,
   suspense: false,
 };

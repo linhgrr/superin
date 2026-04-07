@@ -101,6 +101,7 @@ async function loadIconComponent(iconName: string | undefined | null): Promise<L
   return request;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function resolveIcon(iconName: string | undefined | null): LucideIcon {
   if (!iconName) {
     return Circle;
@@ -110,7 +111,7 @@ export function resolveIcon(iconName: string | undefined | null): LucideIcon {
 }
 
 export interface DynamicIconProps extends Omit<LucideProps, "ref"> {
-  name: string | undefined | null;
+  name?: string;
   className?: string;
 }
 
@@ -158,6 +159,7 @@ export function DynamicIcon({ name, ...props }: DynamicIconProps) {
   return <Icon {...props} />;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function preloadIcons(iconNames: string[]): void {
   for (const iconName of iconNames) {
     void loadIconComponent(iconName);

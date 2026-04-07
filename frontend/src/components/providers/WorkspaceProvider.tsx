@@ -13,7 +13,7 @@ import type {
   PreferenceUpdate,
   WidgetPreferenceSchema,
   WorkspaceBootstrap,
-} from "@/types/generated/api";
+} from "@/types/generated";
 import { WorkspaceContext } from "./workspace-context";
 
 export interface WorkspaceContextValue {
@@ -30,6 +30,13 @@ export interface WorkspaceContextValue {
 }
 
 const WORKSPACE_CACHE_VERSION = 1;
+
+interface PersistedWorkspaceSnapshot {
+  userId: string;
+  version: number;
+  storedAt: number;
+  workspace: WorkspaceBootstrap;
+}
 
 function toRuntimeApp(app: AppCatalogEntry): AppRuntimeEntry {
   return {
@@ -197,27 +204,17 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const iconNames = installedApps.flatMap((app) => [
       app.icon,
-      ...app.widgets.map((widget) => widget.icon),
+      ...(app.widgets ?? []).map((widget) => widget.icon),
     ]);
     if (iconNames.length === 0) {
       return;
     }
 
-    let cancelScheduled = () => {};
-    if (typeof window !== "undefined" && "requestIdleCallback" in window) {
-      const handle = window.requestIdleCallback(() => {
-        preloadIcons(iconNames.filter((name): name is string => Boolean(name)));
-      });
-      cancelScheduled = () => window.cancelIdleCallback(handle);
-    } else {
-      const handle = window.setTimeout(() => {
-        preloadIcons(iconNames.filter((name): name is string => Boolean(name)));
-      }, 1);
-      cancelScheduled = () => window.clearTimeout(handle);
-    }
-
+    const handle = window.setTimeout(() => {
+      preloadIcons(iconNames.filter((name): name is string => Boolean(name)));
+    }, 1);
     return () => {
-      cancelScheduled();
+      window.clearTimeout(handle);
     };
   }, [installedApps]);
 
@@ -228,8 +225,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
     const prioritizedAppIds = [...installedApps]
       .sort((left, right) => {
-        const rightCount = right.widgets.length;
-        const leftCount = left.widgets.length;
+        const rightCount = (right.widgets ?? []).length;
+        const leftCount = (left.widgets ?? []).length;
         return rightCount - leftCount;
       })
       .map((app) => app.id);

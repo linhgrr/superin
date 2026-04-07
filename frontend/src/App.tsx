@@ -154,21 +154,11 @@ function CommandPaletteWrapper({ children }: { children: React.ReactNode }) {
   const handleClose = useCallback(() => setIsOpen(false), []);
 
   useEffect(() => {
-    let cancelScheduled = () => {};
-    if (typeof window !== "undefined" && "requestIdleCallback" in window) {
-      const handle = window.requestIdleCallback(() => {
-        void import("@/components/providers/CommandPalette");
-      });
-      cancelScheduled = () => window.cancelIdleCallback(handle);
-    } else {
-      const handle = window.setTimeout(() => {
-        void import("@/components/providers/CommandPalette");
-      }, 200);
-      cancelScheduled = () => window.clearTimeout(handle);
-    }
-
+    const handle = window.setTimeout(() => {
+      void import("@/components/providers/CommandPalette");
+    }, 200);
     return () => {
-      cancelScheduled();
+      window.clearTimeout(handle);
     };
   }, []);
 

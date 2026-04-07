@@ -20,7 +20,7 @@ import { useToast } from "@/components/providers/ToastProvider";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { ROUTES, STORAGE_KEYS } from "@/constants";
 import { DynamicIcon } from "@/lib/icon-resolver";
-import type { AppCatalogEntry } from "@/types/generated/api";
+import type { AppCatalogEntry } from "@/types/generated";
 import type { Category } from "@/api/catalog";
 
 interface PersistedCatalogSnapshot {

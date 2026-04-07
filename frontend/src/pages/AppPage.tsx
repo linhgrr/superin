@@ -61,7 +61,8 @@ export default function AppPage() {
   const [hasLoadError, setHasLoadError] = useState(false);
   const [showSkeleton, setShowSkeleton] = useState(false);
   const appMetadata = appId ? getAppMetadata(appId) : null;
-  const canLoadApp = Boolean(appId) && !isWorkspaceLoading && installedAppIds.has(appId) && Boolean(appMetadata);
+  const isAppInstalled = appId ? installedAppIds.has(appId) : false;
+  const canLoadApp = Boolean(appId) && !isWorkspaceLoading && isAppInstalled && Boolean(appMetadata);
 
   useEffect(() => {
     if (!canLoadApp || !appId) {
@@ -106,7 +107,7 @@ export default function AppPage() {
 
   if (!appId) return <Navigate to={ROUTES.DASHBOARD} replace />;
   if (isWorkspaceLoading) return <AppSkeleton />;
-  if (!installedAppIds.has(appId)) return <Navigate to={ROUTES.DASHBOARD} replace />;
+  if (!isAppInstalled) return <Navigate to={ROUTES.DASHBOARD} replace />;
   if (!appMetadata || hasLoadError) return <AppNotAvailable appId={appId} />;
 
   if (loadedComponent) {

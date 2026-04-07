@@ -10,7 +10,7 @@ import type {
   TokenResponse,
   UpdateUserSettingsRequest,
   UserPublic,
-} from "@/types/generated/api";
+} from "@/types/generated";
 import { API_PATHS } from "@/constants";
 import { api, setAccessToken, clearAccessToken } from "./client";
 

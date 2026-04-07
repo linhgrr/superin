@@ -2,7 +2,8 @@
  * useWorkspace — extracted hook so WorkspaceProvider only exports the component.
  */
 import { useContext } from "react";
-import { WorkspaceContext, type WorkspaceContextValue } from "@/components/providers/workspace-context";
+import { WorkspaceContext } from "@/components/providers/workspace-context";
+import type { WorkspaceContextValue } from "@/components/providers/workspace-context";
 
 export type { WorkspaceContextValue };
 

@@ -313,8 +313,9 @@ export default function SettingsPage() {
 
   // Sync timezone from user settings when available
   useEffect(() => {
-    if (user?.settings?.timezone) {
-      setSettings((prev) => ({ ...prev, timezone: user.settings.timezone }));
+    const timezone = user?.settings?.timezone;
+    if (typeof timezone === "string" && timezone.length > 0) {
+      setSettings((prev) => ({ ...prev, timezone }));
     }
   }, [user?.settings?.timezone]);
   useEffect(() => {

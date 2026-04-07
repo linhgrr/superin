@@ -160,6 +160,7 @@ async function performRefresh(): Promise<string | null> {
 
 interface AuthConfig extends InternalAxiosRequestConfig {
   _skipProactiveRefresh?: boolean;
+  _retry?: boolean;
 }
 
 axiosInstance.interceptors.request.use(

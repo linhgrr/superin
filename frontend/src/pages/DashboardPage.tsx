@@ -9,7 +9,7 @@
  *       └── "Add Widget" button
  */
 
-import type { Layout } from "react-grid-layout";
+import type { Layout, LayoutItem, ResponsiveLayouts } from "react-grid-layout";
 import { cloneLayout, findOrGenerateResponsiveLayout, Responsive, verticalCompactor } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
@@ -27,7 +27,7 @@ import type {
   PreferenceUpdate,
   WidgetManifestSchema,
   WidgetPreferenceSchema,
-} from "@/types/generated/api";
+} from "@/types/generated";
 
 const ResponsiveGridLayout = Responsive;
 
@@ -37,6 +37,7 @@ const GRID_COLS = { lg: 12, md: 12, sm: 6, xs: 1 };
 const GRID_BREAKPOINTS = { lg: 1200, md: 996, sm: 768, xs: 0 };
 const GRID_BREAKPOINT_ORDER = ["lg", "md", "sm", "xs"] as const;
 const ROW_HEIGHT = 80;
+type GridBreakpoint = (typeof GRID_BREAKPOINT_ORDER)[number];
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -108,7 +109,7 @@ function arePreferenceMapsEqual(
 
 // ─── Auto Rearrange Helper ───────────────────────────────────────────────────
 
-function autoRearrangeWidgets(widgets: ResolvedWidget[], prefs: Map<string, WidgetPreferenceSchema>): Layout[] {
+function autoRearrangeWidgets(widgets: ResolvedWidget[], prefs: Map<string, WidgetPreferenceSchema>): Layout {
   // Sort by actual width (custom size from prefs or default from manifest)
   const sorted = [...widgets].sort((a, b) => {
     const aPref = prefs.get(a.widgetId);
@@ -121,7 +122,7 @@ function autoRearrangeWidgets(widgets: ResolvedWidget[], prefs: Map<string, Widg
     return bWidth - aWidth; // Larger first for better packing
   });
 
-  const layout: Layout[] = [];
+  const layout: LayoutItem[] = [];
   let currentRow = 0;
   let currentCol = 0;
   let rowHeight = 0;
@@ -160,7 +161,7 @@ function buildLayoutItem(
   pref: WidgetPreferenceSchema | undefined,
   previousWidgets: ResolvedWidget[],
   allPrefs: Map<string, WidgetPreferenceSchema>,
-): Layout {
+): LayoutItem {
   // Use custom dimensions from preferences if available, otherwise use manifest default
   const config = getSizeConfig(rw.widget.size);
   const w = pref?.size_w ?? config.width;
@@ -257,7 +258,7 @@ function DashboardInner({
   commitWorkspacePreferenceUpdates: (updates: PreferenceUpdate[]) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const currentLayoutRef = useRef<Layout[]>([]);
+  const currentLayoutRef = useRef<Layout>([]);
   const [containerWidth, setContainerWidth] = useState(1200);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [busyWidgetId, setBusyWidgetId] = useState<string | null>(null);
@@ -308,7 +309,7 @@ function DashboardInner({
     const next = new Set<string>();
 
     for (const app of installedApps) {
-      for (const widget of app.widgets) {
+      for (const widget of app.widgets ?? []) {
         if (isWidgetEnabled(widget, prefs.get(widget.id))) {
           next.add(widget.id);
         }
@@ -322,7 +323,7 @@ function DashboardInner({
     const items: ResolvedWidget[] = [];
 
     for (const app of installedApps) {
-      for (const widget of app.widgets) {
+      for (const widget of app.widgets ?? []) {
         const prefsEntry = prefs.get(widget.id);
         if (!isWidgetEnabled(widget, prefsEntry)) continue;
 
@@ -339,21 +340,21 @@ function DashboardInner({
     [visibleWidgets]
   );
 
-  const layout = useMemo<Layout[]>(() => {
+  const layout = useMemo<Layout>(() => {
     return visibleWidgets.map((rw, idx) =>
       buildLayoutItem(rw, prefs.get(rw.widgetId), visibleWidgets.slice(0, idx), prefs)
     );
   }, [visibleWidgets, prefs]);
 
-  const responsiveLayouts = useMemo(() => {
-    const nextLayouts: Record<(typeof GRID_BREAKPOINT_ORDER)[number], Layout[]> = {
+  const responsiveLayouts = useMemo<ResponsiveLayouts<GridBreakpoint>>(() => {
+    const nextLayouts: ResponsiveLayouts<GridBreakpoint> = {
       lg: cloneLayout(layout),
       md: [],
       sm: [],
       xs: [],
     };
 
-    let previousBreakpoint = GRID_BREAKPOINT_ORDER[0];
+    let previousBreakpoint: GridBreakpoint = GRID_BREAKPOINT_ORDER[0];
     for (const breakpoint of GRID_BREAKPOINT_ORDER.slice(1)) {
       nextLayouts[breakpoint] = findOrGenerateResponsiveLayout(
         nextLayouts,
@@ -398,7 +399,7 @@ function DashboardInner({
     });
   }, []);
 
-  const buildLayoutUpdates = useCallback((currentLayout: Layout[]) => {
+  const buildLayoutUpdates = useCallback((currentLayout: Layout) => {
     const updates: PreferenceUpdate[] = [];
 
     for (const item of currentLayout) {
@@ -519,14 +520,14 @@ function DashboardInner({
   );
 
   const handleLayoutChange = useCallback(
-    (currentLayout: Layout[]) => {
+    (currentLayout: Layout) => {
       currentLayoutRef.current = currentLayout;
     },
     []
   );
 
   const handleLayoutCommit = useCallback(
-    async (currentLayout: Layout[]) => {
+    async (currentLayout: Layout) => {
       currentLayoutRef.current = currentLayout;
       const updates = buildLayoutUpdates(currentLayout);
       if (updates.length === 0) {
@@ -698,7 +699,7 @@ export default function DashboardPage() {
             <div
               className="widget-card"
               style={{
-                minHeight: WIDGET_SIZES[size].height === "auto" ? "120px" : WIDGET_SIZES[size].height,
+                minHeight: WIDGET_SIZES[size].height,
                 background: "var(--color-surface-elevated)",
                 animation: `pulse 1.5s ease-in-out ${i * 0.15}s infinite`,
               }}

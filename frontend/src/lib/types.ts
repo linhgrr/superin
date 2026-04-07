@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import type { WidgetManifestSchema } from "@/types/generated/api";
+import type { WidgetManifestSchema } from "@/types/generated";
 import type { WidgetSizeName } from "@/lib/widget-sizes";
 
 export interface FrontendWidgetManifest {

@@ -450,7 +450,7 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
               </p>
             </div>
           ) : (
-            categoryOrder.map((category) => {
+            CATEGORY_ORDER.map((category) => {
               const cmds = groupedDisplay[category];
               if (!cmds?.length) return null;
 

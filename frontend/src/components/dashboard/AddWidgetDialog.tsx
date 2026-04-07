@@ -9,7 +9,7 @@
 import { ArrowLeft, Eye, EyeOff, LayoutGrid, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { DynamicIcon } from "@/lib/icon-resolver";
-import type { AppRuntimeEntry } from "@/types/generated/api";
+import type { AppRuntimeEntry } from "@/types/generated";
 
 export interface AddWidgetDialogProps {
   catalog: AppRuntimeEntry[];
@@ -45,7 +45,7 @@ function IconGlyph({
   // Use DynamicIcon for any icon name - no more hardcoded mapping needed
   return (
     <DynamicIcon
-      name={iconName}
+      name={iconName ?? undefined}
       size={size}
       strokeWidth={2}
     />
@@ -93,7 +93,7 @@ export default function AddWidgetDialog({
   }, []);
 
   const selectedAppVisibleCount = selectedApp
-    ? selectedApp.widgets.filter((widget) => enabledWidgetIds.has(widget.id)).length
+    ? (selectedApp.widgets ?? []).filter((widget) => enabledWidgetIds.has(widget.id)).length
     : 0;
 
   // ── Step 1: app list ──────────────────────────────────────────────────────
@@ -131,7 +131,8 @@ export default function AddWidgetDialog({
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>
                 {catalog.map((app) => {
-                  const visibleCount = app.widgets.filter((widget) =>
+                  const widgets = app.widgets ?? [];
+                  const visibleCount = widgets.filter((widget) =>
                     enabledWidgetIds.has(widget.id)
                   ).length;
 
@@ -163,7 +164,7 @@ export default function AddWidgetDialog({
                       <div className="option-info">
                         <div className="option-name">{app.name}</div>
                         <div style={{ fontSize: "0.75rem", color: "var(--color-foreground-muted)" }}>
-                          {visibleCount}/{app.widgets.length} widgets visible
+                          {visibleCount}/{widgets.length} widgets visible
                         </div>
                       </div>
 
@@ -181,7 +182,7 @@ export default function AddWidgetDialog({
 
   // ── Step 2: widget list ───────────────────────────────────────────────────
 
-  const widgets = selectedApp.widgets;
+  const widgets = selectedApp.widgets ?? [];
 
   return (
     <div className="dialog-backdrop" onClick={onClose}>
@@ -248,7 +249,7 @@ export default function AddWidgetDialog({
                   >
                     <div style={{ display: "flex", width: "100%", gap: "0.75rem" }}>
                       <div className="option-icon">
-                        <IconGlyph iconName={widget.icon} fallback={widget.name} size={16} />
+                        <IconGlyph iconName={widget.icon} size={16} />
                       </div>
 
                       <div className="option-info" style={{ flex: 1 }}>

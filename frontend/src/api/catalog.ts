@@ -10,7 +10,7 @@ import type {
   AppUninstallRequest,
   WidgetPreferenceSchema,
   PreferenceUpdate,
-} from "@/types/generated/api";
+} from "@/types/generated";
 import { API_PATHS } from "@/constants";
 import { api } from "./client";
 

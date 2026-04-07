@@ -5,154 +5,112 @@
  */
 
 import useSWR from "swr";
-import { swrConfig, fetcher, mutateByPrefix } from "@/lib/swr";
-import type { TodoSummary, CreateTaskRequest } from "@/types/generated/api";
-
-const BASE = "/api/apps/todo";
-
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-export interface TaskRead {
-  id: string;
-  user_id: string;
-  title: string;
-  description: string | null;
-  due_date: string | null;
-  priority: "low" | "medium" | "high";
-  status: "pending" | "completed";
-  subtask_count: number;
-  subtask_completed: number;
-  recurring_rule?: { frequency: string; is_active: boolean } | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface SubTask {
-  id: string;
-  task_id: string;
-  title: string;
-  completed: boolean;
-  created_at: string;
-}
-
-export type RecurringFrequency = "daily" | "weekly" | "monthly" | "yearly";
-
-export interface RecurringRule {
-  id: string;
-  task_id: string;
-  frequency: RecurringFrequency;
-  interval: number;
-  days_of_week: number[] | null;
-  end_date: string | null;
-  max_occurrences: number | null;
-  is_active: boolean;
-  created_at: string;
-}
+import { swrConfig, mutateByPrefix } from "@/lib/swr";
+import {
+  createRecurringRule as apiCreateRecurringRule,
+  createSubtask as apiCreateSubtask,
+  createTask as apiCreateTask,
+  deleteSubtask as apiDeleteSubtask,
+  deleteTask as apiDeleteTask,
+  getSubtasks as apiGetSubtasks,
+  getTasks as apiGetTasks,
+  getTodoSummary as apiGetTodoSummary,
+  toggleTask as apiToggleTask,
+  completeSubtask as apiCompleteSubtask,
+  uncompleteSubtask as apiUncompleteSubtask,
+  updateTask as apiUpdateTask,
+} from "../api";
+import type {
+  CreateRecurringRuleRequest,
+  CreateTaskRequest,
+  RecurringRuleRead,
+  SubTaskRead,
+  TaskRead,
+  SummaryResponse,
+  UpdateTaskRequest,
+} from "../api";
 
 // ─── Read Hooks ──────────────────────────────────────────────────────────────
 
 export function useTodoSummary() {
-  return useSWR<TodoSummary>(
+  return useSWR<SummaryResponse>(
     "todo/summary",
-    () => fetcher(`${BASE}/summary`),
+    apiGetTodoSummary,
     { ...swrConfig, refreshInterval: 30000 }
   );
 }
 
 export function useTasks() {
-  return useSWR<TaskRead[]>("todo/tasks", () => fetcher(`${BASE}/tasks`), swrConfig);
+  return useSWR<TaskRead[]>("todo/tasks", () => apiGetTasks(), swrConfig);
 }
 
 export function useSubtasks(taskId: string | null) {
-  return useSWR<SubTask[]>(
+  return useSWR<SubTaskRead[]>(
     taskId ? ["todo/subtasks", taskId] : null,
-    () => fetcher(`${BASE}/tasks/${taskId}/subtasks`),
+    () => apiGetSubtasks(taskId!),
     swrConfig
   );
 }
 
-// ─── Mutations ───────────────────────────────────────────────────────────────
-
-async function post<T>(path: string, body: unknown): Promise<T> {
-  const { api } = await import("@/api/client");
-  return api.post<T>(path, body);
-}
-
-async function patch<T>(path: string, body?: unknown): Promise<T> {
-  const { api } = await import("@/api/client");
-  return api.patch<T>(path, body);
-}
-
-async function del(path: string): Promise<void> {
-  const { api } = await import("@/api/client");
-  return api.delete<void>(path);
-}
-
 export async function createTask(payload: CreateTaskRequest): Promise<TaskRead> {
-  const result = await post<TaskRead>(`${BASE}/tasks`, payload);
+  const result = await apiCreateTask(payload);
   mutateByPrefix("todo/tasks");
   mutateByPrefix("todo/summary");
   return result;
 }
 
-export async function updateTask(id: string, payload: Partial<CreateTaskRequest>): Promise<TaskRead> {
-  const result = await patch<TaskRead>(`${BASE}/tasks/${id}`, payload);
+export async function updateTask(id: string, payload: UpdateTaskRequest): Promise<TaskRead> {
+  const result = await apiUpdateTask(id, payload);
   mutateByPrefix("todo/tasks");
   mutateByPrefix("todo/summary");
   return result;
 }
 
 export async function toggleTask(id: string): Promise<TaskRead> {
-  const result = await patch<TaskRead>(`${BASE}/tasks/${id}/toggle`);
+  const result = await apiToggleTask(id);
   mutateByPrefix("todo/tasks");
   mutateByPrefix("todo/summary");
   return result;
 }
 
 export async function deleteTask(id: string): Promise<void> {
-  await del(`${BASE}/tasks/${id}`);
+  await apiDeleteTask(id);
   mutateByPrefix("todo/tasks");
   mutateByPrefix("todo/summary");
 }
 
-export async function createSubtask(taskId: string, title: string): Promise<SubTask> {
-  const result = await post<SubTask>(`${BASE}/tasks/${taskId}/subtasks`, { title });
+export async function createSubtask(taskId: string, title: string): Promise<SubTaskRead> {
+  const result = await apiCreateSubtask(taskId, { title });
   mutateByPrefix("todo/subtasks");
   mutateByPrefix("todo/tasks");
   return result;
 }
 
-export async function completeSubtask(subtaskId: string): Promise<SubTask> {
-  const result = await patch<SubTask>(`${BASE}/subtasks/${subtaskId}/complete`);
+export async function completeSubtask(subtaskId: string): Promise<SubTaskRead> {
+  const result = await apiCompleteSubtask(subtaskId);
   mutateByPrefix("todo/subtasks");
   mutateByPrefix("todo/tasks");
   return result;
 }
 
-export async function uncompleteSubtask(subtaskId: string): Promise<SubTask> {
-  const result = await patch<SubTask>(`${BASE}/subtasks/${subtaskId}/uncomplete`);
+export async function uncompleteSubtask(subtaskId: string): Promise<SubTaskRead> {
+  const result = await apiUncompleteSubtask(subtaskId);
   mutateByPrefix("todo/subtasks");
   mutateByPrefix("todo/tasks");
   return result;
 }
 
 export async function deleteSubtask(subtaskId: string): Promise<void> {
-  await del(`${BASE}/subtasks/${subtaskId}`);
+  await apiDeleteSubtask(subtaskId);
   mutateByPrefix("todo/subtasks");
   mutateByPrefix("todo/tasks");
 }
 
 export async function createRecurringRule(
   taskId: string,
-  data: {
-    frequency: RecurringFrequency;
-    interval: number;
-    days_of_week?: number[];
-    end_date?: string;
-    max_occurrences?: number;
-  }
-): Promise<RecurringRule> {
-  const result = await post<RecurringRule>(`${BASE}/tasks/${taskId}/recurring`, data);
+  data: CreateRecurringRuleRequest
+): Promise<RecurringRuleRead> {
+  const result = await apiCreateRecurringRule(taskId, data);
   mutateByPrefix("todo/tasks");
   return result;
 }
