@@ -15,12 +15,13 @@ export interface AppMetadata {
   loadDashboardWidget: () => Promise<{ default: ComponentType<DashboardWidgetProps> }>;
 }
 
-export type AppModule = {
-  default: {
-    AppView: ComponentType;
-    DashboardWidget: ComponentType<DashboardWidgetProps>;
-  };
-};
+export interface AppViewModule {
+  default: ComponentType;
+}
+
+export interface DashboardWidgetModule {
+  default: ComponentType<DashboardWidgetProps>;
+}
 
 const metadataRegistry = new Map<string, AppMetadata>();
 const activeAppIds = new Set<string>();
@@ -50,17 +51,23 @@ function createWidgetErrorComponent(): ComponentType<DashboardWidgetProps> {
     );
 }
 
-function createAppLoaders(loader: () => Promise<AppModule>) {
+function createAppMetadata(
+  id: string,
+  loadAppView: () => Promise<{ default: ComponentType }>,
+  loadDashboardWidget: () => Promise<{ default: ComponentType<DashboardWidgetProps> }>
+): AppMetadata {
   return {
-    loadAppView: () =>
-      loader().then((module) => ({
-        default: module.default.AppView,
-      })),
-    loadDashboardWidget: () =>
-      loader().then((module) => ({
-        default: module.default.DashboardWidget,
-      })),
+    id,
+    loadAppView,
+    loadDashboardWidget,
   };
+}
+
+function extractAppId(path: string, leafName: string): string | null {
+  const match = path.match(
+    new RegExp(`^(?:\\./|\\.\\./apps/)([^/]+)/${leafName.replace(".", "\\.")}$`)
+  );
+  return match?.[1] ?? null;
 }
 
 export function registerAppMetadata(
@@ -70,25 +77,52 @@ export function registerAppMetadata(
     loadDashboardWidget: () => Promise<{ default: ComponentType<DashboardWidgetProps> }>;
   }
 ): void {
-  metadataRegistry.set(id, {
-    id,
-    ...loaders,
-  });
+  metadataRegistry.set(id, createAppMetadata(id, loaders.loadAppView, loaders.loadDashboardWidget));
 }
 
-export function registerAvailableApps(loadersByPath: Record<string, () => Promise<AppModule>>): AppMetadata[] {
+export function registerAvailableApps(
+  appViewLoadersByPath: Record<string, () => Promise<AppViewModule>>,
+  dashboardWidgetLoadersByPath: Record<string, () => Promise<DashboardWidgetModule>>
+): AppMetadata[] {
   const registeredApps: AppMetadata[] = [];
+  const appViewLoaders = new Map<string, () => Promise<{ default: ComponentType }>>();
+  const dashboardWidgetLoaders = new Map<
+    string,
+    () => Promise<{ default: ComponentType<DashboardWidgetProps> }>
+  >();
 
-  for (const [path, loader] of Object.entries(loadersByPath)) {
-    // Vite import.meta.glob path keys can vary by caller path:
-    // - "./{appId}/index.ts"
-    // - "../apps/{appId}/index.ts"
-    const match = path.match(/^(?:\.\/|\.\.\/apps\/)([^/]+)\/index\.ts$/);
-    if (!match) {
+  for (const [path, loader] of Object.entries(appViewLoadersByPath)) {
+    const appId = extractAppId(path, "AppView.tsx");
+    if (appId) {
+      appViewLoaders.set(appId, loader as () => Promise<{ default: ComponentType }>);
+    }
+  }
+
+  for (const [path, loader] of Object.entries(dashboardWidgetLoadersByPath)) {
+    const appId = extractAppId(path, "DashboardWidget.tsx");
+    if (appId) {
+      dashboardWidgetLoaders.set(
+        appId,
+        loader as () => Promise<{ default: ComponentType<DashboardWidgetProps> }>
+      );
+    }
+  }
+
+  const discoveredAppIds = Array.from(
+    new Set([...appViewLoaders.keys(), ...dashboardWidgetLoaders.keys()])
+  ).sort();
+
+  for (const appId of discoveredAppIds) {
+    const loadAppView = appViewLoaders.get(appId);
+    const loadDashboardWidget = dashboardWidgetLoaders.get(appId);
+
+    if (!loadAppView || !loadDashboardWidget) {
+      console.warn(
+        `[discovery] Skipping app "${appId}" because ${!loadAppView ? "AppView.tsx" : "DashboardWidget.tsx"} is missing`
+      );
       continue;
     }
 
-    const appId = match[1];
     if (metadataRegistry.has(appId)) {
       const existing = metadataRegistry.get(appId);
       if (existing) {
@@ -97,12 +131,9 @@ export function registerAvailableApps(loadersByPath: Record<string, () => Promis
       continue;
     }
 
-    const appLoaders = createAppLoaders(loader);
+    const appLoaders = createAppMetadata(appId, loadAppView, loadDashboardWidget);
     registerAppMetadata(appId, appLoaders);
-    registeredApps.push({
-      id: appId,
-      ...appLoaders,
-    });
+    registeredApps.push(appLoaders);
   }
 
   return registeredApps;

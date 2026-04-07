@@ -11,6 +11,7 @@ export type Schemas = components["schemas"];
 export type SchemaName = keyof Schemas;
 
 export type AppCatalogEntry = Schemas["AppCatalogEntry"];
+export type AppCategoryRead = Schemas["AppCategoryRead"];
 export type AppInstallRequest = Schemas["AppInstallRequest"];
 export type AppRuntimeEntry = Schemas["AppRuntimeEntry"];
 export type AppUninstallRequest = Schemas["AppUninstallRequest"];

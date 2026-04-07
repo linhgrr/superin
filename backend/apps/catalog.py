@@ -24,6 +24,7 @@ from shared.preference_utils import (
 )
 from shared.schemas import (
     AppCatalogEntry,
+    AppCategoryRead,
     AppInstallRequest,
     AppUninstallRequest,
     PreferenceUpdate,
@@ -51,8 +52,8 @@ class UpdateCategoryRequest(BaseModel):
 
 # ─── Categories ────────────────────────────────────────────────────────────────
 
-@router.get("/categories")
-async def list_categories() -> list[dict]:
+@router.get("/categories", response_model=list[AppCategoryRead])
+async def list_categories() -> list[AppCategoryRead]:
     """List all app categories, merged from DB and app registry.
 
     Categories are discovered from:
@@ -69,7 +70,7 @@ async def list_categories() -> list[dict]:
     registry_cats = list_registry_categories()
 
     # Merge: DB categories take priority, registry fills gaps
-    merged: dict[str, dict] = {}
+    merged: dict[str, AppCategoryRead] = {}
 
     # First, add all DB categories
     for cat in db_cats:
@@ -81,24 +82,24 @@ async def list_categories() -> list[dict]:
         cat_id = cat["id"].lower()
         if cat_id not in merged:
             # Auto-discovered category from app manifest
-            merged[cat_id] = {
-                "id": cat["id"],  # Use category id as string id
-                "name": cat["name"],
-                "icon": cat["icon"],
-                "color": cat["color"],
-                "order": 999,  # Auto-discovered categories appear at end
-                "auto_discovered": True,  # Flag for UI
-            }
+            merged[cat_id] = AppCategoryRead(
+                id=cat["id"],  # Use category id as string id
+                name=cat["name"],
+                icon=cat["icon"],
+                color=cat["color"],
+                order=999,  # Auto-discovered categories appear at end
+                auto_discovered=True,  # Flag for UI
+            )
 
     # Return sorted by order, then name
-    return sorted(merged.values(), key=lambda x: (x.get("order", 0), x["name"]))
+    return sorted(merged.values(), key=lambda x: (x.order, x.name))
 
 
-@router.post("/categories")
+@router.post("/categories", response_model=AppCategoryRead)
 async def create_category(
     request: CreateCategoryRequest,
     admin_user_id: str = Depends(get_current_admin_user),
-) -> dict:
+) -> AppCategoryRead:
     """Create a new app category. Requires auth."""
     existing = await AppCategory.find_one(AppCategory.name == request.name)
     if existing:
@@ -112,12 +113,12 @@ async def create_category(
     return _cat_to_dict(cat)
 
 
-@router.patch("/categories/{category_id}")
+@router.patch("/categories/{category_id}", response_model=AppCategoryRead)
 async def update_category(
     category_id: str,
     request: UpdateCategoryRequest,
     admin_user_id: str = Depends(get_current_admin_user),
-) -> dict:
+) -> AppCategoryRead:
     """Update an app category."""
     cat = await AppCategory.find_one(AppCategory.id == PydanticObjectId(category_id))
     if not cat:
@@ -147,14 +148,14 @@ async def delete_category(
     return {"success": True, "id": category_id}
 
 
-def _cat_to_dict(c: AppCategory) -> dict:
-    return {
-        "id": str(c.id),
-        "name": c.name,
-        "icon": c.icon,
-        "color": c.color,
-        "order": c.order,
-    }
+def _cat_to_dict(c: AppCategory) -> AppCategoryRead:
+    return AppCategoryRead(
+        id=str(c.id),
+        name=c.name,
+        icon=c.icon,
+        color=c.color,
+        order=c.order,
+    )
 
 
 # ─── Catalog ──────────────────────────────────────────────────────────────────

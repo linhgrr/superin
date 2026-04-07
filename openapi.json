@@ -266,8 +266,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": true,
-                    "type": "object"
+                    "$ref": "#/components/schemas/AppCategoryRead"
                   },
                   "type": "array",
                   "title": "Response List Categories Api Catalog Categories Get"
@@ -300,9 +299,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Create Category Api Catalog Categories Post"
+                  "$ref": "#/components/schemas/AppCategoryRead"
                 }
               }
             }
@@ -365,9 +362,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Update Category Api Catalog Categories  Category Id  Patch"
+                  "$ref": "#/components/schemas/AppCategoryRead"
                 }
               }
             }
@@ -4231,6 +4226,45 @@
         ],
         "title": "AppCatalogEntry",
         "description": "Summary entry shown in the app store."
+      },
+      "AppCategoryRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "icon": {
+            "type": "string",
+            "title": "Icon"
+          },
+          "color": {
+            "type": "string",
+            "title": "Color"
+          },
+          "order": {
+            "type": "integer",
+            "title": "Order"
+          },
+          "auto_discovered": {
+            "type": "boolean",
+            "title": "Auto Discovered",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "icon",
+          "color",
+          "order"
+        ],
+        "title": "AppCategoryRead",
+        "description": "App catalog category entry shown in the store UI."
       },
       "AppInstallRequest": {
         "properties": {

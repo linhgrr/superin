@@ -5,23 +5,15 @@
  */
 
 import type {
+  AppCategoryRead,
   AppCatalogEntry,
   AppInstallRequest,
   AppUninstallRequest,
-  WidgetPreferenceSchema,
   PreferenceUpdate,
+  WidgetPreferenceSchema,
 } from "@/types/generated";
 import { API_PATHS } from "@/constants";
 import { api } from "./client";
-
-export interface Category {
-  id: string;
-  name: string;
-  icon: string;
-  color: string;
-  order: number;
-  auto_discovered?: boolean;
-}
 
 // ─── Catalog ──────────────────────────────────────────────────────────────────
 
@@ -29,8 +21,8 @@ export async function getCatalog(): Promise<AppCatalogEntry[]> {
   return api.get<AppCatalogEntry[]>(API_PATHS.CATALOG_APPS);
 }
 
-export async function getCategories(): Promise<Category[]> {
-  return api.get<Category[]>(API_PATHS.CATALOG_CATEGORIES);
+export async function getCategories(): Promise<AppCategoryRead[]> {
+  return api.get<AppCategoryRead[]>(API_PATHS.CATALOG_CATEGORIES);
 }
 
 // ─── Install / Uninstall ────────────────────────────────────────────────────────

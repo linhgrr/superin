@@ -27,8 +27,8 @@ Hệ thống hỗ trợ true plug-n-play cho plugins:
 - **Platform code** (core/, shared/) KHÔNG ĐƯỢC import từ bất kỳ app nào trong `apps/`
 
 **Frontend:**
-- Auto-discovery qua Vite glob import trong `src/apps/index.ts`
-- Không cần import thủ công từng app — hệ thống tự tìm tất cả `src/apps/*/index.ts`
+- Auto-discovery qua Vite glob import trong `src/lib/discovery.ts`
+- Không cần import thủ công từng app — hệ thống tự tìm tất cả `src/apps/*/AppView.tsx` và `src/apps/*/DashboardWidget.tsx`
 - Backend là source of truth cho metadata (icon, color, name, widgets)
 - Icons render động qua `DynamicIcon` resolver
 - **`src/shared/`** — Pure utilities & shared hooks: `shared/utils/`, `shared/hooks/`. Dành cho code không có app-specific logic hay platform code nặng (timezone, formatters). **Apps được phép import từ đây.**
@@ -46,7 +46,7 @@ Hệ thống hỗ trợ true plug-n-play cho plugins:
 
 **CLI:**
 - `sync-fe` vẫn hữu ích để tạo boilerplate widgets, nhưng không bắt buộc để app hiển thị
-- Registry (`src/apps/index.ts`) tự động cập nhật không cần regenerate
+- Registry app FE tự động cập nhật không cần sửa file trung tâm
 
 ---
 
@@ -124,11 +124,9 @@ backend/
 frontend/
 ├── src/
 │   ├── apps/{app_id}/       # App modules
-│   │   ├── manifest.json    # Frontend mirror
-│   │   ├── index.ts         # FrontendAppDefinition (export default)
 │   │   ├── AppView.tsx      # Thin orchestration
-│   │   ├── DashboardWidget.tsx  # Widget dispatcher
-│   │   ├── api.ts           # App API client
+│   │   ├── DashboardWidget.tsx  # Generated widget dispatcher
+│   │   ├── api.ts           # Generated app API client
 │   │   ├── views/           # Screen composition
 │   │   ├── widgets/         # Individual widgets
 │   │   ├── features/        # Domain slices
@@ -267,14 +265,10 @@ npm run build:frontend
 
 ### Frontend
 
-1. **Auto-discovery** — `src/apps/index.ts` dùng Vite glob import để tự động phát hiện tất cả apps trong `src/apps/*/index.ts`. Không cần import thủ công.
-2. **Export pattern** — Mỗi app phải `export default` một `FrontendAppDefinition` object:
-   ```typescript
-   const myApp = { manifest, AppView, DashboardWidget } satisfies FrontendAppDefinition;
-   export default myApp;
-   ```
+1. **Auto-discovery** — `src/lib/discovery.ts` dùng Vite glob import để tự động phát hiện tất cả apps qua `src/apps/*/AppView.tsx` và `src/apps/*/DashboardWidget.tsx`. Không cần `index.ts`.
+2. **Không tạo frontend manifest mirror** — FE không được giữ `manifest.json` hay bất kỳ app metadata mirror nào cho `id/name/widgets/size`. Các giá trị này thuộc BE manifest và phải đi qua codegen/runtime payload.
 3. **AppView.tsx** phải thin — chỉ orchestration, delegate xuống `views/`
-4. **DashboardWidget.tsx** phải thin — chỉ dispatch, delegate xuống `widgets/`
+4. **DashboardWidget.tsx là generated** — file này được sinh từ backend manifest + convention tên component widget. Không edit tay.
 5. **KHÔNG dùng** `registerWidget()` side-effect pattern (đã deprecated)
 6. **KHÔNG edit** `frontend/src/types/generated/*` (auto-generated)
 7. **Luôn dùng** design tokens từ `globals.css` (oklch colors)
@@ -287,19 +281,24 @@ npm run build:frontend
 14. **Không code tay contract type** — FE không được tự định nghĩa lại BE contract dưới dạng `interface/type` thủ công trong app code. Request/response/resource DTO phải lấy từ generated sources (`src/apps/{app_id}/api.ts` hoặc `@/types/generated`).
 15. **Chỉ cho phép local UI-only types** — Type viết tay trong app chỉ được dùng cho props/state/view-model/computed data không tồn tại ở BE. Nếu shape đó đã có trong OpenAPI thì phải dùng generated type.
 16. **Operation params cũng đi theo codegen** — Query/path/body contract của subapp phải đi qua generated app API client; không tự dựng shape request rời rạc ở component/hook nếu có thể import từ generated facade.
+17. **Generated dashboard binding** — Map `widget_id -> component` của mỗi app không được code tay. `frontend/src/apps/{app_id}/DashboardWidget.tsx` phải do codegen sinh từ backend manifest. Muốn thêm widget mới: thêm widget vào BE manifest rồi tạo component đúng convention tên file trong `src/apps/{app_id}/widgets/`.
+18. **Widget component naming convention** — Với widget id `{app_id}.{kebab-name}`, component FE phải ở `src/apps/{app_id}/widgets/{PascalCase(kebab-name)}Widget.tsx`. Ví dụ `calendar.month-view` -> `MonthViewWidget.tsx`.
+19. **Platform CLI/validator không được phụ thuộc frontend mirrors** — `scripts/codegen.py` và `scripts/superin.py manifests validate` phải suy ra app/widget từ BE manifest + file structure hiện tại, không đọc `frontend/src/apps/{app_id}/manifest.json`.
 
 ### Anti-Regression Notes (Cập nhật bắt buộc)
 
-- Khi gặp lỗi kiến trúc/contract, phải thêm note ngắn vào section này để tránh lặp lại.
-- 2026-04-07:
-  - Đã gặp case subapp routes thiếu `response_model` nên OpenAPI sinh `unknown`; từ nay route plugin phải annotate đầy đủ request/response.
-  - Đã gặp mismatch FE gửi body nhưng BE route nhận query (ví dụ update wallet); từ nay PATCH/PUT phải dùng request schema thay vì query params rời.
-  - Subapp FE từng tự viết tay response types lệch BE; từ nay ưu tiên generated types + facade `@/types/generated`.
-  - Khi naming schema plugin không globally unique, OpenAPI generator sinh tên xấu kiểu `apps__...`; chuẩn repo là đổi tên schema ngay ở BE theo `{App}{Entity}{Suffix}`, không vá alias thủ công ở FE/platform.
-  - Discovery key từ `import.meta.glob` có thể khác prefix (`./` vs `../apps/`); regex registry phải chấp nhận cả hai dạng.
-  - `frontend/src/apps/{app_id}/api.ts` từng là file viết tay; từ nay đây là generated file và là app-local contract facade chuẩn. Không sửa tay để “vá nhanh”.
-  - Khi FE cần type như `TaskRead`, `SummaryResponse`, `UpdateWalletRequest`, phải import từ generated subapp facade thay vì tự alias rải rác trong component/hook.
-  - Nếu một local type không phải UI-only, coi đó là lỗi kiến trúc: phải đưa về BE/OpenAPI/codegen thay vì giữ ở FE.
+- Khi gặp lỗi kiến trúc/contract, phải thêm note ngắn vào section này dưới dạng **quy tắc chuẩn phải tuân theo**, không mô tả lịch sử lỗi.
+- Route plugin phải khai báo `response_model` rõ ràng và dùng request/response schema đầy đủ để OpenAPI sinh contract chính xác.
+- `PATCH`/`PUT` endpoint phải nhận request schema rõ ràng; không encode request body thành query params rời cho domain update chính.
+- Mọi BE schema public phải có tên globally unique theo mẫu `{App}{Entity}{Suffix}`.
+- FE app code phải lấy contract type từ generated sources (`@/types/generated` hoặc `src/apps/{app_id}/api.ts`).
+- Local type viết tay trong FE chỉ dành cho UI-only props/state/view-model không thuộc contract BE.
+- `frontend/src/apps/{app_id}/api.ts` là generated app-local contract facade; mọi thay đổi signature phải xuất phát từ BE schema/routes rồi regenerate.
+- Discovery frontend phải dựa vào `AppView.tsx` và `DashboardWidget.tsx`; metadata app/widget phải đến từ BE manifest/runtime payload.
+- `frontend/src/apps/{app_id}/DashboardWidget.tsx` phải là generated binding từ backend manifest.
+- Widget component file phải tuân theo convention `src/apps/{app_id}/widgets/{PascalCase(widget-slug)}Widget.tsx`.
+- `scripts/codegen.py` và `scripts/superin.py manifests validate` phải auto-discover app/widget từ BE manifest, OpenAPI, và file structure hiện tại; không hardcode app list hoặc đọc FE mirror metadata.
+- Platform route nào được FE tiêu thụ như typed contract thì phải có schema + `response_model` để FE dùng generated type thay vì type viết tay.
 
 ### Chat/Agent
 
@@ -405,8 +404,9 @@ python scripts/superin.py codegen
 - Nếu thêm category mới, restart backend để apps re-register
 
 ### Frontend app không auto-discover
-- Check `src/apps/{app_id}/index.ts` tồn tại và có `export default`
-- Check file có export đúng kiểu `FrontendAppDefinition`
+- Check `src/apps/{app_id}/AppView.tsx` tồn tại
+- Check `src/apps/{app_id}/DashboardWidget.tsx` đã được codegen sinh ra
+- Nếu vừa đổi BE manifest/routes, chạy lại `python scripts/superin.py codegen`
 - Restart dev server để Vite pick up glob import changes
 
 ### lint-staged fails on `cd frontend && eslint`

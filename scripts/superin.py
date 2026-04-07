@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import json
 import os
 import re
 import shutil
@@ -39,11 +38,6 @@ def to_pascal_case(value: str) -> str:
     return "".join(part.capitalize() for part in value.replace("-", "").split(" "))
 
 
-def to_camel_case(value: str) -> str:
-    pascal = to_pascal_case(value)
-    return pascal[:1].lower() + pascal[1:]
-
-
 def widget_suffix(widget_id: str) -> str:
     suffix = widget_id.split(".", 1)[1]
     return "".join(part.capitalize() for part in suffix.split("-"))
@@ -62,10 +56,6 @@ def write_file(path: Path, content: str, *, overwrite: bool) -> None:
     if path.exists() and not overwrite:
         return
     path.write_text(content, encoding="utf-8")
-
-
-def write_json(path: Path, payload: object, *, overwrite: bool) -> None:
-    write_file(path, json.dumps(payload, indent=2, ensure_ascii=False) + "\n", overwrite=overwrite)
 
 
 def ensure_dir(path: Path) -> None:
@@ -117,19 +107,11 @@ def load_backend_manifests() -> list[Any]:
     return manifests
 
 
-def load_frontend_manifest(app_id: str) -> dict[str, Any]:
-    manifest_path = FRONTEND_APPS / app_id / "manifest.json"
-    if not manifest_path.exists():
-        fail(f"missing frontend manifest: {manifest_path.relative_to(ROOT)}")
-    return json.loads(manifest_path.read_text(encoding="utf-8"))
-
-
 def sync_frontend_registry() -> None:
     """Update frontend registry index for auto-discovery.
 
     Note: With auto-discovery via Vite glob imports, this is now a no-op.
-    The frontend/src/apps/index.ts uses import.meta.glob to automatically
-    discover all apps without manual registration.
+    Frontend app folders are discovered from AppView.tsx and DashboardWidget.tsx.
     """
     print("[sync_frontend_registry] Auto-discovery is enabled via Vite glob import.")
     print("[sync_frontend_registry] No manual registry update needed.")
@@ -139,7 +121,7 @@ def sync_frontend_registry() -> None:
     app_ids = sorted(
         entry.name
         for entry in FRONTEND_APPS.iterdir()
-        if entry.is_dir() and (entry / "manifest.json").exists() and (entry / "index.ts").exists()
+        if entry.is_dir() and (entry / "AppView.tsx").exists()
     )
     print(f"[sync_frontend_registry] Found {len(app_ids)} apps: {', '.join(app_ids)}")
 
@@ -153,75 +135,7 @@ def sync_frontend_app(app_id: str, *, force_widgets: bool = False) -> None:
     app_root = FRONTEND_APPS / app_id
     ensure_dir(app_root)
 
-    write_json(
-        app_root / "manifest.json",
-        {
-            "id": manifest.id,
-            "name": manifest.name,
-            "version": manifest.version,
-            "description": manifest.description,
-            "icon": manifest.icon,
-            "color": manifest.color,
-            "widgets": [
-                {
-                    "id": widget.id,
-                    "name": widget.name,
-                    "description": widget.description,
-                    "icon": widget.icon,
-                    "size": widget.size,
-                    "config_fields": widget.config_fields or [],
-                }
-                for widget in manifest.widgets
-            ],
-        },
-        overwrite=True,
-    )
-
-    write_file(
-        app_root / "index.ts",
-        (
-            'import manifest from "./manifest.json";\n'
-            'import AppView from "./AppView";\n'
-            'import DashboardWidget from "./DashboardWidget";\n'
-            'import type { FrontendAppDefinition, FrontendAppManifest } from "../types";\n\n'
-            f"const {to_camel_case(app_id)}Manifest = manifest as FrontendAppManifest;\n\n"
-            f"const {to_camel_case(app_id)}App = {{\n"
-            f"  manifest: {to_camel_case(app_id)}Manifest,\n"
-            "  AppView,\n"
-            "  DashboardWidget,\n"
-            '} satisfies FrontendAppDefinition;\n\n'
-            f'export default {to_camel_case(app_id)}App;\n'
-        ),
-        overwrite=True,
-    )
-
     write_file(app_root / "AppView.tsx", f'export {{ default }} from "./views/{sanitized_name}Screen";\n', overwrite=True)
-    write_file(
-        app_root / "DashboardWidget.tsx",
-        f'export {{ default }} from "./widgets/{sanitized_name}DashboardWidget";\n',
-        overwrite=True,
-    )
-
-    api_path = app_root / "api.ts"
-    if not api_path.exists():
-        plural = f"{app_name.lower()}s"
-        write_file(
-            api_path,
-            (
-                'import { api } from "@/api/client";\n\n'
-                f'const BASE = "/api/apps/{app_id}";\n\n'
-                "export interface ItemRead {\n"
-                "  id: string;\n"
-                "  title: string;\n"
-                "  description: string | null;\n"
-                "  created_at: string;\n"
-                "}\n\n"
-                f"export async function getItems(): Promise<ItemRead[]> {{\n"
-                f'  return api.get<ItemRead[]>(`${{BASE}}/{plural}`);\n'
-                "}\n"
-            ),
-            overwrite=False,
-        )
 
     views_dir = app_root / "views"
     widgets_dir = app_root / "widgets"
@@ -248,12 +162,8 @@ def sync_frontend_app(app_id: str, *, force_widgets: bool = False) -> None:
             overwrite=False,
         )
 
-    imports: list[str] = []
-    mappings: list[str] = []
     for widget in manifest.widgets:
         component_name = widget_component_name(widget.id)
-        imports.append(f'import {component_name} from "./{component_name}";')
-        mappings.append(f'  "{widget.id}": {component_name},')
         widget_path = widgets_dir / widget_file_name(widget.id)
         if not widget_path.exists() or force_widgets:
             write_file(
@@ -273,32 +183,8 @@ def sync_frontend_app(app_id: str, *, force_widgets: bool = False) -> None:
                 ),
                 overwrite=True,
             )
-
-    dispatcher = (
-        'import type { ComponentType } from "react";\n'
-        'import type { DashboardWidgetProps, DashboardWidgetRendererProps } from "../types";\n'
-        + "\n".join(imports)
-        + "\n\n"
-        + "const WIDGET_COMPONENTS = {\n"
-        + "\n".join(mappings)
-        + '\n} as const satisfies Record<string, ComponentType<DashboardWidgetRendererProps>>;\n\n'
-        + f"export default function {sanitized_name}DashboardWidget({{ widgetId, widget }}: DashboardWidgetProps) {{\n"
-        + "  const Component = WIDGET_COMPONENTS[widgetId as keyof typeof WIDGET_COMPONENTS];\n\n"
-        + "  if (Component) {\n"
-        + "    return <Component widget={widget} />;\n"
-        + "  }\n\n"
-        + "  return (\n"
-        + "    <div>\n"
-        + '      <p className="section-label">{widget.name}</p>\n'
-        + '      <p style={{ fontSize: "0.875rem", color: "var(--color-muted)", margin: "0.25rem 0 0" }}>\n'
-        + "        {widget.description}\n"
-        + "      </p>\n"
-        + "    </div>\n"
-        + "  );\n"
-        + "}\n"
-    )
-    write_file(widgets_dir / f"{sanitized_name}DashboardWidget.tsx", dispatcher, overwrite=True)
     sync_frontend_registry()
+    run_codegen()
 
 
 def validate_manifests() -> None:
@@ -308,9 +194,9 @@ def validate_manifests() -> None:
     frontend_app_dirs = sorted(
         entry.name
         for entry in FRONTEND_APPS.iterdir()
-        if entry.is_dir() and (entry / "manifest.json").exists()
+        if entry.is_dir() and (entry / "AppView.tsx").exists()
     )
-    frontend_by_id = {app_id: load_frontend_manifest(app_id) for app_id in frontend_app_dirs}
+    frontend_by_id = {app_id: FRONTEND_APPS / app_id for app_id in frontend_app_dirs}
 
     if sorted(backend_by_id) != sorted(frontend_by_id):
         fail(
@@ -319,9 +205,8 @@ def validate_manifests() -> None:
             f"backend: {', '.join(sorted(backend_by_id))}",
         )
 
-    for app_id, frontend_manifest in frontend_by_id.items():
-        app_root = FRONTEND_APPS / app_id
-        for required_file in ["AppView.tsx", "DashboardWidget.tsx", "api.ts", "index.ts"]:
+    for app_id, app_root in frontend_by_id.items():
+        for required_file in ["AppView.tsx", "DashboardWidget.tsx", "api.ts"]:
             if not (app_root / required_file).exists():
                 fail(f"manifest validation failed: missing frontend app file: {(app_root / required_file).relative_to(ROOT)}")
         for required_dir in ["components", "features", "views", "widgets", "lib"]:
@@ -329,22 +214,24 @@ def validate_manifests() -> None:
                 fail(f"manifest validation failed: missing frontend app dir: {(app_root / required_dir).relative_to(ROOT)}")
 
         backend_manifest = backend_by_id[app_id]
-        frontend_widgets = {widget["id"]: widget["size"] for widget in frontend_manifest["widgets"]}
+        frontend_widgets = {widget.id for widget in backend_manifest.widgets}
         backend_widgets = {widget.id: widget.size for widget in backend_manifest.widgets}
 
-        if sorted(frontend_widgets) != sorted(backend_widgets):
+        discovered_widget_files = {
+            path.name
+            for path in (app_root / "widgets").glob("*.tsx")
+            if path.name != "Widget.tsx"
+        }
+        expected_widget_files = {widget_file_name(widget_id) for widget_id in frontend_widgets}
+
+        if discovered_widget_files != expected_widget_files:
             fail(
-                f"manifest validation failed: widget ids differ for {app_id}.\n"
-                f"frontend: {', '.join(sorted(frontend_widgets))}\n"
-                f"backend: {', '.join(sorted(backend_widgets))}",
+                f"manifest validation failed: widget files differ for {app_id}.\n"
+                f"frontend: {', '.join(sorted(discovered_widget_files))}\n"
+                f"backend: {', '.join(sorted(expected_widget_files))}",
             )
 
         for widget_id, backend_size in backend_widgets.items():
-            if frontend_widgets[widget_id] != backend_size:
-                fail(
-                    f"manifest validation failed: widget size differs for {widget_id}. "
-                    f"frontend={frontend_widgets[widget_id]} backend={backend_size}",
-                )
             expected_widget_file = app_root / "widgets" / widget_file_name(widget_id)
             if not expected_widget_file.exists():
                 fail(

@@ -1,15 +1,13 @@
+import type { DashboardWidgetRendererProps } from "../types";
 import { useCallback, useEffect, useState } from "react";
 import { listEvents, type EventRead } from "../api";
 import { Calendar } from "lucide-react";
 import { useTimezone } from "@/shared/hooks/useTimezone";
 import { getUserTimezone } from "@/shared/utils/timezone";
 
-interface UpcomingWidgetProps {
-  maxItems?: number;
-  calendarFilter?: string | null;
-}
-
-export default function UpcomingWidget({ maxItems = 3, calendarFilter }: UpcomingWidgetProps) {
+export default function UpcomingWidget({ widget: _widget }: DashboardWidgetRendererProps) {
+  const maxItems = 3;
+  const calendarFilter = null;
   const [events, setEvents] = useState<EventRead[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { timezone, formatDate, formatTime, isToday } = useTimezone();

@@ -1,14 +1,12 @@
+import type { DashboardWidgetRendererProps } from "../types";
 import { useCallback, useEffect, useState } from "react";
 import { listEvents, listCalendars, type CalendarRead, type EventRead } from "../api";
 import { useTimezone } from "@/shared/hooks/useTimezone";
 import Widget from "./Widget";
 
-interface MonthViewWidgetProps {
-  defaultCalendar?: string | null;
-  showTimeBlockedTasks?: boolean;
-}
-
-export default function MonthViewWidget({ defaultCalendar, showTimeBlockedTasks = true }: MonthViewWidgetProps) {
+export default function MonthViewWidget({ widget: _widget }: DashboardWidgetRendererProps) {
+  const defaultCalendar = null;
+  const showTimeBlockedTasks = true;
   const [events, setEvents] = useState<EventRead[]>([]);
   const [calendars, setCalendars] = useState<CalendarRead[]>([]);
   const [currentDate, setCurrentDate] = useState(new Date());

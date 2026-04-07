@@ -20,8 +20,7 @@ import { useToast } from "@/components/providers/ToastProvider";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { ROUTES, STORAGE_KEYS } from "@/constants";
 import { DynamicIcon } from "@/lib/icon-resolver";
-import type { AppCatalogEntry } from "@/types/generated";
-import type { Category } from "@/api/catalog";
+import type { AppCatalogEntry, AppCategoryRead } from "@/types/generated";
 
 interface PersistedCatalogSnapshot {
   catalog: AppCatalogEntry[];
@@ -111,7 +110,7 @@ export default function StorePage() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   // Categories from API
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [categories, setCategories] = useState<AppCategoryRead[]>([]);
 
   useEffect(() => {
     async function loadCatalog() {
@@ -151,7 +150,7 @@ export default function StorePage() {
 
   // Build category lookup map
   const categoryMap = useMemo(() => {
-    const map: Record<string, Category> = {};
+    const map: Record<string, AppCategoryRead> = {};
     for (const cat of categories) {
       map[cat.name.toLowerCase()] = cat;
       map[cat.id.toLowerCase()] = cat; // Also map by id
@@ -160,7 +159,7 @@ export default function StorePage() {
   }, [categories]);
 
   // Get category metadata with fallback
-  const getCategory = (categoryId: string): Category => {
+  const getCategory = (categoryId: string): AppCategoryRead => {
     const key = categoryId.toLowerCase();
     return (
       categoryMap[key] || {
@@ -385,7 +384,7 @@ export default function StorePage() {
 
 interface AppCardProps {
   app: AppCatalogEntry;
-  getCategory: (id: string) => Category;
+  getCategory: (id: string) => AppCategoryRead;
   installing: Set<string>;
   onToggle: (app: AppCatalogEntry) => void;
   delay?: number;

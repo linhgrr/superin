@@ -1,7 +1,5 @@
 export type {
+  DashboardWidgetComponentMap,
   DashboardWidgetProps,
   DashboardWidgetRendererProps,
-  FrontendAppDefinition,
-  FrontendAppManifest,
-  FrontendWidgetManifest,
 } from "../types";

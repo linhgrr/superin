@@ -199,6 +199,17 @@ class AppRuntimeEntry(BaseModel):
     widgets: list[WidgetManifestSchema] = Field(default_factory=list)
 
 
+class AppCategoryRead(BaseModel):
+    """App catalog category entry shown in the store UI."""
+
+    id: str
+    name: str
+    icon: str
+    color: str
+    order: int
+    auto_discovered: bool = False
+
+
 class AppInstallRequest(BaseModel):
     app_id: str
 

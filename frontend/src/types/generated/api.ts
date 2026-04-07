@@ -1281,6 +1281,27 @@ export interface components {
             /** Widgets */
             widgets?: components["schemas"]["WidgetManifestSchema"][];
         };
+        /**
+         * AppCategoryRead
+         * @description App catalog category entry shown in the store UI.
+         */
+        AppCategoryRead: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Icon */
+            icon: string;
+            /** Color */
+            color: string;
+            /** Order */
+            order: number;
+            /**
+             * Auto Discovered
+             * @default false
+             */
+            auto_discovered: boolean;
+        };
         /** AppInstallRequest */
         AppInstallRequest: {
             /** App Id */
@@ -2493,9 +2514,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["AppCategoryRead"][];
                 };
             };
         };
@@ -2519,9 +2538,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["AppCategoryRead"];
                 };
             };
             /** @description Validation Error */
@@ -2589,9 +2606,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["AppCategoryRead"];
                 };
             };
             /** @description Validation Error */

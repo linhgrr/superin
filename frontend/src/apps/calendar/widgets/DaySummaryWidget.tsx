@@ -1,10 +1,11 @@
+import type { DashboardWidgetRendererProps } from "../types";
 import { useState, useEffect } from "react";
 import { listEvents, type EventRead } from "../api";
 import { Sun, Sunrise } from "lucide-react";
 import { useTimezone } from "@/shared/hooks/useTimezone";
 import { getTodayRange } from "@/shared/utils/timezone";
 
-export default function DaySummaryWidget() {
+export default function DaySummaryWidget({ widget: _widget }: DashboardWidgetRendererProps) {
   const [todayCount, setTodayCount] = useState(0);
   const [nextEvent, setNextEvent] = useState<EventRead | null>(null);
   const [isLoading, setIsLoading] = useState(true);

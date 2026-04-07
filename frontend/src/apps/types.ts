@@ -5,9 +5,7 @@
  */
 
 export type {
+  DashboardWidgetComponentMap,
   DashboardWidgetProps,
   DashboardWidgetRendererProps,
-  FrontendAppDefinition,
-  FrontendAppManifest,
-  FrontendWidgetManifest,
 } from "@/lib/types";
