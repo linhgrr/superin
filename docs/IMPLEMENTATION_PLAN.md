@@ -5,6 +5,19 @@
 > **Architecture:** Plugin auto-discovery via importlib, agents in Python (LangGraph), widgets self-fetch from FastAPI REST endpoints, JWT auth with httpOnly refresh cookie, SSE streaming.
 > **Tech Stack:** React 19 + Vite + React Router + Tailwind v4 + HeroUI v3 + assistant-ui | FastAPI + LangGraph + Beanie + Motor | MongoDB Atlas | Vercel + HF Spaces
 
+> **Status:** Historical implementation plan. Do not treat this file as the current frontend plugin protocol or contract source-of-truth.
+> Current source-of-truth lives in:
+> - [docs/ARCHITECTURE.md](/home/linh/Downloads/superin/docs/ARCHITECTURE.md)
+> - [docs/PLUGIN_DEVELOPMENT_GUIDE.md](/home/linh/Downloads/superin/docs/PLUGIN_DEVELOPMENT_GUIDE.md)
+> - [docs/WORKFLOW.md](/home/linh/Downloads/superin/docs/WORKFLOW.md)
+> - [CLAUDE.md](/home/linh/Downloads/superin/CLAUDE.md)
+>
+> Current rules that supersede older tasks below:
+> - frontend app discovery is file-structure based via `AppView.tsx` and generated `DashboardWidget.tsx`
+> - frontend must not mirror backend app metadata in `manifest.json`
+> - `frontend/src/apps/{app_id}/api.ts` and `DashboardWidget.tsx` are generated files
+> - backend schemas/manifests are the only contract source of truth
+
 ---
 
 ## Phase 1 — Repo Setup & Backend Skeleton

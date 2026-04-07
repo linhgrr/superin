@@ -5,6 +5,19 @@
 > **Scope:** Full system audit — frontend + backend
 > **Overall Score:** 25/38 checks passed | 7 critical | 6 high | 26 medium/low
 
+> **Post-audit update (2026-04-07):**
+> The following findings were resolved after this snapshot was written:
+> - `🟠-12` Frontend `manifest.json` Missing Core Fields
+> - `🟠-13` Codegen Scope Excludes App Schemas
+> - `🟡-28` Manual `Category` Type in `api/catalog.ts`
+> - `🟡-30` `CategoryRead.user_id` Spurious Field
+>
+> Resolution commits:
+> - `d5ea38d` `feat: generate subapp contracts from backend schemas`
+> - `4c36b66` `fix: clean up frontend type boundaries`
+> - `ccdf61d` `refactor(core): remove frontend app metadata mirrors`
+> - `26b4dcb` `docs(core): sync frontend plugin architecture docs`
+
 ---
 
 ## Severity Legend
@@ -286,6 +299,8 @@ full:     rowSpan=1, rglH=2   // ❌ mismatch
 
 ### 🟠-12 | Frontend `manifest.json` Missing Core Fields
 
+**Status:** Resolved on 2026-04-07 by removing frontend manifest mirrors entirely. Frontend no longer owns app metadata; backend manifest/runtime payload is the only source of truth.
+
 **Location:** `frontend/src/apps/{calendar,todo,finance}/manifest.json`
 **Classification:** Incomplete data contract — widget config UI cannot render
 
@@ -300,6 +315,8 @@ Missing fields that exist in backend manifests: `name`, `description`, `icon`, `
 ---
 
 ### 🟠-13 | Codegen Scope Excludes App Schemas
+
+**Status:** Resolved on 2026-04-07. App-local frontend contracts are now generated from the backend OpenAPI spec into `frontend/src/apps/{app_id}/api.ts`, so request/response DTOs are no longer handwritten in subapps.
 
 **Location:** `scripts/codegen.config.yaml`
 **Classification:** Type drift risk — frontend manually defines request types
@@ -552,6 +569,8 @@ Components work around this with `var(--color-warning-muted, oklch(...))` fallba
 
 ### 🟡-28 | Manual `Category` Type in `api/catalog.ts`
 
+**Status:** Resolved on 2026-04-07. Catalog category types now come from backend-generated schemas.
+
 **Location:** `frontend/src/api/catalog.ts` lines 17–24
 **Classification:** Type drift risk — not generated from backend
 
@@ -584,6 +603,8 @@ Backend `Category` schema may change without frontend catching it.
 ---
 
 ### 🟡-30 | `CategoryRead.user_id` Spurious Field
+
+**Status:** Resolved on 2026-04-07. `CategoryRead` is now generated from backend contracts instead of maintained manually in the frontend app facade.
 
 **Location:** `frontend/src/apps/finance/api.ts`
 **Classification:** Type/API mismatch
