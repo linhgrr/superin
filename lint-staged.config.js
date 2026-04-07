@@ -1,9 +1,9 @@
 /** @type {import('lint-staged').Configuration} */
 module.exports = {
-  // TypeScript / React
+  // TypeScript / React — sh -c needed because lint-staged runs from repo root
   "frontend/**/*.{ts,tsx}": [
-    "cd frontend && eslint --fix",
-    "cd frontend && tsc --noEmit",
+    (files) => `sh -c 'cd frontend && npx eslint --fix --max-warnings 0 ${files.join(" ")}'`,
+    (files) => `sh -c 'cd frontend && npx tsc --noEmit'`,
   ],
 
   // Python
