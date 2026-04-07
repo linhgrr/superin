@@ -27,7 +27,7 @@ from shared.agent_context import clear_agent_context, set_thread_context, set_us
 from shared.llm import get_llm
 
 from .prompts import build_system_prompt
-from .tools import _build_ask_tool
+from .tools import _build_ask_tool, _build_install_app_tool, _build_uninstall_app_tool
 
 logger = logging.getLogger(__name__)
 
@@ -326,6 +326,7 @@ class RootAgent:
     def __init__(self) -> None:
         self._system_prompt = ""
         self._all_ask_tools: dict[str, BaseTool] = {}
+        self._base_tools: list[BaseTool] = self._build_base_tools()
         # LRU-bounded graph cache keyed by sorted tool names.
         self._graphs: OrderedDict[tuple[str, ...], Any] = OrderedDict()
 
@@ -340,6 +341,7 @@ class RootAgent:
             )
             for app_id, plugin in PLUGIN_REGISTRY.items()
         }
+        self._base_tools = self._build_base_tools()
         self._graphs.clear()  # force rebuild on next request
 
     @staticmethod
@@ -349,6 +351,14 @@ class RootAgent:
             return "Superin is an AI platform with an app store. Users can install apps to add capabilities."
 
         return get_platform_info
+
+    @classmethod
+    def _build_base_tools(cls) -> list[BaseTool]:
+        return [
+            cls._build_platform_info_tool(),
+            _build_install_app_tool(),
+            _build_uninstall_app_tool(),
+        ]
 
     async def _get_user_tools(self, user_id: str) -> list[BaseTool]:
         """Get tools available to the user based on installed apps."""
@@ -362,17 +372,13 @@ class RootAgent:
                 "falling back to platform info only",
                 exc_info=True,
             )
-            return [self._build_platform_info_tool()]
+            return self._base_tools or self._build_base_tools()
 
         tools = [
             t for app_id, t in self._all_ask_tools.items()
             if app_id in installed_app_ids
         ]
-
-        # Provide fallback tool if no apps installed
-        if not tools:
-            tools.append(self._build_platform_info_tool())
-
+        tools.extend(self._base_tools or self._build_base_tools())
         return tools
 
     def _get_graph(self, tools: list[BaseTool]) -> Any:

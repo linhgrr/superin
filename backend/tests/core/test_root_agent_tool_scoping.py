@@ -2,6 +2,8 @@ from beanie import PydanticObjectId
 from langchain_core.tools import tool
 
 from core.agents.root.agent import EventStreamHandler, RootAgent
+from core.agents.root.prompts import build_system_prompt
+from shared.schemas import AppManifestSchema
 
 
 @tool("ask_finance")
@@ -38,7 +40,12 @@ async def test_get_user_tools_returns_only_installed_app_tools(monkeypatch) -> N
 
     tools = await agent._get_user_tools("user-1")
 
-    assert [tool.name for tool in tools] == ["ask_finance"]
+    assert [tool.name for tool in tools] == [
+        "ask_finance",
+        "get_platform_info",
+        "install_app_for_user",
+        "uninstall_app_for_user",
+    ]
 
 
 async def test_get_user_tools_falls_back_closed_when_scoping_fails(monkeypatch) -> None:
@@ -54,7 +61,11 @@ async def test_get_user_tools_falls_back_closed_when_scoping_fails(monkeypatch) 
 
     tools = await agent._get_user_tools("user-1")
 
-    assert [tool.name for tool in tools] == ["get_platform_info"]
+    assert [tool.name for tool in tools] == [
+        "get_platform_info",
+        "install_app_for_user",
+        "uninstall_app_for_user",
+    ]
 
 
 async def test_get_user_tools_returns_platform_info_when_no_apps_installed(monkeypatch) -> None:
@@ -70,7 +81,11 @@ async def test_get_user_tools_returns_platform_info_when_no_apps_installed(monke
 
     tools = await agent._get_user_tools("user-1")
 
-    assert [tool.name for tool in tools] == ["get_platform_info"]
+    assert [tool.name for tool in tools] == [
+        "get_platform_info",
+        "install_app_for_user",
+        "uninstall_app_for_user",
+    ]
 
 
 def test_event_stream_handler_surfaces_multiple_parallel_root_tool_calls() -> None:
@@ -151,3 +166,32 @@ async def test_load_history_scopes_by_user_and_thread(monkeypatch) -> None:
     }
     assert captured["sort"] == "-created_at"
     assert captured["limit"] == 50
+
+
+def test_build_system_prompt_includes_available_app_catalog(monkeypatch) -> None:
+    manifest = AppManifestSchema(
+        id="finance",
+        name="Finance",
+        version="1.0.0",
+        description="Track spending and budgets.",
+        icon="Wallet",
+        color="oklch(0.72 0.19 145)",
+        widgets=[],
+        agent_description="Helps users manage budgets and transactions.",
+        tools=["finance_get_summary"],
+        models=["Wallet"],
+        category="finance",
+    )
+    monkeypatch.setattr(
+        "core.agents.root.prompts.PLUGIN_REGISTRY",
+        {"finance": {"manifest": manifest}},
+    )
+
+    prompt = build_system_prompt()
+
+    assert "Finance (`finance`)" in prompt
+    assert "install_app_for_user" in prompt
+    assert "uninstall_app_for_user" in prompt
+    assert "next user message" in prompt
+    assert "Track spending and budgets." in prompt
+    assert "Helps users manage budgets and transactions." in prompt

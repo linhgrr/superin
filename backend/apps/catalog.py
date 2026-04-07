@@ -13,11 +13,15 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from core.auth import get_current_admin_user, get_current_user, get_current_user_optional
+from core.catalog_service import (
+    UnknownAppError,
+    install_app_for_user,
+    uninstall_app_for_user,
+)
 from core.models import AppCategory, UserAppInstallation, WidgetPreference
 from core.registry import list_categories as list_registry_categories
 from core.registry import list_plugins
 from core.workspace import list_installed_app_ids
-from shared.enums import INSTALL_STATUS_ALREADY_INSTALLED
 from shared.preference_utils import (
     preference_to_schema,
     update_multiple_preferences,
@@ -206,61 +210,16 @@ async def install_app(
     Uses atomic find_one_and_update with upsert to prevent race conditions
     when two concurrent requests try to install the same app.
     """
-    from core.registry import get_plugin
-    plugin = get_plugin(request.app_id)
-    if not plugin:
-        raise HTTPException(status_code=404, detail=f"App '{request.app_id}' not found")
+    try:
+        result = await install_app_for_user(user_id, request.app_id)
+    except UnknownAppError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
-    # Atomic upsert via raw PyMongo — Beanie doesn't support $setOnInsert + upsert
-    # cleanly, and we need atomic find+update to prevent double-install race conditions.
-    from core.db import get_db
-    from core.models import utc_now
-    db = get_db()
-    previous = await db["user_app_installations"].find_one_and_update(
-        {"user_id": PydanticObjectId(user_id), "app_id": request.app_id},
-        {
-            "$set": {"status": "active"},  # InstallationStatus value
-            "$setOnInsert": {
-                "user_id": PydanticObjectId(user_id),
-                "app_id": request.app_id,
-                "installed_at": utc_now(),
-            },
-        },
-        upsert=True,
-        return_document=False,  # return pre-update state
-    )
-
-    # If already active, skip on_install hook entirely
-    if previous and previous.get("status") == "active":
-        return {"status": INSTALL_STATUS_ALREADY_INSTALLED, "app_id": request.app_id}
-
-    # Run on_install only on actual state transition (new or re-activate)
-    await plugin["agent"].on_install(user_id)
-
-    # Seed widget preferences for newly installed app
-    widget_ids = [widget.id for widget in plugin["manifest"].widgets]
-    existing_prefs = await WidgetPreference.find(
-        WidgetPreference.user_id == PydanticObjectId(user_id),
-        In(WidgetPreference.widget_id, widget_ids),
-    ).to_list()
-    existing_ids = {pref.widget_id for pref in existing_prefs}
-
-    to_insert = [
-        WidgetPreference(
-            user_id=PydanticObjectId(user_id),
-            widget_id=widget.id,
-            app_id=request.app_id,
-            enabled=True,
-            sort_order=index,
-            config={},
-        )
-        for index, widget in enumerate(plugin["manifest"].widgets)
-        if widget.id not in existing_ids
-    ]
-    if to_insert:
-        await WidgetPreference.insert_many(to_insert)
-
-    return {"status": "installed", "app_id": request.app_id}
+    return {
+        "status": result["status"],
+        "app_id": result["app_id"],
+        **({"app_name": result["app_name"]} if "app_name" in result else {}),
+    }
 
 
 @router.post("/uninstall")
@@ -269,23 +228,16 @@ async def uninstall_app(
     user_id: str = Depends(get_current_user),
 ) -> dict:
     """Uninstall an app for the current user (soft delete)."""
-    installation = await UserAppInstallation.find_one(
-        UserAppInstallation.user_id == PydanticObjectId(user_id),
-        UserAppInstallation.app_id == request.app_id,
-        UserAppInstallation.status == "active",
-    )
-    if not installation:
-        return {"status": "already_uninstalled", "app_id": request.app_id}
+    try:
+        result = await uninstall_app_for_user(user_id, request.app_id)
+    except UnknownAppError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
-    from core.registry import get_plugin
-    plugin = get_plugin(request.app_id)
-    if plugin:
-        await plugin["agent"].on_uninstall(user_id)
-
-    installation.status = "disabled"
-    await installation.save()
-
-    return {"status": "uninstalled", "app_id": request.app_id}
+    return {
+        "status": result["status"],
+        "app_id": result["app_id"],
+        **({"app_name": result["app_name"]} if "app_name" in result else {}),
+    }
 
 
 # ─── Widget Preferences ────────────────────────────────────────────────────────
