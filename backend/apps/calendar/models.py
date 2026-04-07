@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 
 from beanie import Document, PydanticObjectId
 from pydantic import BaseModel, Field
+from pymongo import IndexModel
 
 from apps.calendar.enums import AttendeeStatus, EventType, RecurrenceFrequency
 
@@ -71,6 +72,7 @@ class Calendar(Document):
 
     user_id: PydanticObjectId
     name: str  # e.g., "Personal", "Work", "Family"
+    name_key: str
     color: str = "oklch(0.70 0.18 250)"  # Default blue-ish
     is_visible: bool = True
     is_default: bool = False  # Default calendar for new events
@@ -79,7 +81,17 @@ class Calendar(Document):
     class Settings:
         name = "calendar_calendars"
         indexes = [
-            [("user_id", 1), ("is_default", 1)],
+            IndexModel(
+                [("user_id", 1), ("name_key", 1)],
+                name="calendar_calendars_user_id_name_key_unique",
+                unique=True,
+            ),
+            IndexModel(
+                [("user_id", 1), ("is_default", 1)],
+                name="calendar_calendars_user_id_is_default_unique",
+                unique=True,
+                partialFilterExpression={"is_default": True},
+            ),
         ]
 
 

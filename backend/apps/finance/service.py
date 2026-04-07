@@ -4,10 +4,17 @@ import asyncio
 from datetime import UTC, datetime
 
 from beanie import PydanticObjectId
+from pymongo.asynchronous.client_session import AsyncClientSession
+from pymongo.errors import DuplicateKeyError
 
 from apps.finance.enums import TransactionType
 from apps.finance.models import Category, Transaction, Wallet
-from apps.finance.repository import CategoryRepository, TransactionRepository, WalletRepository
+from apps.finance.repository import (
+    CategoryRepository,
+    TransactionRepository,
+    WalletRepository,
+    finance_transaction,
+)
 from core.models import User
 from core.timezone import get_user_timezone_context
 
@@ -27,11 +34,10 @@ class FinanceService:
         return [_wallet_to_dict(w) for w in wallets]
 
     async def create_wallet(self, user_id: str, name: str, currency: str = "USD") -> dict:
-        # Check by name for duplicates
-        all_wallets = await self.wallets.find_by_user(user_id)
-        if any(w.name.lower() == name.lower() for w in all_wallets):
-            raise ValueError(f"Wallet '{name}' already exists")
-        wallet = await self.wallets.create(user_id, name, currency)
+        try:
+            wallet = await self.wallets.create(user_id, name, currency)
+        except DuplicateKeyError as exc:
+            raise ValueError(_wallet_name_exists_message(name)) from exc
         return _wallet_to_dict(wallet)
 
     async def get_wallet(self, wallet_id: str, user_id: str) -> dict | None:
@@ -44,8 +50,10 @@ class FinanceService:
         if not wallet:
             raise ValueError("Wallet not found")
         if name is not None:
-            wallet.name = name
-            await wallet.save()
+            try:
+                wallet = await self.wallets.rename(wallet, name=name)
+            except DuplicateKeyError as exc:
+                raise ValueError(_wallet_name_exists_message(name)) from exc
         return _wallet_to_dict(wallet)
 
     async def delete_wallet(self, wallet_id: str, user_id: str) -> dict:
@@ -59,7 +67,7 @@ class FinanceService:
         txs = await self.transactions.find_by_user(user_id, wallet_id=wallet_id, limit=1)
         if txs:
             raise ValueError("Cannot delete wallet with transactions. Delete transactions first.")
-        await wallet.delete()
+        await self.wallets.delete(wallet)
         return {"success": True, "id": wallet_id, "message": "Wallet deleted"}
 
     # ─── Categories ─────────────────────────────────────────────────────────────
@@ -81,7 +89,10 @@ class FinanceService:
         color: str = "oklch(0.65 0.21 280)",
         budget: float = 0.0,
     ) -> dict:
-        category = await self.categories.create(user_id, name, icon, color, budget)
+        try:
+            category = await self.categories.create(user_id, name, icon, color, budget)
+        except DuplicateKeyError as exc:
+            raise ValueError(_category_name_exists_message(name)) from exc
         return _category_to_dict(category)
 
     async def update_category(
@@ -97,15 +108,16 @@ class FinanceService:
         category = await self.categories.find_by_id(category_id, user_id)
         if not category:
             raise ValueError("Category not found")
-        if name is not None:
-            category.name = name
-        if icon is not None:
-            category.icon = icon
-        if color is not None:
-            category.color = color
-        if budget is not None:
-            category.budget = budget
-        await category.save()
+        try:
+            category = await self.categories.update(
+                category,
+                name=name,
+                icon=icon,
+                color=color,
+                budget=budget,
+            )
+        except DuplicateKeyError as exc:
+            raise ValueError(_category_name_exists_message(name or category.name)) from exc
         return _category_to_dict(category)
 
     async def delete_category(self, category_id: str, user_id: str) -> dict:
@@ -117,7 +129,7 @@ class FinanceService:
         txs = await self.transactions.find_by_user(user_id, category_id=category_id, limit=1)
         if txs:
             raise ValueError("Cannot delete category with transactions. Delete or reassign transactions first.")
-        await category.delete()
+        await self.categories.delete(category)
         return {"success": True, "id": category_id, "message": "Category deleted"}
 
     # ─── Transactions ──────────────────────────────────────────────────────────
@@ -132,7 +144,12 @@ class FinanceService:
         limit: int = 20,
     ) -> list[dict]:
         txs = await self.transactions.find_by_user(
-            user_id, type_, category_id, wallet_id, skip, limit
+            user_id,
+            type_,
+            category_id,
+            wallet_id,
+            skip=skip,
+            limit=limit,
         )
         return [_tx_to_dict(t) for t in txs]
 
@@ -153,21 +170,34 @@ class FinanceService:
     ) -> dict:
         if amount <= 0:
             raise ValueError("Amount must be positive")
+        async with finance_transaction() as session:
+            wallet = await self.wallets.find_by_id(wallet_id, user_id, session=session)
+            if not wallet:
+                raise ValueError("Wallet not found")
 
-        wallet = await self.wallets.find_by_id(wallet_id, user_id)
-        if not wallet:
-            raise ValueError("Wallet not found")
+            category = await self.categories.find_by_id(category_id, user_id, session=session)
+            if not category:
+                raise ValueError("Category not found")
 
-        if type_ == "expense" and wallet.balance < amount:
-            raise ValueError("Insufficient balance")
+            delta = amount if type_ == "income" else -amount
+            await self._apply_wallet_delta_or_raise(
+                wallet_id,
+                user_id,
+                delta,
+                insufficient_message="Insufficient balance",
+                session=session,
+            )
 
-        tx = await self.transactions.create(
-            user_id, wallet_id, category_id, type_, amount, date, note
-        )
-
-        # Update wallet balance
-        delta = amount if type_ == "income" else -amount
-        await self.wallets.update_balance(wallet, delta)
+            tx = await self.transactions.create(
+                user_id,
+                wallet_id,
+                str(category.id),
+                type_,
+                amount,
+                date,
+                note,
+                session=session,
+            )
 
         return _tx_to_dict(tx)
 
@@ -182,86 +212,97 @@ class FinanceService:
         note: str | None = None,
     ) -> dict:
         """Update a transaction and adjust wallet balances if needed."""
-        tx = await self.transactions.find_by_id(transaction_id, user_id)
-        if not tx:
-            raise ValueError("Transaction not found")
+        async with finance_transaction() as session:
+            tx = await self.transactions.find_by_id(transaction_id, user_id, session=session)
+            if not tx:
+                raise ValueError("Transaction not found")
 
-        original_wallet = await self.wallets.find_by_id(str(tx.wallet_id), user_id)
-        if not original_wallet:
-            raise ValueError("Original wallet not found")
+            original_wallet = await self.wallets.find_by_id(
+                str(tx.wallet_id),
+                user_id,
+                session=session,
+            )
+            if not original_wallet:
+                raise ValueError("Original wallet not found")
 
-        # Calculate balance adjustments
-        old_delta = tx.amount if tx.type == "income" else -tx.amount
+            old_delta = tx.amount if tx.type == "income" else -tx.amount
+            new_wallet_id = wallet_id if wallet_id else str(tx.wallet_id)
+            new_amount = amount if amount is not None else tx.amount
+            new_category_id = category_id if category_id else str(tx.category_id)
 
-        # Determine new values
-        new_wallet_id = wallet_id if wallet_id else str(tx.wallet_id)
-        new_amount = amount if amount is not None else tx.amount
-        new_category_id = category_id if category_id else str(tx.category_id)
+            if new_amount <= 0:
+                raise ValueError("Amount must be positive")
 
-        if new_amount <= 0:
-            raise ValueError("Amount must be positive")
+            category = await self.categories.find_by_id(new_category_id, user_id, session=session)
+            if not category:
+                raise ValueError("Category not found")
 
-        # Check if wallet changed
-        wallet_changed = new_wallet_id != str(tx.wallet_id)
-
-        if wallet_changed:
-            # Revert old wallet balance
-            await self.wallets.update_balance(original_wallet, -old_delta)
-
-            # Apply to new wallet
-            new_wallet = await self.wallets.find_by_id(new_wallet_id, user_id)
-            if not new_wallet:
-                # Revert if new wallet invalid
-                await self.wallets.update_balance(original_wallet, old_delta)
-                raise ValueError("New wallet not found")
-
+            wallet_changed = new_wallet_id != str(tx.wallet_id)
             new_delta = new_amount if tx.type == "income" else -new_amount
 
-            if tx.type == "expense" and new_wallet.balance < new_amount:
-                # Revert old wallet if insufficient
-                await self.wallets.update_balance(original_wallet, old_delta)
-                raise ValueError("Insufficient balance in new wallet")
+            if wallet_changed:
+                await self._apply_wallet_delta_or_raise(
+                    str(tx.wallet_id),
+                    user_id,
+                    -old_delta,
+                    insufficient_message="Insufficient balance in original wallet",
+                    session=session,
+                )
 
-            await self.wallets.update_balance(new_wallet, new_delta)
-        else:
-            # Same wallet, just adjust for amount change
-            if new_amount != tx.amount:
-                delta_change = new_amount - tx.amount
-                if tx.type == "expense":
-                    delta_change = -delta_change
+                new_wallet = await self.wallets.find_by_id(new_wallet_id, user_id, session=session)
+                if not new_wallet:
+                    raise ValueError("New wallet not found")
 
-                # Check sufficient balance for expense increase
-                if tx.type == "expense" and new_amount > tx.amount:
-                    if original_wallet.balance < (new_amount - tx.amount):
-                        raise ValueError("Insufficient balance for increased expense")
+                await self._apply_wallet_delta_or_raise(
+                    new_wallet_id,
+                    user_id,
+                    new_delta,
+                    insufficient_message="Insufficient balance in new wallet",
+                    session=session,
+                )
+            else:
+                delta_change = new_delta - old_delta
+                if delta_change != 0:
+                    await self._apply_wallet_delta_or_raise(
+                        str(tx.wallet_id),
+                        user_id,
+                        delta_change,
+                        insufficient_message="Insufficient balance for this update",
+                        session=session,
+                    )
 
-                await self.wallets.update_balance(original_wallet, delta_change)
+            tx.wallet_id = PydanticObjectId(new_wallet_id)
+            tx.category_id = PydanticObjectId(str(category.id))
+            tx.amount = new_amount
+            if date:
+                tx.date = date
+            if note is not None:
+                tx.note = note
 
-        # Update transaction fields
-        tx.wallet_id = PydanticObjectId(new_wallet_id)
-        tx.category_id = PydanticObjectId(new_category_id)
-        tx.amount = new_amount
-        if date:
-            tx.date = date
-        if note is not None:
-            tx.note = note
-
-        await tx.save()
+            await self.transactions.save(tx, session=session)
         return _tx_to_dict(tx)
 
     async def delete_transaction(self, transaction_id: str, user_id: str) -> dict:
         """Delete a transaction and reverse its effect on wallet balance."""
-        tx = await self.transactions.find_by_id(transaction_id, user_id)
-        if not tx:
-            raise ValueError("Transaction not found")
+        async with finance_transaction() as session:
+            tx = await self.transactions.find_by_id(transaction_id, user_id, session=session)
+            if not tx:
+                raise ValueError("Transaction not found")
 
-        wallet = await self.wallets.find_by_id(str(tx.wallet_id), user_id)
-        if wallet:
-            # Reverse the transaction effect
+            wallet = await self.wallets.find_by_id(str(tx.wallet_id), user_id, session=session)
+            if not wallet:
+                raise ValueError("Wallet not found")
+
             reverse_delta = -tx.amount if tx.type == "income" else tx.amount
-            await self.wallets.update_balance(wallet, reverse_delta)
+            await self._apply_wallet_delta_or_raise(
+                str(tx.wallet_id),
+                user_id,
+                reverse_delta,
+                insufficient_message="Insufficient balance to delete this transaction",
+                session=session,
+            )
 
-        await tx.delete()
+            await self.transactions.delete(tx, session=session)
         return {"success": True, "id": transaction_id, "message": "Transaction deleted"}
 
     # ─── Transfer ────────────────────────────────────────────────────────────────
@@ -278,48 +319,104 @@ class FinanceService:
             raise ValueError("Transfer amount must be positive")
         if from_wallet_id == to_wallet_id:
             raise ValueError("Cannot transfer to the same wallet")
+        async with finance_transaction() as session:
+            src = await self.wallets.find_by_id(from_wallet_id, user_id, session=session)
+            if not src:
+                raise ValueError("Source wallet not found")
 
-        src = await self.wallets.find_by_id(from_wallet_id, user_id)
-        if not src:
-            raise ValueError("Source wallet not found")
-        if src.balance < amount:
-            raise ValueError("Insufficient balance")
+            dst = await self.wallets.find_by_id(to_wallet_id, user_id, session=session)
+            if not dst:
+                raise ValueError("Destination wallet not found")
 
-        dst = await self.wallets.find_by_id(to_wallet_id, user_id)
-        if not dst:
-            raise ValueError("Destination wallet not found")
-
-        await self.wallets.update_balance(src, -amount)
-        await self.wallets.update_balance(dst, amount)
-
-        # Create transfer category if it doesn't exist
-        transfer_cat = await self.categories.find_by_user(user_id)
-        transfer_cat_entry = next(
-            (c for c in transfer_cat if c.name == "Internal Transfer"), None
-        )
-        if not transfer_cat_entry:
-            transfer_cat_entry = await self.categories.create(
-                user_id, "Internal Transfer", "ArrowLeftRight", "oklch(0.65 0.21 280)", 0.0
+            updated_src = await self._apply_wallet_delta_or_raise(
+                from_wallet_id,
+                user_id,
+                -amount,
+                insufficient_message="Insufficient balance",
+                session=session,
+            )
+            updated_dst = await self._apply_wallet_delta_or_raise(
+                to_wallet_id,
+                user_id,
+                amount,
+                insufficient_message="Destination wallet could not be updated",
+                session=session,
             )
 
-        # Record paired transactions
-        now = datetime.now(UTC)
-        note_str = f": {note}" if note else ""
-        await self.transactions.create(
-            user_id, from_wallet_id, str(transfer_cat_entry.id),
-            "expense", amount, now, f"Transfer to {dst.name}{note_str}"
-        )
-        await self.transactions.create(
-            user_id, to_wallet_id, str(transfer_cat_entry.id),
-            "income", amount, now, f"Transfer from {src.name}{note_str}"
-        )
+            transfer_cat_entry = await self.categories.find_by_name(
+                user_id,
+                "Internal Transfer",
+                session=session,
+            )
+            if not transfer_cat_entry:
+                try:
+                    transfer_cat_entry = await self.categories.create(
+                        user_id,
+                        "Internal Transfer",
+                        "ArrowLeftRight",
+                        "oklch(0.65 0.21 280)",
+                        0.0,
+                        session=session,
+                    )
+                except DuplicateKeyError:
+                    transfer_cat_entry = await self.categories.find_by_name(
+                        user_id,
+                        "Internal Transfer",
+                        session=session,
+                    )
+            if not transfer_cat_entry:
+                raise ValueError("Transfer category could not be resolved")
+
+            now = datetime.now(UTC)
+            note_str = f": {note}" if note else ""
+            await self.transactions.create(
+                user_id,
+                from_wallet_id,
+                str(transfer_cat_entry.id),
+                "expense",
+                amount,
+                now,
+                f"Transfer to {dst.name}{note_str}",
+                session=session,
+            )
+            await self.transactions.create(
+                user_id,
+                to_wallet_id,
+                str(transfer_cat_entry.id),
+                "income",
+                amount,
+                now,
+                f"Transfer from {src.name}{note_str}",
+                session=session,
+            )
 
         return {
-            "from_wallet": _wallet_to_dict(src),
-            "to_wallet": _wallet_to_dict(dst),
+            "from_wallet": _wallet_to_dict(updated_src),
+            "to_wallet": _wallet_to_dict(updated_dst),
             "amount": amount,
             "note": note,
         }
+
+    async def _apply_wallet_delta_or_raise(
+        self,
+        wallet_id: str,
+        user_id: str,
+        delta: float,
+        *,
+        insufficient_message: str,
+        session: AsyncClientSession,
+    ) -> Wallet:
+        min_balance = abs(delta) if delta < 0 else None
+        updated_wallet = await self.wallets.apply_balance_delta(
+            wallet_id,
+            user_id,
+            delta,
+            min_balance=min_balance,
+            session=session,
+        )
+        if updated_wallet is None:
+            raise ValueError(insufficient_message)
+        return updated_wallet
 
     # ─── Summary ────────────────────────────────────────────────────────────────
 
@@ -339,7 +436,7 @@ class FinanceService:
         )
 
         income = sum(t.amount for t in txs if t.type == "income")
-        expense = sum(t.amount for t in txs if t.type in ("expense", "transfer_out"))
+        expense = sum(t.amount for t in txs if t.type == "expense")
 
         return {
             "total_balance": total_balance,
@@ -549,22 +646,40 @@ class FinanceService:
 
     async def on_install(self, user_id: str) -> None:
         """Seed default data for a new user."""
-        wallets = await self.wallets.find_by_user(user_id)
-        if not wallets:
-            await self.wallets.create(user_id, "Main Wallet", "USD")
+        async with finance_transaction() as session:
+            if await self.wallets.count_by_user(user_id, session=session) == 0:
+                try:
+                    await self.wallets.create(
+                        user_id,
+                        "Main Wallet",
+                        "USD",
+                        session=session,
+                    )
+                except DuplicateKeyError:
+                    pass
 
-        existing_categories = {category.name for category in await self.categories.find_by_user(user_id)}
-        for name in ["Food", "Transport", "Entertainment", "Shopping", "Salary"]:
-            if name not in existing_categories:
-                await self.categories.create(user_id, name)
+            for name in ["Food", "Transport", "Entertainment", "Shopping", "Salary"]:
+                try:
+                    await self.categories.create(user_id, name, session=session)
+                except DuplicateKeyError:
+                    continue
 
     async def on_uninstall(self, user_id: str) -> None:
-        await self.wallets.delete_all_by_user(user_id)
-        await self.categories.delete_all_by_user(user_id)
-        await self.transactions.delete_all_by_user(user_id)
+        async with finance_transaction() as session:
+            await self.wallets.delete_all_by_user(user_id, session=session)
+            await self.categories.delete_all_by_user(user_id, session=session)
+            await self.transactions.delete_all_by_user(user_id, session=session)
 
 
 # ─── DTO helpers ───────────────────────────────────────────────────────────────
+
+def _wallet_name_exists_message(name: str) -> str:
+    return f"Wallet '{name}' already exists"
+
+
+def _category_name_exists_message(name: str) -> str:
+    return f"Category '{name}' already exists"
+
 
 def _wallet_to_dict(w: Wallet) -> dict:
     return {

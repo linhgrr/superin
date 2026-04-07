@@ -2,9 +2,16 @@
 
 from datetime import datetime, timedelta
 
+from pymongo.errors import DuplicateKeyError
+
 from apps.calendar.enums import EventType, RecurrenceFrequency
 from apps.calendar.models import Calendar, Event, RecurringRule
-from apps.calendar.repository import CalendarRepository, EventRepository, RecurringRuleRepository
+from apps.calendar.repository import (
+    CalendarRepository,
+    EventRepository,
+    RecurringRuleRepository,
+    calendar_transaction,
+)
 
 # Default colors for calendars
 DEFAULT_CALENDAR_COLOR = "oklch(0.70 0.18 250)"  # Blue-ish
@@ -135,15 +142,18 @@ class CalendarService:
         color: str | None = None,
     ) -> dict:
         """Create new calendar."""
-        # Check for duplicate name
-        existing = await self.calendars.find_by_user(user_id)
-        if any(c.name.lower() == name.lower() for c in existing):
-            raise ValueError(f"Calendar '{name}' already exists")
-
-        # First calendar is default
-        is_default = len(existing) == 0
-
-        calendar = await self.calendars.create(user_id, name, color, is_default)
+        async with calendar_transaction() as session:
+            is_default = await self.calendars.count_by_user(user_id, session=session) == 0
+            try:
+                calendar = await self.calendars.create(
+                    user_id,
+                    name,
+                    color,
+                    is_default,
+                    session=session,
+                )
+            except DuplicateKeyError as exc:
+                raise ValueError(_calendar_name_exists_message(name)) from exc
         return _calendar_to_dict(calendar)
 
     async def update_calendar(
@@ -153,32 +163,55 @@ class CalendarService:
         **kwargs,
     ) -> dict:
         """Update calendar."""
-        calendar = await self.calendars.find_by_id(calendar_id, user_id)
-        if not calendar:
-            raise ValueError("Calendar not found")
+        async with calendar_transaction() as session:
+            calendar = await self.calendars.find_by_id(calendar_id, user_id, session=session)
+            if not calendar:
+                raise ValueError("Calendar not found")
 
-        # If setting as default, unset others
-        if kwargs.get("is_default"):
-            # Find and unset other default calendars
-            all_cals = await self.calendars.find_by_user(user_id)
-            for c in all_cals:
-                if c.id != calendar.id and c.is_default:
-                    c.is_default = False
-                    await c.save()
+            if kwargs.get("is_default"):
+                await self.calendars.unset_default_for_user(
+                    user_id,
+                    exclude_calendar_id=calendar_id,
+                    session=session,
+                )
 
-        updated = await self.calendars.update(calendar, **kwargs)
+            try:
+                updated = await self.calendars.update(
+                    calendar,
+                    session=session,
+                    **kwargs,
+                )
+            except DuplicateKeyError as exc:
+                raise ValueError(
+                    _calendar_name_exists_message(kwargs.get("name") or calendar.name)
+                ) from exc
         return _calendar_to_dict(updated)
 
     async def delete_calendar(self, calendar_id: str, user_id: str) -> dict:
         """Delete calendar and all its events."""
-        calendar = await self.calendars.find_by_id(calendar_id, user_id)
-        if not calendar:
-            raise ValueError("Calendar not found")
+        async with calendar_transaction() as session:
+            calendar = await self.calendars.find_by_id(calendar_id, user_id, session=session)
+            if not calendar:
+                raise ValueError("Calendar not found")
 
-        # Delete all events in calendar
-        await self.events.delete_by_calendar(calendar_id)
+            replacement = None
+            if calendar.is_default:
+                replacement = await self.calendars.find_first_other(
+                    user_id,
+                    calendar_id,
+                    session=session,
+                )
 
-        await self.calendars.delete(calendar)
+            await self.events.delete_by_calendar(calendar_id, session=session)
+            await self.calendars.delete(calendar, session=session)
+
+            if replacement:
+                await self.calendars.unset_default_for_user(user_id, session=session)
+                await self.calendars.update(
+                    replacement,
+                    is_default=True,
+                    session=session,
+                )
         return {"success": True, "id": calendar_id}
 
     # ─── Recurring Rules ────────────────────────────────────────────────────────
@@ -267,27 +300,58 @@ class CalendarService:
 
     async def on_install(self, user_id: str) -> None:
         """Create default calendars for new user."""
-        existing_names = {calendar.name for calendar in await self.calendars.find_by_user(user_id)}
-        if "Personal" not in existing_names:
-            await self.calendars.create(user_id, "Personal", DEFAULT_CALENDAR_COLOR, True)
-        if "Work" not in existing_names:
-            await self.calendars.create(user_id, "Work", WORK_CALENDAR_COLOR, False)
+        async with calendar_transaction() as session:
+            personal = await self.calendars.find_by_name(user_id, "Personal", session=session)
+            if not personal:
+                try:
+                    personal = await self.calendars.create(
+                        user_id,
+                        "Personal",
+                        DEFAULT_CALENDAR_COLOR,
+                        True,
+                        session=session,
+                    )
+                except DuplicateKeyError:
+                    personal = await self.calendars.find_by_name(
+                        user_id,
+                        "Personal",
+                        session=session,
+                    )
+
+            if not await self.calendars.find_by_name(user_id, "Work", session=session):
+                try:
+                    await self.calendars.create(
+                        user_id,
+                        "Work",
+                        WORK_CALENDAR_COLOR,
+                        False,
+                        session=session,
+                    )
+                except DuplicateKeyError:
+                    pass
+
+            default_calendar = await self.calendars.find_default(user_id, session=session)
+            if not default_calendar and personal:
+                await self.calendars.update(personal, is_default=True, session=session)
 
     async def on_uninstall(self, user_id: str) -> None:
         """Clean up all user data."""
-        # Delete all calendars (cascades to events via delete_by_calendar)
-        calendars = await self.calendars.find_by_user(user_id)
-        for cal in calendars:
-            await self.events.delete_by_calendar(str(cal.id))
-            await self.calendars.delete(cal)
+        async with calendar_transaction() as session:
+            calendars = await self.calendars.find_by_user(user_id, session=session)
+            for cal in calendars:
+                await self.events.delete_by_calendar(str(cal.id), session=session)
+                await self.calendars.delete(cal, session=session)
 
-        # Delete recurring rules
-        rules = await self.recurring.find_by_user(user_id)
-        for rule in rules:
-            await self.recurring.delete(rule)
+            rules = await self.recurring.find_by_user(user_id, session=session)
+            for rule in rules:
+                await self.recurring.delete(rule, session=session)
 
 
 # ─── DTO helpers ───────────────────────────────────────────────────────────────
+
+
+def _calendar_name_exists_message(name: str) -> str:
+    return f"Calendar '{name}' already exists"
 
 
 def _event_to_dict(e: Event) -> dict:

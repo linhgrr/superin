@@ -209,6 +209,8 @@ npm run build:frontend
 5. **Backend là source of truth** — manifest (icon, color, name, widgets), schemas, types đều bắt nguồn từ đây
 6. **TUYỆT ĐỐI KHÔNG silent catch** — Không bao giờ dùng `.catch(() => {})`, `except: pass`, hoặc bất kỳ nhánh bắt lỗi nào nuốt lỗi im lặng. Mọi lỗi phải được log rõ ràng (`console.error`, logger) hoặc chuyển thành error/result có cấu trúc.
 7. **BẮT BUỘC annotate API đầy đủ** — Mọi route plugin trong `backend/apps/{app_id}/routes.py` phải có `response_model` rõ ràng; mọi request/response body phải có schema trong `apps/{app_id}/schemas.py`. Không để OpenAPI trả về `unknown` cho endpoint chính.
+8. **DB invariants phải nằm ở DB** — Mọi uniqueness/correctness invariant của dữ liệu thật (`name` unique theo user, chỉ một default, một installation duy nhất, v.v.) phải được enforce bằng Mongo index/constraint. Check ở service chỉ được dùng để cải thiện UX/message, không được là lớp bảo vệ duy nhất.
+9. **Multi-document mutate phải dùng transaction** — Bất kỳ flow mutate nào chạm nhiều document/collection hoặc có read-check-write cần tính atomic phải chạy trong Mongo session/transaction. Không dùng read-modify-write trên object Beanie cho balance/counter nếu có thể bị concurrent requests đè nhau.
 
 ### Backend `shared/` Conventions
 
@@ -299,6 +301,9 @@ npm run build:frontend
 - Widget component file phải tuân theo convention `src/apps/{app_id}/widgets/{PascalCase(widget-slug)}Widget.tsx`.
 - `scripts/codegen.py` và `scripts/superin.py manifests validate` phải auto-discover app/widget từ BE manifest, OpenAPI, và file structure hiện tại; không hardcode app list hoặc đọc FE mirror metadata.
 - Platform route nào được FE tiêu thụ như typed contract thì phải có schema + `response_model` để FE dùng generated type thay vì type viết tay.
+- Mọi uniqueness/default invariant của subapp phải được enforce bằng Mongo index; không dựa hoàn toàn vào pre-check ở service.
+- Mọi mutate flow đa-document hoặc read-check-write có thể bị race phải dùng Mongo transaction hoặc atomic DB operator tương đương.
+- Root agent chỉ được expose tool của app đã cài; nếu bước resolve installed-app thất bại thì phải fail-closed.
 
 ### Chat/Agent
 
@@ -306,6 +311,8 @@ npm run build:frontend
 2. **Child-internal tools** (vd: `finance_list_wallets`) phải ẩn khỏi UI
 3. **Tool results** phải là structured objects, không phải plain text
 4. **Mọi app tool** phải dùng `safe_tool_call()` để convert errors thành tool results
+5. **Root agent tool scoping phải fail-closed** — Nếu không xác minh được installed apps thì chỉ expose platform-safe tools, không bao giờ fallback sang toàn bộ `ask_*` tools.
+6. **Persisted agent history phải scope theo user + thread** — Không query hay replay history chỉ dựa trên `thread_id`.
 
 ---
 
