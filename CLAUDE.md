@@ -108,6 +108,7 @@ backend/
 └── apps/{app_id}/           # Plugin folders
     ├── __init__.py          # register_plugin()
     ├── manifest.py          # AppManifestSchema
+    ├── enums.py             # Plugin type enums (PluginType, Priority, Status...)
     ├── models.py            # Beanie Documents
     ├── repository.py        # Data access
     ├── service.py           # Business logic
@@ -216,20 +217,26 @@ npm run build:frontend
 
 | File | Chứa |
 |------|-------|
-| `shared/enums.py` | Tất cả `Literal` types, string constants, status values, platform-wide constants (VD: `INSTALL_STATUS_ALREADY_INSTALLED`, `InstallationStatus`, `ChatEventType`) |
+| `shared/enums.py` | Platform-wide `Literal` types, string constants (VD: `InstallationStatus`, `ChatEventType`, `WidgetSize`). **KHÔNG** chứa plugin-specific types. |
 | `shared/schemas.py` | Pydantic schemas dùng chung (request/response body) |
 | `shared/interfaces.py` | Python `Protocol` definitions |
 
 **Rules:**
+- **Plugin-specific types** (VD: `EventType`, `TaskStatus`, `TransactionType`, `RecurrenceFrequency`) → để trong `apps/{app_id}/enums.py`. Mỗi plugin tự sở hữu các type của nó, không shared ra ngoài.
 - **Mọi status/string constant dùng chung phải vào `shared/enums.py`** — không đặt trong route file hay service file dưới dạng module-level constant
 - **API response status** (`"already_installed"`, `"new"`, `"reactivated"`) là platform-wide vì frontend/caller phụ thuộc vào giá trị này → `shared/enums.py`
 - **DB model status** (`"active"`, `"disabled"`) → cũng là platform-wide Literal type → `shared/enums.py`
-- **Khi tạo constant mới, hỏi trước:** constant này có dùng chung không? Nếu có → `shared/enums.py`. Nếu chỉ dùng trong 1 app → để trong app đó.
+- **Khi tạo constant mới, hỏi trước:** constant này có dùng chung không? Nếu có → `shared/enums.py`. Nếu chỉ dùng trong 1 app → để trong `apps/{app_id}/enums.py`.
 
 **Naming convention cho `shared/enums.py`:**
 - `Literal` types → `PascalCase` (VD: `InstallationStatus`, `ChatEventType`, `WidgetSize`)
 - `frozenset` / `dict` constants → `SCREAMING_SNAKE_CASE` (VD: `INSTALLATION_STATUSES`, `WIDGET_SIZES`, `VALID_WIDGET_SIZES`)
 - String value constants → `SCREAMING_SNAKE_CASE` với prefix theo domain (VD: `INSTALL_STATUS_*`, `CHAT_EVENT_*`)
+
+**Plugin `enums.py` conventions:**
+- Mỗi plugin có `apps/{app_id}/enums.py` chứa các type riêng của plugin
+- Plugin **không bao giờ** import từ `shared/enums.py` về plugin-specific type
+- Plugin **không bao giờ** export type để plugin khác import
 
 ### Python Code Style
 
@@ -317,7 +324,7 @@ npm run build:frontend
 - [ ] Tool dùng `safe_tool_call()`
 - [ ] Widget ID format đúng `{app_id}.{name}`
 - [ ] Backend/frontend widget sizes khớp nhau
-- [ ] Shared constants → đã vào `shared/enums.py` chưa? (xem section 7)
+- [ ] Shared constants → đã vào `shared/enums.py` (platform-wide) hoặc `apps/{app_id}/enums.py` (plugin-specific) chưa? (xem section 7)
 - [ ] Module-level constants → đặt sau imports và `logger` chưa?
 - [ ] `git commit --no-verify` chỉ dùng khi lint-staged/ESLint config bị lỗi — KHÔNG dùng để skip tất cả hooks
 

@@ -1,10 +1,10 @@
 """Finance plugin LangGraph tools (LLM-facing)."""
 
 from datetime import UTC, datetime
-from typing import Literal
 
 from langchain_core.tools import tool
 
+from apps.finance.enums import TransactionType
 from apps.finance.service import finance_service
 from core.models import User
 from shared.agent_context import get_user_context
@@ -308,7 +308,7 @@ async def finance_delete_category(category_id: str) -> dict:
 
 @tool
 async def finance_list_transactions(
-    type_: Literal["income", "expense"] | None = None,
+    type_: TransactionType | None = None,
     wallet_id: str | None = None,
     category_id: str | None = None,
     limit: int = 20,
@@ -376,7 +376,7 @@ async def finance_get_transaction(transaction_id: str) -> dict:
 async def finance_add_transaction(
     wallet_id: str,
     category_id: str,
-    type_: Literal["income", "expense"],
+    type_: TransactionType,
     amount: float,
     date: str,
     note: str | None = None,

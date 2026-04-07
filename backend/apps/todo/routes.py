@@ -1,10 +1,9 @@
 """Todo plugin FastAPI routes."""
 
-from typing import Literal
-
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+from apps.todo.enums import TaskPriority, TaskStatus
 from apps.todo.schemas import (
     CreateRecurringRuleRequest,
     CreateSubTaskRequest,
@@ -37,8 +36,8 @@ async def list_widgets():
 @router.get("/tasks")
 async def list_tasks(
     user_id: str = Depends(get_current_user),
-    status: Literal["pending", "completed"] | None = Query(None),
-    priority: Literal["low", "medium", "high"] | None = Query(None),
+    status: TaskStatus | None = Query(None),
+    priority: TaskPriority | None = Query(None),
     tag: str | None = Query(None),
     limit: int = Query(20, le=100),
 ):

@@ -1,9 +1,12 @@
 """Calendar plugin Pydantic request/response schemas."""
 
+from __future__ import annotations
+
 from datetime import datetime
-from typing import Literal
 
 from pydantic import BaseModel, Field
+
+from apps.calendar.enums import EventType, RecurrenceFrequency
 
 
 class CreateEventRequest(BaseModel):
@@ -14,7 +17,7 @@ class CreateEventRequest(BaseModel):
     description: str | None = None
     location: str | None = None
     is_all_day: bool = False
-    type: Literal["event", "time_blocked_task"] = "event"
+    type: EventType = "event"
     task_id: str | None = None  # For time-blocked tasks
     color: str | None = None
     reminders: list[int] = Field(default_factory=list)
@@ -45,7 +48,7 @@ class UpdateCalendarRequest(BaseModel):
 
 
 class CreateRecurringRuleRequest(BaseModel):
-    frequency: Literal["daily", "weekly", "monthly", "yearly"]
+    frequency: RecurrenceFrequency
     interval: int = Field(default=1, ge=1, le=52)
     days_of_week: list[int] | None = None  # 0=Monday, 6=Sunday
     end_date: datetime | None = None

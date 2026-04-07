@@ -1,10 +1,10 @@
 """Calendar plugin data access layer."""
 
 from datetime import UTC, datetime
-from typing import Literal
 
 from beanie import PydanticObjectId
 
+from apps.calendar.enums import EventType, RecurrenceFrequency
 from apps.calendar.models import Calendar, Event, RecurringRule
 
 # Default color for new calendars
@@ -104,7 +104,7 @@ class EventRepository:
         description: str | None = None,
         location: str | None = None,
         is_all_day: bool = False,
-        type_: Literal["event", "time_blocked_task"] = "event",
+        type_: EventType = "event",
         task_id: str | None = None,
         color: str | None = None,
         reminders: list[int] | None = None,
@@ -207,7 +207,7 @@ class RecurringRuleRepository:
         self,
         user_id: str,
         event_template_id: str,
-        frequency: Literal["daily", "weekly", "monthly", "yearly"],
+        frequency: RecurrenceFrequency,
         interval: int = 1,
         days_of_week: list[int] | None = None,
         end_date: datetime | None = None,

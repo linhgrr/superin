@@ -1,10 +1,13 @@
 """Finance plugin Beanie document models."""
 
+from __future__ import annotations
+
 from datetime import UTC, datetime
-from typing import Literal
 
 from beanie import Document, PydanticObjectId
 from pydantic import Field
+
+from apps.finance.enums import TransactionType
 
 
 class Wallet(Document):
@@ -47,7 +50,7 @@ class Transaction(Document):
     user_id: PydanticObjectId
     wallet_id: PydanticObjectId
     category_id: PydanticObjectId
-    type: Literal["income", "expense"]
+    type: TransactionType
     amount: float
     date: datetime
     note: str | None = None

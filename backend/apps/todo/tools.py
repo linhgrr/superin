@@ -1,10 +1,10 @@
 """Todo plugin LangGraph tools (LLM-facing)."""
 
 from datetime import datetime
-from typing import Literal
 
 from langchain_core.tools import tool
 
+from apps.todo.enums import RecurrenceFrequency, TaskPriority, TaskStatus
 from apps.todo.service import task_service
 from core.models import User
 from shared.agent_context import get_user_context
@@ -18,7 +18,7 @@ async def todo_add_task(
     description: str | None = None,
     due_date: str | None = None,
     due_time: str | None = None,
-    priority: Literal["low", "medium", "high"] = "medium",
+    priority: TaskPriority = "medium",
     tags: list[str] | None = None,
     reminder_minutes: int | None = None,
 ) -> dict:
@@ -59,8 +59,8 @@ async def todo_add_task(
 
 @tool
 async def todo_list_tasks(
-    status: Literal["pending", "completed"] | None = None,
-    priority: Literal["low", "medium", "high"] | None = None,
+    status: TaskStatus | None = None,
+    priority: TaskPriority | None = None,
     tag: str | None = None,
     limit: int = 20,
 ) -> dict:
@@ -162,8 +162,8 @@ async def todo_update_task(
     description: str | None = None,
     due_date: str | None = None,
     due_time: str | None = None,
-    priority: Literal["low", "medium", "high"] | None = None,
-    status: Literal["pending", "completed"] | None = None,
+    priority: TaskPriority | None = None,
+    status: TaskStatus | None = None,
     tags: list[str] | None = None,
     reminder_minutes: int | None = None,
 ) -> dict:
@@ -515,7 +515,7 @@ async def todo_delete_subtask(subtask_id: str) -> dict:
 @tool
 async def todo_create_recurring_task(
     task_template_id: str,
-    frequency: Literal["daily", "weekly", "monthly", "yearly"],
+    frequency: RecurrenceFrequency,
     interval: int = 1,
     days_of_week: list[int] | None = None,
     end_date: str | None = None,

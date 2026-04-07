@@ -8,10 +8,10 @@ Following tool design principles:
 """
 
 from datetime import datetime
-from typing import Literal
 
 from langchain_core.tools import tool
 
+from apps.calendar.enums import EventType, RecurrenceFrequency
 from apps.calendar.service import calendar_service
 from shared.agent_context import get_user_context
 from shared.tool_results import safe_tool_call
@@ -29,7 +29,7 @@ async def calendar_schedule_event(
     description: str | None = None,
     location: str | None = None,
     is_all_day: bool = False,
-    type_: Literal["event", "time_blocked_task"] = "event",
+    type_: EventType = "event",
     task_id: str | None = None,
     color: str | None = None,
     reminders: list[int] | None = None,
@@ -400,7 +400,7 @@ async def calendar_list_calendars() -> list[dict]:
 @tool
 async def calendar_make_recurring(
     event_id: str,
-    frequency: Literal["daily", "weekly", "monthly", "yearly"],
+    frequency: RecurrenceFrequency,
     interval: int = 1,
     days_of_week: list[int] | None = None,
     end_date: str | None = None,

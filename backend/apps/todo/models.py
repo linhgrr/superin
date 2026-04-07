@@ -1,10 +1,13 @@
 """Todo plugin Beanie document models."""
 
+from __future__ import annotations
+
 from datetime import UTC, datetime, time
-from typing import Literal
 
 from beanie import Document, PydanticObjectId
 from pydantic import Field
+
+from apps.todo.enums import RecurrenceFrequency, TaskPriority, TaskStatus
 
 
 class Task(Document):
@@ -16,8 +19,8 @@ class Task(Document):
     due_date: datetime | None = None
     due_time: time | None = None  # New: specific time for the task
     reminder_minutes: int | None = None  # New: remind X minutes before due
-    priority: Literal["low", "medium", "high"] = "medium"
-    status: Literal["pending", "completed"] = "pending"
+    priority: TaskPriority = "medium"
+    status: TaskStatus = "pending"
     tags: list[str] = Field(default_factory=list)  # New: labels/tags
     is_archived: bool = False  # New: soft delete/archive
     parent_task_id: PydanticObjectId | None = None  # New: for subtasks
@@ -60,7 +63,7 @@ class RecurringRule(Document):
 
     user_id: PydanticObjectId
     task_template_id: PydanticObjectId  # Original task that defines the pattern
-    frequency: Literal["daily", "weekly", "monthly", "yearly"]
+    frequency: RecurrenceFrequency
     interval: int = 1  # Every N days/weeks/months
     days_of_week: list[int] | None = None  # For weekly: 0=Monday, 6=Sunday
     end_date: datetime | None = None  # When to stop recurring

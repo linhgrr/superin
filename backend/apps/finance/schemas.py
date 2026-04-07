@@ -1,9 +1,12 @@
 """Finance plugin Pydantic request/response schemas."""
 
+from __future__ import annotations
+
 from datetime import datetime
-from typing import Literal
 
 from pydantic import BaseModel, Field
+
+from apps.finance.enums import TransactionType
 
 
 class CreateWalletRequest(BaseModel):
@@ -21,7 +24,7 @@ class CreateCategoryRequest(BaseModel):
 class CreateTransactionRequest(BaseModel):
     wallet_id: str
     category_id: str
-    type: Literal["income", "expense"]
+    type: TransactionType
     amount: float = Field(gt=0)
     date: datetime
     note: str | None = None

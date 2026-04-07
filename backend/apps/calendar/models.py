@@ -1,17 +1,20 @@
 """Calendar plugin Beanie document models."""
 
+from __future__ import annotations
+
 from datetime import UTC, datetime
-from typing import Literal
 
 from beanie import Document, PydanticObjectId
 from pydantic import BaseModel, Field
+
+from apps.calendar.enums import AttendeeStatus, EventType, RecurrenceFrequency
 
 
 class Attendee(BaseModel):
     """Basic attendee for events (Phase 2 feature)."""
     email: str
     name: str | None = None
-    status: Literal["pending", "accepted", "declined", "tentative"] = "pending"
+    status: AttendeeStatus = "pending"
 
 
 class Event(Document):
@@ -30,7 +33,7 @@ class Event(Document):
 
     # Classification
     calendar_id: PydanticObjectId
-    type: Literal["event", "time_blocked_task"] = "event"
+    type: EventType = "event"
     task_id: PydanticObjectId | None = None  # Link to Todo task
 
     # Appearance
@@ -87,7 +90,7 @@ class RecurringRule(Document):
     event_template_id: PydanticObjectId  # Original event with pattern
 
     # Pattern
-    frequency: Literal["daily", "weekly", "monthly", "yearly"]
+    frequency: RecurrenceFrequency
     interval: int = 1  # Every N frequencies
     days_of_week: list[int] | None = None  # 0=Monday for weekly
 

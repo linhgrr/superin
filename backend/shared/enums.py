@@ -1,10 +1,17 @@
-"""Platform-wide constants.
+"""Platform-wide constants and enums.
 
 Only contains values that are structural (defined by the platform, not user data).
 Values that need CRUD (app categories, etc.) belong in a Beanie Document model.
 
+**Rule:** Every platform-wide Literal type, status value, and string constant
+lives here — NOT in route/service files or app modules.
+Plugin-specific types (TaskStatus, EventType, etc.) belong in the plugin's own module.
+
 Usage:
-    from shared.enums import WidgetSize, ConfigFieldType, InstallationStatus
+    from shared.enums import (
+        WidgetSize, ConfigFieldType, InstallationStatus,
+        INSTALL_STATUS_ALREADY_INSTALLED, ChatEventType,
+    )
 """
 
 from __future__ import annotations
@@ -35,12 +42,20 @@ ConfigFieldType = Literal["text", "number", "select", "multi-select", "date", "b
 """Valid types for ConfigFieldSchema.type."""
 
 
-# ─── Installation ────────────────────────────────────────────────────────────────
+# ─── Installation ───────────────────────────────────────────────────────────────
 
 InstallationStatus = Literal["active", "disabled"]
 """Valid values for UserAppInstallation.status."""
 
 INSTALLATION_STATUSES: frozenset[str] = frozenset({"active", "disabled"})
+
+# ─── Installation (API response) ────────────────────────────────────────────────
+# Distinct from InstallationStatus (DB model values above).
+# Frontend/caller depends on these string values — must live here, not in routes.
+
+INSTALL_STATUS_ALREADY_INSTALLED = "already_installed"
+INSTALL_STATUS_NEW = "new"
+INSTALL_STATUS_REACTIVATED = "reactivated"
 
 
 # ─── Chat ──────────────────────────────────────────────────────────────────────

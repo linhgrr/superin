@@ -1,10 +1,10 @@
 """Todo plugin data access layer."""
 
 from datetime import UTC, datetime
-from typing import Literal
 
 from beanie import PydanticObjectId
 
+from apps.todo.enums import RecurrenceFrequency, TaskPriority, TaskStatus
 from apps.todo.models import RecurringRule, SubTask, Task
 
 
@@ -12,8 +12,8 @@ class TaskRepository:
     async def find_by_user(
         self,
         user_id: str,
-        status: Literal["pending", "completed"] | None = None,
-        priority: Literal["low", "medium", "high"] | None = None,
+        status: TaskStatus | None = None,
+        priority: TaskPriority | None = None,
         tag: str | None = None,
         include_archived: bool = False,
         limit: int = 20,
@@ -256,7 +256,7 @@ class RecurringRuleRepository:
         self,
         user_id: str,
         task_template_id: str,
-        frequency: Literal["daily", "weekly", "monthly", "yearly"],
+        frequency: RecurrenceFrequency,
         interval: int = 1,
         days_of_week: list[int] | None = None,
         end_date: datetime | None = None,

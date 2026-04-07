@@ -1,8 +1,8 @@
 """Todo plugin business logic."""
 
 from datetime import datetime
-from typing import Literal
 
+from apps.todo.enums import RecurrenceFrequency
 from apps.todo.models import RecurringRule, SubTask, Task
 from apps.todo.repository import RecurringRuleRepository, SubTaskRepository, TaskRepository
 from core.models import User
@@ -203,7 +203,7 @@ class TaskService:
         self,
         user_id: str,
         task_template_id: str,
-        frequency: Literal["daily", "weekly", "monthly", "yearly"],
+        frequency: RecurrenceFrequency,
         interval: int = 1,
         days_of_week: list[int] | None = None,
         end_date: datetime | None = None,

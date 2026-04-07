@@ -1,10 +1,10 @@
 """Finance plugin data access layer — Beanie queries only, no business logic."""
 
 from datetime import datetime
-from typing import Literal
 
 from beanie import PydanticObjectId
 
+from apps.finance.enums import TransactionType
 from apps.finance.models import Category, Transaction, Wallet
 
 
@@ -112,7 +112,7 @@ class TransactionRepository:
         user_id: str,
         wallet_id: str,
         category_id: str,
-        type_: Literal["income", "expense"],
+        type_: TransactionType,
         amount: float,
         date: datetime,
         note: str | None = None,

@@ -1,9 +1,12 @@
 """Todo plugin Pydantic request schemas."""
 
+from __future__ import annotations
+
 from datetime import datetime, time
-from typing import Literal
 
 from pydantic import BaseModel, Field
+
+from apps.todo.enums import RecurrenceFrequency, TaskPriority, TaskStatus
 
 
 class CreateTaskRequest(BaseModel):
@@ -11,7 +14,7 @@ class CreateTaskRequest(BaseModel):
     description: str | None = None
     due_date: datetime | None = None
     due_time: time | None = None
-    priority: Literal["low", "medium", "high"] = "medium"
+    priority: TaskPriority = "medium"
     tags: list[str] = Field(default_factory=list)
     reminder_minutes: int | None = Field(None, ge=0, le=10080)  # Max 1 week
 
@@ -21,8 +24,8 @@ class UpdateTaskRequest(BaseModel):
     description: str | None = None
     due_date: datetime | None = None
     due_time: time | None = None
-    priority: Literal["low", "medium", "high"] | None = None
-    status: Literal["pending", "completed"] | None = None
+    priority: TaskPriority | None = None
+    status: TaskStatus | None = None
     tags: list[str] | None = None
     reminder_minutes: int | None = Field(None, ge=0, le=10080)
 
@@ -32,7 +35,7 @@ class CreateSubTaskRequest(BaseModel):
 
 
 class CreateRecurringRuleRequest(BaseModel):
-    frequency: Literal["daily", "weekly", "monthly", "yearly"]
+    frequency: RecurrenceFrequency
     interval: int = Field(default=1, ge=1, le=52)
     days_of_week: list[int] | None = None  # 0=Monday, 6=Sunday
     end_date: datetime | None = None
