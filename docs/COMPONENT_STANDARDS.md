@@ -172,11 +172,11 @@ function StatCard({ label, value, icon, trend, className }) { ... }
 ```tsx
 // ✅ Optional props có default
 interface Props {
-  size?: "small" | "medium";
+  size?: "compact" | "standard";
   onChange?: (value: string) => void;
 }
 
-function Widget({ size = "medium", onChange }: Props) {
+function Widget({ size = "standard", onChange }: Props) {
   // ...
 }
 
@@ -348,7 +348,7 @@ describe("WidgetGrid", () => {
   });
 
   it("renders widget with correct size class", () => {
-    render(<WidgetGrid widgets={[{ id: "f.tb", size: "medium" }]} />);
+    render(<WidgetGrid widgets={[{ id: "f.tb", size: "standard" }]} />);
     const widget = screen.getByTestId("widget-f-tb");
     expect(widget.className).toContain("widget-size-standard");
   });

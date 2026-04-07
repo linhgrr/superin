@@ -410,73 +410,65 @@ export interface AppCatalogEntry {
 
 ---
 
-## 4. Protocols (Python)
+## 4. Runtime Contracts (Python)
 
-Protocols define the **runtime contract** between the platform and plugins.
-They live in `backend/shared/interfaces.py` and are imported by every plugin.
+The platform/runtime contracts live across three files:
+- `backend/core/agents/base_app.py` for child-agent behavior
+- `backend/core/registry.py` for plugin registration shape
+- `backend/shared/interfaces.py` for shared lightweight protocols such as widget option resolvers
 
-### AgentProtocol
+### BaseAppAgent
 
 ```python
-# backend/shared/interfaces.py
+# backend/core/agents/base_app.py
 
-from typing import Protocol, Any
-from langgraph.graph import CompiledGraph
 from langchain_core.tools import BaseTool
 
-class AgentProtocol(Protocol):
-    """
-    Every app agent MUST implement this protocol.
-
-    The RootAgent reads PLUGIN_REGISTRY to find the right agent
-    for each user message, then calls agent.astream() with the
-    user's messages and context.
-    """
+class BaseAppAgent:
+    app_id: str
 
     @property
-    def graph(self) -> CompiledGraph:
-        """The compiled LangGraph state graph."""
+    def graph(self) -> CompiledStateGraph:
         ...
 
     def tools(self) -> list[BaseTool]:
-        """Domain-specific tools this agent exposes."""
+        ...
+
+    def build_prompt(self) -> str:
+        ...
+
+    async def delegate(self, question: str, thread_id: str) -> dict[str, Any]:
         ...
 
     async def on_install(self, user_id: str) -> None:
-        """
-        Called when a user installs this app.
-        Use to seed default data (wallets, categories, etc.)
-        """
         ...
 
     async def on_uninstall(self, user_id: str) -> None:
-        """
-        Called when a user uninstalls this app.
-        Use to clean up user-specific data.
-        """
         ...
 ```
 
-### AppPlugin
+Every child app agent must subclass `BaseAppAgent`, not implement a custom registry protocol.
+
+### PluginEntry
 
 ```python
-# backend/shared/interfaces.py
+# backend/core/registry.py
 
 from typing import TypedDict
+
 from fastapi import APIRouter
-from langgraph.graph import CompiledGraph
 
-from .schemas import AppManifestSchema
+from core.agents.base_app import BaseAppAgent
+from shared.schemas import AppManifestSchema
 
-class AppPlugin(TypedDict):
-    """
-    The shape stored in PLUGIN_REGISTRY after register_plugin() is called.
-    """
+class PluginEntry(TypedDict):
     manifest: AppManifestSchema
-    agent: AgentProtocol
+    agent: BaseAppAgent
     router: APIRouter
-    models: list[type[Any]]  # Beanie Document classes
+    models: list[type]
 ```
+
+This is the shape stored in `PLUGIN_REGISTRY` after `register_plugin(...)`.
 
 ### WidgetResolverProtocol
 
@@ -630,70 +622,48 @@ export interface DashboardWidgetRendererProps {
 ```python
 # backend/apps/finance/agent.py
 
-from langgraph.graph import StateGraph, MessagesState, END
-from langchain_core.messages import HumanMessage, AIMessage
-from langchain_core.tools import tool
+from langchain_core.tools import BaseTool
 
-from shared.interfaces import AgentProtocol
+from core.agents.base_app import BaseAppAgent
 
-@register_agent("finance")
-class FinanceAgent(AgentProtocol):
-    """
-    Finance-specific agent with domain tools.
-    Called by RootAgent when user asks about money, spending, etc.
-    """
 
-    @property
-    def graph(self) -> CompiledGraph:
-        return self._graph
+class FinanceAgent(BaseAppAgent):
+    app_id = "finance"
 
     def tools(self) -> list[BaseTool]:
         return [
-            add_transaction,
-            query_spending,
-            analyze_budget,
-            list_wallets,
-            create_wallet,
-            create_category,
+            finance_add_transaction,
+            finance_get_summary,
+            finance_list_wallets,
         ]
+
+    def build_prompt(self) -> str:
+        return get_finance_prompt()
 
     async def on_install(self, user_id: str) -> None:
         """Seed default wallet + categories for new user."""
-        await Wallet(user_id=user_id, name="Main Wallet", balance=0.0).insert()
-        for cat_name in ["Food", "Transport", "Entertainment", "Shopping"]:
-            await Category(user_id=user_id, name=cat_name, budget=0.0).insert()
+        set_user_context(user_id)
+        await finance_service.on_install(user_id)
 
     async def on_uninstall(self, user_id: str) -> None:
         """Clean up all user data for this app."""
-        await Wallet.find(Wallet.user_id == user_id).delete()
-        await Transaction.find(Transaction.user_id == user_id).delete()
-        await Category.find(Category.user_id == user_id).delete()
+        set_user_context(user_id)
+        await finance_service.on_uninstall(user_id)
 ```
 
 ### RootAgent Routing
 
 ```python
-# backend/core/agents/root.py
+# backend/core/agents/root/agent.py
 
-from langgraph.graph import StateGraph, MessagesState, END
-from langgraph.prebuilt import ToolNode, tools_condition
+installed_app_ids = set(await list_installed_app_ids(user_id))
+tools = [
+    tool
+    for app_id, tool in self._all_ask_tools.items()
+    if app_id in installed_app_ids
+]
 
-class RootAgentState(MessagesState):
-    user_id: str
-    apps: list[str]  # installed app IDs for this user
-    routing_decision: str | None = None
-
-root_graph = (
-    StateGraph(RootAgentState)
-    .add_node("decide", decide_routing)      # Pick app based on message + PLUGIN_REGISTRY
-    .add_node("delegate", delegate_to_app)  # Call app agent graph
-    .add_node("format", format_response)     # Format final response
-    .set_entry_point("decide")
-    .add_edge("decide", "delegate")
-    .add_edge("delegate", "format")
-    .add_edge("format", END)
-    .compile()
-)
+# If installed-app resolution fails, runtime fails closed and does not expose ask_* tools.
 ```
 
 ### Tool Naming Convention
@@ -795,17 +765,18 @@ GET  /api/apps/finance/analytics/budget      → BudgetAnalytics
 backend/
 ├── shared/
 │   ├── schemas.py          # All Pydantic base schemas (codegen source)
-│   └── interfaces.py       # AgentProtocol, AppPlugin, WidgetResolverProtocol
+│   └── interfaces.py       # WidgetResolverProtocol
 │
 ├── core/
 │   ├── auth.py             # JWT utils, get_current_user dependency
 │   ├── registry.py         # PLUGIN_REGISTRY, register_plugin(), get_plugin_models()
+│   ├── agents/base_app.py  # BaseAppAgent runtime contract
 │   └── discovery.py        # Plugin auto-discovery via importlib
 │
 └── apps/{app_id}/
     ├── manifest.py         # AppManifestSchema + WidgetManifestSchema[]
     ├── models.py           # Beanie Document classes
-    ├── agent.py            # AgentProtocol implementation
+    ├── agent.py            # BaseAppAgent subclass
     ├── routes.py           # FastAPI router with all endpoints
     └── schemas.py          # App-specific Pydantic schemas
 

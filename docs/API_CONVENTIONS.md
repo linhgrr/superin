@@ -18,11 +18,11 @@
 
 | URL | Method | Mô tả |
 |-----|--------|-------|
-| `GET /api/apps/catalog` | list all | App catalog |
-| `POST /api/apps/install` | action | Install app |
-| `GET /api/apps/{appId}/widgets` | list | Widget list |
-| `GET /api/apps/{appId}/preferences` | get user's | Widget prefs |
-| `PUT /api/apps/{appId}/preferences` | replace | Update prefs |
+| `GET /api/catalog/apps` | list all | App catalog |
+| `POST /api/catalog/install/{app_id}` | action | Install app |
+| `GET /api/apps/{app_id}/widgets` | list | Widget list |
+| `GET /api/apps/{app_id}/preferences` | get user's | Widget prefs |
+| `PUT /api/apps/{app_id}/preferences` | replace | Update prefs |
 | `GET /api/apps/finance/wallets` | list | Finance wallets |
 | `POST /api/apps/finance/transactions` | create | Add transaction |
 
@@ -167,7 +167,7 @@ async def optional_user(
         return await get_current_user(credentials)
     return None
 
-@router.get("/apps/catalog")
+@router.get("/apps")
 async def list_apps(user_id: str | None = Depends(optional_user)):
     apps = get_all_plugins()
     if user_id:
@@ -189,6 +189,7 @@ for app_id, plugin in PLUGIN_REGISTRY.items():
         plugin.router,
         prefix=f"/api/apps/{app_id}",
         tags=[app_id],
+        dependencies=[Depends(require_installed_app(app_id))],
     )
 ```
 
@@ -202,32 +203,34 @@ router = APIRouter()  # KHÔNG có prefix
 @router.get("/widgets")         # → /api/apps/finance/widgets
 @router.get("/wallets")        # → /api/apps/finance/wallets
 @router.post("/transactions")   # → /api/apps/finance/transactions
-@router.get("/preferences")    # → /api/apps/finance/preferences (core catalog route)
+@router.get("/preferences")    # → /api/apps/finance/preferences
 ```
 
 ### 5.2 App routes phải có
 
 ```python
 # BẮT BUỘC — core platform gọi
-@router.get("/widgets")
-async def list_widgets():
+@router.get("/widgets", response_model=list[WidgetManifestSchema])
+async def list_widgets() -> list[WidgetManifestSchema]:
     from .manifest import finance_manifest
     return finance_manifest.widgets
 
 # BẮT BUỘC — core platform gọi
-@router.get("/preferences")
-async def get_preferences(user_id=Depends(get_current_user)):
+@router.get("/preferences", response_model=list[WidgetPreferenceSchema])
+async def get_preferences(user_id: str = Depends(get_current_user)) -> list[WidgetPreferenceSchema]:
     prefs = await WidgetPreference.find(
-        WidgetPreference.user_id == user_id
+        WidgetPreference.user_id == PydanticObjectId(user_id),
+        WidgetPreference.app_id == "finance",
     ).to_list()
-    return prefs
+    return [preference_to_schema(pref) for pref in prefs]
 
-@router.put("/preferences")
+@router.put("/preferences", response_model=list[WidgetPreferenceSchema])
 async def update_preferences(
     updates: list[PreferenceUpdate],
-    user_id=Depends(get_current_user),
-):
-    ...
+    user_id: str = Depends(get_current_user),
+) -> list[WidgetPreferenceSchema]:
+    await update_multiple_preferences(user_id, updates, "finance")
+    return await get_preferences(user_id)
 ```
 
 ---

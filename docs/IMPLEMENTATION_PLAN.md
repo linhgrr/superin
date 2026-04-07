@@ -112,7 +112,7 @@ class WidgetPreference(Document):
     widget_id: str  # e.g. "finance.total-balance"
     app_id: str
     enabled: bool = False
-    position: int = 0
+    sort_order: int = 0
     config: dict = {}
 
     class Settings:
@@ -265,7 +265,7 @@ def verify_plugins() -> tuple[list[str], list[str]]:
                 )
 
             # Valid size
-            valid_sizes = {"small", "medium", "large", "full-width"}
+            valid_sizes = {"compact", "standard", "wide", "tall", "full"}
             if w.size not in valid_sizes:
                 errors.append(
                     f"[{app_id}] widget '{w.id}' has invalid size '{w.size}' — must be one of {valid_sizes}"
@@ -456,7 +456,7 @@ Refresh → validate refresh cookie → return new access_token + refresh_token.
 Routes: `GET /catalog`, `POST /install/{app_id}`, `DELETE /uninstall/{app_id}`, `GET /{app_id}/widgets`, `GET /{app_id}/preferences`, `PUT /{app_id}/preferences`.
 
 **Step 1:** Write catalog.py
-**Step 2:** `curl http://localhost:8000/api/apps/catalog` → returns installed apps
+**Step 2:** `curl http://localhost:8000/api/catalog/apps` → returns app catalog
 **Step 3:** Commit
 
 ---
@@ -579,7 +579,7 @@ Routes bắt buộc:
 - `GET /preferences` / `PUT /preferences` — widget preferences
 
 **Step 1:** Write all finance plugin files (routes → service → repository)
-**Step 2:** `curl http://localhost:8000/api/apps/catalog | jq '.[] | .id'` → includes "finance"
+**Step 2:** `curl http://localhost:8000/api/catalog/apps | jq '.[] | .id'` → includes "finance"
 **Step 3:** `curl http://localhost:8000/api/apps/finance/widgets` → returns widget list
 **Step 4:** `pytest tests/apps/test_finance.py -v` → PASS
 **Step 5:** Commit
@@ -600,7 +600,7 @@ Routes bắt buộc:
 Routes bắt buộc: `GET /widgets`, `GET /tasks`, `POST /tasks`, `PATCH /tasks/{id}`, `DELETE /tasks/{id}`, `GET /preferences`, `PUT /preferences`.
 
 **Step 1:** Write all todo plugin files
-**Step 2:** `curl http://localhost:8000/api/apps/catalog | jq '.[] | .id'` → includes "todo"
+**Step 2:** `curl http://localhost:8000/api/catalog/apps | jq '.[] | .id'` → includes "todo"
 **Step 3:** Commit
 
 ---
@@ -808,7 +808,7 @@ export function DashboardShell({ children }) {
 - Create: `frontend/src/pages/AppPage.tsx`
 - Create: `frontend/src/pages/StorePage.tsx`
 
-StorePage: `GET /api/apps/catalog`, shows install/uninstall buttons.
+StorePage: `GET /api/catalog/apps`, shows install/uninstall buttons.
 AppPage: `GET /api/apps/{appId}/widgets`, renders full app view + widget manager.
 
 **Step 1:** `npm run build` → 0 errors
@@ -825,10 +825,10 @@ AppPage: `GET /api/apps/{appId}/widgets`, renders full app view + widget manager
 - Create: `frontend/src/apps/finance/pages/WalletsPage.tsx` — wallet CRUD
 - Create: `frontend/src/apps/finance/pages/CategoriesPage.tsx` — category CRUD
 - Create: `frontend/src/apps/finance/pages/TransactionsPage.tsx` — full transaction list + form
-- Create: `frontend/src/apps/finance/widgets/TotalBalance.tsx` — dashboard widget
-- Create: `frontend/src/apps/finance/widgets/BudgetOverview.tsx` — dashboard widget
-- Create: `frontend/src/apps/finance/widgets/RecentTransactions.tsx` — dashboard widget
-- Create: `frontend/src/apps/finance/widgets/index.ts` — registerWidget calls
+- Create: `frontend/src/apps/finance/widgets/TotalBalanceWidget.tsx` — dashboard widget
+- Create: `frontend/src/apps/finance/widgets/BudgetOverviewWidget.tsx` — dashboard widget
+- Create: `frontend/src/apps/finance/widgets/RecentTransactionsWidget.tsx` — dashboard widget
+- Generated: `frontend/src/apps/finance/DashboardWidget.tsx` — widget dispatcher from backend manifest
 - Modify: `frontend/src/App.tsx` — nested finance routes
 
 ```tsx
@@ -860,9 +860,9 @@ Use `StatCard`, `SectionHeader`, `AppShell` from shared components.
 - Create: `frontend/src/apps/todo/AppNav.tsx`
 - Create: `frontend/src/apps/todo/pages/TaskListPage.tsx` — main task page
 - Create: `frontend/src/apps/todo/pages/SettingsPage.tsx`
-- Create: `frontend/src/apps/todo/widgets/TaskList.tsx` — dashboard widget
+- Create: `frontend/src/apps/todo/widgets/TaskListWidget.tsx` — dashboard widget
 - Create: `frontend/src/apps/todo/widgets/TodayWidget.tsx` — dashboard widget
-- Create: `frontend/src/apps/todo/widgets/index.ts` — registerWidget calls
+- Generated: `frontend/src/apps/todo/DashboardWidget.tsx` — widget dispatcher from backend manifest
 - Modify: `frontend/src/App.tsx` — nested todo routes
 
 **Step 1:** `npm run build` → 0 errors

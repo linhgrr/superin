@@ -214,9 +214,9 @@ Developer commands:
 
 The dashboard is manifest-driven:
 - app catalog returns each installed app with its widgets
-- widget preferences determine enabled state, position, and config
+- widget preferences determine enabled state, `sort_order`, size overrides, and config
 - frontend activates only installed apps from the workspace bootstrap payload
-- frontend chooses the correct app module via discovered app metadata in `lazy-registry`
+- frontend chooses the correct app module via app auto-discovery (`src/apps/*/AppView.tsx`, `DashboardWidget.tsx`)
 - dashboard renders the generated app `DashboardWidget`, which maps manifest widget ids to app-local components
 
 Size contract:
