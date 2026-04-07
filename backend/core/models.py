@@ -6,8 +6,8 @@ Plugin-specific models live in backend/apps/{app_id}/models.py.
 
 from datetime import UTC, datetime
 from typing import Literal
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-import pytz
 from beanie import Document, PydanticObjectId
 from pydantic import Field
 from pymongo import IndexModel
@@ -26,9 +26,9 @@ def get_user_local_time(user: "User") -> tuple[str, str]:
     """
     tz_name = user.settings.get("timezone", "UTC")
     try:
-        tz = pytz.timezone(tz_name)
-    except pytz.UnknownTimeZoneError:
-        tz = pytz.UTC
+        tz = ZoneInfo(tz_name)
+    except (ZoneInfoNotFoundError, KeyError):
+        tz = ZoneInfo("UTC")
 
     now = datetime.now(UTC).astimezone(tz)
     return now.strftime("%Y-%m-%d"), now.strftime("%H:%M")
@@ -41,7 +41,7 @@ class User(Document):
     hashed_password: str
     name: str
     created_at: datetime = Field(default_factory=utc_now)
-    settings: dict = {}
+    settings: dict = Field(default_factory=dict)
 
     class Settings:
         name = "users"
@@ -77,7 +77,7 @@ class WidgetPreference(Document):
     app_id: str
     enabled: bool = False
     sort_order: int = 0  # Sequential ordering for widget list (not grid position)
-    config: dict = {}
+    config: dict = Field(default_factory=dict)
     # Custom dimensions - override manifest default
     size_w: int | None = Field(default=None, ge=2, le=12)  # Grid width (2-12)
     size_h: int | None = Field(default=None, ge=1, le=6)  # Grid height (1-6)

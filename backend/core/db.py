@@ -32,7 +32,7 @@ async def init_db() -> None:
     )
     from core.registry import get_plugin_models
 
-    database = _client["superin"]
+    database = _client[settings.mongodb_database]
     await validate_index_contract(database)
 
     await init_beanie(
@@ -61,4 +61,4 @@ def get_db():
     """Return the active database instance. Requires init_db() to have run."""
     if _client is None:
         raise RuntimeError("Database not initialized. Call init_db() first.")
-    return _client["superin"]
+    return _client[settings.mongodb_database]

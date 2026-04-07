@@ -80,11 +80,13 @@ def register_plugin(
     manifest: AppManifestSchema,
     agent: "BaseAppAgent",
     router: APIRouter,
-    models: list[type] = [],
+    models: list[type] | None = None,
 ) -> None:
     """Register a plugin. Called by each app's __init__.py at import time."""
     if manifest.id in PLUGIN_REGISTRY:
         raise ValueError(f"Plugin already registered: {manifest.id}")
+
+    models = models or []
 
     PLUGIN_REGISTRY[manifest.id] = PluginEntry(
         manifest=manifest,

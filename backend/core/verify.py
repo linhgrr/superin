@@ -156,4 +156,19 @@ def verify_plugins() -> tuple[list[str], list[str]]:
             errors.append(f"Duplicate app_id '{app_id}' in registry")
         seen_app_ids.append(app_id)
 
+    # ── Cross-plugin route collision check ────────────────────────────────
+    seen_routes: dict[str, str] = {}  # (method, path) -> app_id
+    for app_id, plugin in PLUGIN_REGISTRY.items():
+        for route in plugin["router"].routes:
+            path = route.path  # FastAPI guarantees APIRoute.path is never None
+            methods = getattr(route, "methods", None) or {"GET"}
+            for method in methods:
+                key = f"{method.upper()} {path}"
+                if key in seen_routes and seen_routes[key] != app_id:
+                    errors.append(
+                        f"Route collision: '{key}' registered by both "
+                        f"'{seen_routes[key]}' and '{app_id}'"
+                    )
+                seen_routes[key] = app_id
+
     return errors, warnings

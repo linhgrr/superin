@@ -31,6 +31,7 @@ class Settings(BaseSettings):
 
     # ─── Database ─────────────────────────────────────────────────────────────
     mongodb_uri: str
+    mongodb_database: str = "superin"
 
     # ─── Auth ─────────────────────────────────────────────────────────────────
     jwt_secret: str

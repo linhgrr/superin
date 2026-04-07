@@ -17,6 +17,7 @@ from core.models import AppCategory, UserAppInstallation, WidgetPreference
 from core.registry import list_categories as list_registry_categories
 from core.registry import list_plugins
 from core.workspace import list_installed_app_ids
+from shared.enums import INSTALL_STATUS_ALREADY_INSTALLED
 from shared.preference_utils import (
     preference_to_schema,
     update_multiple_preferences,
@@ -199,31 +200,43 @@ async def install_app(
     request: AppInstallRequest,
     user_id: str = Depends(get_current_user),
 ) -> dict:
-    """Install an app for the current user."""
+    """Install an app for the current user.
+
+    Uses atomic find_one_and_update with upsert to prevent race conditions
+    when two concurrent requests try to install the same app.
+    """
     from core.registry import get_plugin
     plugin = get_plugin(request.app_id)
     if not plugin:
         raise HTTPException(status_code=404, detail=f"App '{request.app_id}' not found")
 
-    existing = await UserAppInstallation.find_one(
-        UserAppInstallation.user_id == PydanticObjectId(user_id),
-        UserAppInstallation.app_id == request.app_id,
+    # Atomic upsert via raw PyMongo — Beanie doesn't support $setOnInsert + upsert
+    # cleanly, and we need atomic find+update to prevent double-install race conditions.
+    from core.db import get_db
+    from core.models import utc_now
+    db = get_db()
+    previous = await db["user_app_installations"].find_one_and_update(
+        {"user_id": PydanticObjectId(user_id), "app_id": request.app_id},
+        {
+            "$set": {"status": "active"},  # InstallationStatus value
+            "$setOnInsert": {
+                "user_id": PydanticObjectId(user_id),
+                "app_id": request.app_id,
+                "installed_at": utc_now(),
+            },
+        },
+        upsert=True,
+        return_document=False,  # return pre-update state
     )
-    if existing and existing.status == "active":
-        return {"status": "already_installed", "app_id": request.app_id}
 
+    # If already active, skip on_install hook entirely
+    if previous and previous.get("status") == "active":
+        return {"status": INSTALL_STATUS_ALREADY_INSTALLED, "app_id": request.app_id}
+
+    # Run on_install only on actual state transition (new or re-activate)
     await plugin["agent"].on_install(user_id)
 
-    if existing:
-        existing.status = "active"
-        await existing.save()
-    else:
-        await UserAppInstallation(
-            user_id=PydanticObjectId(user_id),
-            app_id=request.app_id,
-            status="active",
-        ).insert()
-
+    # Seed widget preferences for newly installed app
     widget_ids = [widget.id for widget in plugin["manifest"].widgets]
     existing_prefs = await WidgetPreference.find(
         WidgetPreference.user_id == PydanticObjectId(user_id),
