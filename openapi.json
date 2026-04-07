@@ -288,7 +288,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateCategoryRequest"
+                "$ref": "#/components/schemas/apps__catalog__CreateCategoryRequest"
               }
             }
           },
@@ -470,7 +470,7 @@
           "catalog"
         ],
         "summary": "Install App",
-        "description": "Install an app for the current user.",
+        "description": "Install an app for the current user.\n\nUses atomic find_one_and_update with upsert to prevent race conditions\nwhen two concurrent requests try to install the same app.",
         "operationId": "install_app_api_catalog_install_post",
         "requestBody": {
           "content": {
@@ -715,7 +715,7 @@
           "chat"
         ],
         "summary": "Chat Stream",
-        "description": "POST /api/chat/stream\nBody: {\n    \"messages\": GenericMessage[],\n    \"tools\": ToolDefinition[]   # optional JSON Schema \u2014 forwarded to LLM\n}\nReturns: SSE (assistant-stream data stream protocol)",
+        "description": "POST /api/chat/stream\nBody: {\n    \"messages\": GenericMessage[],\n    \"tools\": ToolDefinition[]   # optional JSON Schema \u2014 forwarded to LLM\n}\nReturns: SSE (assistant-ui UI message stream protocol)",
         "operationId": "chat_stream_api_chat_stream_post",
         "responses": {
           "200": {
@@ -1898,7 +1898,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/apps__finance__schemas__CreateCategoryRequest"
+                "$ref": "#/components/schemas/CreateCategoryRequest"
               }
             }
           },
@@ -2004,7 +2004,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/apps__finance__schemas__CreateCategoryRequest"
+                "$ref": "#/components/schemas/CreateCategoryRequest"
               }
             }
           }
@@ -3028,6 +3028,54 @@
         }
       }
     },
+    "/api/apps/todo/tasks/archived/list": {
+      "get": {
+        "tags": [
+          "todo"
+        ],
+        "summary": "List Archived",
+        "description": "List archived (soft deleted) tasks.",
+        "operationId": "list_archived_api_apps_todo_tasks_archived_list_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "default": 20,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/apps/todo/tasks/{task_id}": {
       "get": {
         "tags": [
@@ -3284,54 +3332,6 @@
             "schema": {
               "type": "string",
               "title": "Task Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/apps/todo/tasks/archived/list": {
-      "get": {
-        "tags": [
-          "todo"
-        ],
-        "summary": "List Archived",
-        "description": "List archived (soft deleted) tasks.",
-        "operationId": "list_archived_api_apps_todo_tasks_archived_list_get",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "maximum": 100,
-              "default": 20,
-              "title": "Limit"
             }
           }
         ],
@@ -4263,20 +4263,19 @@
           },
           "icon": {
             "type": "string",
-            "maxLength": 30,
             "title": "Icon",
-            "default": "Folder"
+            "default": "Tag"
           },
           "color": {
             "type": "string",
-            "maxLength": 50,
             "title": "Color",
             "default": "oklch(0.65 0.21 280)"
           },
-          "order": {
-            "type": "integer",
-            "title": "Order",
-            "default": 0
+          "budget": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Budget",
+            "default": 0.0
           }
         },
         "type": "object",
@@ -5422,7 +5421,7 @@
         "title": "WorkspaceBootstrap",
         "description": "Authenticated workspace runtime bootstrap payload."
       },
-      "apps__finance__schemas__CreateCategoryRequest": {
+      "apps__catalog__CreateCategoryRequest": {
         "properties": {
           "name": {
             "type": "string",
@@ -5432,19 +5431,20 @@
           },
           "icon": {
             "type": "string",
+            "maxLength": 30,
             "title": "Icon",
-            "default": "Tag"
+            "default": "Folder"
           },
           "color": {
             "type": "string",
+            "maxLength": 50,
             "title": "Color",
             "default": "oklch(0.65 0.21 280)"
           },
-          "budget": {
-            "type": "number",
-            "minimum": 0.0,
-            "title": "Budget",
-            "default": 0.0
+          "order": {
+            "type": "integer",
+            "title": "Order",
+            "default": 0
           }
         },
         "type": "object",

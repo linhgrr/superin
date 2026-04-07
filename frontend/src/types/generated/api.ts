@@ -196,6 +196,9 @@ export interface paths {
         /**
          * Install App
          * @description Install an app for the current user.
+         *
+         *     Uses atomic find_one_and_update with upsert to prevent race conditions
+         *     when two concurrent requests try to install the same app.
          */
         post: operations["install_app_api_catalog_install_post"];
         delete?: never;
@@ -284,7 +287,7 @@ export interface paths {
          *         "messages": GenericMessage[],
          *         "tools": ToolDefinition[]   # optional JSON Schema — forwarded to LLM
          *     }
-         *     Returns: SSE (assistant-stream data stream protocol)
+         *     Returns: SSE (assistant-ui UI message stream protocol)
          */
         post: operations["chat_stream_api_chat_stream_post"];
         delete?: never;
@@ -910,6 +913,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/apps/todo/tasks/archived/list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Archived
+         * @description List archived (soft deleted) tasks.
+         */
+        get: operations["list_archived_api_apps_todo_tasks_archived_list_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/apps/todo/tasks/{task_id}": {
         parameters: {
             query?: never;
@@ -993,26 +1016,6 @@ export interface paths {
          * @description Restore an archived task.
          */
         patch: operations["restore_task_api_apps_todo_tasks__task_id__restore_patch"];
-        trace?: never;
-    };
-    "/api/apps/todo/tasks/archived/list": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Archived
-         * @description List archived (soft deleted) tasks.
-         */
-        get: operations["list_archived_api_apps_todo_tasks_archived_list_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
         trace?: never;
     };
     "/api/apps/todo/tasks/{task_id}/tags/{tag}": {
@@ -1365,7 +1368,7 @@ export interface components {
             name: string;
             /**
              * Icon
-             * @default Folder
+             * @default Tag
              */
             icon: string;
             /**
@@ -1374,10 +1377,10 @@ export interface components {
              */
             color: string;
             /**
-             * Order
+             * Budget
              * @default 0
              */
-            order: number;
+            budget: number;
         };
         /** CreateEventRequest */
         CreateEventRequest: {
@@ -1762,12 +1765,12 @@ export interface components {
             widget_preferences?: components["schemas"]["WidgetPreferenceSchema"][];
         };
         /** CreateCategoryRequest */
-        apps__finance__schemas__CreateCategoryRequest: {
+        apps__catalog__CreateCategoryRequest: {
             /** Name */
             name: string;
             /**
              * Icon
-             * @default Tag
+             * @default Folder
              */
             icon: string;
             /**
@@ -1776,10 +1779,10 @@ export interface components {
              */
             color: string;
             /**
-             * Budget
+             * Order
              * @default 0
              */
-            budget: number;
+            order: number;
         };
     };
     responses: never;
@@ -2000,7 +2003,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CreateCategoryRequest"];
+                "application/json": components["schemas"]["apps__catalog__CreateCategoryRequest"];
             };
         };
         responses: {
@@ -3051,7 +3054,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["apps__finance__schemas__CreateCategoryRequest"];
+                "application/json": components["schemas"]["CreateCategoryRequest"];
             };
         };
         responses: {
@@ -3148,7 +3151,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["apps__finance__schemas__CreateCategoryRequest"];
+                "application/json": components["schemas"]["CreateCategoryRequest"];
             };
         };
         responses: {
@@ -3691,6 +3694,37 @@ export interface operations {
             };
         };
     };
+    list_archived_api_apps_todo_tasks_archived_list_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_task_api_apps_todo_tasks__task_id__get: {
         parameters: {
             query?: never;
@@ -3857,37 +3891,6 @@ export interface operations {
             path: {
                 task_id: string;
             };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_archived_api_apps_todo_tasks_archived_list_get: {
-        parameters: {
-            query?: {
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
             cookie?: never;
         };
         requestBody?: never;

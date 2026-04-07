@@ -158,7 +158,21 @@ def sync_frontend_app(app_id: str, *, force_widgets: bool = False) -> None:
         {
             "id": manifest.id,
             "name": manifest.name,
-            "widgets": [{"id": widget.id, "size": widget.size} for widget in manifest.widgets],
+            "version": manifest.version,
+            "description": manifest.description,
+            "icon": manifest.icon,
+            "color": manifest.color,
+            "widgets": [
+                {
+                    "id": widget.id,
+                    "name": widget.name,
+                    "description": widget.description,
+                    "icon": widget.icon,
+                    "size": widget.size,
+                    "config_fields": widget.config_fields or [],
+                }
+                for widget in manifest.widgets
+            ],
         },
         overwrite=True,
     )

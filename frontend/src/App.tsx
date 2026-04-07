@@ -64,7 +64,7 @@ function RouteFallback() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        color: "var(--color-muted)",
+        color: "var(--color-foreground-muted)",
       }}
     >
       Loading…
@@ -107,7 +107,7 @@ function Protected({ children }: { children: React.ReactNode }) {
           alignItems: "center",
           justifyContent: "center",
           background: "var(--color-background)",
-          color: "var(--color-muted)",
+          color: "var(--color-foreground-muted)",
         }}
       >
         Loading…
@@ -253,7 +253,7 @@ export default function App() {
                     justifyContent: "center",
                     gap: "0.5rem",
                     background: "var(--color-background)",
-                    color: "var(--color-muted)",
+                    color: "var(--color-foreground-muted)",
                   }}
                 >
                   <span style={{ fontSize: "3rem" }}>404</span>
