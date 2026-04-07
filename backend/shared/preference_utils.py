@@ -6,6 +6,7 @@ across multiple app routes.
 
 from beanie import PydanticObjectId
 from beanie.operators import In
+from pymongo import ReturnDocument, UpdateOne
 
 from core.models import WidgetPreference
 from shared.schemas import PreferenceUpdate
@@ -37,25 +38,66 @@ def _apply_update_to_preference(
         pref.size_h = None
 
 
+def _build_update_document(
+    update: PreferenceUpdate,
+    *,
+    user_object_id: PydanticObjectId,
+    app_id: str,
+) -> dict[str, dict]:
+    payload = update.model_dump(exclude_unset=True)
+    set_payload = {
+        key: payload[key]
+        for key in ("enabled", "sort_order", "config", "size_w", "size_h")
+        if key in payload
+    }
+    insert_defaults = {
+        "user_id": user_object_id,
+        "app_id": app_id,
+        "widget_id": update.widget_id,
+        "enabled": False,
+        "sort_order": 0,
+        "config": {},
+        "size_w": None,
+        "size_h": None,
+    }
+    set_on_insert = {
+        key: value
+        for key, value in insert_defaults.items()
+        if key not in set_payload
+    }
+
+    update_document: dict[str, dict] = {"$setOnInsert": set_on_insert}
+    if set_payload:
+        update_document["$set"] = set_payload
+    return update_document
+
+
 async def update_widget_preference(
     user_id: str,
     update: PreferenceUpdate,
     app_id: str,
 ) -> WidgetPreference | None:
-    """Update a single widget preference for a user."""
-    pref = await WidgetPreference.find_one(
-        WidgetPreference.user_id == PydanticObjectId(user_id),
-        WidgetPreference.app_id == app_id,
-        WidgetPreference.widget_id == update.widget_id,
+    """Update or create a single widget preference for a user."""
+    user_object_id = PydanticObjectId(user_id)
+    updated = await WidgetPreference.get_pymongo_collection().find_one_and_update(
+        {
+            "user_id": user_object_id,
+            "app_id": app_id,
+            "widget_id": update.widget_id,
+        },
+        {
+            **_build_update_document(
+                update,
+                user_object_id=user_object_id,
+                app_id=app_id,
+            ),
+        },
+        upsert=True,
+        return_document=ReturnDocument.AFTER,
     )
-
-    if not pref:
+    if updated is None:
         return None
-
-    _apply_update_to_preference(pref, update)
-
-    await pref.save()
-    return pref
+    return WidgetPreference.model_validate(updated)
 
 
 async def update_multiple_preferences(
@@ -63,31 +105,50 @@ async def update_multiple_preferences(
     updates: list[PreferenceUpdate],
     app_id: str,
 ) -> list[WidgetPreference]:
-    """Update multiple widget preferences for a user with one read and batched writes."""
+    """Update or create multiple widget preferences for a user."""
     if not updates:
         return []
 
-    widget_ids = [update.widget_id for update in updates]
+    latest_by_widget_id: dict[str, PreferenceUpdate] = {}
+    for update in updates:
+        latest_by_widget_id[update.widget_id] = update
+
+    user_object_id = PydanticObjectId(user_id)
+    collection = WidgetPreference.get_pymongo_collection()
+    operations = [
+        UpdateOne(
+            {
+                "user_id": user_object_id,
+                "app_id": app_id,
+                "widget_id": update.widget_id,
+            },
+            {
+                **_build_update_document(
+                    update,
+                    user_object_id=user_object_id,
+                    app_id=app_id,
+                ),
+            },
+            upsert=True,
+        )
+        for update in latest_by_widget_id.values()
+    ]
+
+    await collection.bulk_write(operations, ordered=False)
+
+    widget_ids = list(latest_by_widget_id.keys())
     prefs = await WidgetPreference.find(
-        WidgetPreference.user_id == PydanticObjectId(user_id),
+        WidgetPreference.user_id == user_object_id,
         WidgetPreference.app_id == app_id,
         In(WidgetPreference.widget_id, widget_ids),
     ).to_list()
 
     pref_by_widget_id = {pref.widget_id: pref for pref in prefs}
-    results: list[WidgetPreference] = []
-
-    async with WidgetPreference.bulk_writer() as bulk_writer:
-        for update in updates:
-            pref = pref_by_widget_id.get(update.widget_id)
-            if not pref:
-                continue
-
-            _apply_update_to_preference(pref, update)
-            await pref.replace(bulk_writer=bulk_writer)
-            results.append(pref)
-
-    return results
+    return [
+        pref_by_widget_id[widget_id]
+        for widget_id in widget_ids
+        if widget_id in pref_by_widget_id
+    ]
 
 
 def preference_to_schema(
