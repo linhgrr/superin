@@ -31,7 +31,10 @@ Hệ thống hỗ trợ true plug-n-play cho plugins:
 - Không cần import thủ công từng app — hệ thống tự tìm tất cả `src/apps/*/index.ts`
 - Backend là source of truth cho metadata (icon, color, name, widgets)
 - Icons render động qua `DynamicIcon` resolver
-- **Platform code** (`src/lib/`, `src/components/`, `src/hooks/` trừ `useAuth`) KHÔNG ĐƯỢC import từ bất kỳ app nào
+- **`src/shared/`** — Pure utilities & shared hooks: `shared/utils/`, `shared/hooks/`. Dành cho code không có app-specific logic hay platform code nặng (timezone, formatters). **Apps được phép import từ đây.**
+- **`src/lib/`** — Platform utilities (SWR config, icon-resolver). Apps **KHÔNG** được import từ đây trừ `@/lib/swr`.
+- **`src/hooks/`** — Platform hooks (`useAuth`). Apps **KHÔNG** được import từ đây trừ `useAuth`.
+- **`src/components/`** — Platform components (dashboard, chat). Apps **KHÔNG** được import từ đây.
 - **TUYỆT ĐỐI KHÔNG** đặt logic app-specific bên ngoài folder `src/apps/{app_id}/`
 - Apps có thể import từ nhau nếu cần (ví dụ: calendar có thể import từ todo)
 
@@ -51,7 +54,8 @@ Hệ thống hỗ trợ true plug-n-play cho plugins:
 ┌─────────────────────────────────────────────────────────────┐
 │  Frontend (React + Vite)                                     │
 │  ├── src/apps/{app_id}/      # App modules                 │
-│  ├── src/components/          # Shared components          │
+│  ├── src/shared/             # Shared utilities & hooks    │
+│  ├── src/components/         # Shared components          │
 │  ├── src/pages/               # Top-level pages            │
 │  └── src/types/generated/     # Auto-generated from Pydantic│
 ├─────────────────────────────────────────────────────────────┤
@@ -202,9 +206,37 @@ npm run build:frontend
 1. **Platform agnostic to Apps** — Platform code (`src/lib/`, `src/components/`, `backend/core/`, `backend/shared/`) KHÔNG ĐƯỢC import từ bất kỳ app nào
 2. **App containment** — Mỗi app chứa tất cả code của mình trong `src/apps/{app_id}/`
 3. **Apps có thể import từ nhau** — Cross-app integration được phép (vd: calendar import từ todo)
-4. **Shared code ở `src/lib/` hoặc `src/components/`** — Không bao giờ để app-specific logic ở đây
+4. **`src/shared/` là cầu nối hợp lệ** — `shared/utils/` và `shared/hooks/` dành cho pure utilities (timezone, formatters). Apps được phép import từ đây. Không bao giờ để app-specific logic ở `shared/`.
 5. **Backend là source of truth** — manifest (icon, color, name, widgets), schemas, types đều bắt nguồn từ đây
 6. **TUYỆT ĐỐI KHÔNG silent catch** — Không bao giờ dùng `.catch(() => {})`, `except: pass`, hoặc bất kỳ nhánh bắt lỗi nào nuốt lỗi im lặng. Mọi lỗi phải được log rõ ràng (`console.error`, logger) hoặc chuyển thành error/result có cấu trúc.
+
+### Backend `shared/` Conventions
+
+`backend/shared/` là nơi duy nhất cho mọi platform-wide code. **Không được** đặt constants, status values, hay schemas ở nơi khác.
+
+| File | Chứa |
+|------|-------|
+| `shared/enums.py` | Tất cả `Literal` types, string constants, status values, platform-wide constants (VD: `INSTALL_STATUS_ALREADY_INSTALLED`, `InstallationStatus`, `ChatEventType`) |
+| `shared/schemas.py` | Pydantic schemas dùng chung (request/response body) |
+| `shared/interfaces.py` | Python `Protocol` definitions |
+
+**Rules:**
+- **Mọi status/string constant dùng chung phải vào `shared/enums.py`** — không đặt trong route file hay service file dưới dạng module-level constant
+- **API response status** (`"already_installed"`, `"new"`, `"reactivated"`) là platform-wide vì frontend/caller phụ thuộc vào giá trị này → `shared/enums.py`
+- **DB model status** (`"active"`, `"disabled"`) → cũng là platform-wide Literal type → `shared/enums.py`
+- **Khi tạo constant mới, hỏi trước:** constant này có dùng chung không? Nếu có → `shared/enums.py`. Nếu chỉ dùng trong 1 app → để trong app đó.
+
+**Naming convention cho `shared/enums.py`:**
+- `Literal` types → `PascalCase` (VD: `InstallationStatus`, `ChatEventType`, `WidgetSize`)
+- `frozenset` / `dict` constants → `SCREAMING_SNAKE_CASE` (VD: `INSTALLATION_STATUSES`, `WIDGET_SIZES`, `VALID_WIDGET_SIZES`)
+- String value constants → `SCREAMING_SNAKE_CASE` với prefix theo domain (VD: `INSTALL_STATUS_*`, `CHAT_EVENT_*`)
+
+### Python Code Style
+
+- **Module-level constants** (VD: `MAX_HISTORY_MESSAGES`, `MAX_CACHED_GRAPHS`) phải đặt **SAU các import statements**, sau `logger = logging.getLogger(__name__)`. Không đặt constants giữa `from __future__` và các import khác — gây ruff E402.
+- **Mutable default arguments** (`=[]`, `={}`) → dùng `None` + `= models or []` bên trong function. Đây là Python footgun phổ biến.
+- **Thứ tự import** — theo ruff `isort` (Stdlib → Third-party → First-party): `from __future__ import annotations` → stdlib → third-party (`beanie`, `fastapi`, `langchain`) → relative (`from core.`, `from shared.`) → sibling (`from .`)
+- **Hạn chế inline import** — import thư viện ở đầu file, không import bên trong function trừ khi cần tránh circular dependency. Nếu thấy cần inline import → kiểm tra lại architecture.
 
 ### Plugin Development
 
@@ -231,7 +263,8 @@ npm run build:frontend
 7. **Luôn dùng** design tokens từ `globals.css` (oklch colors)
 8. **Icons** — Dùng `DynamicIcon` từ `icon-resolver.ts` để render icons động từ tên (backend cung cấp)
 9. **SWR Hooks** — Mỗi app tự tạo hooks trong `hooks/` folder, import shared config từ `@/lib/swr`
-10. **Platform code KHÔNG import từ apps** — `src/lib/`, `src/components/`, `src/hooks/` (trừ `useAuth`) không được import từ `src/apps/`
+10. **Platform code KHÔNG import từ apps** — `src/lib/`, `src/components/`, `src/hooks/` (trừ `useAuth`) không được import từ `src/apps/`. Chỉ `src/shared/` được phép.
+11. **`src/shared/` structure:** `shared/utils/` cho pure functions, `shared/hooks/` cho React hooks. Chỉ chứa code hoàn toàn không có app-specific logic.
 
 ### Chat/Agent
 
@@ -284,6 +317,9 @@ npm run build:frontend
 - [ ] Tool dùng `safe_tool_call()`
 - [ ] Widget ID format đúng `{app_id}.{name}`
 - [ ] Backend/frontend widget sizes khớp nhau
+- [ ] Shared constants → đã vào `shared/enums.py` chưa? (xem section 7)
+- [ ] Module-level constants → đặt sau imports và `logger` chưa?
+- [ ] `git commit --no-verify` chỉ dùng khi lint-staged/ESLint config bị lỗi — KHÔNG dùng để skip tất cả hooks
 
 ---
 
@@ -335,6 +371,15 @@ python scripts/superin.py codegen
 - Check `src/apps/{app_id}/index.ts` tồn tại và có `export default`
 - Check file có export đúng kiểu `FrontendAppDefinition`
 - Restart dev server để Vite pick up glob import changes
+
+### lint-staged fails on `cd frontend && eslint`
+lint-staged runs tasks with `shell: false` by default, so `cd frontend &&` chain fails with ENOENT. Fix: wrap the command in `sh -c` via a function:
+```js
+"frontend/**/*.{ts,tsx}": [
+  (files) => `sh -c 'cd frontend && npx eslint --fix --max-warnings 0 ${files.join(" ")}'`,
+  (files) => `sh -c 'cd frontend && npx tsc --noEmit'`,
+],
+```
 
 ### Icons không hiển thị
 - Check `manifest.icon` trong backend là tên Lucide icon hợp lệ (vd: "Wallet", "Calendar")

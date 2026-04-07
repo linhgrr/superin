@@ -9,7 +9,6 @@ import {
   MessagePrimitive,
   MessagePartPrimitive,
   ThreadPrimitive,
-  AuiIf,
   useMessagePartText,
 } from "@assistant-ui/react";
 import { Zap, Send, Sparkles } from "lucide-react";
@@ -121,12 +120,10 @@ function AssistantMessage() {
         </div>
       </MessagePrimitive.Root>
 
-      {/* Error display */}
-      <AuiIf condition={(s) => !!s.message.status?.error}>
-        <ErrorPrimitive.Root className="mb-2 px-3.5 py-2.5 rounded-xl bg-danger/10 border border-danger/25 text-danger text-sm leading-snug">
-          <ErrorPrimitive.Message />
-        </ErrorPrimitive.Root>
-      </AuiIf>
+      {/* Error display — use message.status from ThreadPrimitive context */}
+      <ErrorPrimitive.Root className="mb-2 px-3.5 py-2.5 rounded-xl bg-danger/10 border border-danger/25 text-danger text-sm leading-snug">
+        <ErrorPrimitive.Message />
+      </ErrorPrimitive.Root>
     </div>
   );
 }

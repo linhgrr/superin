@@ -7,6 +7,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from collections import OrderedDict
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass, field
 from typing import Any
@@ -29,6 +30,14 @@ from .prompts import build_system_prompt
 from .tools import _build_ask_tool
 
 logger = logging.getLogger(__name__)
+
+# Limit how many historical messages to load from DB per thread.
+# Prevents OOM and context window overflow for long-running threads.
+MAX_HISTORY_MESSAGES = 50
+
+# Cap on the number of compiled LangGraph instances retained per RootAgent.
+# Uses LRU eviction — least recently used graph is dropped when the cap is hit.
+MAX_CACHED_GRAPHS = 32
 
 
 def _normalize_tool_output(output: Any) -> Any:
@@ -323,7 +332,8 @@ class RootAgent:
     def __init__(self) -> None:
         self._system_prompt = ""
         self._all_ask_tools: dict[str, BaseTool] = {}
-        self._graphs: dict[tuple[str, ...], Any] = {}
+        # LRU-bounded graph cache keyed by sorted tool names.
+        self._graphs: OrderedDict[tuple[str, ...], Any] = OrderedDict()
 
     def refresh(self) -> None:
         """Rebuild system prompt, ask_X tools, and cached graph. Called after plugin discovery."""
@@ -343,8 +353,14 @@ class RootAgent:
         try:
             installed_app_ids = set(await list_installed_app_ids(user_id))
         except Exception:
-            logger.exception("Failed to load installed apps for tool scoping")
-            installed_app_ids = set()
+            # DB unavailable — degrade gracefully by returning all tools.
+            # User loses per-app scoping but retains full functionality.
+            logger.warning(
+                "Failed to load installed apps for tool scoping, "
+                "falling back to all tools",
+                exc_info=True,
+            )
+            return list(self._all_ask_tools.values())
 
         tools = [
             t for app_id, t in self._all_ask_tools.items()
@@ -361,21 +377,35 @@ class RootAgent:
         return tools
 
     def _get_graph(self, tools: list[BaseTool]) -> Any:
-        """Get or create LangGraph for given tools."""
+        """Get or create LangGraph for given tools (LRU cache, max MAX_CACHED_GRAPHS)."""
         tool_names = tuple(sorted(t.name for t in tools))
-        if tool_names not in self._graphs:
-            self._graphs[tool_names] = create_react_agent(
-                model=get_llm(),
-                tools=tools,
-                prompt=self._system_prompt or None,
-            )
-        return self._graphs[tool_names]
+        if tool_names in self._graphs:
+            # Move to end (most-recently-used)
+            self._graphs.move_to_end(tool_names)
+            return self._graphs[tool_names]
+
+        graph = create_react_agent(
+            model=get_llm(),
+            tools=tools,
+            prompt=self._system_prompt or None,
+        )
+        self._graphs[tool_names] = graph
+
+        # Evict oldest (least-recently-used) entry if over limit
+        if len(self._graphs) > MAX_CACHED_GRAPHS:
+            self._graphs.popitem(last=False)
+
+        return graph
 
     async def _load_history(self, thread_id: str) -> list[ConversationMessage]:
-        """Load ordered message history from MongoDB for a thread."""
+        """Load the most recent message history from MongoDB for a thread.
+
+        Capped to MAX_HISTORY_MESSAGES to prevent OOM and context overflow.
+        Messages are returned in chronological order (oldest-first).
+        """
         return await ConversationMessage.find(
             {"thread_id": thread_id},
-        ).sort("created_at").to_list()
+        ).sort("-created_at").limit(MAX_HISTORY_MESSAGES).to_list()
 
     async def _save_messages(
         self,
@@ -489,7 +519,10 @@ class RootAgent:
 
         # Load history from DB if not skipping
         if not skip_db_load:
-            for msg in await self._load_history(thread):
+            history = await self._load_history(thread)
+            # _load_history returns newest-first (for efficient LIMIT),
+            # reverse to chronological order for the LLM.
+            for msg in reversed(history):
                 langchain_messages.append(
                     HumanMessage(content=msg.content) if msg.role == "user" else AIMessage(content=msg.content)
                 )
@@ -517,7 +550,7 @@ class RootAgent:
         thread: str,
         event_handler: EventStreamHandler,
         langchain_messages: list[BaseMessage],
-    ) -> None:
+    ) -> AsyncGenerator[dict[str, Any], None]:
         """Run graph and yield stream events."""
         config = {
             "configurable": {"thread_id": thread},

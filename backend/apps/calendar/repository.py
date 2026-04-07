@@ -62,19 +62,17 @@ class EventRepository:
         query: str,
         limit: int = 20,
     ) -> list[Event]:
-        """Search events by title or description."""
-        search_lower = query.lower()
-        all_events = await Event.find(
-            Event.user_id == PydanticObjectId(user_id)
-        ).to_list()
-
-        filtered = [
-            e for e in all_events
-            if search_lower in e.title.lower()
-            or (e.description and search_lower in e.description.lower())
-            or (e.location and search_lower in e.location.lower())
-        ]
-        return filtered[:limit]
+        """Search events by title, description, or location using MongoDB $regex."""
+        return await Event.find(
+            Event.user_id == PydanticObjectId(user_id),
+            {
+                "$or": [
+                    {"title": {"$regex": query, "$options": "i"}},
+                    {"description": {"$regex": query, "$options": "i"}},
+                    {"location": {"$regex": query, "$options": "i"}},
+                ]
+            },
+        ).limit(limit).to_list()
 
     async def find_conflicts(
         self,

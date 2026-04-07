@@ -1,5 +1,6 @@
 """Auth routes — login, register, refresh, logout."""
 
+import logging
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
@@ -13,6 +14,7 @@ from core.security import get_password_hash, verify_password
 from shared.schemas import TokenResponse, UserPublic
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 def _token_response(user: User) -> TokenResponse:
@@ -139,7 +141,10 @@ async def logout(
             if blacklist_entry:
                 await blacklist_entry.insert()
         except Exception:
-            pass  # Token invalid or expired, just delete cookie
+            logger.debug(
+                "Token invalid or expired during logout blacklist",
+                exc_info=True,
+            )
 
     response.delete_cookie(key=AUTH_COOKIE_NAME, secure=True)
 
