@@ -12,6 +12,8 @@ from beanie import Document, PydanticObjectId
 from pydantic import Field
 from pymongo import IndexModel
 
+from shared.enums import UserRole
+
 
 def utc_now() -> datetime:
     return datetime.now(UTC)
@@ -40,7 +42,7 @@ class User(Document):
     email: str
     hashed_password: str
     name: str
-    role: Literal["admin", "user"] = "user"
+    role: UserRole = "user"
     created_at: datetime = Field(default_factory=utc_now)
     settings: dict = Field(default_factory=dict)
 
