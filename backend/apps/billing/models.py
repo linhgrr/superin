@@ -2,8 +2,9 @@
 
 from datetime import datetime
 
-from beanie import Document, IndexModel, PydanticObjectId
+from beanie import Document, PydanticObjectId
 from pydantic import Field
+from pymongo import IndexModel
 
 from core.models import utc_now
 from shared.enums import PaymentProvider, SubscriptionStatus, SubscriptionTier
