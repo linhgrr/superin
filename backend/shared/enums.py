@@ -62,3 +62,34 @@ INSTALL_STATUS_REACTIVATED = "reactivated"
 
 ChatEventType = Literal["token", "tool_call", "tool_result", "done", "error"]
 """Valid values for ChatStream event types."""
+
+
+# ─── User Role ───────────────────────────────────────────────────────────────
+
+UserRole = Literal["admin", "user"]
+"""Valid values for User.role."""
+
+USER_ROLES: frozenset[str] = frozenset({"admin", "user"})
+
+
+# ─── Subscription ───────────────────────────────────────────────────────────
+
+SubscriptionTier = Literal["free", "paid"]
+"""Subscription tier — determines which features are accessible."""
+
+SUBSCRIPTION_TIERS: frozenset[str] = frozenset({"free", "paid"})
+
+SubscriptionStatus = Literal["active", "inactive", "cancelled", "past_due"]
+"""Payment lifecycle status for a subscription."""
+
+SUBSCRIPTION_STATUSES: frozenset[str] = frozenset(
+    {"active", "inactive", "cancelled", "past_due"}
+)
+
+
+# ─── Payment Provider ───────────────────────────────────────────────────────
+
+PaymentProvider = Literal["stripe", "payos"]
+"""Supported payment providers."""
+
+PAYMENT_PROVIDERS: frozenset[str] = frozenset({"stripe", "payos"})
