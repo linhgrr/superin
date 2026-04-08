@@ -40,6 +40,7 @@ class User(Document):
     email: str
     hashed_password: str
     name: str
+    role: Literal["admin", "user"] = "user"
     created_at: datetime = Field(default_factory=utc_now)
     settings: dict = Field(default_factory=dict)
 
@@ -47,6 +48,7 @@ class User(Document):
         name = "users"
         indexes = [
             IndexModel([("email", 1)], name="users_email_unique", unique=True),
+            IndexModel([("role", 1)], name="users_role_index"),
         ]
 
 
