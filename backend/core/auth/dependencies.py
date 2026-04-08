@@ -1,4 +1,6 @@
-"""JWT utilities: create, verify tokens and FastAPI dependency for getting current user."""
+"""Auth FastAPI dependencies and JWT utilities."""
+
+from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -122,7 +124,7 @@ def require_permission(permission: str):
             return user_id
 
         # Determine user's effective tier — inline import to avoid circular dependency
-        from apps.billing.models import Subscription  # noqa: PLC0415
+        from core.subscriptions.model import Subscription  # noqa: PLC0415
         sub = await Subscription.find_one(
             Subscription.user_id == PydanticObjectId(user_id),
         )

@@ -1,13 +1,12 @@
-"""Billing routes — stub for Phase 1 (RBAC). Full implementation in Plan B."""
+"""Subscription routes — platform-level, not a plugin."""
 
 import logging
 
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends
 
-from apps.billing.models import Subscription
-from core.auth import get_current_user
-from shared.enums import SubscriptionStatus, SubscriptionTier
+from core.auth.dependencies import get_current_user
+from core.subscriptions.model import Subscription
 from shared.schemas import SubscriptionRead
 
 router = APIRouter()
@@ -24,8 +23,8 @@ async def get_my_subscription(
     )
     if sub is None:
         return SubscriptionRead(
-            tier=SubscriptionTier.FREE,
-            status=SubscriptionStatus.INACTIVE,
+            tier="free",
+            status="inactive",
             provider=None,
             started_at=None,
             expires_at=None,

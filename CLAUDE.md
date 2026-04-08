@@ -46,7 +46,7 @@ Hệ thống hỗ trợ true plug-n-play cho plugins:
 
 **CLI:**
 - `sync-fe` vẫn hữu ích để tạo boilerplate widgets, nhưng không bắt buộc để app hiển thị
-- Registry app FE tự động cập nhật không cần sửa file trung tâm
+- `src/apps/index.ts` là compatibility facade — không cần sửa; app được discover qua `src/lib/discovery.ts` (Vite glob trên `AppView.tsx`, `DashboardWidget.tsx`)
 
 ---
 
@@ -83,12 +83,13 @@ Hệ thống hỗ trợ true plug-n-play cho plugins:
 **Lưu ý quan trọng:**
 - **Backend:** `cd backend && git push origin main:main`
 - **Frontend:** `cd frontend && git push origin main:main` (hoặc push từ root nếu FE remote đã set)
-- Root là nơi chứa `CLAUDE.md`, `scripts/`, `docs/` — không phải monorepo
-- Khi chạy BE scripts: `cd backend && python ../scripts/superin.py ...`
+- Root là nơi chứa `CLAUDE.md`, `scripts/`, `package.json` — không phải monorepo
+- Root-level scripts: `npm run build:frontend`, `npm run codegen`, `npm run superin`
+- Khi chạy BE scripts từ root: dùng `npm run superin -- <subcommand>` (xem Commands section bên dưới)
 
 ---
 
-## 4. Critical File Locations
+## 3. Critical File Locations
 
 ### Backend (Source of Truth)
 
@@ -137,8 +138,16 @@ frontend/
 │   │   ├── dashboard/       # WidgetGrid, AppShell
 │   │   ├── chat/            # ChatThread
 │   │   └── providers/       # AppProviders
-│   ├── lib/                 # Utilities
-│   │   └── icon-resolver.ts # Dynamic Lucide icon resolver
+│   ├── lib/
+│   │   ├── discovery.ts    # Vite glob: src/apps/*/AppView.tsx, DashboardWidget.tsx
+│   │   ├── lazy-registry.ts  # App/widget lazy loading
+│   │   ├── prefetch.ts    # App prefetching
+│   │   ├── swr.ts         # SWR shared config
+│   │   ├── icon-resolver.tsx # Dynamic Lucide resolver
+│   │   └── types.ts       # Platform types
+│   ├── shared/
+│   │   ├── utils/         # Pure utilities (timezone, formatters — apps may import)
+│   │   └── hooks/         # Shared React hooks
 │   ├── pages/               # DashboardPage, StorePage, etc.
 │   └── types/generated/     # Auto-generated (KHÔNG edit)
 └── src/app/globals.css       # Design tokens
@@ -146,7 +155,7 @@ frontend/
 
 ---
 
-## 5. Widget Size Contract
+## 4. Widget Size Contract
 
 Backend manifest, frontend types, và CSS phải đồng nhất:
 
@@ -162,45 +171,47 @@ Widget ID format: `{app_id}.{kebab-name}` (vd: `finance.total-balance`)
 
 ---
 
-## 6. Essential Commands
+## 5. Essential Commands
 
 ```bash
 # Codegen (chạy sau khi đổi Pydantic schema)
-python scripts/superin.py codegen
+npm run codegen
 
 # Validate manifests
-python scripts/superin.py manifests validate
+npm run validate:manifests
 
 # Validate core Mongo index contract
-python scripts/superin.py db check-indexes
+npm run superin -- db check-indexes
 
 # Reset local Mongo DB sạch theo model/index hiện tại
-python scripts/superin.py db reset --yes
+npm run superin -- db reset --yes
 
 # Tạo plugin mới
-python scripts/superin.py plugin create {app_id}
+npm run superin -- plugin create {app_id}
 
-# Sync frontend từ backend manifest (auto-detect từ Vite glob)
-python scripts/superin.py plugin sync-fe {app_id}
-
-# Sync tất cả apps
-python scripts/superin.py plugin sync-fe --all
+# Sync frontend từ backend manifest
+npm run superin -- plugin sync-fe {app_id}
+npm run superin -- plugin sync-fe --all
 
 # Dev server
-python scripts/superin.py dev          # Backend + Frontend
-npm run dev                            # Frontend only
+npm run dev                           # Backend + Frontend
+cd frontend && npm run dev            # Frontend only
+
+# Linting
+cd frontend && npx eslint --fix --max-warnings 0    # Frontend lint
+ruff check backend --fix                                   # Backend lint
 
 # Verify (trước khi commit contract-sensitive changes)
-python scripts/superin.py codegen
-python scripts/superin.py db check-indexes
-python scripts/superin.py manifests validate
+npm run codegen
+npm run superin -- db check-indexes
+npm run validate:manifests
 ruff check backend
-npm run build:frontend
+cd frontend && npm run build
 ```
 
 ---
 
-## 7. Development Rules
+## 6. Development Rules
 
 ### ⚠️ ABSOLUTE RULES - Never Violate
 
@@ -213,7 +224,14 @@ npm run build:frontend
 7. **BẮT BUỘC annotate API đầy đủ** — Mọi route plugin trong `backend/apps/{app_id}/routes.py` phải có `response_model` rõ ràng; mọi request/response body phải có schema trong `apps/{app_id}/schemas.py`. Không để OpenAPI trả về `unknown` cho endpoint chính.
 8. **DB invariants phải nằm ở DB** — Mọi uniqueness/correctness invariant của dữ liệu thật (`name` unique theo user, chỉ một default, một installation duy nhất, v.v.) phải được enforce bằng Mongo index/constraint. Check ở service chỉ được dùng để cải thiện UX/message, không được là lớp bảo vệ duy nhất.
 9. **Multi-document mutate phải dùng transaction** — Bất kỳ flow mutate nào chạm nhiều document/collection hoặc có read-check-write cần tính atomic phải chạy trong Mongo session/transaction. Không dùng read-modify-write trên object Beanie cho balance/counter nếu có thể bị concurrent requests đè nhau.
-10. **Local DB phải disposable** — Khi Mongo index/schema contract thay đổi không tương thích ngược trong local/dev, chuẩn xử lý là dùng DB mới hoặc `python scripts/superin.py db reset --yes`. Không thiết kế thêm workflow migration/backfill tạm chỉ để cứu state local cũ.
+10. **Local DB phải disposable** — Khi Mongo index/schema contract thay đổi không tương thích ngược trong local/dev, chuẩn xử lý là dùng DB mới hoặc `npm run superin -- db reset --yes`. Không thiết kế thêm workflow migration/backfill tạm chỉ để cứu state local cũ.
+
+### Datetime Conventions
+
+**Backend lưu UTC, hiển thị theo user timezone.** Mọi tính toán date/time phải đi qua timezone context — không dùng `datetime.now()` trực tiếp.
+
+- **Backend:** Dùng `get_user_timezone_context(user)` từ `core/timezone.py`. Luôn dùng `ctx.now_utc()` hoặc `ctx.now_local()` thay vì `datetime.now()`. Dùng `ctx.today_range()`, `ctx.month_range()` cho date-range queries (due date, "income this month").
+- **Frontend:** Dùng `shared/utils/timezone.ts` để convert UTC → local khi hiển thị. Không tính toán timezone ở FE — chỉ convert để hiển thị, logic nghiệp vụ luôn ở BE.
 
 ### Backend `shared/` Conventions
 
@@ -294,22 +312,11 @@ npm run build:frontend
 
 ### Anti-Regression Notes (Cập nhật bắt buộc)
 
-- Khi gặp lỗi kiến trúc/contract, phải thêm note ngắn vào section này dưới dạng **quy tắc chuẩn phải tuân theo**, không mô tả lịch sử lỗi.
-- Route plugin phải khai báo `response_model` rõ ràng và dùng request/response schema đầy đủ để OpenAPI sinh contract chính xác.
+**Khi phát hiện lỗi kiến trúc/contract mới, thêm note ngắn vào section này dưới dạng quy tắc chuẩn phải tuân theo — không mô tả lịch sử lỗi.**
+
 - `PATCH`/`PUT` endpoint phải nhận request schema rõ ràng; không encode request body thành query params rời cho domain update chính.
 - Mọi BE schema public phải có tên globally unique theo mẫu `{App}{Entity}{Suffix}`.
-- `app_id` chuẩn của platform là lowercase alnum không dấu phân tách: `^[a-z][a-z0-9]*$`.
 - Public tool names phải được pin explicit bằng `@tool("...")`; Python function name chỉ là implementation detail.
-- FE app code phải lấy contract type từ generated sources (`@/types/generated` hoặc `src/apps/{app_id}/api.ts`).
-- Local type viết tay trong FE chỉ dành cho UI-only props/state/view-model không thuộc contract BE.
-- `frontend/src/apps/{app_id}/api.ts` là generated app-local contract facade; mọi thay đổi signature phải xuất phát từ BE schema/routes rồi regenerate.
-- Discovery frontend phải dựa vào `AppView.tsx` và `DashboardWidget.tsx`; metadata app/widget phải đến từ BE manifest/runtime payload.
-- `frontend/src/apps/{app_id}/DashboardWidget.tsx` phải là generated binding từ backend manifest.
-- Widget component file phải tuân theo convention `src/apps/{app_id}/widgets/{PascalCase(widget-slug)}Widget.tsx`.
-- `scripts/codegen.py` và `scripts/superin.py manifests validate` phải auto-discover app/widget từ BE manifest, OpenAPI, và file structure hiện tại; không hardcode app list hoặc đọc FE mirror metadata.
-- Platform route nào được FE tiêu thụ như typed contract thì phải có schema + `response_model` để FE dùng generated type thay vì type viết tay.
-- Mọi uniqueness/default invariant của subapp phải được enforce bằng Mongo index; không dựa hoàn toàn vào pre-check ở service.
-- Mọi mutate flow đa-document hoặc read-check-write có thể bị race phải dùng Mongo transaction hoặc atomic DB operator tương đương.
 - Root agent chỉ được expose tool của app đã cài; nếu bước resolve installed-app thất bại thì phải fail-closed.
 
 ### Chat/Agent
@@ -323,7 +330,7 @@ npm run build:frontend
 
 ---
 
-## 8. Design System Tokens
+## 7. Design System Tokens
 
 ### Colors (oklch — từ `globals.css`)
 
@@ -354,58 +361,38 @@ npm run build:frontend
 
 ---
 
-## 9. Checklist Trước Khi Commit
+## 8. Checklist Trước Khi Commit
 
-- [ ] `python scripts/superin.py codegen` (nếu đổi schema)
-- [ ] `python scripts/superin.py manifests validate` pass
+- [ ] `npm run codegen` (nếu đổi schema)
+- [ ] `npm run validate:manifests` pass
+- [ ] `npm run superin -- db check-indexes` pass
 - [ ] `ruff check backend` pass
-- [ ] `npm run build:frontend` pass
+- [ ] `cd frontend && npx eslint --fix --max-warnings 0` pass
+- [ ] `cd frontend && npm run build` pass
 - [ ] Component > 100 lines → đã tách sub-component
 - [ ] Props có TypeScript interface (không any)
 - [ ] Tool dùng `safe_tool_call()`
 - [ ] Widget ID format đúng `{app_id}.{name}`
 - [ ] Backend/frontend widget sizes khớp nhau
-- [ ] Shared constants → đã vào `shared/enums.py` (platform-wide) hoặc `apps/{app_id}/enums.py` (plugin-specific) chưa? (xem section 7)
+- [ ] Shared constants → đã vào `shared/enums.py` (platform-wide) hoặc `apps/{app_id}/enums.py` (plugin-specific) chưa? (xem section 6)
 - [ ] Module-level constants → đặt sau imports và `logger` chưa?
 - [ ] Mọi plugin route có `response_model` + request/response schema đầy đủ chưa (không để OpenAPI `unknown`)?
 - [ ] FE type import đã đi qua `@/types/generated` facade chưa (không import trực tiếp `@/types/generated/api`)?
 - [ ] `git commit --no-verify` chỉ dùng khi lint-staged/ESLint config bị lỗi — KHÔNG dùng để skip tất cả hooks
-- [ ] **Sau khi build success trên HF Space:** commit và push lên **cả 3 repo** (root, backend, frontend) nếu có thay đổi tương ứng
+- [ ] **Sau khi deploy thành công:** commit và push lên **cả 3 repo** (root, backend, frontend) nếu có thay đổi tương ứng
 
 ---
 
-## 10. Recent Active Plans
-
-### Calendar App (2026-04-01)
-- **Location:** `docs/plans/2026-04-01-calendar-implementation.md`
-- **Status:** Ready for implementation
-- **Features:** Events, recurring patterns, Todo integration, conflict detection
-- **Tools:** 10 consolidated tools
-
-### Auth + Payment + Admin (2026-03-31)
-- **Location:** `docs/plans/2026-03-31-auth-payment-admin-design.md`
-- **Status:** Design approved
-- **Features:** Role-based auth, PayOS + Stripe, Admin dashboard
-
-### Frontend Sub-App Refactor (2026-03-31)
-- **Location:** `docs/plans/2026-03-31-frontend-subapp-refactor-checklist.md`
-- **Status:** Phase 2-3 completed
-- **Goal:** Tách `AppView.tsx` và `DashboardWidget.tsx` thành thin orchestration
-
----
-
-## 11. Troubleshooting
+## 9. Troubleshooting
 
 ### Manifest validation fails
 ```bash
-# Check backend/frontend widget IDs match
-python scripts/superin.py manifests validate --verbose
+npm run superin -- manifests validate --verbose
 ```
 
 ### Import errors after codegen
 ```bash
-# Regenerate types
-python scripts/superin.py codegen
+npm run codegen
 ```
 
 ### Plugin not showing in catalog
@@ -421,7 +408,7 @@ python scripts/superin.py codegen
 ### Frontend app không auto-discover
 - Check `src/apps/{app_id}/AppView.tsx` tồn tại
 - Check `src/apps/{app_id}/DashboardWidget.tsx` đã được codegen sinh ra
-- Nếu vừa đổi BE manifest/routes, chạy lại `python scripts/superin.py codegen`
+- Nếu vừa đổi BE manifest/routes, chạy lại `npm run codegen`
 - Restart dev server để Vite pick up glob import changes
 
 ### lint-staged fails on `cd frontend && eslint`
@@ -442,7 +429,7 @@ lint-staged runs tasks with `shell: false` by default, so `cd frontend &&` chain
 
 ---
 
-## 12. MCP References
+## 10. MCP References
 
 ### HeroUI v3 (đã cài)
 ```
@@ -458,7 +445,7 @@ mcp__plugin_context7_context7__query-docs
 
 ---
 
-## 13. Commit Message Format
+## 11. Commit Message Format
 
 ```
 <type>(<scope>): <description>

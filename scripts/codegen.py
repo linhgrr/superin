@@ -25,7 +25,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).parent.parent
+ROOT = Path(__file__).resolve().parent.parent
+BACKEND_DIR = ROOT / "backend"
 OPENAPI_SPEC = ROOT / "openapi.json"
 OUTPUT = ROOT / "frontend" / "src" / "types" / "generated" / "api.ts"
 INDEX_OUTPUT = ROOT / "frontend" / "src" / "types" / "generated" / "index.ts"
@@ -70,11 +71,16 @@ _backend_env = {
 
 
 def _run_python(cmd: str) -> subprocess.CompletedProcess:
-    """Run Python snippet via conda env if available, else direct."""
+    """Run Python snippet in linhdz environment."""
     env = {**os.environ, **{k: v for k, v in _backend_env.items() if v}}
 
+    # Use absolute path to linhdz python to avoid conda run nesting issues.
+    # /home/linh/miniconda3/envs/linhdz/bin/python3 is always correct
+    # regardless of which conda env the outer process is in.
+    python_bin = "/home/linh/miniconda3/envs/linhdz/bin/python3"
+
     result = subprocess.run(
-        ["conda", "run", "-n", "linhdz", "python3", "-c", cmd],
+        [python_bin, "-c", cmd],
         cwd=str(ROOT),
         capture_output=True,
         text=True,
@@ -85,15 +91,17 @@ def _run_python(cmd: str) -> subprocess.CompletedProcess:
 
 def generate_openapi_spec() -> None:
     """Build openapi.json by importing the FastAPI app."""
-    script = """
-import sys; sys.path.insert(0, 'backend')
-from core.main import app
-import json
-spec = app.openapi()
-with open('openapi.json', 'w') as f:
-    json.dump(spec, f, indent=2)
-print('paths:', len(spec.get('paths', {})), 'schemas:', len(spec.get('components', {}).get('schemas', {})))
-"""
+    backend_path = str(BACKEND_DIR.resolve())
+    script = (
+        f"import sys\n"
+        f"sys.path.insert(0, {backend_path!r})\n"
+        "from core.main import app\n"
+        "import json\n"
+        "spec = app.openapi()\n"
+        f"with open({str(OPENAPI_SPEC)!r}, 'w') as f:\n"
+        "    json.dump(spec, f, indent=2)\n"
+        "print('paths:', len(spec.get('paths', {})), 'schemas:', len(spec.get('components', {}).get('schemas', {})))\n"
+    )
 
     result = _run_python(script)
     if result.returncode != 0:
@@ -158,22 +166,21 @@ def generate_typescript_index() -> None:
 
 def load_plugin_manifests() -> dict[str, dict]:
     """Load registered backend plugin manifests as plain JSON-compatible dicts."""
-    script = """
-import json
+    backend_path = str(BACKEND_DIR.resolve())
+    script = f"""
 import sys
-
-sys.path.insert(0, 'backend')
-
+sys.path.insert(0, {backend_path!r})
+import json
 from core.discovery import discover_apps
 
 discover_apps()
 
 from core.registry import PLUGIN_REGISTRY
 
-payload = {
+payload = {{
     app_id: entry["manifest"].model_dump(mode="json")
     for app_id, entry in sorted(PLUGIN_REGISTRY.items())
-}
+}}
 print(json.dumps(payload))
 """
 

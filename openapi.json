@@ -257,7 +257,7 @@
           "catalog"
         ],
         "summary": "List Categories",
-        "description": "List all app categories, merged from DB and app registry.\n\nCategories are discovered from:\n1. AppCategory documents in DB (admin-managed categories)\n2. App manifests in PLUGIN_REGISTRY (auto-discovered from installed apps)\n\nThis enables true plug-n-play: when a new app declares a new category,\nit automatically appears in the UI without manual registration.",
+        "description": "List all app categories, merged from DB and app registry.",
         "operationId": "list_categories_api_catalog_categories_get",
         "responses": {
           "200": {
@@ -281,7 +281,7 @@
           "catalog"
         ],
         "summary": "Create Category",
-        "description": "Create a new app category. Requires auth.",
+        "description": "Create a new app category. Requires admin.",
         "operationId": "create_category_api_catalog_categories_post",
         "requestBody": {
           "content": {
@@ -465,7 +465,7 @@
           "catalog"
         ],
         "summary": "Install App",
-        "description": "Install an app for the current user.\n\nUses atomic find_one_and_update with upsert to prevent race conditions\nwhen two concurrent requests try to install the same app.",
+        "description": "Install an app for the current user.",
         "operationId": "install_app_api_catalog_install_post",
         "requestBody": {
           "content": {
@@ -710,7 +710,7 @@
           "chat"
         ],
         "summary": "Chat Stream",
-        "description": "POST /api/chat/stream\nBody: {\n    \"messages\": GenericMessage[],\n    \"tools\": ToolDefinition[]   # optional JSON Schema \u2014 forwarded to LLM\n}\nReturns: SSE (assistant-ui UI message stream protocol)",
+        "description": "POST /api/chat/stream\nBody: {\n    \"messages\": GenericMessage[],\n    \"tools\": ToolDefinition[]   # optional\n}\nReturns: SSE (assistant-ui UI message stream protocol)",
         "operationId": "chat_stream_api_chat_stream_post",
         "responses": {
           "200": {
@@ -744,6 +744,33 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/WorkspaceBootstrap"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/subscription/subscription": {
+      "get": {
+        "tags": [
+          "subscriptions"
+        ],
+        "summary": "Get My Subscription",
+        "description": "Return the current user's subscription (or default free/inactive).",
+        "operationId": "get_my_subscription_api_subscription_subscription_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionRead"
                 }
               }
             }
@@ -4211,6 +4238,15 @@
             },
             "type": "array",
             "title": "Widgets"
+          },
+          "requires_tier": {
+            "type": "string",
+            "enum": [
+              "free",
+              "paid"
+            ],
+            "title": "Requires Tier",
+            "default": "free"
           }
         },
         "type": "object",
@@ -4319,6 +4355,15 @@
             },
             "type": "array",
             "title": "Widgets"
+          },
+          "requires_tier": {
+            "type": "string",
+            "enum": [
+              "free",
+              "paid"
+            ],
+            "title": "Requires Tier",
+            "default": "free"
           }
         },
         "type": "object",
@@ -6055,6 +6100,74 @@
         ],
         "title": "SelectOption"
       },
+      "SubscriptionRead": {
+        "properties": {
+          "tier": {
+            "type": "string",
+            "enum": [
+              "free",
+              "paid"
+            ],
+            "title": "Tier"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "inactive",
+              "cancelled",
+              "past_due"
+            ],
+            "title": "Status"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "stripe",
+                  "payos"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tier",
+          "status"
+        ],
+        "title": "SubscriptionRead",
+        "description": "User subscription state \u2014 returned in auth responses."
+      },
       "TodoActionResponse": {
         "properties": {
           "success": {
@@ -6942,6 +7055,14 @@
             "type": "string",
             "title": "Name"
           },
+          "role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "user"
+            ],
+            "title": "Role"
+          },
           "settings": {
             "additionalProperties": true,
             "type": "object",
@@ -6952,7 +7073,8 @@
         "required": [
           "id",
           "email",
-          "name"
+          "name",
+          "role"
         ],
         "title": "UserPublic",
         "description": "Public user info \u2014 returned in auth responses."

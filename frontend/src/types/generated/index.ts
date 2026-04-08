@@ -52,6 +52,7 @@ export type LoginRequest = Schemas["LoginRequest"];
 export type PreferenceUpdate = Schemas["PreferenceUpdate"];
 export type RegisterRequest = Schemas["RegisterRequest"];
 export type SelectOption = Schemas["SelectOption"];
+export type SubscriptionRead = Schemas["SubscriptionRead"];
 export type TodoActionResponse = Schemas["TodoActionResponse"];
 export type TodoCreateRecurringRuleRequest = Schemas["TodoCreateRecurringRuleRequest"];
 export type TodoCreateSubTaskRequest = Schemas["TodoCreateSubTaskRequest"];

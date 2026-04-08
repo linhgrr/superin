@@ -6,6 +6,11 @@
       "sourceType": "github",
       "computedHash": "e2c6c594828cbbf4f0c181eedcf2bd39a2a49b4f087942b295faf36cdc88c423"
     },
+    "claude-md-improver": {
+      "source": "anthropics/claude-plugins-official",
+      "sourceType": "github",
+      "computedHash": "d6707ed0467d9664d0f9d2c44724c8fb1814475ec6d3c62a5d54bbbe807e0775"
+    },
     "fastapi-templates": {
       "source": "wshobson/agents",
       "sourceType": "github",
@@ -15,6 +20,11 @@
       "source": "semgrep/skills",
       "sourceType": "github",
       "computedHash": "27fa571b75861545226c9ee3d861fda4831cbf10099bf34118d59470dffb0fc8"
+    },
+    "payment-integration": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "computedHash": "c5cc36c9f5be78994e69ed57f875345df95e5e915b565670d779f5f3320c9ab1"
     },
     "security-architect": {
       "source": "oimiragieo/agent-studio",

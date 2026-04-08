@@ -1,19 +1,16 @@
-"""App catalog routes — list apps, install/uninstall, categories.
-
-Core platform routes at prefix /api/catalog (NOT /api/apps to avoid
-conflicting with plugin routes at /api/apps/{app_id}).
-
-Plugin-specific data routes live in each plugin's routes.py at /api/apps/{app_id}.
-"""
-
+"""App catalog routes — list apps, install/uninstall, categories."""
 
 from beanie import PydanticObjectId
 from beanie.operators import In
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from core.auth import get_current_admin_user, get_current_user, get_current_user_optional
-from core.catalog_service import (
+from core.auth.dependencies import (
+    get_current_admin_user,
+    get_current_user,
+    get_current_user_optional,
+)
+from core.catalog.service import (
     UnknownAppError,
     install_app_for_user,
     uninstall_app_for_user,
@@ -21,7 +18,7 @@ from core.catalog_service import (
 from core.models import AppCategory, UserAppInstallation, WidgetPreference
 from core.registry import list_categories as list_registry_categories
 from core.registry import list_plugins
-from core.workspace import list_installed_app_ids
+from core.workspace.service import list_installed_app_ids
 from shared.preference_utils import (
     preference_to_schema,
     update_multiple_preferences,
@@ -58,44 +55,28 @@ class UpdateCategoryRequest(BaseModel):
 
 @router.get("/categories", response_model=list[AppCategoryRead])
 async def list_categories() -> list[AppCategoryRead]:
-    """List all app categories, merged from DB and app registry.
-
-    Categories are discovered from:
-    1. AppCategory documents in DB (admin-managed categories)
-    2. App manifests in PLUGIN_REGISTRY (auto-discovered from installed apps)
-
-    This enables true plug-n-play: when a new app declares a new category,
-    it automatically appears in the UI without manual registration.
-    """
-    # Get categories from DB
+    """List all app categories, merged from DB and app registry."""
     db_cats = await AppCategory.find_all().sort("order").to_list()
-
-    # Get categories from app registry
     registry_cats = list_registry_categories()
 
-    # Merge: DB categories take priority, registry fills gaps
     merged: dict[str, AppCategoryRead] = {}
 
-    # First, add all DB categories
     for cat in db_cats:
         cat_id = cat.name.lower()
-        merged[cat_id] = _cat_to_dict(cat)
+        merged[cat_id] = _cat_to_read(cat)
 
-    # Then, add registry categories if not already in DB
     for cat in registry_cats:
         cat_id = cat["id"].lower()
         if cat_id not in merged:
-            # Auto-discovered category from app manifest
             merged[cat_id] = AppCategoryRead(
-                id=cat["id"],  # Use category id as string id
+                id=cat["id"],
                 name=cat["name"],
                 icon=cat["icon"],
                 color=cat["color"],
-                order=999,  # Auto-discovered categories appear at end
-                auto_discovered=True,  # Flag for UI
+                order=999,
+                auto_discovered=True,
             )
 
-    # Return sorted by order, then name
     return sorted(merged.values(), key=lambda x: (x.order, x.name))
 
 
@@ -104,7 +85,7 @@ async def create_category(
     request: CreateCategoryRequest,
     admin_user_id: str = Depends(get_current_admin_user),
 ) -> AppCategoryRead:
-    """Create a new app category. Requires auth."""
+    """Create a new app category. Requires admin."""
     existing = await AppCategory.find_one(AppCategory.name == request.name)
     if existing:
         raise HTTPException(status_code=409, detail=f"Category '{request.name}' already exists")
@@ -114,7 +95,7 @@ async def create_category(
         color=request.color,
         order=request.order,
     ).insert()
-    return _cat_to_dict(cat)
+    return _cat_to_read(cat)
 
 
 @router.patch("/categories/{category_id}", response_model=AppCategoryRead)
@@ -136,7 +117,7 @@ async def update_category(
     if request.order is not None:
         cat.order = request.order
     await cat.save()
-    return _cat_to_dict(cat)
+    return _cat_to_read(cat)
 
 
 @router.delete("/categories/{category_id}")
@@ -152,7 +133,7 @@ async def delete_category(
     return {"success": True, "id": category_id}
 
 
-def _cat_to_dict(c: AppCategory) -> AppCategoryRead:
+def _cat_to_read(c: AppCategory) -> AppCategoryRead:
     return AppCategoryRead(
         id=str(c.id),
         name=c.name,
@@ -193,6 +174,7 @@ async def list_catalog(
             tags=m.tags,
             screenshots=m.screenshots,
             widgets=m.widgets,
+            requires_tier=m.requires_tier,
         )
         for m in manifests
     ]
@@ -205,11 +187,7 @@ async def install_app(
     request: AppInstallRequest,
     user_id: str = Depends(get_current_user),
 ) -> dict:
-    """Install an app for the current user.
-
-    Uses atomic find_one_and_update with upsert to prevent race conditions
-    when two concurrent requests try to install the same app.
-    """
+    """Install an app for the current user."""
     try:
         result = await install_app_for_user(user_id, request.app_id)
     except UnknownAppError as exc:
@@ -241,13 +219,6 @@ async def uninstall_app(
 
 
 # ─── Widget Preferences ────────────────────────────────────────────────────────
-# Route at /preferences/{app_id} to avoid conflict with plugin routes
-# at /api/apps/{app_id}/... which take priority in FastAPI routing.
-
-def _pref_to_schema(p: WidgetPreference) -> WidgetPreferenceSchema:
-    """Convert WidgetPreference document to schema - uses shared utility."""
-    return preference_to_schema(p)
-
 
 @router.get("/preferences")
 async def get_all_preferences(
@@ -262,7 +233,7 @@ async def get_all_preferences(
         WidgetPreference.user_id == PydanticObjectId(user_id),
         In(WidgetPreference.app_id, installed_app_ids),
     ).to_list()
-    return [_pref_to_schema(p) for p in prefs]
+    return [preference_to_schema(p) for p in prefs]
 
 
 @router.get("/preferences/{app_id}")
@@ -279,7 +250,7 @@ async def get_preferences(
         WidgetPreference.user_id == PydanticObjectId(user_id),
         WidgetPreference.app_id == app_id,
     ).to_list()
-    return [_pref_to_schema(p) for p in prefs]
+    return [preference_to_schema(p) for p in prefs]
 
 
 @router.put("/preferences/{app_id}")

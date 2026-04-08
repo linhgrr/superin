@@ -14,11 +14,10 @@ class RegisterRequest(BaseModel):
     name: str = Field(min_length=1, max_length=100)
 
 
-class RefreshRequest(BaseModel):
-    """Body not needed — refresh token comes via httpOnly cookie."""
-
-
 class UpdateUserSettingsRequest(BaseModel):
     """Update user settings like timezone."""
 
-    settings: dict = Field(default_factory=dict, description="User settings object (e.g., {timezone: 'Asia/Ho_Chi_Minh'})")
+    settings: dict = Field(
+        default_factory=dict,
+        description="User settings object (e.g., {timezone: 'Asia/Ho_Chi_Minh'})",
+    )

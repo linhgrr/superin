@@ -119,19 +119,12 @@ export interface paths {
         /**
          * List Categories
          * @description List all app categories, merged from DB and app registry.
-         *
-         *     Categories are discovered from:
-         *     1. AppCategory documents in DB (admin-managed categories)
-         *     2. App manifests in PLUGIN_REGISTRY (auto-discovered from installed apps)
-         *
-         *     This enables true plug-n-play: when a new app declares a new category,
-         *     it automatically appears in the UI without manual registration.
          */
         get: operations["list_categories_api_catalog_categories_get"];
         put?: never;
         /**
          * Create Category
-         * @description Create a new app category. Requires auth.
+         * @description Create a new app category. Requires admin.
          */
         post: operations["create_category_api_catalog_categories_post"];
         delete?: never;
@@ -196,9 +189,6 @@ export interface paths {
         /**
          * Install App
          * @description Install an app for the current user.
-         *
-         *     Uses atomic find_one_and_update with upsert to prevent race conditions
-         *     when two concurrent requests try to install the same app.
          */
         post: operations["install_app_api_catalog_install_post"];
         delete?: never;
@@ -285,7 +275,7 @@ export interface paths {
          * @description POST /api/chat/stream
          *     Body: {
          *         "messages": GenericMessage[],
-         *         "tools": ToolDefinition[]   # optional JSON Schema — forwarded to LLM
+         *         "tools": ToolDefinition[]   # optional
          *     }
          *     Returns: SSE (assistant-ui UI message stream protocol)
          */
@@ -308,6 +298,26 @@ export interface paths {
          * @description Return installed apps and widget preferences for the authenticated user.
          */
         get: operations["get_workspace_bootstrap_api_workspace_bootstrap_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/subscription/subscription": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get My Subscription
+         * @description Return the current user's subscription (or default free/inactive).
+         */
+        get: operations["get_my_subscription_api_subscription_subscription_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1280,6 +1290,12 @@ export interface components {
             screenshots: string[];
             /** Widgets */
             widgets?: components["schemas"]["WidgetManifestSchema"][];
+            /**
+             * Requires Tier
+             * @default free
+             * @enum {string}
+             */
+            requires_tier: "free" | "paid";
         };
         /**
          * AppCategoryRead
@@ -1330,6 +1346,12 @@ export interface components {
             author: string;
             /** Widgets */
             widgets?: components["schemas"]["WidgetManifestSchema"][];
+            /**
+             * Requires Tier
+             * @default free
+             * @enum {string}
+             */
+            requires_tier: "free" | "paid";
         };
         /** AppUninstallRequest */
         AppUninstallRequest: {
@@ -1938,6 +1960,28 @@ export interface components {
             /** Value */
             value: string;
         };
+        /**
+         * SubscriptionRead
+         * @description User subscription state — returned in auth responses.
+         */
+        SubscriptionRead: {
+            /**
+             * Tier
+             * @enum {string}
+             */
+            tier: "free" | "paid";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "inactive" | "cancelled" | "past_due";
+            /** Provider */
+            provider?: ("stripe" | "payos") | null;
+            /** Started At */
+            started_at?: string | null;
+            /** Expires At */
+            expires_at?: string | null;
+        };
         /** TodoActionResponse */
         TodoActionResponse: {
             /** Success */
@@ -2222,6 +2266,11 @@ export interface components {
             email: string;
             /** Name */
             name: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "admin" | "user";
             /** Settings */
             settings?: {
                 [key: string]: unknown;
@@ -2832,6 +2881,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkspaceBootstrap"];
+                };
+            };
+        };
+    };
+    get_my_subscription_api_subscription_subscription_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionRead"];
                 };
             };
         };

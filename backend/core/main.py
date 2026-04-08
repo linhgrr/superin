@@ -9,7 +9,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from core.config import settings
-from core.constants import API_AUTH, API_CATALOG, API_CHAT, API_ROOT, API_WORKSPACE
+from core.constants import (
+    API_AUTH,
+    API_CATALOG,
+    API_CHAT,
+    API_ROOT,
+    API_SUBSCRIPTIONS,
+    API_WORKSPACE,
+)
 from core.db import close_db, init_db
 from core.discovery import discover_apps
 from core.exceptions import (
@@ -17,8 +24,8 @@ from core.exceptions import (
     http_exception_handler,
     validation_handler,
 )
-from core.logging_middleware import RequestLoggingMiddleware
-from core.security_middleware import SecurityHeadersMiddleware
+from core.middleware.logging import RequestLoggingMiddleware
+from core.middleware.security import SecurityHeadersMiddleware
 from core.verify import verify_plugins
 
 # Configure logging
@@ -107,23 +114,26 @@ def create_app() -> FastAPI:
     app.add_exception_handler(Exception, generic_handler)
 
     # ── Core routers ──────────────────────────────────────────────────────
-    from apps.auth import router as auth_router
+    from core.auth.routes import router as auth_router
     app.include_router(auth_router, prefix=API_AUTH, tags=["auth"])
 
-    from apps.catalog import router as catalog_router
+    from core.catalog.routes import router as catalog_router
     app.include_router(catalog_router, prefix=API_CATALOG, tags=["catalog"])
 
-    from apps.chat import router as chat_router
+    from core.chat.routes import router as chat_router
     app.include_router(chat_router, prefix=API_CHAT, tags=["chat"])
 
-    from core.workspace import require_installed_app
-    from core.workspace import router as workspace_router
+    from core.workspace.routes import router as workspace_router
     app.include_router(workspace_router, prefix=API_WORKSPACE, tags=["workspace"])
+
+    from core.subscriptions.routes import router as subscriptions_router
+    app.include_router(subscriptions_router, prefix=API_SUBSCRIPTIONS, tags=["subscriptions"])
 
     # ── Plugin routers — discover and mount immediately for OpenAPI spec ──
     # Safe to call multiple times; plugin modules are already imported.
     discover_apps()
     from core.registry import PLUGIN_REGISTRY
+    from core.workspace.service import require_installed_app
     for app_id, plugin in PLUGIN_REGISTRY.items():
         app.include_router(
             plugin["router"],

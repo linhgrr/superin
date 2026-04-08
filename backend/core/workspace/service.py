@@ -1,15 +1,13 @@
-"""Workspace runtime bootstrap and installed-app access helpers."""
-
-from __future__ import annotations
+"""Workspace domain — installed app access helpers."""
 
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from beanie import PydanticObjectId
 from beanie.operators import In
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import Depends, HTTPException, Request
 
-from core.auth import get_current_user
+from core.auth.dependencies import get_current_user
 from core.models import UserAppInstallation, WidgetPreference
 from core.registry import get_plugin
 from shared.enums import SubscriptionTier
@@ -19,8 +17,6 @@ from shared.schemas import AppRuntimeEntry, WidgetPreferenceSchema, WorkspaceBoo
 
 if TYPE_CHECKING:
     pass
-
-router = APIRouter()
 
 
 async def list_installed_app_ids(user_id: str) -> list[str]:
@@ -99,16 +95,8 @@ async def build_workspace_bootstrap(user_id: str) -> WorkspaceBootstrap:
     )
 
 
-@router.get("/bootstrap")
-async def get_workspace_bootstrap(
-    user_id: str = Depends(get_current_user),
-) -> WorkspaceBootstrap:
-    """Return installed apps and widget preferences for the authenticated user."""
-    return await build_workspace_bootstrap(user_id)
-
-
 def require_installed_app(app_id: str) -> Callable:
-    """Create a dependency that rejects access to apps the user has not installed."""
+    """FastAPI dependency — rejects access to apps the user has not installed."""
 
     async def dependency(
         request: Request,
@@ -122,8 +110,7 @@ def require_installed_app(app_id: str) -> Callable:
         plugin = get_plugin(app_id)
         if plugin:
             required_tier: SubscriptionTier = plugin["manifest"].requires_tier
-            # Avoid circular import: resolve Subscription at call time
-            from apps.billing.models import Subscription  # noqa: PLC0415
+            from core.subscriptions.model import Subscription  # noqa: PLC0415
             sub = await Subscription.find_one(
                 Subscription.user_id == PydanticObjectId(user_id),
             )

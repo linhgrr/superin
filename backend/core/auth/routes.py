@@ -5,10 +5,15 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
 
-from apps.auth_schemas import LoginRequest, RegisterRequest, UpdateUserSettingsRequest
-from core.auth import create_access_token, create_refresh_token, decode_token, get_current_user
+from core.auth.dependencies import (
+    create_access_token,
+    create_refresh_token,
+    decode_token,
+    get_current_user,
+)
+from core.auth.schemas import LoginRequest, RegisterRequest, UpdateUserSettingsRequest
 from core.constants import AUTH_COOKIE_MAX_AGE_SECONDS, AUTH_COOKIE_NAME
-from core.logging_middleware import login_limiter
+from core.middleware.logging import login_limiter
 from core.models import TokenBlacklist, User
 from core.security import get_password_hash, verify_password
 from shared.schemas import TokenResponse, UserPublic
@@ -22,7 +27,12 @@ def _token_response(user: User) -> TokenResponse:
         access_token=create_access_token({"sub": str(user.id)}),
         refresh_token=create_refresh_token({"sub": str(user.id)}),
         token_type="bearer",
-        user=UserPublic(id=str(user.id), email=user.email, name=user.name, role=user.role),
+        user=UserPublic(
+            id=str(user.id),
+            email=user.email,
+            name=user.name,
+            role=user.role,
+        ),
     )
 
 
@@ -133,7 +143,6 @@ async def logout(
     response: Response,
     refresh_token: str | None = Cookie(None, alias=AUTH_COOKIE_NAME),
 ) -> None:
-    # Blacklist the refresh token to prevent reuse after logout
     if refresh_token:
         try:
             payload = decode_token(refresh_token)
@@ -154,7 +163,13 @@ async def get_me(user_id: str = Depends(get_current_user)) -> UserPublic:
     user = await User.get(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    return UserPublic(id=str(user.id), email=user.email, name=user.name, role=user.role, settings=user.settings or {})
+    return UserPublic(
+        id=str(user.id),
+        email=user.email,
+        name=user.name,
+        role=user.role,
+        settings=user.settings or {},
+    )
 
 
 @router.patch("/me/settings")
@@ -167,10 +182,15 @@ async def update_settings(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # Merge new settings with existing
     current_settings = user.settings or {}
     current_settings.update(request.settings)
     user.settings = current_settings
     await user.save()
 
-    return UserPublic(id=str(user.id), email=user.email, name=user.name, role=user.role, settings=user.settings)
+    return UserPublic(
+        id=str(user.id),
+        email=user.email,
+        name=user.name,
+        role=user.role,
+        settings=user.settings,
+    )

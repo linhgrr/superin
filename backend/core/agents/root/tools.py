@@ -7,7 +7,7 @@ from typing import Any
 from langchain_core.tools import BaseTool, tool
 
 from core.agents.base_app import BaseAppAgent
-from core.catalog_service import (
+from core.catalog.service import (
     UnknownAppError,
     install_app_for_user,
     uninstall_app_for_user,

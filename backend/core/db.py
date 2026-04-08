@@ -3,7 +3,7 @@
 from pymongo import AsyncMongoClient
 
 from core.config import settings
-from core.index_contract import validate_index_contract
+from core.utils.index_contract import validate_index_contract
 
 # ─── Global client (set during lifespan) ──────────────────────────────────────
 

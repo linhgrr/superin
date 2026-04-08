@@ -12,7 +12,7 @@ import logging
 from collections.abc import Awaitable, Callable
 from typing import Any, TypeVar
 
-from core.input_sanitizer import sanitize_db_content_for_llm
+from core.utils.sanitizer import sanitize_db_content_for_llm
 
 T = TypeVar("T")
 

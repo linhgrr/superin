@@ -19,10 +19,10 @@ from langchain_core.tools import BaseTool, tool
 from langgraph.prebuilt import create_react_agent
 
 from core.config import settings
-from core.input_sanitizer import sanitize_for_memory_async, sanitize_user_content_async
 from core.models import ConversationMessage, User, get_user_local_time
 from core.registry import PLUGIN_REGISTRY
-from core.workspace import list_installed_app_ids
+from core.utils.sanitizer import sanitize_for_memory_async, sanitize_user_content_async
+from core.workspace.service import list_installed_app_ids
 from shared.agent_context import clear_agent_context, set_thread_context, set_user_context
 from shared.llm import get_llm
 

@@ -1,4 +1,4 @@
-"""Billing Beanie document models."""
+"""Subscription model — platform-wide, not a plugin."""
 
 from datetime import datetime
 

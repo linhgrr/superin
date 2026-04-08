@@ -79,7 +79,7 @@ def ensure_linhdz() -> None:
     result = subprocess.run(
         ["conda", "run", "-n", "linhdz", "python", str(SCRIPT_PATH), *sys.argv[1:]],
         cwd=ROOT,
-        env={**os.environ, "SUPERIN_SKIP_REEXEC": "1"},
+        env={**os.environ, "SUPERIN_SKIP_REEXEC": "1", "CONDA_PYTHON_EXE": "python"},
     )
     raise SystemExit(result.returncode)
 
@@ -612,7 +612,7 @@ from __future__ import annotations
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from core.auth import get_current_user
+from core.auth.dependencies import get_current_user
 from core.models import WidgetPreference
 from shared.preference_utils import preference_to_schema, update_multiple_preferences
 from shared.schemas import PreferenceUpdate, WidgetManifestSchema, WidgetPreferenceSchema
@@ -726,7 +726,7 @@ async def check_core_indexes() -> None:
     if str(BACKEND_ROOT) not in sys.path:
         sys.path.insert(0, str(BACKEND_ROOT))
 
-    from core.index_contract import validate_index_contract  # type: ignore
+    from core.utils.index_contract import validate_index_contract  # type: ignore
 
     client, database_name = _db_connection()
     try:

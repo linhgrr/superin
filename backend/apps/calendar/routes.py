@@ -18,7 +18,7 @@ from apps.calendar.schemas import (
     CalendarUpdateEventRequest,
 )
 from apps.calendar.service import calendar_service
-from core.auth import get_current_user
+from core.auth.dependencies import get_current_user
 from core.models import WidgetPreference
 from shared.preference_utils import (
     preference_to_schema,
