@@ -9,7 +9,14 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, EmailStr, Field
 
-from shared.enums import ConfigFieldType, SubscriptionTier, WidgetSize
+from shared.enums import (
+    ConfigFieldType,
+    PaymentProvider,
+    SubscriptionStatus,
+    SubscriptionTier,
+    UserRole,
+    WidgetSize,
+)
 
 # ─── User ───────────────────────────────────────────────────────────────────────
 
@@ -35,7 +42,34 @@ class UserPublic(BaseModel):
     id: str
     email: str
     name: str
+    role: UserRole
     settings: dict = Field(default_factory=dict)
+
+
+# ─── Subscription ──────────────────────────────────────────────────────────────
+
+
+class SubscriptionRead(BaseModel):
+    """User subscription state — returned in auth responses."""
+
+    tier: SubscriptionTier
+    status: SubscriptionStatus
+    provider: PaymentProvider | None = None
+    started_at: datetime | None = None
+    expires_at: datetime | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class UserWithSubscription(BaseModel):
+    """User with their subscription — used for /me and workspace."""
+
+    id: str
+    email: str
+    name: str
+    role: UserRole
+    settings: dict = Field(default_factory=dict)
+    subscription: SubscriptionRead
 
 
 # ─── Auth ──────────────────────────────────────────────────────────────────────

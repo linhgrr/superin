@@ -6,9 +6,9 @@ from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends
 
 from apps.billing.models import Subscription
-from apps.billing.schemas import SubscriptionRead
 from core.auth import get_current_user
 from shared.enums import SubscriptionStatus, SubscriptionTier
+from shared.schemas import SubscriptionRead
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

@@ -22,7 +22,7 @@ def _token_response(user: User) -> TokenResponse:
         access_token=create_access_token({"sub": str(user.id)}),
         refresh_token=create_refresh_token({"sub": str(user.id)}),
         token_type="bearer",
-        user=UserPublic(id=str(user.id), email=user.email, name=user.name),
+        user=UserPublic(id=str(user.id), email=user.email, name=user.name, role=user.role),
     )
 
 
@@ -154,7 +154,7 @@ async def get_me(user_id: str = Depends(get_current_user)) -> UserPublic:
     user = await User.get(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    return UserPublic(id=str(user.id), email=user.email, name=user.name, settings=user.settings or {})
+    return UserPublic(id=str(user.id), email=user.email, name=user.name, role=user.role, settings=user.settings or {})
 
 
 @router.patch("/me/settings")
@@ -173,4 +173,4 @@ async def update_settings(
     user.settings = current_settings
     await user.save()
 
-    return UserPublic(id=str(user.id), email=user.email, name=user.name, settings=user.settings)
+    return UserPublic(id=str(user.id), email=user.email, name=user.name, role=user.role, settings=user.settings)
