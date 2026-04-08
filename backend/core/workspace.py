@@ -1,6 +1,9 @@
 """Workspace runtime bootstrap and installed-app access helpers."""
 
+from __future__ import annotations
+
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 from beanie import PydanticObjectId
 from beanie.operators import In
@@ -9,8 +12,13 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from core.auth import get_current_user
 from core.models import UserAppInstallation, WidgetPreference
 from core.registry import get_plugin
+from shared.enums import SubscriptionTier
+from shared.permissions import meets_minimum_tier
 from shared.preference_utils import preference_to_schema
 from shared.schemas import AppRuntimeEntry, WidgetPreferenceSchema, WorkspaceBootstrap
+
+if TYPE_CHECKING:
+    pass
 
 router = APIRouter()
 
@@ -58,6 +66,7 @@ async def list_installed_apps(user_id: str) -> list[AppRuntimeEntry]:
                 version=manifest.version,
                 author=manifest.author,
                 widgets=manifest.widgets,
+                requires_tier=manifest.requires_tier,
             )
         )
 
@@ -108,5 +117,21 @@ def require_installed_app(app_id: str) -> Callable:
         installed_app_ids = await get_installed_app_id_set(user_id, request)
         if app_id not in installed_app_ids:
             raise HTTPException(status_code=403, detail=f"App '{app_id}' is not installed")
+
+        # Check tier requirement against user's subscription
+        plugin = get_plugin(app_id)
+        if plugin:
+            required_tier: SubscriptionTier = plugin["manifest"].requires_tier
+            # Avoid circular import: resolve Subscription at call time
+            from apps.billing.models import Subscription  # noqa: PLC0415
+            sub = await Subscription.find_one(
+                Subscription.user_id == PydanticObjectId(user_id),
+            )
+            user_tier: SubscriptionTier = sub.tier if sub else "free"
+            if not meets_minimum_tier(user_tier, required_tier):
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"App '{app_id}' requires a {required_tier} subscription.",
+                )
 
     return dependency
