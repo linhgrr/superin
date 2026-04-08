@@ -9,7 +9,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, EmailStr, Field
 
-from shared.enums import ConfigFieldType, WidgetSize
+from shared.enums import ConfigFieldType, SubscriptionTier, WidgetSize
 
 # ─── User ───────────────────────────────────────────────────────────────────────
 
@@ -166,6 +166,7 @@ class AppManifestSchema(BaseModel):
     author: str = "Shin Team"
     homepage: str = ""
     requires_auth: bool = True
+    requires_tier: SubscriptionTier = "free"
 
 
 class AppCatalogEntry(BaseModel):
@@ -183,6 +184,7 @@ class AppCatalogEntry(BaseModel):
     tags: list[str] = []
     screenshots: list[str] = []
     widgets: list[WidgetManifestSchema] = Field(default_factory=list)
+    requires_tier: SubscriptionTier = "free"
 
 
 class AppRuntimeEntry(BaseModel):
@@ -197,6 +199,7 @@ class AppRuntimeEntry(BaseModel):
     version: str
     author: str
     widgets: list[WidgetManifestSchema] = Field(default_factory=list)
+    requires_tier: SubscriptionTier = "free"
 
 
 class AppCategoryRead(BaseModel):
