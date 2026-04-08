@@ -92,37 +92,30 @@ async def get_current_user_optional(
         return None
 
 
-async def get_current_admin_user(
-    user_id: Annotated[str, Depends(get_current_user)],
-) -> str:
-    """FastAPI dependency — ensures the current user has admin role.
-
-    Checks user.role == "admin" in the database.
-    Raises 403 if the user exists but is not an admin.
-    Raises 401 if the user does not exist.
-    """
+async def _get_user_or_401(user_id: str) -> User:
+    """Fetch User document or raise 401. Shared by admin and permission checks."""
     user = await User.get(user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+    return user
 
+
+async def get_current_admin_user(
+    user_id: Annotated[str, Depends(get_current_user)],
+) -> str:
+    """FastAPI dependency — ensures the current user has admin role."""
+    user = await _get_user_or_401(user_id)
     if user.role != "admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
-
     return user_id
 
 
 def require_permission(permission: str):
-    """FastAPI dependency factory — raises 403 if user lacks the permission.
-
-    Usage:
-        @router.post("/events", dependencies=[Depends(require_permission("calendar_recurring"))])
-    """
+    """FastAPI dependency factory — raises 403 if user lacks the permission."""
     async def dependency(
         user_id: Annotated[str, Depends(get_current_user)],
     ) -> str:
-        user = await User.get(user_id)
-        if not user:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+        user = await _get_user_or_401(user_id)
 
         # Admin always passes all permission checks
         if user.role == "admin":
@@ -132,15 +125,12 @@ def require_permission(permission: str):
         sub = await Subscription.find_one(
             Subscription.user_id == PydanticObjectId(user_id),
         )
-        if sub is None:
-            effective_tier: SubscriptionTier = "free"
-        else:
-            effective_tier = sub.tier
+        effective_tier: SubscriptionTier = sub.tier if sub else "free"
 
         if not has_permission(effective_tier, permission):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"This feature requires '{permission}'. Upgrade to paid.",
+                detail="This feature requires a paid subscription.",
             )
 
         return user_id
