@@ -8,6 +8,7 @@ from beanie import PydanticObjectId
 from beanie.operators import In
 from pymongo import ReturnDocument, UpdateOne
 
+from core.db import get_db
 from core.models import WidgetPreference
 from shared.schemas import PreferenceUpdate
 
@@ -79,7 +80,8 @@ async def update_widget_preference(
 ) -> WidgetPreference | None:
     """Update or create a single widget preference for a user."""
     user_object_id = PydanticObjectId(user_id)
-    updated = await WidgetPreference.get_pymongo_collection().find_one_and_update(
+    collection = get_db()["widget_preferences"]
+    updated = await collection.find_one_and_update(
         {
             "user_id": user_object_id,
             "app_id": app_id,
@@ -114,7 +116,7 @@ async def update_multiple_preferences(
         latest_by_widget_id[update.widget_id] = update
 
     user_object_id = PydanticObjectId(user_id)
-    collection = WidgetPreference.get_pymongo_collection()
+    collection = get_db()["widget_preferences"]
     operations = [
         UpdateOne(
             {

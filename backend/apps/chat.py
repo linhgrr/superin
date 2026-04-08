@@ -1,6 +1,7 @@
 """Chat streaming route for assistant-ui's modern UI message stream protocol."""
 
 import json
+import logging
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Request
@@ -8,6 +9,8 @@ from fastapi.responses import StreamingResponse
 
 from core.agents.root import root_agent
 from core.auth import get_current_user
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -112,6 +115,7 @@ async def chat_stream(
                     return
 
         except Exception as exc:
+            logger.exception("Chat stream error: %s", exc)
             yield _encode_ui_message_stream_chunk({
                 "type": "error",
                 "errorText": str(exc),
