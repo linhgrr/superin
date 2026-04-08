@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends
 from apps.billing.models import Subscription
 from apps.billing.schemas import SubscriptionRead
 from core.auth import get_current_user
+from shared.enums import SubscriptionStatus, SubscriptionTier
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -23,8 +24,8 @@ async def get_my_subscription(
     )
     if sub is None:
         return SubscriptionRead(
-            tier="free",
-            status="inactive",
+            tier=SubscriptionTier.FREE,
+            status=SubscriptionStatus.INACTIVE,
             provider=None,
             started_at=None,
             expires_at=None,

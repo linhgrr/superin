@@ -1,16 +1,12 @@
 """Billing Beanie document models."""
 
-from datetime import UTC, datetime
+from datetime import datetime
 
-from beanie import Document, PydanticObjectId
+from beanie import Document, IndexModel, PydanticObjectId
 from pydantic import Field
-from pymongo import IndexModel
 
+from core.models import utc_now
 from shared.enums import PaymentProvider, SubscriptionStatus, SubscriptionTier
-
-
-def utc_now() -> datetime:
-    return datetime.now(UTC)
 
 
 class Subscription(Document):
