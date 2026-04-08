@@ -4,12 +4,15 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
+from beanie import PydanticObjectId
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 
 from core.config import settings
-from core.models import TokenBlacklist, User
+from core.models import Subscription, TokenBlacklist, User
+from shared.enums import SubscriptionTier
+from shared.permissions import has_permission
 
 security = HTTPBearer()
 
@@ -92,12 +95,54 @@ async def get_current_user_optional(
 async def get_current_admin_user(
     user_id: Annotated[str, Depends(get_current_user)],
 ) -> str:
-    """FastAPI dependency — ensures the current user is configured as an admin."""
+    """FastAPI dependency — ensures the current user has admin role.
+
+    Checks user.role == "admin" in the database.
+    Raises 403 if the user exists but is not an admin.
+    Raises 401 if the user does not exist.
+    """
     user = await User.get(user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
 
-    if user.email not in settings.admin_emails:
+    if user.role != "admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
 
     return user_id
+
+
+def require_permission(permission: str):
+    """FastAPI dependency factory — raises 403 if user lacks the permission.
+
+    Usage:
+        @router.post("/events", dependencies=[Depends(require_permission("calendar_recurring"))])
+    """
+    async def dependency(
+        user_id: Annotated[str, Depends(get_current_user)],
+    ) -> str:
+        user = await User.get(user_id)
+        if not user:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+
+        # Admin always passes all permission checks
+        if user.role == "admin":
+            return user_id
+
+        # Determine user's effective tier
+        sub = await Subscription.find_one(
+            Subscription.user_id == PydanticObjectId(user_id),
+        )
+        if sub is None:
+            effective_tier: SubscriptionTier = "free"
+        else:
+            effective_tier = sub.tier
+
+        if not has_permission(effective_tier, permission):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"This feature requires '{permission}'. Upgrade to paid.",
+            )
+
+        return user_id
+
+    return dependency
