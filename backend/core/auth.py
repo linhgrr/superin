@@ -10,7 +10,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 
 from core.config import settings
-from core.models import Subscription, TokenBlacklist, User
+from core.models import TokenBlacklist, User
 from shared.enums import SubscriptionTier
 from shared.permissions import has_permission
 
@@ -121,7 +121,8 @@ def require_permission(permission: str):
         if user.role == "admin":
             return user_id
 
-        # Determine user's effective tier
+        # Determine user's effective tier — inline import to avoid circular dependency
+        from apps.billing.models import Subscription  # noqa: PLC0415
         sub = await Subscription.find_one(
             Subscription.user_id == PydanticObjectId(user_id),
         )
