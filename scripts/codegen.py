@@ -30,6 +30,7 @@ BACKEND_DIR = ROOT / "backend"
 OPENAPI_SPEC = ROOT / "openapi.json"
 OUTPUT = ROOT / "frontend" / "src" / "types" / "generated" / "api.ts"
 INDEX_OUTPUT = ROOT / "frontend" / "src" / "types" / "generated" / "index.ts"
+API_CONSTANTS_OUTPUT = ROOT / "frontend" / "src" / "constants" / "api.generated.ts"
 FRONTEND_APPS_DIR = ROOT / "frontend" / "src" / "apps"
 FUNCTION_NAME_OVERRIDES = {
     "calendar": {
@@ -194,6 +195,176 @@ def generate_typescript_index() -> None:
 
     INDEX_OUTPUT.write_text("\n".join(lines))
     print("[codegen] ✓ Barrel generated ->", INDEX_OUTPUT)
+
+
+def to_camel_from_snake(value: str) -> str:
+    parts = [part for part in re.split(r"[_\-]+", value) if part]
+    if not parts:
+        return value
+    return parts[0] + "".join(part[:1].upper() + part[1:] for part in parts[1:])
+
+
+def path_parts(path: str) -> list[str]:
+    return [segment for segment in path.strip("/").split("/") if segment]
+
+
+def path_param_names(path: str) -> list[str]:
+    return [segment[1:-1] for segment in path_parts(path) if segment.startswith("{") and segment.endswith("}")]
+
+
+def key_for_core_api_path(path: str) -> str:
+    parts = path_parts(path)
+    if len(parts) < 2 or parts[0] != "api":
+        raise ValueError(f"Not a core /api path: {path}")
+
+    domain = parts[1]
+    tail = parts[2:]
+
+    if domain == "auth":
+        if tail == ["me", "settings"]:
+            return "SETTINGS"
+        if len(tail) == 1 and not tail[0].startswith("{"):
+            return tail[0].upper()
+        static_tail = [part.upper() for part in tail if not (part.startswith("{") and part.endswith("}"))]
+        return "_".join(static_tail) if static_tail else "AUTH"
+
+    if domain == "catalog":
+        if not tail:
+            return "CATALOG_APPS"
+        if tail == ["preferences"]:
+            return "CATALOG_ALL_PREFERENCES"
+        if tail == ["preferences", "{app_id}"]:
+            return "CATALOG_PREFERENCES"
+        if tail == ["categories", "{category_id}"]:
+            return "CATALOG_CATEGORY"
+        static_tail = [part.upper() for part in tail if not (part.startswith("{") and part.endswith("}"))]
+        return "_".join(["CATALOG", *static_tail])
+
+    if domain == "chat":
+        static_tail = [part.upper() for part in tail if not (part.startswith("{") and part.endswith("}"))]
+        return "_".join(["CHAT", *static_tail])
+
+    if domain == "workspace":
+        static_tail = [part.upper() for part in tail if not (part.startswith("{") and part.endswith("}"))]
+        return "_".join(["WORKSPACE", *static_tail])
+
+    if domain == "subscription":
+        if tail == ["subscription"]:
+            return "SUBSCRIPTION_ME"
+        static_tail = [part.upper() for part in tail if not (part.startswith("{") and part.endswith("}"))]
+        return "_".join(["SUBSCRIPTION", *static_tail])
+
+    if domain == "admin":
+        if tail == ["users", "{user_id}", "role"]:
+            return "ADMIN_USER_ROLE"
+        if tail == ["subscriptions", "{user_id}"]:
+            return "ADMIN_SUBSCRIPTION_USER"
+        if tail == ["apps", "{app_id}", "tier"]:
+            return "ADMIN_APP_TIER"
+        static_tail = [part.upper() for part in tail if not (part.startswith("{") and part.endswith("}"))]
+        return "_".join(["ADMIN", *static_tail])
+
+    static_tail = [part.upper() for part in tail if not (part.startswith("{") and part.endswith("}"))]
+    return "_".join([domain.upper(), *static_tail])
+
+
+def key_for_auth_route(path: str) -> str:
+    parts = path_parts(path)
+    if parts[:2] != ["api", "auth"]:
+        raise ValueError(f"Not an auth route: {path}")
+
+    tail = parts[2:]
+    if tail == ["me", "settings"]:
+        return "SETTINGS"
+    if len(tail) == 1 and not tail[0].startswith("{"):
+        return tail[0].upper()
+
+    static_tail = [part.upper() for part in tail if not (part.startswith("{") and part.endswith("}"))]
+    return "_".join(static_tail) if static_tail else "AUTH"
+
+
+def render_path_value(path: str) -> tuple[list[str], str]:
+    params = path_param_names(path)
+    if not params:
+        return [], json.dumps(path)
+
+    args = [f"{to_camel_from_snake(param)}: string | number" for param in params]
+    rendered_path = path
+    for param in params:
+        rendered_path = rendered_path.replace(
+            "{" + param + "}",
+            "${encodeURIComponent(String(" + to_camel_from_snake(param) + "))}",
+        )
+    return args, f'`{rendered_path}`'
+
+
+def generate_frontend_api_constants() -> None:
+    """Generate frontend core API constants from OpenAPI paths."""
+    spec = json.loads(OPENAPI_SPEC.read_text())
+    path_map = spec.get("paths", {})
+
+    core_paths = sorted(
+        path
+        for path in path_map
+        if path.startswith("/api/")
+        and not path.startswith("/api/apps/")
+    )
+
+    auth_paths = [path for path in core_paths if path.startswith("/api/auth/")]
+
+    lines = [
+        "/**",
+        " * This file was auto-generated by scripts/codegen.py.",
+        " * Do not make direct changes to the file.",
+        " */",
+        "",
+        "// Core API routes generated from backend OpenAPI.",
+        "",
+        "export const AUTH_ROUTES = {",
+    ]
+
+    for path in auth_paths:
+        key = key_for_auth_route(path)
+        route_value = "/" + "/".join(path_parts(path)[1:])
+        lines.append(f"  {key}: {json.dumps(route_value)},")
+
+    lines.extend(
+        [
+            "} as const;",
+            "",
+            "export const API_PATHS = {",
+        ]
+    )
+
+    used_core_keys: set[str] = set()
+    for path in core_paths:
+        key = key_for_core_api_path(path)
+        if key in used_core_keys:
+            suffix = "_".join(param.upper() for param in path_param_names(path))
+            if suffix:
+                key = f"{key}_{suffix}"
+            else:
+                counter = 2
+                while f"{key}_{counter}" in used_core_keys:
+                    counter += 1
+                key = f"{key}_{counter}"
+
+        args, rendered = render_path_value(path)
+        if args:
+            lines.append(f"  {key}: ({', '.join(args)}) => {rendered},")
+        else:
+            lines.append(f"  {key}: {rendered},")
+        used_core_keys.add(key)
+
+    lines.extend(
+        [
+            "} as const;",
+            "",
+        ]
+    )
+
+    API_CONSTANTS_OUTPUT.write_text("\n".join(lines), encoding="utf-8")
+    print("[codegen] ✓ API constants generated ->", API_CONSTANTS_OUTPUT)
 
 
 def load_plugin_manifests() -> dict[str, dict]:
@@ -619,6 +790,7 @@ def main() -> None:
     print("[codegen] Step 2: Generating TypeScript types from OpenAPI spec...")
     run_typescript_codegen()
     generate_typescript_index()
+    generate_frontend_api_constants()
 
     manifests = load_plugin_manifests()
     app_ids = get_app_ids(json.loads(OPENAPI_SPEC.read_text()).get("paths", {}))
