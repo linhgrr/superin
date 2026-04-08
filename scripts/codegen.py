@@ -151,6 +151,38 @@ def generate_typescript_index() -> None:
             continue
         lines.append(f'export type {schema_name} = Schemas["{schema_name}"];')
 
+    def to_enum_member_name(value: object, used_names: set[str]) -> str:
+        raw = re.sub(r"[^A-Za-z0-9]+", "_", str(value)).strip("_").upper()
+        if not raw:
+            raw = "VALUE"
+        if raw[0].isdigit():
+            raw = f"VALUE_{raw}"
+
+        candidate = raw
+        counter = 2
+        while candidate in used_names:
+            candidate = f"{raw}_{counter}"
+            counter += 1
+        used_names.add(candidate)
+        return candidate
+
+    lines.append("")
+    for schema_name in sorted(schemas):
+        if not valid_identifier.match(schema_name):
+            continue
+        schema = schemas[schema_name]
+        enum_values = schema.get("enum") if isinstance(schema, dict) else None
+        if not enum_values or not isinstance(enum_values, list):
+            continue
+
+        used_member_names: set[str] = set()
+        lines.append(f"export const {schema_name} = {{")
+        for enum_value in enum_values:
+            member_name = to_enum_member_name(enum_value, used_member_names)
+            lines.append(f"  {member_name}: {json.dumps(enum_value)},")
+        lines.append(f'}} as const satisfies Record<string, Schemas["{schema_name}"]>;')
+        lines.append("")
+
     lines.extend(
         [
             "",
