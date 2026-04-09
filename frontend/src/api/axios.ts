@@ -24,27 +24,37 @@ const PROACTIVE_CHECK_CACHE_MS = 30_000;
 
 // ─── Token Storage ────────────────────────────────────────────────────────────
 
-let accessToken: string | null = sessionStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+let accessToken: string | null = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
 let lastProactiveCheck = 0;
 let cachedRefreshNeeded = false;
 
 export function setAccessToken(token: string): void {
   accessToken = token;
-  sessionStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, token);
-  // Reset cache on new token
   lastProactiveCheck = 0;
   cachedRefreshNeeded = false;
+  // localStorage for PWA persistence — survives tab close and browser restart
+  try {
+    localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, token);
+  } catch (e: unknown) {
+    // Non-critical: in-memory token is still valid, localStorage failure (quota,
+    // private browsing) won't break the current session — only page refresh.
+    console.warn("[auth] Failed to persist access token to localStorage.", e);
+  }
 }
 
 export function clearAccessToken(): void {
   accessToken = null;
-  sessionStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
   lastProactiveCheck = 0;
   cachedRefreshNeeded = false;
+  try {
+    localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
+  } catch (e: unknown) {
+    console.warn("[auth] Failed to remove access token from localStorage.", e);
+  }
 }
 
 export function getAccessToken(): string | null {
-  return accessToken ?? sessionStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+  return accessToken ?? localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
 }
 
 export function isAuthenticated(): boolean {
