@@ -21,12 +21,17 @@ import AppShell from "@/pages/AppShell";
 const LoginPage = lazy(() => import("@/pages/LoginPage"));
 const DashboardPage = lazy(() => import("@/pages/DashboardPage"));
 const StorePage = lazy(() => import("@/pages/StorePage"));
+const BillingPage = lazy(() => import("@/pages/BillingPage"));
+const BillingSuccessPage = lazy(() => import("@/pages/BillingSuccessPage"));
+const BillingCancelPage = lazy(() => import("@/pages/BillingCancelPage"));
 const AppPage = lazy(() => import("@/pages/AppPage"));
 const SettingsPage = lazy(() => import("@/pages/SettingsPage"));
+const AdminPage = lazy(() => import("@/pages/AdminPage"));
 const CommandPalette = lazy(async () => {
   const module = await import("@/components/providers/CommandPalette");
   return { default: module.CommandPalette };
 });
+const ChatPage = lazy(() => import("@/pages/ChatPage"));
 
 // ─── Global Theme Loader ───────────────────────────────────────────────────────
 
@@ -223,8 +228,13 @@ export default function App() {
             <Route element={<ShellLayout />}>
               <Route path="/dashboard" element={<LazyRoute Component={DashboardPage} />} />
               <Route path="/store" element={<LazyRoute Component={StorePage} />} />
+              <Route path="/billing" element={<LazyRoute Component={BillingPage} />} />
+              <Route path="/billing/success" element={<LazyRoute Component={BillingSuccessPage} />} />
+              <Route path="/billing/cancel" element={<LazyRoute Component={BillingCancelPage} />} />
               <Route path="/apps/:appId" element={<LazyRoute Component={AppPage} />} />
               <Route path="/settings" element={<LazyRoute Component={SettingsPage} />} />
+              <Route path="/admin" element={<LazyRoute Component={AdminPage} />} />
+              <Route path="/chat" element={<LazyRoute Component={ChatPage} />} />
             </Route>
 
             {/* Default redirect */}

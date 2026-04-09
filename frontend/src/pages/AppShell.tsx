@@ -94,8 +94,8 @@ export default function AppShell({ children, title, showChat = true }: AppShellP
       </div>
 
       {showChat && (
-        <Suspense fallback={<div className="chat-container" />}>
-          {isChatReady ? <ChatPanel /> : <div className="chat-container" />}
+        <Suspense fallback={<aside className="chat-container" />}>
+          {isChatReady ? <ChatPanel /> : <aside className="chat-container" />}
         </Suspense>
       )}
     </div>
