@@ -253,7 +253,10 @@ class CalendarRepository:
     ) -> Calendar | None:
         return await Calendar.find_one(
             Calendar.user_id == PydanticObjectId(user_id),
-            Calendar.is_default,
+            {
+                "user_id": PydanticObjectId(user_id),
+                "is_default": True,
+            },
             session=session,
         )
 

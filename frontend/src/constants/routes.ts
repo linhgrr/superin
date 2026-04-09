@@ -9,7 +9,12 @@ export const ROUTES = {
   // Protected
   DASHBOARD: "/dashboard",
   STORE: "/store",
+  BILLING: "/billing",
+  BILLING_SUCCESS: "/billing/success",
+  BILLING_CANCEL: "/billing/cancel",
   SETTINGS: "/settings",
+  ADMIN: "/admin",
+  CHAT: "/chat",
   APP_DETAIL: (appId: string) => `/apps/${appId}`,
 
   // Default
@@ -21,5 +26,8 @@ export const ROUTE_NAMES: Record<string, string> = {
   [ROUTES.LOGIN]: "Login",
   [ROUTES.DASHBOARD]: "Dashboard",
   [ROUTES.STORE]: "App Store",
+  [ROUTES.BILLING]: "Billing",
   [ROUTES.SETTINGS]: "Settings",
+  [ROUTES.ADMIN]: "Admin",
+  [ROUTES.CHAT]: "Chat",
 };

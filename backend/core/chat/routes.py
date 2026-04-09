@@ -9,6 +9,8 @@ from fastapi.responses import StreamingResponse
 
 from core.agents.root import root_agent
 from core.auth.dependencies import get_current_user
+from core.constants import CHAT_STREAM_FRIENDLY_ERROR_TEXT
+from shared.enums import ChatEventType
 
 logger = logging.getLogger(__name__)
 
@@ -99,7 +101,10 @@ async def chat_stream(request: Request, user_id: str = Depends(get_current_user)
 
         except Exception as exc:
             logger.exception("Chat stream error: %s", exc)
-            yield _encode_chunk({"type": "error", "errorText": str(exc)})
+            yield _encode_chunk({
+                "type": ChatEventType.ERROR,
+                "errorText": CHAT_STREAM_FRIENDLY_ERROR_TEXT,
+            })
             yield _encode_done()
 
     return StreamingResponse(

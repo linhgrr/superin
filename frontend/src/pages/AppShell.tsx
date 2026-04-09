@@ -3,6 +3,7 @@
  *
  * 3-column grid: Sidebar | Main Content | Chat Panel
  * Handles responsive collapse.
+ * Mobile: BottomTabBar replaces sidebar on viewports <= 768px.
  */
 
 import { lazy, ReactNode, Suspense, useEffect, useMemo, useState } from "react";
@@ -10,6 +11,7 @@ import { Outlet, useLocation } from "react-router-dom";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
+import MobileTabBar from "@/components/navigation/MobileTabBar";
 
 const ChatPanel = lazy(() => import("@/components/chat/ChatPanel"));
 
@@ -32,7 +34,9 @@ function usePageTitles(): Record<string, string> {
     const titles: Record<string, string> = {
       dashboard: "Dashboard",
       store: "App Store",
+      billing: "Billing",
       settings: "Settings",
+      admin: "Admin",
     };
 
     // Add titles from installed apps
@@ -112,6 +116,9 @@ export default function AppShell({
           {children ?? <Outlet />}
         </main>
       </div>
+
+      {/* Mobile tab bar — fixed bottom, z-index above sidebar */}
+      <MobileTabBar />
 
       {/* Right: Chat panel */}
       {showChat && (
