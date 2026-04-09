@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background circle with coral/orange color matching app theme -->
+  <rect width="512" height="512" rx="112" fill="#b05c32"/>
+  <!-- Inner lighter ring for depth -->
+  <rect x="24" y="24" width="464" height="464" rx="96" fill="none" stroke="#c87a4a" stroke-width="8"/>
+  <!-- "S" letterform — bold geometric -->
+  <text x="256" y="340"
+    font-family="Arial, system-ui, sans-serif"
+    font-size="280"
+    font-weight="700"
+    text-anchor="middle"
+    fill="white"
+    letter-spacing="-8">S</text>
+</svg>

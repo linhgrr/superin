@@ -30,6 +30,9 @@
     "react-router-dom": "^7.1.1",
     "react-textarea-autosize": "^8.5.4",
     "remark-gfm": "^4.0.1",
+    "swr": "^2.4.1",
+    "vite-plugin-pwa": "^1.2.0",
+    "workbox-window": "^7.4.0",
     "zod": "^4.0.0"
   },
   "devDependencies": {
