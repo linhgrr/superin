@@ -201,10 +201,19 @@ html,
 body {
   margin: 0;
   padding: 0;
-  min-height: 100vh;
+  min-height: 100dvh;
   background: var(--color-background);
   color: var(--color-foreground);
   font-family: var(--font-sans);
+}
+
+/* Safe-area insets — scoped to mobile widths only to avoid global padding on desktop */
+@media (max-width: 768px) {
+  html {
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════════
@@ -404,7 +413,7 @@ body {
 .dashboard-grid {
   display: grid;
   grid-template-columns: 260px 1fr 380px;
-  height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   background: var(--color-background);
 }
@@ -429,6 +438,10 @@ body {
     grid-template-columns: 1fr;
   }
   .dashboard-grid .sidebar {
+    display: none;
+  }
+  /* Chat panel hidden on mobile — accessible via header toggle */
+  .dashboard-grid aside:last-child {
     display: none;
   }
 }
@@ -1369,7 +1382,7 @@ tr:hover td {
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 .login-container {
-  min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
