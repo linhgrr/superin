@@ -1,11 +1,15 @@
+import { memo } from "react";
+
 import { ChatRuntimeProvider } from "@/components/providers/InnerProviders";
 
 import ChatThread from "./ChatThread";
 
-export default function ChatPanel() {
+const ChatPanel = memo(function ChatPanel() {
   return (
     <ChatRuntimeProvider>
       <ChatThread />
     </ChatRuntimeProvider>
   );
-}
+});
+
+export default ChatPanel;
