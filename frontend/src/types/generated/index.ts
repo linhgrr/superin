@@ -10,11 +10,23 @@ export type { components, operations, paths } from "./api";
 export type Schemas = components["schemas"];
 export type SchemaName = keyof Schemas;
 
+export type AdminAppRead = Schemas["AdminAppRead"];
+export type AdminAppsResponse = Schemas["AdminAppsResponse"];
+export type AdminStatsRead = Schemas["AdminStatsRead"];
+export type AdminSubscriptionRead = Schemas["AdminSubscriptionRead"];
+export type AdminSubscriptionsResponse = Schemas["AdminSubscriptionsResponse"];
+export type AdminUpdateAppTierRequest = Schemas["AdminUpdateAppTierRequest"];
+export type AdminUpdateSubscriptionRequest = Schemas["AdminUpdateSubscriptionRequest"];
+export type AdminUpdateUserRoleRequest = Schemas["AdminUpdateUserRoleRequest"];
+export type AdminUserRead = Schemas["AdminUserRead"];
+export type AdminUserSubscriptionRead = Schemas["AdminUserSubscriptionRead"];
+export type AdminUsersResponse = Schemas["AdminUsersResponse"];
 export type AppCatalogEntry = Schemas["AppCatalogEntry"];
 export type AppCategoryRead = Schemas["AppCategoryRead"];
 export type AppInstallRequest = Schemas["AppInstallRequest"];
 export type AppRuntimeEntry = Schemas["AppRuntimeEntry"];
 export type AppUninstallRequest = Schemas["AppUninstallRequest"];
+export type Body_update_avatar_api_auth_me_avatar_post = Schemas["Body_update_avatar_api_auth_me_avatar_post"];
 export type CalendarActionResponse = Schemas["CalendarActionResponse"];
 export type CalendarCalendarRead = Schemas["CalendarCalendarRead"];
 export type CalendarCreateCalendarRequest = Schemas["CalendarCreateCalendarRequest"];
@@ -26,7 +38,11 @@ export type CalendarRecurringRuleRead = Schemas["CalendarRecurringRuleRead"];
 export type CalendarScheduleTaskRequest = Schemas["CalendarScheduleTaskRequest"];
 export type CalendarUpdateCalendarRequest = Schemas["CalendarUpdateCalendarRequest"];
 export type CalendarUpdateEventRequest = Schemas["CalendarUpdateEventRequest"];
+export type CancelSubscriptionResponse = Schemas["CancelSubscriptionResponse"];
+export type CheckoutRequest = Schemas["CheckoutRequest"];
+export type CheckoutResponse = Schemas["CheckoutResponse"];
 export type ConfigFieldSchema = Schemas["ConfigFieldSchema"];
+export type ConfigFieldType = Schemas["ConfigFieldType"];
 export type CreateCategoryRequest = Schemas["CreateCategoryRequest"];
 export type FinanceActionResponse = Schemas["FinanceActionResponse"];
 export type FinanceBudgetCategoryStatus = Schemas["FinanceBudgetCategoryStatus"];
@@ -49,10 +65,16 @@ export type FinanceUpdateWalletRequest = Schemas["FinanceUpdateWalletRequest"];
 export type FinanceWalletRead = Schemas["FinanceWalletRead"];
 export type HTTPValidationError = Schemas["HTTPValidationError"];
 export type LoginRequest = Schemas["LoginRequest"];
+export type PaymentProvider = Schemas["PaymentProvider"];
+export type PermissionKey = Schemas["PermissionKey"];
+export type PermissionListRead = Schemas["PermissionListRead"];
+export type PermissionRead = Schemas["PermissionRead"];
 export type PreferenceUpdate = Schemas["PreferenceUpdate"];
 export type RegisterRequest = Schemas["RegisterRequest"];
 export type SelectOption = Schemas["SelectOption"];
 export type SubscriptionRead = Schemas["SubscriptionRead"];
+export type SubscriptionStatus = Schemas["SubscriptionStatus"];
+export type SubscriptionTier = Schemas["SubscriptionTier"];
 export type TodoActionResponse = Schemas["TodoActionResponse"];
 export type TodoCreateRecurringRuleRequest = Schemas["TodoCreateRecurringRuleRequest"];
 export type TodoCreateSubTaskRequest = Schemas["TodoCreateSubTaskRequest"];
@@ -68,10 +90,60 @@ export type TokenResponse = Schemas["TokenResponse"];
 export type UpdateCategoryRequest = Schemas["UpdateCategoryRequest"];
 export type UpdateUserSettingsRequest = Schemas["UpdateUserSettingsRequest"];
 export type UserPublic = Schemas["UserPublic"];
+export type UserRole = Schemas["UserRole"];
 export type ValidationError = Schemas["ValidationError"];
+export type WebhookAck = Schemas["WebhookAck"];
 export type WidgetManifestSchema = Schemas["WidgetManifestSchema"];
 export type WidgetPreferenceSchema = Schemas["WidgetPreferenceSchema"];
+export type WidgetSize = Schemas["WidgetSize"];
 export type WorkspaceBootstrap = Schemas["WorkspaceBootstrap"];
+
+export const ConfigFieldType = {
+  TEXT: "text",
+  NUMBER: "number",
+  SELECT: "select",
+  MULTI_SELECT: "multi-select",
+  DATE: "date",
+  BOOLEAN: "boolean",
+} as const satisfies Record<string, Schemas["ConfigFieldType"]>;
+
+export const PaymentProvider = {
+  STRIPE: "stripe",
+  PAYOS: "payos",
+} as const satisfies Record<string, Schemas["PaymentProvider"]>;
+
+export const PermissionKey = {
+  CHAT_AI_UNLIMITED: "chat_ai_unlimited",
+  ADMIN_USERS_VIEW: "admin_users_view",
+  ADMIN_SUBSCRIPTIONS_VIEW: "admin_subscriptions_view",
+  ADMIN_APPS_MANAGE: "admin_apps_manage",
+} as const satisfies Record<string, Schemas["PermissionKey"]>;
+
+export const SubscriptionStatus = {
+  ACTIVE: "active",
+  INACTIVE: "inactive",
+  CANCELLED: "cancelled",
+  PAST_DUE: "past_due",
+} as const satisfies Record<string, Schemas["SubscriptionStatus"]>;
+
+export const SubscriptionTier = {
+  FREE: "free",
+  PAID: "paid",
+} as const satisfies Record<string, Schemas["SubscriptionTier"]>;
+
+export const UserRole = {
+  ADMIN: "admin",
+  USER: "user",
+} as const satisfies Record<string, Schemas["UserRole"]>;
+
+export const WidgetSize = {
+  COMPACT: "compact",
+  STANDARD: "standard",
+  WIDE: "wide",
+  TALL: "tall",
+  FULL: "full",
+} as const satisfies Record<string, Schemas["WidgetSize"]>;
+
 
 export type OperationMap = operations;
 export type PathMap = paths;

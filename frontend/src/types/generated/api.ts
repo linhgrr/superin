@@ -89,6 +89,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get My Permissions
+         * @description Return current user's effective permissions from backend matrix.
+         */
+        get: operations["get_my_permissions_api_auth_permissions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/me/settings": {
         parameters: {
             query?: never;
@@ -107,6 +127,26 @@ export interface paths {
          * @description Update user settings (timezone, etc.).
          */
         patch: operations["update_settings_api_auth_me_settings_patch"];
+        trace?: never;
+    };
+    "/api/auth/me/avatar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Update Avatar
+         * @description Upload and update the current user's avatar.
+         */
+        post: operations["update_avatar_api_auth_me_avatar_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/catalog/categories": {
@@ -324,6 +364,205 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/subscription/checkout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Subscription Checkout
+         * @description Create checkout URL for upgrading to paid tier.
+         */
+        post: operations["create_subscription_checkout_api_subscription_checkout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/subscription/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel Subscription
+         * @description Cancel current subscription and downgrade to free.
+         */
+        post: operations["cancel_subscription_api_subscription_cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/subscription/webhook/stripe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Stripe Webhook
+         * @description Stripe webhook endpoint.
+         */
+        post: operations["stripe_webhook_api_subscription_webhook_stripe_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/subscription/webhook/payos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Payos Webhook
+         * @description PayOS webhook endpoint.
+         */
+        post: operations["payos_webhook_api_subscription_webhook_payos_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Admin Stats */
+        get: operations["get_admin_stats_api_admin_stats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Admin Users */
+        get: operations["get_admin_users_api_admin_users_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/users/{user_id}/role": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Patch Admin User Role */
+        patch: operations["patch_admin_user_role_api_admin_users__user_id__role_patch"];
+        trace?: never;
+    };
+    "/api/admin/subscriptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Admin Subscriptions */
+        get: operations["get_admin_subscriptions_api_admin_subscriptions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/subscriptions/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Patch Admin Subscription */
+        patch: operations["patch_admin_subscription_api_admin_subscriptions__user_id__patch"];
+        trace?: never;
+    };
+    "/api/admin/apps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Admin Apps */
+        get: operations["get_admin_apps_api_admin_apps_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/apps/{app_id}/tier": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Patch Admin App Tier */
+        patch: operations["patch_admin_app_tier_api_admin_apps__app_id__tier_patch"];
         trace?: never;
     };
     "/api/apps/calendar/widgets": {
@@ -1252,6 +1491,127 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AdminAppRead */
+        AdminAppRead: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Category */
+            category: string;
+            requires_tier: components["schemas"]["SubscriptionTier"];
+            /** Install Count */
+            install_count: number;
+        };
+        /** AdminAppsResponse */
+        AdminAppsResponse: {
+            /** Items */
+            items: components["schemas"]["AdminAppRead"][];
+            /** Total */
+            total: number;
+        };
+        /** AdminStatsRead */
+        AdminStatsRead: {
+            /** Total Users */
+            total_users: number;
+            /** Admin Users */
+            admin_users: number;
+            /** Active Subscriptions */
+            active_subscriptions: number;
+            /** Paid Subscriptions */
+            paid_subscriptions: number;
+            /** Installed Apps */
+            installed_apps: number;
+        };
+        /** AdminSubscriptionRead */
+        AdminSubscriptionRead: {
+            /** Id */
+            id: string;
+            /** User Id */
+            user_id: string;
+            /**
+             * User Email
+             * Format: email
+             */
+            user_email: string;
+            /** User Name */
+            user_name: string;
+            tier: components["schemas"]["SubscriptionTier"];
+            status: components["schemas"]["SubscriptionStatus"];
+            provider?: components["schemas"]["PaymentProvider"] | null;
+            /** Started At */
+            started_at?: string | null;
+            /** Expires At */
+            expires_at?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** AdminSubscriptionsResponse */
+        AdminSubscriptionsResponse: {
+            /** Items */
+            items: components["schemas"]["AdminSubscriptionRead"][];
+            /** Total */
+            total: number;
+        };
+        /** AdminUpdateAppTierRequest */
+        AdminUpdateAppTierRequest: {
+            requires_tier: components["schemas"]["SubscriptionTier"];
+        };
+        /** AdminUpdateSubscriptionRequest */
+        AdminUpdateSubscriptionRequest: {
+            tier?: components["schemas"]["SubscriptionTier"] | null;
+            status?: components["schemas"]["SubscriptionStatus"] | null;
+            /** Expires At */
+            expires_at?: string | null;
+        };
+        /** AdminUpdateUserRoleRequest */
+        AdminUpdateUserRoleRequest: {
+            role: components["schemas"]["UserRole"];
+        };
+        /** AdminUserRead */
+        AdminUserRead: {
+            /** Id */
+            id: string;
+            /**
+             * Email
+             * Format: email
+             */
+            email: string;
+            /** Name */
+            name: string;
+            role: components["schemas"]["UserRole"];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            subscription: components["schemas"]["AdminUserSubscriptionRead"];
+        };
+        /** AdminUserSubscriptionRead */
+        AdminUserSubscriptionRead: {
+            tier: components["schemas"]["SubscriptionTier"];
+            status: components["schemas"]["SubscriptionStatus"];
+            provider?: components["schemas"]["PaymentProvider"] | null;
+            /** Started At */
+            started_at?: string | null;
+            /** Expires At */
+            expires_at?: string | null;
+        };
+        /** AdminUsersResponse */
+        AdminUsersResponse: {
+            /** Items */
+            items: components["schemas"]["AdminUserRead"][];
+            /** Total */
+            total: number;
+        };
         /**
          * AppCatalogEntry
          * @description Summary entry shown in the app store.
@@ -1290,12 +1650,8 @@ export interface components {
             screenshots: string[];
             /** Widgets */
             widgets?: components["schemas"]["WidgetManifestSchema"][];
-            /**
-             * Requires Tier
-             * @default free
-             * @enum {string}
-             */
-            requires_tier: "free" | "paid";
+            /** @default free */
+            requires_tier: components["schemas"]["SubscriptionTier"];
         };
         /**
          * AppCategoryRead
@@ -1346,17 +1702,19 @@ export interface components {
             author: string;
             /** Widgets */
             widgets?: components["schemas"]["WidgetManifestSchema"][];
-            /**
-             * Requires Tier
-             * @default free
-             * @enum {string}
-             */
-            requires_tier: "free" | "paid";
         };
         /** AppUninstallRequest */
         AppUninstallRequest: {
             /** App Id */
             app_id: string;
+        };
+        /** Body_update_avatar_api_auth_me_avatar_post */
+        Body_update_avatar_api_auth_me_avatar_post: {
+            /**
+             * File
+             * Format: binary
+             */
+            file: string;
         };
         /** CalendarActionResponse */
         CalendarActionResponse: {
@@ -1586,6 +1944,29 @@ export interface components {
             /** Reminders */
             reminders?: number[] | null;
         };
+        /** CancelSubscriptionResponse */
+        CancelSubscriptionResponse: {
+            /** Cancelled */
+            cancelled: boolean;
+            status: components["schemas"]["SubscriptionStatus"];
+            tier: components["schemas"]["SubscriptionTier"];
+        };
+        /** CheckoutRequest */
+        CheckoutRequest: {
+            provider?: components["schemas"]["PaymentProvider"] | null;
+            /** Success Url */
+            success_url?: string | null;
+            /** Cancel Url */
+            cancel_url?: string | null;
+        };
+        /** CheckoutResponse */
+        CheckoutResponse: {
+            provider: components["schemas"]["PaymentProvider"];
+            /** Checkout Url */
+            checkout_url: string;
+            /** Provider Reference */
+            provider_reference: string;
+        };
         /**
          * ConfigFieldSchema
          * @description A configuration field for a widget.
@@ -1598,11 +1979,7 @@ export interface components {
             name: string;
             /** Label */
             label: string;
-            /**
-             * Type
-             * @enum {string}
-             */
-            type: "text" | "number" | "select" | "multi-select" | "date" | "boolean";
+            type: components["schemas"]["ConfigFieldType"];
             /**
              * Required
              * @default false
@@ -1626,6 +2003,12 @@ export interface components {
             /** Step */
             step?: number | null;
         };
+        /**
+         * ConfigFieldType
+         * @description Valid types for ConfigFieldSchema.type.
+         * @enum {string}
+         */
+        ConfigFieldType: "text" | "number" | "select" | "multi-select" | "date" | "boolean";
         /** CreateCategoryRequest */
         CreateCategoryRequest: {
             /** Name */
@@ -1922,6 +2305,29 @@ export interface components {
             password: string;
         };
         /**
+         * PaymentProvider
+         * @description Supported payment providers.
+         * @enum {string}
+         */
+        PaymentProvider: "stripe" | "payos";
+        /**
+         * PermissionKey
+         * @description Platform permission keys used by backend and frontend.
+         * @enum {string}
+         */
+        PermissionKey: "chat_ai_unlimited" | "admin_users_view" | "admin_subscriptions_view" | "admin_apps_manage";
+        /** PermissionListRead */
+        PermissionListRead: {
+            /** Items */
+            items: components["schemas"]["PermissionRead"][];
+        };
+        /** PermissionRead */
+        PermissionRead: {
+            key: components["schemas"]["PermissionKey"];
+            /** Allowed */
+            allowed: boolean;
+        };
+        /**
          * PreferenceUpdate
          * @description Update payload for a single widget preference.
          */
@@ -1965,23 +2371,26 @@ export interface components {
          * @description User subscription state — returned in auth responses.
          */
         SubscriptionRead: {
-            /**
-             * Tier
-             * @enum {string}
-             */
-            tier: "free" | "paid";
-            /**
-             * Status
-             * @enum {string}
-             */
-            status: "active" | "inactive" | "cancelled" | "past_due";
-            /** Provider */
-            provider?: ("stripe" | "payos") | null;
+            tier: components["schemas"]["SubscriptionTier"];
+            status: components["schemas"]["SubscriptionStatus"];
+            provider?: components["schemas"]["PaymentProvider"] | null;
             /** Started At */
             started_at?: string | null;
             /** Expires At */
             expires_at?: string | null;
         };
+        /**
+         * SubscriptionStatus
+         * @description Payment lifecycle status for a subscription.
+         * @enum {string}
+         */
+        SubscriptionStatus: "active" | "inactive" | "cancelled" | "past_due";
+        /**
+         * SubscriptionTier
+         * @description Subscription tier — determines which features are accessible.
+         * @enum {string}
+         */
+        SubscriptionTier: "free" | "paid";
         /** TodoActionResponse */
         TodoActionResponse: {
             /** Success */
@@ -2266,16 +2675,20 @@ export interface components {
             email: string;
             /** Name */
             name: string;
-            /**
-             * Role
-             * @enum {string}
-             */
-            role: "admin" | "user";
+            /** Avatar Url */
+            avatar_url?: string | null;
+            role: components["schemas"]["UserRole"];
             /** Settings */
             settings?: {
                 [key: string]: unknown;
             };
         };
+        /**
+         * UserRole
+         * @description Valid values for User.role.
+         * @enum {string}
+         */
+        UserRole: "admin" | "user";
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -2284,6 +2697,27 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /** WebhookAck */
+        WebhookAck: {
+            /**
+             * Ok
+             * @default true
+             */
+            ok: boolean;
+            provider: components["schemas"]["PaymentProvider"];
+            /**
+             * Event Type
+             * @default unknown
+             */
+            event_type: string;
+            /**
+             * Processed
+             * @default false
+             */
+            processed: boolean;
+            /** Message */
+            message?: string | null;
         };
         /**
          * WidgetManifestSchema
@@ -2304,12 +2738,8 @@ export interface components {
              * @description Lucide icon name
              */
             icon: string;
-            /**
-             * Size
-             * @default standard
-             * @enum {string}
-             */
-            size: "compact" | "standard" | "wide" | "tall" | "full";
+            /** @default standard */
+            size: components["schemas"]["WidgetSize"];
             /** Config Fields */
             config_fields?: components["schemas"]["ConfigFieldSchema"][];
             /**
@@ -2350,6 +2780,12 @@ export interface components {
             /** Size H */
             size_h?: number | null;
         };
+        /**
+         * WidgetSize
+         * @description Valid widget sizes for WidgetManifestSchema.size.
+         * @enum {string}
+         */
+        WidgetSize: "compact" | "standard" | "wide" | "tall" | "full";
         /**
          * WorkspaceBootstrap
          * @description Authenticated workspace runtime bootstrap payload.
@@ -2515,6 +2951,26 @@ export interface operations {
             };
         };
     };
+    get_my_permissions_api_auth_permissions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PermissionListRead"];
+                };
+            };
+        };
+    };
     update_settings_api_auth_me_settings_patch: {
         parameters: {
             query?: never;
@@ -2525,6 +2981,39 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["UpdateUserSettingsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserPublic"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_avatar_api_auth_me_avatar_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_update_avatar_api_auth_me_avatar_post"];
             };
         };
         responses: {
@@ -2901,6 +3390,322 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SubscriptionRead"];
+                };
+            };
+        };
+    };
+    create_subscription_checkout_api_subscription_checkout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckoutRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckoutResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_subscription_api_subscription_cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CancelSubscriptionResponse"];
+                };
+            };
+        };
+    };
+    stripe_webhook_api_subscription_webhook_stripe_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "stripe-signature"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookAck"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    payos_webhook_api_subscription_webhook_payos_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookAck"];
+                };
+            };
+        };
+    };
+    get_admin_stats_api_admin_stats_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminStatsRead"];
+                };
+            };
+        };
+    };
+    get_admin_users_api_admin_users_get: {
+        parameters: {
+            query?: {
+                skip?: number;
+                limit?: number;
+                search?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUsersResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_admin_user_role_api_admin_users__user_id__role_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminUpdateUserRoleRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_admin_subscriptions_api_admin_subscriptions_get: {
+        parameters: {
+            query?: {
+                skip?: number;
+                limit?: number;
+                status?: components["schemas"]["SubscriptionStatus"] | null;
+                tier?: components["schemas"]["SubscriptionTier"] | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSubscriptionsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_admin_subscription_api_admin_subscriptions__user_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminUpdateSubscriptionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSubscriptionRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_admin_apps_api_admin_apps_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminAppsResponse"];
+                };
+            };
+        };
+    };
+    patch_admin_app_tier_api_admin_apps__app_id__tier_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminUpdateAppTierRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminAppRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

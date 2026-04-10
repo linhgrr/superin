@@ -7,7 +7,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { ApiError } from "@/api/client";
+import { ApiError } from "@/api/axios";
 import { APP_NAME } from "@/config";
 import { Eye, EyeOff, ArrowRight, Sparkles } from "lucide-react";
 

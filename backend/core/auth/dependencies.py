@@ -6,14 +6,13 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
-from beanie import PydanticObjectId
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 
 from core.config import settings
 from core.models import TokenBlacklist, User
-from shared.enums import SubscriptionTier
+from shared.enums import PermissionKey, UserRole
 from shared.permissions import has_permission
 
 security = HTTPBearer()
@@ -107,12 +106,12 @@ async def get_current_admin_user(
 ) -> str:
     """FastAPI dependency — ensures the current user has admin role."""
     user = await _get_user_or_401(user_id)
-    if user.role != "admin":
+    if user.role != UserRole.ADMIN:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
     return user_id
 
 
-def require_permission(permission: str):
+def require_permission(permission: PermissionKey | str):
     """FastAPI dependency factory — raises 403 if user lacks the permission."""
     async def dependency(
         user_id: Annotated[str, Depends(get_current_user)],
@@ -120,15 +119,13 @@ def require_permission(permission: str):
         user = await _get_user_or_401(user_id)
 
         # Admin always passes all permission checks
-        if user.role == "admin":
+        if user.role == UserRole.ADMIN:
             return user_id
 
-        # Determine user's effective tier — inline import to avoid circular dependency
-        from core.subscriptions.model import Subscription  # noqa: PLC0415
-        sub = await Subscription.find_one(
-            Subscription.user_id == PydanticObjectId(user_id),
-        )
-        effective_tier: SubscriptionTier = sub.tier if sub else "free"
+        # Determine user's effective tier (includes PayOS expiry downgrade)
+        from core.subscriptions.service import get_effective_tier  # noqa: PLC0415
+
+        effective_tier = await get_effective_tier(user_id)
 
         if not has_permission(effective_tier, permission):
             raise HTTPException(

@@ -1,5 +1,6 @@
 """Todo plugin manifest."""
 
+from shared.enums import ConfigFieldType, WidgetSize
 from shared.schemas import (
     AppManifestSchema,
     ConfigFieldSchema,
@@ -11,12 +12,12 @@ task_list_widget = WidgetManifestSchema(
     name="Task List",
     description="Shows pending tasks grouped by priority",
     icon="CheckSquare",
-    size="standard",
+    size=WidgetSize.STANDARD,
     config_fields=[
         ConfigFieldSchema(
             name="filter",
             label="Show",
-            type="select",
+            type=ConfigFieldType.SELECT,
             required=False,
             default="all",
             options=[
@@ -33,7 +34,7 @@ today_widget = WidgetManifestSchema(
     name="Today's Tasks",
     description="Tasks due today or overdue",
     icon="Calendar",
-    size="compact",
+    size=WidgetSize.COMPACT,
     config_fields=[],
 )
 

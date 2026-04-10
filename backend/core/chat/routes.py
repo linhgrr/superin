@@ -54,14 +54,14 @@ async def chat_stream(request: Request, user_id: str = Depends(get_current_user)
             ):
                 event_type = event.get("type")
 
-                if event_type in {"text", "token"}:
+                if event_type in {"text", ChatEventType.TOKEN}:
                     yield _encode_chunk({
                         "type": "text-delta",
                         "textDelta": event["content"],
                     })
                     continue
 
-                if event_type == "tool_call":
+                if event_type == ChatEventType.TOOL_CALL:
                     tool_call_id = event["toolCallId"]
                     yield _encode_chunk({
                         "type": "tool-call-start",
@@ -78,7 +78,7 @@ async def chat_stream(request: Request, user_id: str = Depends(get_current_user)
                     yield _encode_chunk({"type": "tool-call-end"})
                     continue
 
-                if event_type == "tool_result":
+                if event_type == ChatEventType.TOOL_RESULT:
                     result = event["result"]
                     payload: dict[str, object] = {
                         "type": "tool-result",
@@ -90,7 +90,7 @@ async def chat_stream(request: Request, user_id: str = Depends(get_current_user)
                     yield _encode_chunk(payload)
                     continue
 
-                if event_type == "done":
+                if event_type == ChatEventType.DONE:
                     yield _encode_chunk({
                         "type": "finish",
                         "finishReason": "stop",

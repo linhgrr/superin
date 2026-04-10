@@ -31,6 +31,7 @@ async def init_db() -> None:
         WidgetPreference,
     )
     from core.registry import get_plugin_models
+    from core.subscriptions.model import Subscription, SubscriptionWebhookEvent
 
     database = _client[settings.mongodb_database]
     await validate_index_contract(database)
@@ -44,6 +45,8 @@ async def init_db() -> None:
             WidgetPreference,
             TokenBlacklist,
             ConversationMessage,
+            Subscription,
+            SubscriptionWebhookEvent,
             *get_plugin_models(),
         ],
     )

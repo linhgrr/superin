@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { getWorkspaceBootstrap } from "@/api/workspace";
-import { clearActiveApps, setActiveApps } from "@/lib/lazy-registry";
 import { discoverAndRegisterApps } from "@/lib/discovery";
-import { prefetchApps, primeAppAndWidget } from "@/lib/prefetch";
-import { STORAGE_KEYS } from "@/constants";
+import { useRenderLoopDebug } from "@/lib/debug-render-loop";
+import { clearActiveApps } from "@/lib/lazy-registry";
 import { useAuth } from "@/hooks/useAuth";
-import { preloadIcons } from "@/lib/icon-resolver";
 import type {
   AppCatalogEntry,
   AppRuntimeEntry,
@@ -14,7 +12,11 @@ import type {
   WidgetPreferenceSchema,
   WorkspaceBootstrap,
 } from "@/types/generated";
+
+import { useAppActivation } from "./useAppActivation";
+import { clearWorkspaceSnapshot, readWorkspaceSnapshot, writeWorkspaceSnapshot } from "./workspace-snapshot";
 import { WorkspaceContext } from "./workspace-context";
+import { mergePreferenceUpdates } from "@/pages/dashboard/preference-utils";
 
 export interface WorkspaceContextValue {
   installedApps: AppRuntimeEntry[];
@@ -29,16 +31,7 @@ export interface WorkspaceContextValue {
   replaceWidgetPreferences: (preferences: WidgetPreferenceSchema[]) => void;
 }
 
-const WORKSPACE_CACHE_VERSION = 1;
-
-interface PersistedWorkspaceSnapshot {
-  userId: string;
-  version: number;
-  storedAt: number;
-  workspace: WorkspaceBootstrap;
-}
-
-function toRuntimeApp(app: AppCatalogEntry): AppRuntimeEntry {
+export function toRuntimeApp(app: AppCatalogEntry): AppRuntimeEntry {
   return {
     id: app.id,
     name: app.name,
@@ -52,77 +45,6 @@ function toRuntimeApp(app: AppCatalogEntry): AppRuntimeEntry {
   };
 }
 
-function readWorkspaceSnapshot(userId: string): WorkspaceBootstrap | null {
-  try {
-    const raw = sessionStorage.getItem(STORAGE_KEYS.WORKSPACE_SNAPSHOT);
-    if (!raw) {
-      return null;
-    }
-
-    const parsed = JSON.parse(raw) as PersistedWorkspaceSnapshot;
-    if (
-      parsed.version !== WORKSPACE_CACHE_VERSION ||
-      parsed.userId !== userId ||
-      !parsed.workspace
-    ) {
-      return null;
-    }
-
-    return parsed.workspace;
-  } catch (error: unknown) {
-    console.error("Failed to read workspace snapshot", error);
-    return null;
-  }
-}
-
-function writeWorkspaceSnapshot(userId: string, workspace: WorkspaceBootstrap): void {
-  try {
-    const payload: PersistedWorkspaceSnapshot = {
-      userId,
-      version: WORKSPACE_CACHE_VERSION,
-      storedAt: Date.now(),
-      workspace,
-    };
-    sessionStorage.setItem(STORAGE_KEYS.WORKSPACE_SNAPSHOT, JSON.stringify(payload));
-  } catch (error: unknown) {
-    console.error("Failed to write workspace snapshot", error);
-  }
-}
-
-function clearWorkspaceSnapshot(): void {
-  try {
-    sessionStorage.removeItem(STORAGE_KEYS.WORKSPACE_SNAPSHOT);
-  } catch (error: unknown) {
-    console.error("Failed to clear workspace snapshot", error);
-  }
-}
-
-function mergePreferenceUpdates(
-  current: WidgetPreferenceSchema[],
-  updates: PreferenceUpdate[]
-): WidgetPreferenceSchema[] {
-  const next = new Map(current.map((pref) => [pref.widget_id, pref] as const));
-
-  for (const update of updates) {
-    const existing = next.get(update.widget_id);
-    const appId = existing?.app_id ?? update.widget_id.split(".")[0] ?? "";
-
-    next.set(update.widget_id, {
-      _id: existing?._id ?? null,
-      user_id: existing?.user_id ?? "",
-      widget_id: update.widget_id,
-      app_id: appId,
-      enabled: update.enabled ?? existing?.enabled ?? false,
-      sort_order: update.sort_order ?? existing?.sort_order ?? 0,
-      config: update.config ?? existing?.config ?? {},
-      size_w: update.size_w ?? existing?.size_w ?? null,
-      size_h: update.size_h ?? existing?.size_h ?? null,
-    });
-  }
-
-  return Array.from(next.values());
-}
-
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [installedApps, setInstalledApps] = useState<AppRuntimeEntry[]>([]);
@@ -132,6 +54,21 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const refreshRequestIdRef = useRef(0);
 
   const userId = user?.id ?? null;
+
+  useRenderLoopDebug("WorkspaceProvider", {
+    details: () => ({
+      userId,
+      installedApps: installedApps.length,
+      widgetPreferences: widgetPreferences.length,
+      isWorkspaceLoading,
+      isWorkspaceRefreshing,
+    }),
+  });
+
+  // ─── App activation, icon preload, prefetch (extracted) ────────────────────
+  useAppActivation(installedApps);
+
+  // ─── Bootstrap ─────────────────────────────────────────────────────────────
 
   const applyWorkspace = useCallback((workspace: WorkspaceBootstrap) => {
     setInstalledApps(workspace.installed_apps ?? []);
@@ -155,9 +92,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
     try {
       const workspace = await getWorkspaceBootstrap();
-      if (refreshRequestIdRef.current !== requestId) {
-        return;
-      }
+      if (refreshRequestIdRef.current !== requestId) return;
       applyWorkspace(workspace);
       writeWorkspaceSnapshot(userId, workspace);
     } finally {
@@ -168,10 +103,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }
   }, [applyWorkspace, userId]);
 
+  // Register apps on mount
   useEffect(() => {
     discoverAndRegisterApps();
   }, []);
 
+  // Auth-dependent lifecycle
   useEffect(() => {
     if (!userId) {
       refreshRequestIdRef.current += 1;
@@ -197,58 +134,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     void refreshWorkspace();
   }, [applyWorkspace, refreshWorkspace, userId]);
 
-  useEffect(() => {
-    setActiveApps(installedApps.map((app) => app.id));
-  }, [installedApps]);
-
-  useEffect(() => {
-    const iconNames = installedApps.flatMap((app) => [
-      app.icon,
-      ...(app.widgets ?? []).map((widget) => widget.icon),
-    ]);
-    if (iconNames.length === 0) {
-      return;
-    }
-
-    const handle = window.setTimeout(() => {
-      preloadIcons(iconNames.filter((name): name is string => Boolean(name)));
-    }, 1);
-    return () => {
-      window.clearTimeout(handle);
-    };
-  }, [installedApps]);
-
-  useEffect(() => {
-    if (installedApps.length === 0) {
-      return;
-    }
-
-    const prioritizedAppIds = [...installedApps]
-      .sort((left, right) => {
-        const rightCount = (right.widgets ?? []).length;
-        const leftCount = (left.widgets ?? []).length;
-        return rightCount - leftCount;
-      })
-      .map((app) => app.id);
-
-    const eagerAppIds = prioritizedAppIds.slice(0, 3);
-    const idleAppIds = prioritizedAppIds.slice(3);
-    const eagerHandles = eagerAppIds.map((appId, index) =>
-      window.setTimeout(() => {
-        primeAppAndWidget(appId);
-      }, index * 60)
-    );
-    let cancelIdlePrefetch = () => {};
-    const idleHandle = window.setTimeout(() => {
-      cancelIdlePrefetch = prefetchApps(idleAppIds);
-    }, eagerAppIds.length > 0 ? 250 : 0);
-
-    return () => {
-      eagerHandles.forEach((handle) => window.clearTimeout(handle));
-      window.clearTimeout(idleHandle);
-      cancelIdlePrefetch();
-    };
-  }, [installedApps]);
+  // ─── App install/uninstall ──────────────────────────────────────────────────
 
   const setAppInstalled = useCallback((app: AppCatalogEntry, isInstalled: boolean) => {
     const runtimeApp = toRuntimeApp(app);
@@ -256,18 +142,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setInstalledApps((prev) => {
       if (isInstalled) {
         const existing = prev.find((entry) => entry.id === app.id);
-        if (existing) {
-          return prev.map((entry) => (entry.id === app.id ? runtimeApp : entry));
-        }
+        if (existing) return prev.map((entry) => (entry.id === app.id ? runtimeApp : entry));
         return [...prev, runtimeApp];
       }
-
       return prev.filter((entry) => entry.id !== app.id);
     });
 
     setWidgetPreferences((prev) => {
       const next = new Map(prev.map((pref) => [pref.widget_id, pref] as const));
-
       if (isInstalled) {
         for (const [index, widget] of (app.widgets ?? []).entries()) {
           if (!next.has(widget.id)) {
@@ -285,7 +167,6 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           }
         }
       }
-
       return Array.from(next.values());
     });
   }, [userId]);
@@ -298,10 +179,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setWidgetPreferences(preferences);
   }, []);
 
+  // ─── Persistence ────────────────────────────────────────────────────────────
+
   useEffect(() => {
-    if (!userId || isWorkspaceLoading) {
-      return;
-    }
+    if (!userId || isWorkspaceLoading) return;
 
     const workspaceSnapshot = {
       installed_apps: installedApps,
@@ -316,7 +197,6 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         cancelScheduled = () => window.cancelIdleCallback(handle);
         return;
       }
-
       writeWorkspaceSnapshot(userId, workspaceSnapshot);
     }, 250);
 
@@ -325,6 +205,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       cancelScheduled();
     };
   }, [installedApps, isWorkspaceLoading, userId, widgetPreferences]);
+
+  // ─── Context value ──────────────────────────────────────────────────────────
 
   const value = useMemo<WorkspaceContextValue>(() => ({
     installedApps,

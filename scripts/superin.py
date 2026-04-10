@@ -25,7 +25,7 @@ SCRIPT_PATH = Path(__file__).resolve()
 
 APP_ID_RE = re.compile(r"^[a-z][a-z0-9]*$")
 RESERVED = {"auth", "catalog", "chat", "core", "shared", "apps"}
-REQUIRES_LINHDZ = {"codegen", "db", "manifests", "plugin"}
+REQUIRES_LINHDZ = {"codegen", "db", "manifests", "plugin", "users"}
 
 
 def fail(message: str) -> None:
@@ -798,6 +798,49 @@ async def reset_database() -> None:
     print(f"reinitialized database `{database_name}` from current Beanie models")
 
 
+async def promote_user_to_admin(email: str) -> None:
+    if str(BACKEND_ROOT) not in sys.path:
+        sys.path.insert(0, str(BACKEND_ROOT))
+
+    from shared.enums import UserRole  # type: ignore
+
+    normalized_email = email.strip()
+    if not normalized_email:
+        fail("email is required")
+
+    client, database_name = _db_connection()
+    try:
+        users = client[database_name]["users"]
+        case_insensitive_query = {
+            "email": {"$regex": f"^{re.escape(normalized_email)}$", "$options": "i"},
+        }
+        matches = await users.count_documents(case_insensitive_query)
+        if matches == 0:
+            fail(f"user with email '{normalized_email}' not found")
+        if matches > 1:
+            fail(
+                "multiple users matched the email ignoring case; "
+                "please normalize duplicated emails before promoting admin",
+            )
+
+        user = await users.find_one(case_insensitive_query, {"_id": 1, "email": 1, "role": 1})
+        if user is None:
+            fail(f"user with email '{normalized_email}' not found")
+
+        current_role = user.get("role")
+        if current_role == UserRole.ADMIN.value:
+            print(f"user '{user['email']}' is already admin")
+            return
+
+        await users.update_one(
+            {"_id": user["_id"]},
+            {"$set": {"role": UserRole.ADMIN.value}},
+        )
+        print(f"promoted '{user['email']}' to admin")
+    finally:
+        await client.close()
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Superin developer CLI")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -826,6 +869,14 @@ def build_parser() -> argparse.ArgumentParser:
     db_sub.add_parser("check-indexes", help="Validate core Mongo index contract")
     db_reset = db_sub.add_parser("reset", help="Drop the configured Mongo database and recreate indexes from models")
     db_reset.add_argument("--yes", action="store_true", help="Confirm destructive reset")
+
+    users = subparsers.add_parser("users", help="User account workflows")
+    users_sub = users.add_subparsers(dest="users_command", required=True)
+    users_promote_admin = users_sub.add_parser(
+        "promote-admin",
+        help="Promote a user to admin by email",
+    )
+    users_promote_admin.add_argument("--email", required=True, help="User email to promote")
 
     dev = subparsers.add_parser("dev", help="Run backend then frontend dev servers")
     dev.add_argument("--frontend-delay", type=float, default=1.5)
@@ -882,6 +933,10 @@ def main() -> None:
         if not args.yes:
             fail("db reset is destructive. Re-run with --yes to drop the configured Mongo database.")
         asyncio.run(reset_database())
+        return
+
+    if args.command == "users" and args.users_command == "promote-admin":
+        asyncio.run(promote_user_to_admin(args.email))
         return
 
     if args.command == "dev":

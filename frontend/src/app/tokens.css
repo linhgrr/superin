@@ -1,0 +1,240 @@
+/* Shin Superin — Refined Industrial Minimalism Design System */
+
+/* Tailwind v4 @theme — defines all CSS custom properties.
+   In v4, @theme auto-generates equivalent CSS variables, so :root{}
+   duplication is removed. */
+
+@theme {
+  /* ═══════════════════════════════════════════════════════════════════════════════
+     COLOR SYSTEM — Warm Dark with Coral Accents
+     ═══════════════════════════════════════════════════════════════════════════════ */
+
+  /* Primary — Coral/Orange warmth */
+  --color-primary: oklch(0.68 0.22 35);
+  --color-primary-hover: oklch(0.75 0.24 35);
+  --color-primary-foreground: oklch(0.98 0 0);
+  --color-primary-muted: oklch(0.68 0.22 35 / 0.15);
+
+  /* Secondary end-stop for primary gradient (lighter coral) */
+  --color-primary-end: oklch(0.72 0.24 45);
+
+  /* Semantic */
+  --color-success: oklch(0.75 0.18 145);
+  --color-warning: oklch(0.78 0.16 85);
+  --color-danger: oklch(0.62 0.22 25);
+  --color-info: oklch(0.65 0.15 250);
+
+  /* Background — Warm dark */
+  --color-background: oklch(0.12 0.01 40);
+  --color-background-elevated: oklch(0.16 0.015 40);
+  --color-background-sunken: oklch(0.09 0.008 40);
+
+  /* Foreground */
+  --color-foreground: oklch(0.95 0.005 40);
+  --color-foreground-muted: oklch(0.65 0.01 40);
+  --color-foreground-subtle: oklch(0.45 0.01 40);
+
+  /* Surfaces — Glassmorphism ready */
+  --color-surface: oklch(0.15 0.012 40);
+  --color-surface-elevated: oklch(0.20 0.015 40);
+  --color-surface-floating: oklch(0.24 0.018 40);
+  --color-surface-transparent: oklch(0.15 0.012 40 / 0.85);
+
+  /* Borders — Subtle depth */
+  --color-border: oklch(0.22 0.015 40);
+  --color-border-subtle: oklch(0.18 0.012 40);
+  --color-border-highlight: oklch(0.30 0.02 40);
+
+  /* Interaction */
+  --color-ring: oklch(0.68 0.22 35);
+  --color-ring-offset: oklch(0.12 0.01 40);
+
+  /* Primary at various opacities for use in gradients/overlays */
+  --color-primary-glow: oklch(0.68 0.22 35);
+
+  /* Semantic color tokens at specific opacities for reuse in components */
+  --color-success-muted-bg: oklch(0.75 0.18 145 / 0.15);
+  --color-warning-muted-bg: oklch(0.78 0.16 85 / 0.15);
+  --color-danger-muted-bg: oklch(0.62 0.22 25 / 0.15);
+  --color-danger-muted-border: oklch(0.62 0.22 25 / 0.3);
+  --color-danger-subtle-bg: oklch(0.62 0.22 25 / 0.1);
+
+  /* ═══════════════════════════════════════════════════════════════════════════════
+     TYPOGRAPHY — Distinctive & Characterful
+     ═══════════════════════════════════════════════════════════════════════════════ */
+
+  --font-display: "Space Grotesk", "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-heading: "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", monospace;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   LIGHT MODE — Clean & Airy
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+:root.light {
+  color-scheme: light;
+
+  /* Primary — Coral accent maintained */
+  --color-primary: oklch(0.65 0.2 35);
+  --color-primary-hover: oklch(0.58 0.22 35);
+  --color-primary-foreground: oklch(0.98 0 0);
+  --color-primary-muted: oklch(0.65 0.2 35 / 0.12);
+
+  /* Semantic — adjusted for light */
+  --color-success: oklch(0.65 0.2 145);
+  --color-warning: oklch(0.7 0.18 85);
+  --color-danger: oklch(0.55 0.2 25);
+  --color-info: oklch(0.55 0.15 250);
+
+  /* Background — Warm light tones */
+  --color-background: oklch(0.97 0.005 80);
+  --color-background-elevated: oklch(1 0 0);
+  --color-background-sunken: oklch(0.94 0.008 80);
+
+  /* Foreground — Dark text */
+  --color-foreground: oklch(0.2 0.01 80);
+  --color-foreground-muted: oklch(0.5 0.015 80);
+  --color-foreground-subtle: oklch(0.65 0.01 80);
+
+  /* Surfaces — Clean white cards */
+  --color-surface: oklch(1 0 0);
+  --color-surface-elevated: oklch(0.98 0.005 80);
+  --color-surface-floating: oklch(0.95 0.008 80);
+  --color-surface-transparent: oklch(1 0 0 / 0.9);
+
+  /* Borders — Subtle on light */
+  --color-border: oklch(0.88 0.01 80);
+  --color-border-subtle: oklch(0.94 0.008 80);
+  --color-border-highlight: oklch(0.8 0.015 80);
+
+  /* Interaction */
+  --color-ring: oklch(0.65 0.2 35);
+  --color-ring-offset: oklch(0.97 0.005 80);
+  /* Secondary gradient stop */
+  --color-primary-end: oklch(0.72 0.24 45);
+  /* Primary at full chroma for use in gradients */
+  --color-primary-glow: oklch(0.68 0.22 35);
+}
+
+/* Override glass effect in light mode for better visibility */
+:root.light .sidebar,
+:root.light .app-header {
+  background: oklch(1 0 0 / 0.85);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+}
+
+:root.light .widget-card,
+:root.light .store-card,
+:root.light .login-card,
+:root.light .dialog-panel {
+  box-shadow:
+    0 4px 6px oklch(0.5 0.01 80 / 0.05),
+    0 10px 20px oklch(0.5 0.01 80 / 0.08),
+    0 0 0 1px var(--color-border);
+}
+
+:root.light .widget-card:hover,
+:root.light .store-card:hover {
+  box-shadow:
+    0 8px 16px oklch(0.5 0.01 80 / 0.1),
+    0 20px 40px oklch(0.5 0.01 80 / 0.12),
+    0 0 0 1px var(--color-border-highlight);
+}
+
+:root.light .login-container {
+  background:
+    radial-gradient(ellipse at 20% 20%, oklch(0.65 0.2 35 / 0.06) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 80%, oklch(0.55 0.15 250 / 0.04) 0%, transparent 50%),
+    var(--color-background);
+}
+
+:root.light .sidebar-brand-icon,
+:root.light .login-brand-icon,
+:root.light .btn-primary {
+  box-shadow: 0 4px 14px oklch(0.65 0.2 35 / 0.2);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   BASE STYLES
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100dvh;
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+}
+
+/* Safe-area insets — scoped to mobile widths only to avoid global padding on desktop */
+@media (max-width: 768px) {
+  html {
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   UTILITY CLASSES — Reusable primitives
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+.glass {
+  background: var(--color-surface-transparent);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+}
+
+.glass-strong {
+  background: oklch(0.15 0.012 40 / 0.95);
+  backdrop-filter: blur(40px) saturate(200%);
+  -webkit-backdrop-filter: blur(40px) saturate(200%);
+}
+
+.text-gradient {
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-end) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.glow-sm {
+  box-shadow: 0 0 20px oklch(from var(--color-primary) l c h / 0.2);
+}
+
+.glow-md {
+  box-shadow: 0 0 40px oklch(from var(--color-primary) l c h / 0.3);
+}
+
+/* Focus visible */
+:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+}
+
+/* Selection */
+::selection {
+  background: var(--color-primary-muted);
+  color: var(--color-foreground);
+}

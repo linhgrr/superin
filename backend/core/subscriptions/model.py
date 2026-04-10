@@ -14,8 +14,8 @@ class Subscription(Document):
     """User subscription state — one record per user."""
 
     user_id: PydanticObjectId
-    tier: SubscriptionTier = "free"
-    status: SubscriptionStatus = "inactive"
+    tier: SubscriptionTier = SubscriptionTier.FREE
+    status: SubscriptionStatus = SubscriptionStatus.INACTIVE
     provider: PaymentProvider | None = None
     provider_subscription_id: str | None = None
     started_at: datetime | None = None
@@ -35,4 +35,26 @@ class Subscription(Document):
                 name="subscriptions_provider_reference",
             ),
             IndexModel([("status", 1)], name="subscriptions_status_index"),
+        ]
+
+
+class SubscriptionWebhookEvent(Document):
+    """Processed webhook event ids for idempotency."""
+
+    provider: PaymentProvider
+    event_id: str
+    received_at: datetime = Field(default_factory=utc_now)
+
+    class Settings:
+        name = "subscription_webhook_events"
+        indexes = [
+            IndexModel(
+                [("provider", 1), ("event_id", 1)],
+                name="subscription_webhook_events_provider_event_unique",
+                unique=True,
+            ),
+            IndexModel(
+                [("received_at", 1)],
+                name="subscription_webhook_events_received_at_index",
+            ),
         ]

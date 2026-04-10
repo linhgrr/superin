@@ -7,7 +7,7 @@
  */
 import type { AxiosRequestConfig, Method } from "axios";
 
-import { api } from "./client";
+import { api } from "./axios";
 
 type AppRequestInit = Omit<RequestInit, "body"> & {
   body?: unknown;

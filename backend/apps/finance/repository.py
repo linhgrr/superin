@@ -11,10 +11,7 @@ from pymongo.asynchronous.client_session import AsyncClientSession
 from apps.finance.enums import TransactionType
 from apps.finance.models import Category, Transaction, Wallet
 from core.db import get_db
-
-
-def _normalize_name_key(name: str) -> str:
-    return name.strip().casefold()
+from shared.normalization import normalize_name_key
 
 
 @asynccontextmanager
@@ -70,7 +67,7 @@ class WalletRepository:
     ) -> Wallet | None:
         return await Wallet.find_one(
             Wallet.user_id == PydanticObjectId(user_id),
-            Wallet.name_key == _normalize_name_key(name),
+            Wallet.name_key == normalize_name_key(name),
             session=session,
         )
 
@@ -85,7 +82,7 @@ class WalletRepository:
         wallet = Wallet(
             user_id=PydanticObjectId(user_id),
             name=name,
-            name_key=_normalize_name_key(name),
+            name_key=normalize_name_key(name),
             currency=currency,
             balance=0.0,
         )
@@ -100,7 +97,7 @@ class WalletRepository:
         session: AsyncClientSession | None = None,
     ) -> Wallet:
         wallet.name = name
-        wallet.name_key = _normalize_name_key(name)
+        wallet.name_key = normalize_name_key(name)
         await wallet.save(session=session)
         return wallet
 
@@ -195,7 +192,7 @@ class CategoryRepository:
     ) -> Category | None:
         return await Category.find_one(
             Category.user_id == PydanticObjectId(user_id),
-            Category.name_key == _normalize_name_key(name),
+            Category.name_key == normalize_name_key(name),
             session=session,
         )
 
@@ -212,7 +209,7 @@ class CategoryRepository:
         category = Category(
             user_id=PydanticObjectId(user_id),
             name=name,
-            name_key=_normalize_name_key(name),
+            name_key=normalize_name_key(name),
             icon=icon,
             color=color,
             budget=budget,
@@ -232,7 +229,7 @@ class CategoryRepository:
     ) -> Category:
         if name is not None:
             category.name = name
-            category.name_key = _normalize_name_key(name)
+            category.name_key = normalize_name_key(name)
         if icon is not None:
             category.icon = icon
         if color is not None:

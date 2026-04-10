@@ -41,7 +41,43 @@ export const COMMON_TIMEZONES = {
 
 export const DEFAULT_TIMEZONE = 'UTC';
 
-type DateInput = string | Date | null | undefined;
+// ─── Re-export date-level helpers ─────────────────────────────────────────────
+
+export {
+  isToday,
+  isPast,
+  getTodayRange,
+} from './timezone-dates';
+
+export type { DateInput } from './timezone-dates';
+
+// ─── Re-export formatters ────────────────────────────────────────────────────
+
+export {
+  formatDateTime,
+  formatDate,
+  formatTime,
+  getLocalDateTimeStrings,
+} from './timezone-formatters';
+
+// ─── Conversion ───────────────────────────────────────────────────────────────
+
+/**
+ * Convert UTC ISO string to Date object.
+ * Returns null if input is null/undefined or invalid.
+ */
+export function utcToLocalDate(value: string | Date | null | undefined): Date | null {
+  if (!value) return null;
+
+  try {
+    const date = value instanceof Date ? value : new Date(value);
+    if (isNaN(date.getTime())) return null;
+    return date;
+  } catch (error: unknown) {
+    console.error('[timezone] Failed to convert UTC string to local date', error);
+    return null;
+  }
+}
 
 // ─── User Timezone ───────────────────────────────────────────────────────────
 
@@ -79,181 +115,4 @@ export function setUserTimezone(timezone: string): void {
  */
 export function clearUserTimezone(): void {
   localStorage.removeItem(STORAGE_KEYS.USER_TIMEZONE);
-}
-
-// ─── Conversion ───────────────────────────────────────────────────────────────
-
-/**
- * Convert UTC ISO string to Date object.
- * Returns null if input is null/undefined or invalid.
- */
-export function utcToLocalDate(value: DateInput): Date | null {
-  if (!value) return null;
-
-  try {
-    const date = value instanceof Date ? value : new Date(value);
-    if (isNaN(date.getTime())) return null;
-    return date;
-  } catch (error: unknown) {
-    console.error('[timezone] Failed to convert UTC string to local date', error);
-    return null;
-  }
-}
-
-// ─── Formatters ───────────────────────────────────────────────────────────────
-
-/**
- * Format a UTC datetime string for display in user's local timezone.
- */
-export function formatDateTime(
-  utcString: DateInput,
-  options: Intl.DateTimeFormatOptions = {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }
-): string {
-  const date = utcToLocalDate(utcString);
-  if (!date) return '';
-
-  const tz = getUserTimezone();
-  return new Intl.DateTimeFormat(undefined, { ...options, timeZone: tz }).format(date);
-}
-
-/**
- * Format only the date portion (no time).
- */
-export function formatDate(
-  utcString: DateInput,
-  options: Intl.DateTimeFormatOptions = {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  }
-): string {
-  const date = utcToLocalDate(utcString);
-  if (!date) return '';
-
-  const tz = getUserTimezone();
-  return new Intl.DateTimeFormat(undefined, { ...options, timeZone: tz }).format(date);
-}
-
-/**
- * Format only the time portion (no date).
- */
-export function formatTime(
-  utcString: DateInput,
-  options: Intl.DateTimeFormatOptions = {
-    hour: '2-digit',
-    minute: '2-digit',
-  }
-): string {
-  const date = utcToLocalDate(utcString);
-  if (!date) return '';
-
-  const tz = getUserTimezone();
-  return new Intl.DateTimeFormat(undefined, { ...options, timeZone: tz }).format(date);
-}
-
-// ─── Date Checks ──────────────────────────────────────────────────────────────
-
-/**
- * Check if a UTC datetime string is "today" in user's local timezone.
- */
-export function isToday(utcString: DateInput): boolean {
-  const date = utcToLocalDate(utcString);
-  if (!date) return false;
-
-  const tz = getUserTimezone();
-  const now = new Date();
-
-  const dateStr = new Intl.DateTimeFormat('en-CA', {
-    timeZone: tz,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(date);
-
-  const todayStr = new Intl.DateTimeFormat('en-CA', {
-    timeZone: tz,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(now);
-
-  return dateStr === todayStr;
-}
-
-/**
- * Check if a UTC datetime string is in the past.
- */
-export function isPast(utcString: DateInput): boolean {
-  const date = utcToLocalDate(utcString);
-  if (!date) return false;
-  return date.getTime() < Date.now();
-}
-
-// ─── Range Helpers ────────────────────────────────────────────────────────────
-
-/**
- * Get start and end of "today" in user's timezone, returned as UTC ISO strings.
- */
-export function getTodayRange(): { start: string; end: string } {
-  const tz = getUserTimezone();
-  const now = new Date();
-
-  const startFormatter = new Intl.DateTimeFormat('en-CA', {
-    timeZone: tz,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  });
-
-  const parts = startFormatter.formatToParts(now);
-  const year = parts.find(p => p.type === 'year')?.value;
-  const month = parts.find(p => p.type === 'month')?.value;
-  const day = parts.find(p => p.type === 'day')?.value;
-
-  if (!year || !month || !day) {
-    // Fallback to UTC
-    const start = new Date(now);
-    start.setUTCHours(0, 0, 0, 0);
-    const end = new Date(now);
-    end.setUTCHours(23, 59, 59, 999);
-    return { start: start.toISOString(), end: end.toISOString() };
-  }
-
-  const startLocal = new Date(`${year}-${month}-${day}T00:00:00`);
-  const endLocal = new Date(`${year}-${month}-${day}T23:59:59.999`);
-
-  return {
-    start: startLocal.toISOString(),
-    end: endLocal.toISOString(),
-  };
-}
-
-/**
- * Get current date and time strings in user's local timezone.
- */
-export function getLocalDateTimeStrings(): [string, string] {
-  const tz = getUserTimezone();
-  const now = new Date();
-
-  const dateStr = new Intl.DateTimeFormat('en-CA', {
-    timeZone: tz,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(now);
-
-  const timeStr = new Intl.DateTimeFormat(undefined, {
-    timeZone: tz,
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(now);
-
-  return [dateStr, timeStr];
 }

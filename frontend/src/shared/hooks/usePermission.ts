@@ -1,74 +1,52 @@
 /**
- * usePermission — client-side permission check mirroring the backend PERMISSIONS matrix.
+ * usePermission — client-side permission check backed by /api/auth/permissions.
  *
- * Mirrors `shared/permissions.py` for client-side feature gating.
- * Admin role always passes all permission checks (enforced by the backend).
+ * Source of truth is backend `shared/permissions.py`.
+ * Frontend does not redefine permission matrix.
  *
  * Usage:
- *   const canInstallFinance = usePermission("finance_install");
- *   const canUseRecurring = usePermission("calendar_recurring");
+ *   const canUseUnlimitedAI = usePermission(PERMISSION_KEYS.CHAT_AI_UNLIMITED);
  */
 
 import useSWR from "swr";
 
+import { getMyPermissions } from "@/api/auth";
 import { useAuth } from "@/hooks/useAuth";
-import { fetcher } from "@/lib/swr";
+import { PermissionKey, UserRole } from "@/types/generated";
+import type {
+  PermissionKey as PermissionKeyValue,
+  PermissionListRead,
+} from "@/types/generated";
 
-// ─── Permission matrix (mirrors backend shared/permissions.py) ─────────────────
+const SWR_PERMISSION_KEY = "auth:permissions";
 
-const PERMISSIONS: Record<string, Record<"free" | "paid", boolean>> = {
-  // App installation
-  finance_install: { free: false, paid: true },
-  calendar_install: { free: false, paid: true },
-  billing_install: { free: true, paid: true },
-  todo_install: { free: true, paid: true },
-  chat_install: { free: true, paid: true },
-  health2_install: { free: true, paid: true },
-  // Feature-level per app
-  calendar_recurring: { free: false, paid: true },
-  calendar_export: { free: false, paid: true },
-  todo_recurring: { free: false, paid: true },
-  finance_wallet_multiple: { free: false, paid: true },
-  finance_export: { free: false, paid: true },
-  chat_ai_unlimited: { free: false, paid: true },
-  // Admin (frontend does not gate on admin permissions — they are backend-only)
-  admin_users_view: { free: false, paid: false },
-  admin_subscriptions_view: { free: false, paid: false },
-  admin_apps_manage: { free: false, paid: false },
-};
+export const PERMISSION_KEYS = PermissionKey;
 
-function hasPermission(tier: "free" | "paid", permission: string): boolean {
-  return PERMISSIONS[permission]?.[tier] ?? false;
-}
+function hasPermission(snapshot: PermissionListRead | undefined, permission: PermissionKeyValue): boolean {
+  if (!snapshot) return false;
 
-// ─── Hook ──────────────────────────────────────────────────────────────────────
-
-interface SubscriptionResponse {
-  tier: "free" | "paid";
+  const item = snapshot.items.find((entry) => entry.key === permission);
+  return item?.allowed ?? false;
 }
 
 /**
  * Returns `true` if the current user has the named permission.
  *
  * Missing permission key = denied (safe default).
- * Admin role bypass is handled server-side; the hook only checks tier.
  */
-export function usePermission(permission: string): boolean {
+export function usePermission(permission: PermissionKeyValue): boolean {
   const { user, isAuthenticated } = useAuth();
-  const shouldFetchSubscription = isAuthenticated && user?.role !== "admin";
 
-  const { data } = useSWR<SubscriptionResponse>(
-    shouldFetchSubscription ? "/api/billing/subscription" : null,
-    fetcher,
+  const { data } = useSWR<PermissionListRead>(
+    isAuthenticated ? SWR_PERMISSION_KEY : null,
+    getMyPermissions,
     {
       revalidateOnMount: false,
     },
   );
 
-  // Admin always passes (backend also enforces this)
-  if (user?.role === "admin") return true;
   if (!isAuthenticated) return false;
+  if (user?.role === UserRole.ADMIN) return true;
 
-  const tier = data?.tier ?? "free";
-  return hasPermission(tier, permission);
+  return hasPermission(data, permission);
 }

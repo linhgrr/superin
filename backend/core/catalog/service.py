@@ -8,9 +8,16 @@ from beanie import PydanticObjectId
 from beanie.operators import In
 
 from core.db import get_db
-from core.models import UserAppInstallation, WidgetPreference, utc_now
+from core.models import User, UserAppInstallation, WidgetPreference, utc_now
 from core.registry import get_plugin
-from shared.enums import INSTALL_STATUS_ALREADY_INSTALLED
+from core.subscriptions.model import Subscription
+from shared.enums import (
+    INSTALL_STATUS_ALREADY_INSTALLED,
+    InstallationStatus,
+    SubscriptionTier,
+    UserRole,
+)
+from shared.permissions import meets_minimum_tier
 
 
 class UnknownAppError(ValueError):
@@ -21,17 +28,51 @@ class UnknownAppError(ValueError):
         self.app_id = app_id
 
 
+class InsufficientTierError(PermissionError):
+    """Raised when the user tier cannot install a given app."""
+
+    def __init__(self, app_id: str, required_tier: str) -> None:
+        super().__init__(f"App '{app_id}' requires a {required_tier} subscription.")
+        self.app_id = app_id
+        self.required_tier = required_tier
+
+
+async def _assert_install_tier_allowed(user_id: str, app_id: str) -> None:
+    """Validate installation tier constraints with admin bypass."""
+    user = await User.get(user_id)
+    if user is None:
+        raise PermissionError("User not found")
+    if user.role == UserRole.ADMIN:
+        return
+
+    plugin = get_plugin(app_id)
+    if plugin is None:
+        raise UnknownAppError(app_id)
+
+    required_tier = plugin["manifest"].requires_tier
+    if required_tier == SubscriptionTier.FREE:
+        return
+
+    subscription = await Subscription.find_one(
+        Subscription.user_id == PydanticObjectId(user_id),
+    )
+    user_tier = subscription.tier if subscription else SubscriptionTier.FREE
+    if not meets_minimum_tier(user_tier, required_tier):
+        raise InsufficientTierError(app_id, required_tier)
+
+
 async def install_app_for_user(user_id: str, app_id: str) -> dict[str, str]:
     """Install an app for a user and seed any missing widget preferences."""
     plugin = get_plugin(app_id)
     if not plugin:
         raise UnknownAppError(app_id)
+    await _assert_install_tier_allowed(user_id, app_id)
 
     db = get_db()
     previous = await db["user_app_installations"].find_one_and_update(
         {"user_id": PydanticObjectId(user_id), "app_id": app_id},
         {
-            "$set": {"status": "active"},
+            "$set": {"status": InstallationStatus.ACTIVE},
             "$setOnInsert": {
                 "user_id": PydanticObjectId(user_id),
                 "app_id": app_id,
@@ -42,7 +83,7 @@ async def install_app_for_user(user_id: str, app_id: str) -> dict[str, str]:
         return_document=False,
     )
 
-    if previous and previous.get("status") == "active":
+    if previous and previous.get("status") == InstallationStatus.ACTIVE:
         return {
             "status": INSTALL_STATUS_ALREADY_INSTALLED,
             "app_id": app_id,
@@ -68,7 +109,7 @@ async def uninstall_app_for_user(user_id: str, app_id: str) -> dict[str, str]:
     installation = await UserAppInstallation.find_one(
         UserAppInstallation.user_id == PydanticObjectId(user_id),
         UserAppInstallation.app_id == app_id,
-        UserAppInstallation.status == "active",
+        UserAppInstallation.status == InstallationStatus.ACTIVE,
     )
     if not installation:
         return {
@@ -78,7 +119,7 @@ async def uninstall_app_for_user(user_id: str, app_id: str) -> dict[str, str]:
         }
 
     await plugin["agent"].on_uninstall(user_id)
-    installation.status = "disabled"
+    installation.status = InstallationStatus.DISABLED
     await installation.save()
 
     return {

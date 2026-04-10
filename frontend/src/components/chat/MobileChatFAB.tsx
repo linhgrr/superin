@@ -2,15 +2,24 @@
  * MobileChatFAB — floating action button to open chat overlay on mobile.
  *
  * Only visible on viewports <= 768px via CSS.
+ * Hidden on /chat because that route already renders the chat UI.
  */
 
 import { lazy, Suspense, useState } from "react";
 import { MessageCircle } from "lucide-react";
+import { useLocation } from "react-router-dom";
+import { ROUTES } from "@/constants";
 
 const ChatOverlay = lazy(() => import("./ChatOverlay"));
 
 export default function MobileChatFAB() {
+  const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
+  const isChatRoute = location.pathname === ROUTES.CHAT;
+
+  if (isChatRoute) {
+    return null;
+  }
 
   return (
     <>

@@ -21,6 +21,11 @@
       "sourceType": "github",
       "computedHash": "27fa571b75861545226c9ee3d861fda4831cbf10099bf34118d59470dffb0fc8"
     },
+    "mobile-design": {
+      "source": "davila7/claude-code-templates",
+      "sourceType": "github",
+      "computedHash": "27e338f7267fed0ce198852af954f79ce6746b9c94e4e530e581e19e568b8ba0"
+    },
     "payment-integration": {
       "source": "sickn33/antigravity-awesome-skills",
       "sourceType": "github",

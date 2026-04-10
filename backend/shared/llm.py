@@ -13,6 +13,7 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 _llm: Any | None = None
+_patch_guard: bool = False
 
 
 def _to_safe_int(value: Any) -> int:
@@ -80,14 +81,16 @@ def get_llm() -> Any:
     Returns:
         ChatOpenAI instance configured from settings.
     """
-    global _llm
+    global _llm, _patch_guard
     if _llm is None:
         from langchain_openai import ChatOpenAI
 
         from core.config import settings
 
         logger.info("🔗 LLM init — base_url=%s model=%s", settings.openai_base_url, settings.openai_model)
-        _patch_langchain_openai_usage_metadata()
+        if not _patch_guard:
+            _patch_langchain_openai_usage_metadata()
+            _patch_guard = True
         extra_headers: dict[str, str] = {}
         # Skip ngrok browser warning page when calling through ngrok tunnel
         if "ngrok" in settings.openai_base_url.lower():

@@ -3,8 +3,9 @@
 import logging
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Cookie, Depends, File, HTTPException, Response, UploadFile, status
 
+from core.auth.avatar_storage import upload_avatar
 from core.auth.dependencies import (
     create_access_token,
     create_refresh_token,
@@ -31,7 +32,9 @@ def _token_response(user: User) -> TokenResponse:
             id=str(user.id),
             email=user.email,
             name=user.name,
+            avatar_url=user.avatar_url,
             role=user.role,
+            settings=user.settings or {},
         ),
     )
 
@@ -167,6 +170,7 @@ async def get_me(user_id: str = Depends(get_current_user)) -> UserPublic:
         id=str(user.id),
         email=user.email,
         name=user.name,
+        avatar_url=user.avatar_url,
         role=user.role,
         settings=user.settings or {},
     )
@@ -191,6 +195,31 @@ async def update_settings(
         id=str(user.id),
         email=user.email,
         name=user.name,
+        avatar_url=user.avatar_url,
+        role=user.role,
+        settings=user.settings,
+    )
+
+
+@router.post("/me/avatar")
+async def update_avatar(
+    file: UploadFile = File(...),
+    user_id: str = Depends(get_current_user),
+) -> UserPublic:
+    """Upload and update the current user's avatar."""
+    user = await User.get(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    avatar_url = await upload_avatar(user_id=user_id, upload_file=file)
+    user.avatar_url = avatar_url
+    await user.save()
+
+    return UserPublic(
+        id=str(user.id),
+        email=user.email,
+        name=user.name,
+        avatar_url=user.avatar_url,
         role=user.role,
         settings=user.settings,
     )

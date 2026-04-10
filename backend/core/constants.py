@@ -35,6 +35,7 @@ API_CATALOG = f"{API_ROOT}/catalog"
 API_CHAT = f"{API_ROOT}/chat"
 API_WORKSPACE = f"{API_ROOT}/workspace"
 API_SUBSCRIPTIONS = f"{API_ROOT}/subscription"
+API_ADMIN = f"{API_ROOT}/admin"
 
 # Auth endpoints
 AUTH_LOGIN = f"{API_AUTH}/login"

@@ -14,45 +14,12 @@ export const formatDuration = (startMinutes: number, endMinutes: number): string
 };
 
 /**
- * Check if two dates are the same day (in local/browser timezone).
- * @deprecated Use isSameDayInTimezone for timezone-aware comparison.
- */
-export const isSameDay = (d1: Date, d2: Date): boolean => {
-  return (
-    d1.getFullYear() === d2.getFullYear() &&
-    d1.getMonth() === d2.getMonth() &&
-    d1.getDate() === d2.getDate()
-  );
-};
-
-/**
  * Check if two dates are the same day in the specified timezone.
  */
 export const isSameDayInTimezone = (d1: Date, d2: Date, timezone?: string): boolean => {
-  if (!timezone) {
-    // Fall back to legacy implementation
-    return isSameDay(d1, d2);
-  }
   const d1Str = d1.toLocaleDateString("en-US", { timeZone: timezone });
   const d2Str = d2.toLocaleDateString("en-US", { timeZone: timezone });
   return d1Str === d2Str;
-};
-
-/**
- * Get week dates (Monday-Sunday) relative to the given date.
- * @deprecated Use getWeekDatesInTimezone for timezone-aware calculation.
- */
-export const getWeekDates = (date: Date): Date[] => {
-  const day = date.getDay();
-  const diff = date.getDate() - day + (day === 0 ? -6 : 1); // Adjust to get Monday
-  const monday = new Date(date.setDate(diff));
-  const weekDates = [];
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(monday);
-    d.setDate(monday.getDate() + i);
-    weekDates.push(d);
-  }
-  return weekDates;
 };
 
 /**

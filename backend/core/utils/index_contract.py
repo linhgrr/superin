@@ -41,6 +41,12 @@ INDEX_REQUIREMENTS: tuple[IndexRequirement, ...] = (
         unique=True,
     ),
     IndexRequirement(
+        collection="users",
+        index_name="users_role_index",
+        key=(("role", 1),),
+        unique=False,
+    ),
+    IndexRequirement(
         collection="user_app_installations",
         index_name="user_app_installations_user_id_app_id_unique",
         key=(("user_id", 1), ("app_id", 1)),
@@ -80,6 +86,36 @@ INDEX_REQUIREMENTS: tuple[IndexRequirement, ...] = (
         collection="conversation_messages",
         index_name="conversation_messages_thread_created_at",
         key=(("thread_id", 1), ("created_at", 1)),
+        unique=False,
+    ),
+    IndexRequirement(
+        collection="subscriptions",
+        index_name="subscriptions_user_id_unique",
+        key=(("user_id", 1),),
+        unique=True,
+    ),
+    IndexRequirement(
+        collection="subscriptions",
+        index_name="subscriptions_provider_reference",
+        key=(("provider", 1), ("provider_subscription_id", 1)),
+        unique=False,
+    ),
+    IndexRequirement(
+        collection="subscriptions",
+        index_name="subscriptions_status_index",
+        key=(("status", 1),),
+        unique=False,
+    ),
+    IndexRequirement(
+        collection="subscription_webhook_events",
+        index_name="subscription_webhook_events_provider_event_unique",
+        key=(("provider", 1), ("event_id", 1)),
+        unique=True,
+    ),
+    IndexRequirement(
+        collection="subscription_webhook_events",
+        index_name="subscription_webhook_events_received_at_index",
+        key=(("received_at", 1),),
         unique=False,
     ),
     IndexRequirement(

@@ -17,6 +17,3 @@ export const STORAGE_KEYS = {
   WORKSPACE_SNAPSHOT: "shin_workspace_snapshot",
   STORE_CATALOG_SNAPSHOT: "shin_store_catalog_snapshot",
 } as const;
-
-/** @deprecated Use STORAGE_KEYS.ACCESS_TOKEN directly */
-export const ACCESS_TOKEN_KEY = STORAGE_KEYS.ACCESS_TOKEN;

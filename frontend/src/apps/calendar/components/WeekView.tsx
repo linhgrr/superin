@@ -1,4 +1,4 @@
-import { HOURS, HOUR_HEIGHT, DAY_NAMES, isSameDay, isSameDayInTimezone } from "../utils/dateHelpers";
+import { HOURS, HOUR_HEIGHT, DAY_NAMES, isSameDayInTimezone } from "../utils/dateHelpers";
 import { calculateEventStyle } from "../utils/eventHelpers";
 import type { CalendarRead, EventRead } from "../api";
 import { useTimezone } from "@/shared/hooks/useTimezone";
@@ -42,7 +42,7 @@ export function WeekView({ weekDates, calendars, events, onCellClick }: WeekView
       >
         <div /> {/* Empty corner */}
         {weekDates.map((date, i) => {
-          const isToday = isSameDay(date, today);
+          const isToday = isSameDayInTimezone(date, today, timezone);
           return (
             <div
               key={i}
@@ -111,7 +111,7 @@ export function WeekView({ weekDates, calendars, events, onCellClick }: WeekView
         {/* Day columns */}
         {weekDates.map((date, dayIndex) => {
           const dayEvents = getEventsForDay(date);
-          const isToday = isSameDay(date, today);
+          const isToday = isSameDayInTimezone(date, today, timezone);
 
           return (
             <div

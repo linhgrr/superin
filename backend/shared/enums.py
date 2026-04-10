@@ -16,38 +16,54 @@ Usage:
 
 from __future__ import annotations
 
-from typing import Literal
+from enum import StrEnum
 
 # ─── Widget ────────────────────────────────────────────────────────────────────
 
-WidgetSize = Literal["compact", "standard", "wide", "tall", "full"]
-"""Valid widget sizes for WidgetManifestSchema.size."""
+class WidgetSize(StrEnum):
+    """Valid widget sizes for WidgetManifestSchema.size."""
 
-WIDGET_SIZES: dict[str, dict[str, int | str]] = {
-    "compact": {"width": 4, "height": "120px"},
-    "standard": {"width": 6, "height": "200px"},
-    "wide": {"width": 8, "height": "200px"},
-    "tall": {"width": 6, "height": "300px"},
-    "full": {"width": 12, "height": "auto"},
+    COMPACT = "compact"
+    STANDARD = "standard"
+    WIDE = "wide"
+    TALL = "tall"
+    FULL = "full"
+
+WIDGET_SIZES: dict[WidgetSize, dict[str, int | str]] = {
+    WidgetSize.COMPACT: {"width": 4, "height": "120px"},
+    WidgetSize.STANDARD: {"width": 6, "height": "200px"},
+    WidgetSize.WIDE: {"width": 8, "height": "200px"},
+    WidgetSize.TALL: {"width": 6, "height": "300px"},
+    WidgetSize.FULL: {"width": 12, "height": "auto"},
 }
 """Platform widget size presets shared across validation and docs."""
 
-VALID_WIDGET_SIZES: frozenset[str] = frozenset(WIDGET_SIZES.keys())
+VALID_WIDGET_SIZES: frozenset[str] = frozenset(size.value for size in WIDGET_SIZES)
 """Set of valid widget sizes. Used for validation."""
 
 
 # ─── Config Field ───────────────────────────────────────────────────────────────
 
-ConfigFieldType = Literal["text", "number", "select", "multi-select", "date", "boolean"]
-"""Valid types for ConfigFieldSchema.type."""
+class ConfigFieldType(StrEnum):
+    """Valid types for ConfigFieldSchema.type."""
+
+    TEXT = "text"
+    NUMBER = "number"
+    SELECT = "select"
+    MULTI_SELECT = "multi-select"
+    DATE = "date"
+    BOOLEAN = "boolean"
 
 
 # ─── Installation ───────────────────────────────────────────────────────────────
 
-InstallationStatus = Literal["active", "disabled"]
-"""Valid values for UserAppInstallation.status."""
+class InstallationStatus(StrEnum):
+    """Valid values for UserAppInstallation.status."""
 
-INSTALLATION_STATUSES: frozenset[str] = frozenset({"active", "disabled"})
+    ACTIVE = "active"
+    DISABLED = "disabled"
+
+INSTALLATION_STATUSES: frozenset[str] = frozenset(status.value for status in InstallationStatus)
 
 # ─── Installation (API response) ────────────────────────────────────────────────
 # Distinct from InstallationStatus (DB model values above).
@@ -60,36 +76,70 @@ INSTALL_STATUS_REACTIVATED = "reactivated"
 
 # ─── Chat ──────────────────────────────────────────────────────────────────────
 
-ChatEventType = Literal["token", "tool_call", "tool_result", "done", "error"]
-"""Valid values for ChatStream event types."""
+class ChatEventType(StrEnum):
+    """Valid values for ChatStream event types."""
+
+    TOKEN = "token"
+    TOOL_CALL = "tool_call"
+    TOOL_RESULT = "tool_result"
+    DONE = "done"
+    ERROR = "error"
 
 
 # ─── User Role ───────────────────────────────────────────────────────────────
 
-UserRole = Literal["admin", "user"]
-"""Valid values for User.role."""
+class UserRole(StrEnum):
+    """Valid values for User.role."""
 
-USER_ROLES: frozenset[str] = frozenset({"admin", "user"})
+    ADMIN = "admin"
+    USER = "user"
+
+USER_ROLES: frozenset[str] = frozenset(role.value for role in UserRole)
+
+
+# ─── Permission Key ───────────────────────────────────────────────────────────
+
+class PermissionKey(StrEnum):
+    """Platform permission keys used by backend and frontend."""
+
+    CHAT_AI_UNLIMITED = "chat_ai_unlimited"
+    ADMIN_USERS_VIEW = "admin_users_view"
+    ADMIN_SUBSCRIPTIONS_VIEW = "admin_subscriptions_view"
+    ADMIN_APPS_MANAGE = "admin_apps_manage"
+
+
+PERMISSION_KEYS: frozenset[str] = frozenset(permission.value for permission in PermissionKey)
 
 
 # ─── Subscription ───────────────────────────────────────────────────────────
 
-SubscriptionTier = Literal["free", "paid"]
-"""Subscription tier — determines which features are accessible."""
+class SubscriptionTier(StrEnum):
+    """Subscription tier — determines which features are accessible."""
 
-SUBSCRIPTION_TIERS: frozenset[str] = frozenset({"free", "paid"})
+    FREE = "free"
+    PAID = "paid"
 
-SubscriptionStatus = Literal["active", "inactive", "cancelled", "past_due"]
-"""Payment lifecycle status for a subscription."""
+SUBSCRIPTION_TIERS: frozenset[str] = frozenset(tier.value for tier in SubscriptionTier)
+
+class SubscriptionStatus(StrEnum):
+    """Payment lifecycle status for a subscription."""
+
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+    CANCELLED = "cancelled"
+    PAST_DUE = "past_due"
 
 SUBSCRIPTION_STATUSES: frozenset[str] = frozenset(
-    {"active", "inactive", "cancelled", "past_due"}
+    status.value for status in SubscriptionStatus
 )
 
 
 # ─── Payment Provider ───────────────────────────────────────────────────────
 
-PaymentProvider = Literal["stripe", "payos"]
-"""Supported payment providers."""
+class PaymentProvider(StrEnum):
+    """Supported payment providers."""
 
-PAYMENT_PROVIDERS: frozenset[str] = frozenset({"stripe", "payos"})
+    STRIPE = "stripe"
+    PAYOS = "payos"
+
+PAYMENT_PROVIDERS: frozenset[str] = frozenset(provider.value for provider in PaymentProvider)

@@ -6,7 +6,7 @@
  */
 
 import useSWR, { SWRConfiguration, mutate as swrMutate } from "swr";
-import { api } from "@/api/client";
+import { api } from "@/api/axios";
 
 // ─── Global SWR Config ───────────────────────────────────────────────────────
 

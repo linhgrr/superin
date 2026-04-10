@@ -1,5 +1,18 @@
 import { useEffect, useState } from "react";
-import { completeSubtask, createRecurringRule, createSubtask, createTask, deleteSubtask, deleteTask, getSubtasks, getTasks, toggleTask, type SubTaskRead, type TaskRead, uncompleteSubtask } from "../../api";
+import {
+  completeSubtask,
+  createRecurringRule,
+  createSubtask,
+  createTask,
+  deleteSubtask,
+  deleteTask,
+  getSubtasks,
+  getTasks,
+  toggleTask,
+  type SubTaskRead,
+  type TaskRead,
+  uncompleteSubtask,
+} from "../../api";
 import type { CreateRecurringRuleRequest, CreateTaskRequest } from "../../api";
 import NewTaskForm from "../../components/NewTaskForm";
 import TaskRow from "../../components/TaskRow";
@@ -7,11 +20,12 @@ import Modal from "../../components/Modal";
 import SubtaskList from "../../components/SubtaskList";
 import RecurringRuleForm from "../../components/RecurringRuleForm";
 import type { RecurringFrequency } from "../../api";
+import { TaskFilters } from "./TaskFilters";
 
 type TaskStatus = TaskRead["status"];
 type TaskFilter = "all" | TaskStatus;
 
-const TASK_FILTER_VALUES = ["all", "pending", "completed"] as const satisfies readonly TaskFilter[];
+export const TASK_FILTER_VALUES = ["all", "pending", "completed"] as const satisfies readonly TaskFilter[];
 
 type TaskListItem = TaskRead & {
   subtask_count?: number;
@@ -42,9 +56,7 @@ export default function TasksPanel() {
       .finally(() => setLoading(false));
   }
 
-  useEffect(() => {
-    load();
-  }, []);
+  useEffect(() => { load(); }, []);
 
   async function handleToggle(id: string) {
     try {
@@ -122,7 +134,6 @@ export default function TasksPanel() {
   }
 
   async function handleDeleteSubtask(subtaskId: string) {
-    // Capture wasCompleted BEFORE any state changes (fix stale closure)
     const wasCompleted = subtasks.find((s) => s.id === subtaskId)?.completed;
     await deleteSubtask(subtaskId);
     setSubtasks((current) => current.filter((s) => s.id !== subtaskId));
@@ -156,67 +167,24 @@ export default function TasksPanel() {
     setShowRecurringForm(false);
   }
 
-  const filtered = tasks.filter((task) => {
-    if (filter === "pending") return task.status === "pending";
-    if (filter === "completed") return task.status === "completed";
-    return true;
-  });
-
+  const pendingCount = tasks.filter((t) => t.status === "pending").length;
+  const completedCount = tasks.filter((t) => t.status === "completed").length;
   const counts = {
     all: tasks.length,
-    pending: tasks.filter((task) => task.status === "pending").length,
-    completed: tasks.filter((task) => task.status === "completed").length,
+    pending: pendingCount,
+    completed: completedCount,
   };
+
+  const filtered =
+    filter === "all"
+      ? tasks
+      : filter === "pending"
+        ? tasks.filter((t) => t.status === "pending")
+        : tasks.filter((t) => t.status === "completed");
 
   return (
     <>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(3, 1fr)",
-          gap: "0.75rem",
-          marginBottom: "1.5rem",
-        }}
-      >
-        {TASK_FILTER_VALUES.map((value) => (
-          <button
-            key={value}
-            onClick={() => setFilter(value)}
-            style={{
-              background:
-                filter === value ? "var(--color-primary)" : "var(--color-surface-elevated)",
-              border: `1px solid ${filter === value ? "var(--color-primary)" : "var(--color-border)"}`,
-              borderRadius: "0.75rem",
-              padding: "0.75rem",
-              cursor: "pointer",
-              textAlign: "center",
-              transition: "background 0.15s",
-            }}
-          >
-            <div
-              style={{
-                fontSize: "1.5rem",
-                fontWeight: 700,
-                fontFamily: "var(--font-heading)",
-                color: filter === value ? "var(--color-primary-foreground)" : "var(--color-foreground)",
-              }}
-            >
-              {counts[value]}
-            </div>
-            <div
-              style={{
-                fontSize: "0.75rem",
-                textTransform: "capitalize",
-                color: filter === value
-                  ? "oklch(0.98 0 0 / 0.7)"
-                  : "var(--color-foreground-muted)",
-              }}
-            >
-              {value}
-            </div>
-          </button>
-        ))}
-      </div>
+      <TaskFilters filter={filter} counts={counts} onFilter={setFilter} />
 
       {showForm ? (
         <NewTaskForm onSubmit={handleCreate} onCancel={() => setShowForm(false)} />

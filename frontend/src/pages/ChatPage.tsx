@@ -1,8 +1,7 @@
 /**
  * ChatPage — standalone chat page, full-height.
  *
- * Rendered at /chat. On mobile, the FAB still opens the overlay.
- * This page is primarily for desktop users who want a dedicated chat view.
+ * Rendered at /chat as a dedicated chat view.
  */
 
 import { lazy, Suspense } from "react";

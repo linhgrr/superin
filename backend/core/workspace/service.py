@@ -8,9 +8,9 @@ from beanie.operators import In
 from fastapi import Depends, HTTPException, Request
 
 from core.auth.dependencies import get_current_user
-from core.models import UserAppInstallation, WidgetPreference
+from core.models import User, UserAppInstallation, WidgetPreference
 from core.registry import get_plugin
-from shared.enums import SubscriptionTier
+from shared.enums import InstallationStatus, SubscriptionTier, UserRole
 from shared.permissions import meets_minimum_tier
 from shared.preference_utils import preference_to_schema
 from shared.schemas import AppRuntimeEntry, WidgetPreferenceSchema, WorkspaceBootstrap
@@ -23,7 +23,7 @@ async def list_installed_app_ids(user_id: str) -> list[str]:
     """Return active installed app ids for a user in installation order."""
     installations = await UserAppInstallation.find(
         UserAppInstallation.user_id == PydanticObjectId(user_id),
-        UserAppInstallation.status == "active",
+        UserAppInstallation.status == InstallationStatus.ACTIVE,
     ).sort("installed_at").to_list()
     return [installation.app_id for installation in installations]
 
@@ -62,7 +62,6 @@ async def list_installed_apps(user_id: str) -> list[AppRuntimeEntry]:
                 version=manifest.version,
                 author=manifest.author,
                 widgets=manifest.widgets,
-                requires_tier=manifest.requires_tier,
             )
         )
 
@@ -110,11 +109,13 @@ def require_installed_app(app_id: str) -> Callable:
         plugin = get_plugin(app_id)
         if plugin:
             required_tier: SubscriptionTier = plugin["manifest"].requires_tier
-            from core.subscriptions.model import Subscription  # noqa: PLC0415
-            sub = await Subscription.find_one(
-                Subscription.user_id == PydanticObjectId(user_id),
-            )
-            user_tier: SubscriptionTier = sub.tier if sub else "free"
+            user = await User.get(PydanticObjectId(user_id))
+            if user and user.role == UserRole.ADMIN:
+                return
+
+            from core.subscriptions.service import get_effective_tier  # noqa: PLC0415
+
+            user_tier = await get_effective_tier(user_id)
             if not meets_minimum_tier(user_tier, required_tier):
                 raise HTTPException(
                     status_code=403,

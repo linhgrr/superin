@@ -1,5 +1,6 @@
 """Finance plugin manifest — widget and app definitions."""
 
+from shared.enums import ConfigFieldType, SubscriptionTier, WidgetSize
 from shared.schemas import (
     AppManifestSchema,
     ConfigFieldSchema,
@@ -11,12 +12,12 @@ wallet_widget = WidgetManifestSchema(
     name="Total Balance",
     description="Shows total balance across all wallets",
     icon="Wallet",
-    size="standard",
+    size=WidgetSize.STANDARD,
     config_fields=[
         ConfigFieldSchema(
             name="accountId",
             label="Wallet",
-            type="select",
+            type=ConfigFieldType.SELECT,
             required=False,
             options_source="finance.wallets",
         ),
@@ -28,7 +29,7 @@ budget_widget = WidgetManifestSchema(
     name="Budget Overview",
     description="Monthly spending vs budget by category",
     icon="PieChart",
-    size="wide",
+    size=WidgetSize.WIDE,
     config_fields=[],
 )
 
@@ -37,7 +38,7 @@ recent_tx_widget = WidgetManifestSchema(
     name="Recent Transactions",
     description="Last 5 transactions across all wallets",
     icon="ArrowLeftRight",
-    size="standard",
+    size=WidgetSize.STANDARD,
     config_fields=[],
 )
 
@@ -77,4 +78,5 @@ finance_manifest = AppManifestSchema(
     category="finance",
     tags=["finance", "budget", "wallets", "transactions", "analytics"],
     author="Shin Team",
+    requires_tier=SubscriptionTier.PAID,
 )

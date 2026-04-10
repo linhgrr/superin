@@ -9,7 +9,7 @@
 "use client";
 
 import { ReactNode } from "react";
-import { OnboardingProvider } from "./OnboardingProvider";
+import { OnboardingProvider } from "./onboarding/OnboardingProvider";
 import { ToastProvider } from "./ToastProvider";
 
 export function AppProviders({ children }: { children: ReactNode }) {

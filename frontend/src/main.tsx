@@ -4,6 +4,18 @@ import { registerSW } from "virtual:pwa-register";
 import App from "./App";
 import "./app/globals.css";
 
+if (import.meta.env.DEV) {
+  const originalConsoleError = console.error;
+  console.error = (...args: unknown[]) => {
+    if (typeof args[0] === "string" && args[0].includes("Maximum update depth exceeded")) {
+      originalConsoleError("[debug][max-depth] Captured React update-depth error.");
+      originalConsoleError("[debug][max-depth] URL:", window.location.href);
+      originalConsoleError(new Error("[debug][max-depth] stack trace").stack);
+    }
+    originalConsoleError(...args);
+  };
+}
+
 const root = document.getElementById("root");
 if (!root) throw new Error("Root element not found");
 

@@ -204,6 +204,33 @@
         ]
       }
     },
+    "/api/auth/permissions": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Get My Permissions",
+        "description": "Return current user's effective permissions from backend matrix.",
+        "operationId": "get_my_permissions_api_auth_permissions_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PermissionListRead"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/auth/me/settings": {
       "patch": {
         "tags": [
@@ -217,6 +244,53 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/UpdateUserSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserPublic"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/auth/me/avatar": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Update Avatar",
+        "description": "Upload and update the current user's avatar.",
+        "operationId": "update_avatar_api_auth_me_avatar_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_update_avatar_api_auth_me_avatar_post"
               }
             }
           },
@@ -781,6 +855,545 @@
             "HTTPBearer": []
           }
         ]
+      }
+    },
+    "/api/subscription/checkout": {
+      "post": {
+        "tags": [
+          "subscriptions"
+        ],
+        "summary": "Create Subscription Checkout",
+        "description": "Create checkout URL for upgrading to paid tier.",
+        "operationId": "create_subscription_checkout_api_subscription_checkout_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckoutRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/subscription/cancel": {
+      "post": {
+        "tags": [
+          "subscriptions"
+        ],
+        "summary": "Cancel Subscription",
+        "description": "Cancel current subscription and downgrade to free.",
+        "operationId": "cancel_subscription_api_subscription_cancel_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CancelSubscriptionResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/subscription/webhook/stripe": {
+      "post": {
+        "tags": [
+          "subscriptions"
+        ],
+        "summary": "Stripe Webhook",
+        "description": "Stripe webhook endpoint.",
+        "operationId": "stripe_webhook_api_subscription_webhook_stripe_post",
+        "parameters": [
+          {
+            "name": "stripe-signature",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Stripe-Signature"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookAck"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/subscription/webhook/payos": {
+      "post": {
+        "tags": [
+          "subscriptions"
+        ],
+        "summary": "Payos Webhook",
+        "description": "PayOS webhook endpoint.",
+        "operationId": "payos_webhook_api_subscription_webhook_payos_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookAck"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/stats": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get Admin Stats",
+        "operationId": "get_admin_stats_api_admin_stats_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminStatsRead"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/admin/users": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get Admin Users",
+        "operationId": "get_admin_users_api_admin_users_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Skip"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Search"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUsersResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/users/{user_id}/role": {
+      "patch": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Patch Admin User Role",
+        "operationId": "patch_admin_user_role_api_admin_users__user_id__role_patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "User Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminUpdateUserRoleRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/subscriptions": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get Admin Subscriptions",
+        "operationId": "get_admin_subscriptions_api_admin_subscriptions_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Skip"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/SubscriptionStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "tier",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/SubscriptionTier"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tier"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminSubscriptionsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/subscriptions/{user_id}": {
+      "patch": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Patch Admin Subscription",
+        "operationId": "patch_admin_subscription_api_admin_subscriptions__user_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "User Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminUpdateSubscriptionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminSubscriptionRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/apps": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get Admin Apps",
+        "operationId": "get_admin_apps_api_admin_apps_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminAppsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/admin/apps/{app_id}/tier": {
+      "patch": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Patch Admin App Tier",
+        "operationId": "patch_admin_app_tier_api_admin_apps__app_id__tier_patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "app_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "App Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminUpdateAppTierRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminAppRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/apps/calendar/widgets": {
@@ -4177,6 +4790,367 @@
   },
   "components": {
     "schemas": {
+      "AdminAppRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "requires_tier": {
+            "$ref": "#/components/schemas/SubscriptionTier"
+          },
+          "install_count": {
+            "type": "integer",
+            "title": "Install Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "category",
+          "requires_tier",
+          "install_count"
+        ],
+        "title": "AdminAppRead"
+      },
+      "AdminAppsResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AdminAppRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "AdminAppsResponse"
+      },
+      "AdminStatsRead": {
+        "properties": {
+          "total_users": {
+            "type": "integer",
+            "title": "Total Users"
+          },
+          "admin_users": {
+            "type": "integer",
+            "title": "Admin Users"
+          },
+          "active_subscriptions": {
+            "type": "integer",
+            "title": "Active Subscriptions"
+          },
+          "paid_subscriptions": {
+            "type": "integer",
+            "title": "Paid Subscriptions"
+          },
+          "installed_apps": {
+            "type": "integer",
+            "title": "Installed Apps"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_users",
+          "admin_users",
+          "active_subscriptions",
+          "paid_subscriptions",
+          "installed_apps"
+        ],
+        "title": "AdminStatsRead"
+      },
+      "AdminSubscriptionRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "user_id": {
+            "type": "string",
+            "title": "User Id"
+          },
+          "user_email": {
+            "type": "string",
+            "format": "email",
+            "title": "User Email"
+          },
+          "user_name": {
+            "type": "string",
+            "title": "User Name"
+          },
+          "tier": {
+            "$ref": "#/components/schemas/SubscriptionTier"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SubscriptionStatus"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PaymentProvider"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "user_id",
+          "user_email",
+          "user_name",
+          "tier",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "AdminSubscriptionRead"
+      },
+      "AdminSubscriptionsResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AdminSubscriptionRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "AdminSubscriptionsResponse"
+      },
+      "AdminUpdateAppTierRequest": {
+        "properties": {
+          "requires_tier": {
+            "$ref": "#/components/schemas/SubscriptionTier"
+          }
+        },
+        "type": "object",
+        "required": [
+          "requires_tier"
+        ],
+        "title": "AdminUpdateAppTierRequest"
+      },
+      "AdminUpdateSubscriptionRequest": {
+        "properties": {
+          "tier": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SubscriptionTier"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SubscriptionStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "title": "AdminUpdateSubscriptionRequest"
+      },
+      "AdminUpdateUserRoleRequest": {
+        "properties": {
+          "role": {
+            "$ref": "#/components/schemas/UserRole"
+          }
+        },
+        "type": "object",
+        "required": [
+          "role"
+        ],
+        "title": "AdminUpdateUserRoleRequest"
+      },
+      "AdminUserRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "role": {
+            "$ref": "#/components/schemas/UserRole"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "subscription": {
+            "$ref": "#/components/schemas/AdminUserSubscriptionRead"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "email",
+          "name",
+          "role",
+          "created_at",
+          "subscription"
+        ],
+        "title": "AdminUserRead"
+      },
+      "AdminUserSubscriptionRead": {
+        "properties": {
+          "tier": {
+            "$ref": "#/components/schemas/SubscriptionTier"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SubscriptionStatus"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PaymentProvider"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tier",
+          "status"
+        ],
+        "title": "AdminUserSubscriptionRead"
+      },
+      "AdminUsersResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AdminUserRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "AdminUsersResponse"
+      },
       "AppCatalogEntry": {
         "properties": {
           "id": {
@@ -4240,12 +5214,7 @@
             "title": "Widgets"
           },
           "requires_tier": {
-            "type": "string",
-            "enum": [
-              "free",
-              "paid"
-            ],
-            "title": "Requires Tier",
+            "$ref": "#/components/schemas/SubscriptionTier",
             "default": "free"
           }
         },
@@ -4355,15 +5324,6 @@
             },
             "type": "array",
             "title": "Widgets"
-          },
-          "requires_tier": {
-            "type": "string",
-            "enum": [
-              "free",
-              "paid"
-            ],
-            "title": "Requires Tier",
-            "default": "free"
           }
         },
         "type": "object",
@@ -4392,6 +5352,20 @@
           "app_id"
         ],
         "title": "AppUninstallRequest"
+      },
+      "Body_update_avatar_api_auth_me_avatar_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_update_avatar_api_auth_me_avatar_post"
       },
       "CalendarActionResponse": {
         "properties": {
@@ -5096,6 +6070,87 @@
         "type": "object",
         "title": "CalendarUpdateEventRequest"
       },
+      "CancelSubscriptionResponse": {
+        "properties": {
+          "cancelled": {
+            "type": "boolean",
+            "title": "Cancelled"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SubscriptionStatus"
+          },
+          "tier": {
+            "$ref": "#/components/schemas/SubscriptionTier"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cancelled",
+          "status",
+          "tier"
+        ],
+        "title": "CancelSubscriptionResponse"
+      },
+      "CheckoutRequest": {
+        "properties": {
+          "provider": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PaymentProvider"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "success_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Success Url"
+          },
+          "cancel_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancel Url"
+          }
+        },
+        "type": "object",
+        "title": "CheckoutRequest"
+      },
+      "CheckoutResponse": {
+        "properties": {
+          "provider": {
+            "$ref": "#/components/schemas/PaymentProvider"
+          },
+          "checkout_url": {
+            "type": "string",
+            "title": "Checkout Url"
+          },
+          "provider_reference": {
+            "type": "string",
+            "title": "Provider Reference"
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider",
+          "checkout_url",
+          "provider_reference"
+        ],
+        "title": "CheckoutResponse"
+      },
       "ConfigFieldSchema": {
         "properties": {
           "name": {
@@ -5108,16 +6163,7 @@
             "title": "Label"
           },
           "type": {
-            "type": "string",
-            "enum": [
-              "text",
-              "number",
-              "select",
-              "multi-select",
-              "date",
-              "boolean"
-            ],
-            "title": "Type"
+            "$ref": "#/components/schemas/ConfigFieldType"
           },
           "required": {
             "type": "boolean",
@@ -5205,6 +6251,19 @@
         ],
         "title": "ConfigFieldSchema",
         "description": "A configuration field for a widget."
+      },
+      "ConfigFieldType": {
+        "type": "string",
+        "enum": [
+          "text",
+          "number",
+          "select",
+          "multi-select",
+          "date",
+          "boolean"
+        ],
+        "title": "ConfigFieldType",
+        "description": "Valid types for ConfigFieldSchema.type."
       },
       "CreateCategoryRequest": {
         "properties": {
@@ -5980,6 +7039,59 @@
         ],
         "title": "LoginRequest"
       },
+      "PaymentProvider": {
+        "type": "string",
+        "enum": [
+          "stripe",
+          "payos"
+        ],
+        "title": "PaymentProvider",
+        "description": "Supported payment providers."
+      },
+      "PermissionKey": {
+        "type": "string",
+        "enum": [
+          "chat_ai_unlimited",
+          "admin_users_view",
+          "admin_subscriptions_view",
+          "admin_apps_manage"
+        ],
+        "title": "PermissionKey",
+        "description": "Platform permission keys used by backend and frontend."
+      },
+      "PermissionListRead": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PermissionRead"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "PermissionListRead"
+      },
+      "PermissionRead": {
+        "properties": {
+          "key": {
+            "$ref": "#/components/schemas/PermissionKey"
+          },
+          "allowed": {
+            "type": "boolean",
+            "title": "Allowed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "allowed"
+        ],
+        "title": "PermissionRead"
+      },
       "PreferenceUpdate": {
         "properties": {
           "widget_id": {
@@ -6103,37 +7215,20 @@
       "SubscriptionRead": {
         "properties": {
           "tier": {
-            "type": "string",
-            "enum": [
-              "free",
-              "paid"
-            ],
-            "title": "Tier"
+            "$ref": "#/components/schemas/SubscriptionTier"
           },
           "status": {
-            "type": "string",
-            "enum": [
-              "active",
-              "inactive",
-              "cancelled",
-              "past_due"
-            ],
-            "title": "Status"
+            "$ref": "#/components/schemas/SubscriptionStatus"
           },
           "provider": {
             "anyOf": [
               {
-                "type": "string",
-                "enum": [
-                  "stripe",
-                  "payos"
-                ]
+                "$ref": "#/components/schemas/PaymentProvider"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Provider"
+            ]
           },
           "started_at": {
             "anyOf": [
@@ -6167,6 +7262,26 @@
         ],
         "title": "SubscriptionRead",
         "description": "User subscription state \u2014 returned in auth responses."
+      },
+      "SubscriptionStatus": {
+        "type": "string",
+        "enum": [
+          "active",
+          "inactive",
+          "cancelled",
+          "past_due"
+        ],
+        "title": "SubscriptionStatus",
+        "description": "Payment lifecycle status for a subscription."
+      },
+      "SubscriptionTier": {
+        "type": "string",
+        "enum": [
+          "free",
+          "paid"
+        ],
+        "title": "SubscriptionTier",
+        "description": "Subscription tier \u2014 determines which features are accessible."
       },
       "TodoActionResponse": {
         "properties": {
@@ -7055,13 +8170,19 @@
             "type": "string",
             "title": "Name"
           },
-          "role": {
-            "type": "string",
-            "enum": [
-              "admin",
-              "user"
+          "avatar_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ],
-            "title": "Role"
+            "title": "Avatar Url"
+          },
+          "role": {
+            "$ref": "#/components/schemas/UserRole"
           },
           "settings": {
             "additionalProperties": true,
@@ -7078,6 +8199,15 @@
         ],
         "title": "UserPublic",
         "description": "Public user info \u2014 returned in auth responses."
+      },
+      "UserRole": {
+        "type": "string",
+        "enum": [
+          "admin",
+          "user"
+        ],
+        "title": "UserRole",
+        "description": "Valid values for User.role."
       },
       "ValidationError": {
         "properties": {
@@ -7112,6 +8242,44 @@
         ],
         "title": "ValidationError"
       },
+      "WebhookAck": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok",
+            "default": true
+          },
+          "provider": {
+            "$ref": "#/components/schemas/PaymentProvider"
+          },
+          "event_type": {
+            "type": "string",
+            "title": "Event Type",
+            "default": "unknown"
+          },
+          "processed": {
+            "type": "boolean",
+            "title": "Processed",
+            "default": false
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider"
+        ],
+        "title": "WebhookAck"
+      },
       "WidgetManifestSchema": {
         "properties": {
           "id": {
@@ -7133,15 +8301,7 @@
             "description": "Lucide icon name"
           },
           "size": {
-            "type": "string",
-            "enum": [
-              "compact",
-              "standard",
-              "wide",
-              "tall",
-              "full"
-            ],
-            "title": "Size",
+            "$ref": "#/components/schemas/WidgetSize",
             "default": "standard"
           },
           "config_fields": {
@@ -7242,6 +8402,18 @@
         ],
         "title": "WidgetPreferenceSchema",
         "description": "User-specific widget state stored in DB."
+      },
+      "WidgetSize": {
+        "type": "string",
+        "enum": [
+          "compact",
+          "standard",
+          "wide",
+          "tall",
+          "full"
+        ],
+        "title": "WidgetSize",
+        "description": "Valid widget sizes for WidgetManifestSchema.size."
       },
       "WorkspaceBootstrap": {
         "properties": {

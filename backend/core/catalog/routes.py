@@ -11,6 +11,7 @@ from core.auth.dependencies import (
     get_current_user_optional,
 )
 from core.catalog.service import (
+    InsufficientTierError,
     UnknownAppError,
     install_app_for_user,
     uninstall_app_for_user,
@@ -19,6 +20,7 @@ from core.models import AppCategory, UserAppInstallation, WidgetPreference
 from core.registry import list_categories as list_registry_categories
 from core.registry import list_plugins
 from core.workspace.service import list_installed_app_ids
+from shared.enums import InstallationStatus
 from shared.preference_utils import (
     preference_to_schema,
     update_multiple_preferences,
@@ -156,7 +158,7 @@ async def list_catalog(
     if user_id:
         installations = await UserAppInstallation.find(
             UserAppInstallation.user_id == PydanticObjectId(user_id),
-            UserAppInstallation.status == "active",
+            UserAppInstallation.status == InstallationStatus.ACTIVE,
         ).to_list()
         installed_ids = {inst.app_id for inst in installations}
 
@@ -192,6 +194,8 @@ async def install_app(
         result = await install_app_for_user(user_id, request.app_id)
     except UnknownAppError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except InsufficientTierError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
 
     return {
         "status": result["status"],

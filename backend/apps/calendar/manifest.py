@@ -1,5 +1,6 @@
 """Calendar plugin manifest."""
 
+from shared.enums import ConfigFieldType, SubscriptionTier, WidgetSize
 from shared.schemas import (
     AppManifestSchema,
     ConfigFieldSchema,
@@ -11,19 +12,19 @@ month_view_widget = WidgetManifestSchema(
     name="Month View",
     description="Full month calendar grid with events",
     icon="Calendar",
-    size="wide",
+    size=WidgetSize.WIDE,
     config_fields=[
         ConfigFieldSchema(
             name="default_calendar",
             label="Default Calendar",
-            type="select",
+            type=ConfigFieldType.SELECT,
             required=False,
             options_source="calendar.calendars",
         ),
         ConfigFieldSchema(
             name="show_time_blocked_tasks",
             label="Show Scheduled Tasks",
-            type="boolean",
+            type=ConfigFieldType.BOOLEAN,
             default=True,
         ),
     ],
@@ -34,18 +35,18 @@ upcoming_widget = WidgetManifestSchema(
     name="Upcoming Events",
     description="List of next 5-10 upcoming events",
     icon="Clock",
-    size="standard",
+    size=WidgetSize.STANDARD,
     config_fields=[
         ConfigFieldSchema(
             name="max_items",
             label="Max Events",
-            type="number",
+            type=ConfigFieldType.NUMBER,
             default=5,
         ),
         ConfigFieldSchema(
             name="calendar_filter",
             label="Filter by Calendar",
-            type="select",
+            type=ConfigFieldType.SELECT,
             required=False,
             options_source="calendar.calendars",
         ),
@@ -57,7 +58,7 @@ day_summary_widget = WidgetManifestSchema(
     name="Day Summary",
     description="Today and tomorrow overview",
     icon="Sun",
-    size="compact",
+    size=WidgetSize.COMPACT,
     config_fields=[],
 )
 
@@ -89,4 +90,5 @@ calendar_manifest = AppManifestSchema(
     category="productivity",
     tags=["calendar", "events", "schedule", "time-blocking", "recurring"],
     author="Shin Team",
+    requires_tier=SubscriptionTier.PAID,
 )

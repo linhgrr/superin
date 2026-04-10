@@ -8,9 +8,10 @@ import type { ReactNode } from "react";
 import { AssistantRuntimeProvider } from "@assistant-ui/react";
 import { useDataStreamRuntime } from "@assistant-ui/react-data-stream";
 
-import { getAccessToken } from "@/api/client";
+import { getAccessToken } from "@/api/axios";
 import { API_BASE_URL } from "@/config";
 import { API_PATHS } from "@/constants";
+import { useRenderLoopDebug } from "@/lib/debug-render-loop";
 
 const CHAT_STREAM_API = `${API_BASE_URL}${API_PATHS.CHAT_STREAM}`;
 
@@ -19,6 +20,8 @@ const ChatRuntimeProvider = memo(function ChatRuntimeProvider({
 }: {
   children: ReactNode;
 }) {
+  useRenderLoopDebug("ChatRuntimeProvider");
+
   const getHeaders = useCallback(async () => {
     const token = getAccessToken();
     const headers: Record<string, string> = {};

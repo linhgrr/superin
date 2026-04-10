@@ -21,6 +21,7 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "httpx>=0.28.0",
     "pytz>=2024.2",
+    "boto3>=1.35.0",
     # Security & Sanitization
     "nh3>=0.3.4",            # HTML sanitization (Rust-based)
     "confusables>=1.2.0",    # Homoglyph detection

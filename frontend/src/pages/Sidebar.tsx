@@ -9,7 +9,9 @@
 
 import { memo, useMemo } from "react";
 import { NavLink } from "react-router-dom";
-import { LayoutDashboard, Store, Sparkles, Settings } from "lucide-react";
+import { LayoutDashboard, Store, Sparkles, Settings, Shield, CreditCard } from "lucide-react";
+import { ROUTES } from "@/constants";
+import { useAuth } from "@/hooks/useAuth";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { DynamicIcon } from "@/lib/icon-resolver";
 import { prefetchHandlers } from "@/lib/prefetch";
@@ -80,6 +82,7 @@ function AppIcon({ entry }: { entry: AppRuntimeEntry }) {
 
 function Sidebar() {
   const { installedApps } = useWorkspace();
+  const { isAdmin } = useAuth();
 
   return (
     <aside className="sidebar">
@@ -124,7 +127,7 @@ function Sidebar() {
       {/* Store & Settings */}
       <div style={{ marginTop: "auto", padding: "1rem", borderTop: "1px solid var(--color-border)" }}>
         <NavLink
-          to="/store"
+          to={ROUTES.STORE}
           className={({ isActive }) => `app-item${isActive ? " active" : ""}`}
           style={{ marginBottom: "0.25rem" }}
         >
@@ -132,7 +135,25 @@ function Sidebar() {
           <span>App Store</span>
         </NavLink>
         <NavLink
-          to="/settings"
+          to={ROUTES.BILLING}
+          className={({ isActive }) => `app-item${isActive ? " active" : ""}`}
+          style={{ marginBottom: "0.25rem" }}
+        >
+          <CreditCard size={18} strokeWidth={2} />
+          <span>Billing</span>
+        </NavLink>
+        {isAdmin && (
+          <NavLink
+            to={ROUTES.ADMIN}
+            className={({ isActive }) => `app-item${isActive ? " active" : ""}`}
+            style={{ marginBottom: "0.25rem" }}
+          >
+            <Shield size={18} strokeWidth={2} />
+            <span>Admin</span>
+          </NavLink>
+        )}
+        <NavLink
+          to={ROUTES.SETTINGS}
           className={({ isActive }) => `app-item${isActive ? " active" : ""}`}
         >
           <Settings size={18} strokeWidth={2} />

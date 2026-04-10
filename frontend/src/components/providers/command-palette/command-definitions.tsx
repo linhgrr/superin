@@ -1,0 +1,208 @@
+/**
+ * Command definitions — static command builders that don't need runtime state.
+ */
+
+import {
+  Command,
+  LayoutDashboard,
+  LogOut,
+  Moon,
+  Plus,
+  Settings,
+  Sparkles,
+  Store,
+  Sun,
+  User,
+} from "lucide-react";
+import { DynamicIcon } from "@/lib/icon-resolver";
+import type { AppRuntimeEntry } from "@/types/generated";
+import { STORAGE_KEYS } from "@/constants";
+
+export type CommandCategory = "apps" | "actions" | "settings" | "help";
+
+export interface CommandItem {
+  id: string;
+  title: string;
+  subtitle?: string;
+  icon: React.ReactNode;
+  shortcut?: string;
+  category: CommandCategory;
+  action: () => void;
+  keywords: string[];
+}
+
+export const CATEGORY_ORDER: CommandCategory[] = ["apps", "actions", "settings", "help"];
+
+export const CATEGORY_LABELS: Record<CommandCategory, string> = {
+  apps: "Apps",
+  actions: "Actions",
+  settings: "Settings",
+  help: "Help",
+};
+
+type NavigateFn = (path: string) => void;
+type LogoutFn = () => void;
+
+/**
+ * Build the static commands (non-installed-app commands).
+ * Installed-app commands are built in the component using installedApps.
+ */
+export function buildStaticCommands(
+  navigate: NavigateFn,
+  logout: LogoutFn,
+  onOpenAddWidget: () => void,
+  onOpenSettings: (tab: string) => void
+): Omit<CommandItem, "id">[] {
+  return [
+    // ── Apps ──────────────────────────────────────────────────────────────────
+    {
+      id: "nav-dashboard",
+      title: "Go to Dashboard",
+      subtitle: "View your widgets and overview",
+      icon: <LayoutDashboard size={18} />,
+      shortcut: "G D",
+      category: "apps",
+      action: () => navigate("/dashboard"),
+      keywords: ["dashboard", "home", "widgets", "overview"],
+    },
+    {
+      id: "nav-store",
+      title: "Go to App Store",
+      subtitle: "Browse and install apps",
+      icon: <Store size={18} />,
+      shortcut: "G S",
+      category: "apps",
+      action: () => navigate("/store"),
+      keywords: ["store", "apps", "install", "browse", "marketplace"],
+    },
+    // ── Actions ────────────────────────────────────────────────────────────────
+    {
+      id: "action-add-widget",
+      title: "Add Widget",
+      subtitle: "Add a new widget to your dashboard",
+      icon: <Plus size={18} />,
+      shortcut: "A W",
+      category: "actions",
+      action: () => {
+        navigate("/dashboard");
+        onOpenAddWidget();
+      },
+      keywords: ["add", "widget", "dashboard", "new"],
+    },
+    {
+      id: "action-toggle-theme",
+      title: "Toggle Theme",
+      subtitle: "Switch between light and dark mode",
+      icon: <Moon size={18} />,
+      shortcut: "T T",
+      category: "actions",
+      action: () => {
+        const root = document.documentElement;
+        const isDark = root.classList.contains("dark");
+        const newTheme = isDark ? "light" : "dark";
+
+        root.classList.remove("light", "dark");
+        root.classList.add(newTheme);
+
+        // Sync to localStorage so SettingsPage reflects the change
+        const saved = localStorage.getItem(STORAGE_KEYS.USER_SETTINGS);
+        if (saved) {
+          try {
+            const settings = JSON.parse(saved);
+            settings.theme = newTheme;
+            localStorage.setItem(STORAGE_KEYS.USER_SETTINGS, JSON.stringify(settings));
+          } catch {
+            // Non-critical: localStorage may be unavailable
+          }
+        } else {
+          localStorage.setItem(
+            STORAGE_KEYS.USER_SETTINGS,
+            JSON.stringify({ theme: newTheme })
+          );
+        }
+
+        window.dispatchEvent(new CustomEvent("shin:theme-changed", { detail: newTheme }));
+      },
+      keywords: ["theme", "dark", "light", "mode", "toggle", "appearance"],
+    },
+    // ── Settings ───────────────────────────────────────────────────────────────
+    {
+      id: "settings",
+      title: "Settings",
+      subtitle: "Manage your preferences and account",
+      icon: <Settings size={18} />,
+      category: "settings",
+      action: () => navigate("/settings"),
+      keywords: ["settings", "preferences", "options", "configuration"],
+    },
+    {
+      id: "settings-theme",
+      title: "Theme Settings",
+      subtitle: "Change appearance preferences",
+      icon: <Sun size={18} />,
+      category: "settings",
+      action: () => {
+        navigate("/settings");
+        onOpenSettings("appearance");
+      },
+      keywords: ["settings", "theme", "appearance", "display", "preferences"],
+    },
+    {
+      id: "settings-profile",
+      title: "Profile Settings",
+      subtitle: "Manage your account details",
+      icon: <User size={18} />,
+      category: "settings",
+      action: () => {
+        navigate("/settings");
+        onOpenSettings("profile");
+      },
+      keywords: ["settings", "profile", "account", "personal"],
+    },
+    {
+      id: "settings-logout",
+      title: "Sign Out",
+      subtitle: "Log out of your account",
+      icon: <LogOut size={18} />,
+      category: "settings",
+      action: () => logout(),
+      keywords: ["logout", "sign out", "exit", "account"],
+    },
+    // ── Help ──────────────────────────────────────────────────────────────────
+    {
+      id: "help-shortcuts",
+      title: "Keyboard Shortcuts",
+      subtitle: "View all available shortcuts",
+      icon: <Command size={18} />,
+      shortcut: "?",
+      category: "help",
+      action: () => {
+        navigate("/settings");
+        onOpenSettings("keyboard");
+      },
+      keywords: ["help", "shortcuts", "keyboard", "hotkeys", "commands"],
+    },
+  ];
+}
+
+/**
+ * Build command items for each installed app.
+ */
+export function buildInstalledAppCommands(
+  apps: AppRuntimeEntry[],
+  navigate: NavigateFn
+): CommandItem[] {
+  return apps.map((app) => ({
+    id: `app-${app.id}`,
+    title: `Open ${app.name}`,
+    subtitle: app.description,
+    icon: app.icon ? (
+      <DynamicIcon name={app.icon} size={18} />
+    ) : (
+      <Sparkles size={18} />
+    ),
+    category: "apps" as const,
+    action: () => navigate(`/apps/${app.id}`),
+    keywords: [app.name, app.category, app.description, "app"],
+  }));
+}

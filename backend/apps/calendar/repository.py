@@ -10,23 +10,10 @@ from pymongo.asynchronous.client_session import AsyncClientSession
 from apps.calendar.enums import EventType, RecurrenceFrequency
 from apps.calendar.models import Calendar, Event, RecurringRule
 from core.db import get_db
+from shared.normalization import normalize_name_key, to_naive_datetime
 
 # Default color for new calendars
 DEFAULT_CALENDAR_COLOR = "oklch(0.70 0.18 250)"  # Blue-ish
-
-
-def _to_naive(dt: datetime | None) -> datetime | None:
-    """Convert timezone-aware datetime to naive UTC for DB comparison."""
-    if dt is None:
-        return None
-    if dt.tzinfo is not None:
-        return dt.astimezone().replace(tzinfo=None)
-    return dt
-
-
-def _normalize_name_key(name: str) -> str:
-    return name.strip().casefold()
-
 
 @asynccontextmanager
 async def calendar_transaction() -> AsyncIterator[AsyncClientSession]:
@@ -53,8 +40,8 @@ class EventRepository:
         if calendar_id:
             conditions.append(Event.calendar_id == PydanticObjectId(calendar_id))
 
-        start_naive = _to_naive(start)
-        end_naive = _to_naive(end)
+        start_naive = to_naive_datetime(start)
+        end_naive = to_naive_datetime(end)
 
         if start_naive and end_naive:
             conditions.append(Event.start_datetime < end_naive)
@@ -241,7 +228,7 @@ class CalendarRepository:
     ) -> Calendar | None:
         return await Calendar.find_one(
             Calendar.user_id == PydanticObjectId(user_id),
-            Calendar.name_key == _normalize_name_key(name),
+            Calendar.name_key == normalize_name_key(name),
             session=session,
         )
 
@@ -252,7 +239,6 @@ class CalendarRepository:
         session: AsyncClientSession | None = None,
     ) -> Calendar | None:
         return await Calendar.find_one(
-            Calendar.user_id == PydanticObjectId(user_id),
             {
                 "user_id": PydanticObjectId(user_id),
                 "is_default": True,
@@ -285,7 +271,7 @@ class CalendarRepository:
         calendar = Calendar(
             user_id=PydanticObjectId(user_id),
             name=name,
-            name_key=_normalize_name_key(name),
+            name_key=normalize_name_key(name),
             color=color or DEFAULT_CALENDAR_COLOR,
             is_default=is_default,
         )
@@ -303,7 +289,7 @@ class CalendarRepository:
             if hasattr(calendar, key) and value is not None:
                 setattr(calendar, key, value)
         if "name" in kwargs and kwargs["name"] is not None:
-            calendar.name_key = _normalize_name_key(calendar.name)
+            calendar.name_key = normalize_name_key(calendar.name)
         await calendar.save(session=session)
         return calendar
 

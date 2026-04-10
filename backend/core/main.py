@@ -1,7 +1,10 @@
 """FastAPI application entry point with lifespan management."""
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import Depends, FastAPI
 from fastapi.exceptions import RequestValidationError
@@ -10,6 +13,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from core.config import settings
 from core.constants import (
+    API_ADMIN,
     API_AUTH,
     API_CATALOG,
     API_CHAT,
@@ -34,6 +38,63 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s — %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+
+def _validate_subscription_expiry_cron_config() -> ZoneInfo:
+    if not (0 <= settings.subscription_expiry_cron_hour <= 23):
+        raise RuntimeError("SUBSCRIPTION_EXPIRY_CRON_HOUR must be within [0, 23].")
+    if not (0 <= settings.subscription_expiry_cron_minute <= 59):
+        raise RuntimeError("SUBSCRIPTION_EXPIRY_CRON_MINUTE must be within [0, 59].")
+    if settings.subscription_expiry_cron_batch_limit <= 0:
+        raise RuntimeError("SUBSCRIPTION_EXPIRY_CRON_BATCH_LIMIT must be a positive integer.")
+    try:
+        return ZoneInfo(settings.subscription_expiry_cron_timezone)
+    except ZoneInfoNotFoundError as exc:
+        raise RuntimeError(
+            f"Invalid SUBSCRIPTION_EXPIRY_CRON_TIMEZONE='{settings.subscription_expiry_cron_timezone}'",
+        ) from exc
+
+
+def _seconds_until_next_daily_run(*, timezone: ZoneInfo, hour: int, minute: int) -> float:
+    now = datetime.now(timezone)
+    next_run = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    if next_run <= now:
+        next_run += timedelta(days=1)
+    return (next_run - now).total_seconds()
+
+
+async def _run_subscription_expiry_cron(stop_event: asyncio.Event) -> None:
+    from core.subscriptions.service import expire_due_payos_subscriptions
+
+    timezone = _validate_subscription_expiry_cron_config()
+    hour = settings.subscription_expiry_cron_hour
+    minute = settings.subscription_expiry_cron_minute
+    batch_limit = settings.subscription_expiry_cron_batch_limit
+
+    while not stop_event.is_set():
+        wait_seconds = _seconds_until_next_daily_run(
+            timezone=timezone,
+            hour=hour,
+            minute=minute,
+        )
+        logger.info(
+            "Subscription expiry cron sleeping %.0fs until next run at %02d:%02d (%s)",
+            wait_seconds,
+            hour,
+            minute,
+            settings.subscription_expiry_cron_timezone,
+        )
+        try:
+            await asyncio.wait_for(stop_event.wait(), timeout=wait_seconds)
+            break
+        except TimeoutError:
+            pass
+
+        try:
+            expired_count = await expire_due_payos_subscriptions(limit=batch_limit)
+            logger.info("Subscription expiry cron processed %d expired PayOS subscription(s)", expired_count)
+        except Exception:
+            logger.exception("Subscription expiry cron failed")
 
 
 # ─── Lifespan ─────────────────────────────────────────────────────────────────
@@ -63,9 +124,26 @@ async def lifespan(app: FastAPI):
 
     logger.info("✓ Server ready — all plugins verified")
 
+    expiry_cron_stop_event = asyncio.Event()
+    expiry_cron_task: asyncio.Task[None] | None = None
+    if settings.subscription_expiry_cron_enabled:
+        _validate_subscription_expiry_cron_config()
+        expiry_cron_task = asyncio.create_task(_run_subscription_expiry_cron(expiry_cron_stop_event))
+        logger.info(
+            "✓ Subscription expiry cron enabled (%02d:%02d %s, batch_limit=%d)",
+            settings.subscription_expiry_cron_hour,
+            settings.subscription_expiry_cron_minute,
+            settings.subscription_expiry_cron_timezone,
+            settings.subscription_expiry_cron_batch_limit,
+        )
+
     yield
 
     # Shutdown
+    if expiry_cron_task is not None:
+        expiry_cron_stop_event.set()
+        await expiry_cron_task
+
     await close_db()
     logger.info("✓ Server shutdown complete")
 
@@ -128,6 +206,9 @@ def create_app() -> FastAPI:
 
     from core.subscriptions.routes import router as subscriptions_router
     app.include_router(subscriptions_router, prefix=API_SUBSCRIPTIONS, tags=["subscriptions"])
+
+    from core.admin.routes import router as admin_router
+    app.include_router(admin_router, prefix=API_ADMIN, tags=["admin"])
 
     # ── Plugin routers — discover and mount immediately for OpenAPI spec ──
     # Safe to call multiple times; plugin modules are already imported.

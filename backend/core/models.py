@@ -6,34 +6,16 @@ Plugin-specific models live in backend/apps/{app_id}/models.py.
 
 from datetime import UTC, datetime
 from typing import Literal
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from beanie import Document, PydanticObjectId
 from pydantic import Field
 from pymongo import IndexModel
 
-from shared.enums import UserRole
+from shared.enums import InstallationStatus, UserRole
 
 
 def utc_now() -> datetime:
     return datetime.now(UTC)
-
-
-def get_user_local_time(user: "User") -> tuple[str, str]:
-    """Get current date and time in user's timezone.
-
-    Returns:
-        tuple of (date_str, time_str) in user's local timezone.
-        Defaults to UTC if user has no timezone set.
-    """
-    tz_name = user.settings.get("timezone", "UTC")
-    try:
-        tz = ZoneInfo(tz_name)
-    except (ZoneInfoNotFoundError, KeyError):
-        tz = ZoneInfo("UTC")
-
-    now = datetime.now(UTC).astimezone(tz)
-    return now.strftime("%Y-%m-%d"), now.strftime("%H:%M")
 
 
 class User(Document):
@@ -42,7 +24,8 @@ class User(Document):
     email: str
     hashed_password: str
     name: str
-    role: UserRole = "user"
+    avatar_url: str | None = None
+    role: UserRole = UserRole.USER
     created_at: datetime = Field(default_factory=utc_now)
     settings: dict = Field(default_factory=dict)
 
@@ -59,7 +42,7 @@ class UserAppInstallation(Document):
 
     user_id: PydanticObjectId
     app_id: str
-    status: Literal["active", "disabled"] = "active"
+    status: InstallationStatus = InstallationStatus.ACTIVE
     installed_at: datetime = Field(default_factory=utc_now)
 
     class Settings:

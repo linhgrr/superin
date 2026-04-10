@@ -17,6 +17,7 @@ import {
 
 import { getMe, login as apiLogin, logout as apiLogout, register as apiRegister } from "@/api/auth";
 import { isAuthenticated, triggerLogout } from "@/api/axios";
+import { UserRole } from "@/types/generated";
 import type { LoginRequest, RegisterRequest, UserPublic } from "@/types/generated";
 
 interface AuthContextValue {
@@ -27,6 +28,7 @@ interface AuthContextValue {
   login: (payload: LoginRequest) => Promise<void>;
   register: (payload: RegisterRequest) => Promise<void>;
   logout: () => Promise<void>;
+  refreshUser: () => Promise<UserPublic | null>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -75,17 +77,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const refreshUser = useCallback(async (): Promise<UserPublic | null> => {
+    if (!isAuthenticated()) {
+      setUser(null);
+      return null;
+    }
+    const nextUser = await getMe();
+    setUser(nextUser);
+    return nextUser;
+  }, []);
+
   const value = useMemo(
     () => ({
       user,
       isLoading,
       isAuthenticated: user !== null,
-      isAdmin: user?.role === "admin",
+      isAdmin: user?.role === UserRole.ADMIN,
       login,
       register,
       logout,
+      refreshUser,
     }),
-    [user, isLoading, login, logout, register]
+    [user, isLoading, login, logout, refreshUser, register]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

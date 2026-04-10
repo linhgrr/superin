@@ -1,70 +1,12 @@
 /**
  * API Routes - Core platform only.
  *
- * Plug-n-play rule: Core constants must NOT know about specific apps.
- * App-specific paths are consumed through each app-local generated `api.ts` facade.
- *
- * Example:
- *   import { getTransactions } from "@/apps/finance/api";
+ * Generated routes live in `api.generated.ts` (source: backend OpenAPI via codegen).
  */
 
-// ─── Core Routes ──────────────────────────────────────────────────────────────
+export { AUTH_ROUTES, API_PATHS } from "./api.generated";
 
-// Auth routes
-export const AUTH_ROUTES = {
-  LOGIN: "/auth/login",
-  REGISTER: "/auth/register",
-  REFRESH: "/auth/refresh",
-  LOGOUT: "/auth/logout",
-  ME: "/auth/me",
-  SETTINGS: "/auth/me/settings",
-} as const;
-
-// Catalog routes
-export const CATALOG_ROUTES = {
-  APPS: "/catalog",           // GET /api/catalog — list all apps
-  CATEGORIES: "/catalog/categories",
-  INSTALL: "/catalog/install",
-  UNINSTALL: "/catalog/uninstall",
-  PREFERENCES: (appId: string) => `/catalog/preferences/${appId}`,
-} as const;
-
-// Chat routes
-export const CHAT_ROUTES = {
-  STREAM: "/chat/stream",
-} as const;
-
-export const WORKSPACE_ROUTES = {
-  BOOTSTRAP: "/workspace/bootstrap",
-} as const;
-
-// ─── Full API Paths ───────────────────────────────────────────────────────────
-
-export const API_PATHS = {
-  // Auth
-  LOGIN: `/api${AUTH_ROUTES.LOGIN}`,
-  REGISTER: `/api${AUTH_ROUTES.REGISTER}`,
-  REFRESH: `/api${AUTH_ROUTES.REFRESH}`,
-  LOGOUT: `/api${AUTH_ROUTES.LOGOUT}`,
-  ME: `/api${AUTH_ROUTES.ME}`,
-  SETTINGS: `/api${AUTH_ROUTES.SETTINGS}`,
-
-  // Catalog
-  CATALOG_APPS: `/api${CATALOG_ROUTES.APPS}`,
-  CATALOG_CATEGORIES: `/api${CATALOG_ROUTES.CATEGORIES}`,
-  CATALOG_INSTALL: `/api${CATALOG_ROUTES.INSTALL}`,
-  CATALOG_UNINSTALL: `/api${CATALOG_ROUTES.UNINSTALL}`,
-  CATALOG_ALL_PREFERENCES: `/api/catalog/preferences`,
-  CATALOG_PREFERENCES: (appId: string) => `/api${CATALOG_ROUTES.PREFERENCES(appId)}`,
-
-  // Chat
-  CHAT_STREAM: `/api${CHAT_ROUTES.STREAM}`,
-
-  // Workspace
-  WORKSPACE_BOOTSTRAP: `/api${WORKSPACE_ROUTES.BOOTSTRAP}`,
-} as const;
-
-// ─── App API Helper ─────────────────────────────────────────────────────────────
+// ─── App API Helper ───────────────────────────────────────────────────────────
 /**
  * Build base path for an app API.
  *

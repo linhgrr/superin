@@ -15,19 +15,26 @@ from typing import Any
 from beanie import PydanticObjectId
 from fastapi.encoders import jsonable_encoder
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
-from langchain_core.tools import BaseTool, tool
+from langchain_core.tools import BaseTool
 from langgraph.prebuilt import create_react_agent
 
 from core.config import settings
-from core.models import ConversationMessage, User, get_user_local_time
+from core.models import ConversationMessage, User
 from core.registry import PLUGIN_REGISTRY
 from core.utils.sanitizer import sanitize_for_memory_async, sanitize_user_content_async
+from core.utils.timezone import get_user_local_time
 from core.workspace.service import list_installed_app_ids
 from shared.agent_context import clear_agent_context, set_thread_context, set_user_context
+from shared.enums import ChatEventType
 from shared.llm import get_llm
 
 from .prompts import build_available_apps_context, build_system_prompt
-from .tools import _build_ask_tool, _build_install_app_tool, _build_uninstall_app_tool
+from .tools import (
+    _build_ask_tool,
+    _build_install_app_tool,
+    _build_platform_info_tool,
+    _build_uninstall_app_tool,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -146,7 +153,7 @@ class MessageParser:
                         "name": p.get("toolName") or p.get("name"),
                         "args": raw_args,
                         "id": p.get("toolCallId") or p.get("id"),
-                        "type": "tool_call",
+                        "type": ChatEventType.TOOL_CALL,
                     })
 
         return ParsedMessage(
@@ -169,7 +176,7 @@ class MessageParser:
                 "name": fn.get("name") or tc.get("toolName") or tc.get("name"),
                 "args": args,
                 "id": tc.get("id") or tc.get("toolCallId"),
-                "type": "tool_call",
+                "type": ChatEventType.TOOL_CALL,
             })
         return lc_tool_calls
 
@@ -264,7 +271,7 @@ class EventStreamHandler:
         content = getattr(chunk, "content", "") or ""
         if content:
             self.assistant_buffer += str(content)
-            return StreamEvent(type="token", content=str(content))
+            return StreamEvent(type=ChatEventType.TOKEN, content=str(content))
         return None
 
     def _handle_tool_start(self, run_id: str, tool_name: str, data: dict) -> StreamEvent | None:
@@ -276,7 +283,7 @@ class EventStreamHandler:
 
         inp = data.get("input", {})
         return StreamEvent(
-            type="tool_call",
+            type=ChatEventType.TOOL_CALL,
             tool_name=tool_name,
             tool_call_id=run_id,
             args=jsonable_encoder(inp) if isinstance(inp, dict) else {},
@@ -289,7 +296,7 @@ class EventStreamHandler:
 
         self.active_delegations.discard(run_id)
         return StreamEvent(
-            type="tool_result",
+            type=ChatEventType.TOOL_RESULT,
             tool_call_id=run_id,
             result=_normalize_tool_output(data.get("output", {})),
         )
@@ -301,7 +308,7 @@ class EventStreamHandler:
 
         self.active_delegations.discard(run_id)
         return StreamEvent(
-            type="tool_result",
+            type=ChatEventType.TOOL_RESULT,
             tool_call_id=run_id,
             result={
                 "ok": False,
@@ -344,18 +351,10 @@ class RootAgent:
         self._base_tools = self._build_base_tools()
         self._graphs.clear()  # force rebuild on next request
 
-    @staticmethod
-    def _build_platform_info_tool() -> BaseTool:
-        @tool("get_platform_info", description="Get basic information about the Superin platform")
-        async def get_platform_info() -> str:
-            return "Superin is an AI platform with an app store. Users can install apps to add capabilities."
-
-        return get_platform_info
-
     @classmethod
     def _build_base_tools(cls) -> list[BaseTool]:
         return [
-            cls._build_platform_info_tool(),
+            _build_platform_info_tool(),
             _build_install_app_tool(),
             _build_uninstall_app_tool(),
         ]
@@ -497,7 +496,7 @@ class RootAgent:
                 self._save_messages(user_id, thread, last_user_content, event_handler.assistant_buffer)
             )
 
-            yield {"type": "done"}
+            yield {"type": ChatEventType.DONE}
 
             # Ensure the DB write completes before the response closes
             try:

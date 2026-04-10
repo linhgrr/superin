@@ -19,16 +19,16 @@ import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import AppShell from "@/pages/AppShell";
 
 const LoginPage = lazy(() => import("@/pages/LoginPage"));
-const DashboardPage = lazy(() => import("@/pages/DashboardPage"));
+const DashboardPage = lazy(() => import("@/pages/dashboard/DashboardPage"));
 const StorePage = lazy(() => import("@/pages/StorePage"));
-const BillingPage = lazy(() => import("@/pages/BillingPage"));
-const BillingSuccessPage = lazy(() => import("@/pages/BillingSuccessPage"));
-const BillingCancelPage = lazy(() => import("@/pages/BillingCancelPage"));
+const BillingPage = lazy(() => import("@/pages/billing/BillingPage"));
+const BillingSuccessPage = lazy(() => import("@/pages/billing/BillingSuccessPage"));
+const BillingCancelPage = lazy(() => import("@/pages/billing/BillingCancelPage"));
 const AppPage = lazy(() => import("@/pages/AppPage"));
-const SettingsPage = lazy(() => import("@/pages/SettingsPage"));
-const AdminPage = lazy(() => import("@/pages/AdminPage"));
+const SettingsPage = lazy(() => import("@/pages/settings/SettingsPage"));
+const AdminPage = lazy(() => import("@/pages/admin/AdminPage"));
 const CommandPalette = lazy(async () => {
-  const module = await import("@/components/providers/CommandPalette");
+  const module = await import("@/components/providers/command-palette/CommandPalette");
   return { default: module.CommandPalette };
 });
 const ChatPage = lazy(() => import("@/pages/ChatPage"));
@@ -160,7 +160,7 @@ function CommandPaletteWrapper({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const handle = window.setTimeout(() => {
-      void import("@/components/providers/CommandPalette");
+      void import("@/components/providers/command-palette/CommandPalette");
     }, 200);
     return () => {
       window.clearTimeout(handle);

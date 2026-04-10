@@ -16,6 +16,8 @@ from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from shared.enums import PaymentProvider
+
 
 class Settings(BaseSettings):
     """All configuration comes from environment variables."""
@@ -45,6 +47,11 @@ class Settings(BaseSettings):
 
     # ─── Deployment ──────────────────────────────────────────────────────────
     hf_space: bool = False
+    subscription_expiry_cron_enabled: bool = True
+    subscription_expiry_cron_timezone: str = "Asia/Ho_Chi_Minh"
+    subscription_expiry_cron_hour: int = 0
+    subscription_expiry_cron_minute: int = 0
+    subscription_expiry_cron_batch_limit: int = 500
 
     # ─── AI (OpenAI-compatible / Fireworks) ───────────────────────────────────
     openai_api_key: str = ""
@@ -52,6 +59,37 @@ class Settings(BaseSettings):
     openai_model: str = "accounts/fireworks/routers/kimi-k2p5-turbo"
     llm_request_timeout_seconds: float = 60.0
     llm_stream_idle_timeout_seconds: float = 90.0
+
+    # ─── Object Storage (S3-compatible) ───────────────────────────────────────
+    object_storage_access_key: str | None = None
+    object_storage_secret_key: str | None = None
+    object_storage_bucket: str | None = None
+    object_storage_region: str = "ap-southeast-1"
+    object_storage_endpoint_internal: str | None = None
+    object_storage_endpoint_external: str | None = None
+    object_storage_addressing_style: str = "path"
+    object_storage_avatar_max_bytes: int = 5 * 1024 * 1024
+    object_storage_avatar_prefix: str = "avatars"
+
+    # ─── Payments ─────────────────────────────────────────────────────────────
+    payment_default_provider: PaymentProvider | None = None
+
+    stripe_secret_key: str | None = None
+    stripe_webhook_secret: str | None = None
+    stripe_webhook_tolerance_seconds: int = 300
+    stripe_price_id_paid_monthly: str | None = None
+    stripe_checkout_success_url: str | None = None
+    stripe_checkout_cancel_url: str | None = None
+
+    payos_client_id: str | None = None
+    payos_api_key: str | None = None
+    payos_checksum_key: str | None = None
+    payos_base_url: str | None = None
+    payos_return_url: str | None = None
+    payos_cancel_url: str | None = None
+    payos_amount_vnd: int | None = None
+    payos_paid_duration_days: int | None = None
+    payos_payment_link_expire_seconds: int | None = None
 
 
 # Global singleton — imported everywhere in backend

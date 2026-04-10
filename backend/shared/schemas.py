@@ -10,8 +10,10 @@ from typing import Any, Literal
 from pydantic import BaseModel, EmailStr, Field
 
 from shared.enums import (
+    ChatEventType,
     ConfigFieldType,
     PaymentProvider,
+    PermissionKey,
     SubscriptionStatus,
     SubscriptionTier,
     UserRole,
@@ -31,6 +33,7 @@ class UserCreate(UserBase):
 
 class UserRead(UserBase):
     id: str
+    avatar_url: str | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -42,6 +45,7 @@ class UserPublic(BaseModel):
     id: str
     email: str
     name: str
+    avatar_url: str | None = None
     role: UserRole
     settings: dict = Field(default_factory=dict)
 
@@ -67,6 +71,7 @@ class UserWithSubscription(BaseModel):
     id: str
     email: str
     name: str
+    avatar_url: str | None = None
     role: UserRole
     settings: dict = Field(default_factory=dict)
     subscription: SubscriptionRead
@@ -96,6 +101,15 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8)
     name: str = Field(min_length=1, max_length=100)
+
+
+class PermissionRead(BaseModel):
+    key: PermissionKey
+    allowed: bool
+
+
+class PermissionListRead(BaseModel):
+    items: list[PermissionRead]
 
 
 # ─── Widgets ───────────────────────────────────────────────────────────────────
@@ -133,7 +147,7 @@ class WidgetManifestSchema(BaseModel):
     name: str
     description: str
     icon: str = Field(description="Lucide icon name")
-    size: WidgetSize = "standard"
+    size: WidgetSize = WidgetSize.STANDARD
     config_fields: list[ConfigFieldSchema] = Field(default_factory=list)
     requires_auth: bool = True
 
@@ -200,7 +214,7 @@ class AppManifestSchema(BaseModel):
     author: str = "Shin Team"
     homepage: str = ""
     requires_auth: bool = True
-    requires_tier: SubscriptionTier = "free"
+    requires_tier: SubscriptionTier = SubscriptionTier.FREE
 
 
 class AppCatalogEntry(BaseModel):
@@ -218,7 +232,7 @@ class AppCatalogEntry(BaseModel):
     tags: list[str] = []
     screenshots: list[str] = []
     widgets: list[WidgetManifestSchema] = Field(default_factory=list)
-    requires_tier: SubscriptionTier = "free"
+    requires_tier: SubscriptionTier = SubscriptionTier.FREE
 
 
 class AppRuntimeEntry(BaseModel):
@@ -233,7 +247,8 @@ class AppRuntimeEntry(BaseModel):
     version: str
     author: str
     widgets: list[WidgetManifestSchema] = Field(default_factory=list)
-    requires_tier: SubscriptionTier = "free"
+    # requires_tier is server-only — clients receive 403 before seeing this field.
+    # It is NOT present here so it cannot leak through workspace bootstrap.
 
 
 class AppCategoryRead(BaseModel):
@@ -265,12 +280,12 @@ class WorkspaceBootstrap(BaseModel):
 # ─── Chat / Agent ──────────────────────────────────────────────────────────────
 
 class ChatStreamToken(BaseModel):
-    type: Literal["token"]
+    type: ChatEventType = ChatEventType.TOKEN
     content: str
 
 
 class ChatStreamToolCall(BaseModel):
-    type: Literal["tool_call"]
+    type: ChatEventType = ChatEventType.TOOL_CALL
     tool_call_id: str
     tool_name: str
     args: dict
@@ -278,18 +293,18 @@ class ChatStreamToolCall(BaseModel):
 
 
 class ChatStreamToolResult(BaseModel):
-    type: Literal["tool_result"]
+    type: ChatEventType = ChatEventType.TOOL_RESULT
     tool_call_id: str
     tool_name: str
     result: Any
 
 
 class ChatStreamDone(BaseModel):
-    type: Literal["done"]
+    type: ChatEventType = ChatEventType.DONE
 
 
 class ChatStreamError(BaseModel):
-    type: Literal["error"]
+    type: ChatEventType = ChatEventType.ERROR
     message: str
 
 
