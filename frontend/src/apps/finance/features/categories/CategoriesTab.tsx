@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Pencil } from "lucide-react";
+import { DynamicIcon } from "@/lib/icon-resolver";
 import { createCategory, getCategories, type CategoryRead } from "../../api";
 import type { CreateCategoryRequest } from "../../api";
 import Modal from "../../components/Modal";
@@ -83,7 +83,7 @@ export default function CategoriesTab() {
                   Budget: ${category.budget.toLocaleString()}
                 </p>
               </div>
-              <Pencil size={14} style={{ color: "var(--color-foreground-muted)", flexShrink: 0 }} />
+              <DynamicIcon name="Pencil" size={14} style={{ color: "var(--color-foreground-muted)", flexShrink: 0 }} />
             </div>
           ))}
         </div>

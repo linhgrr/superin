@@ -1,10 +1,10 @@
 import type { DashboardWidgetRendererProps } from "../types";
 import { formatCurrency } from "../lib/formatCurrency";
 import { useFinanceSummary } from "./useFinanceSummary";
-import { ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { DynamicIcon } from "@/lib/icon-resolver";
 
 export default function RecentTransactionsWidget({ widget: _widget }: DashboardWidgetRendererProps) {
-  const { summary, loading } = useFinanceSummary();
+  const { data: summary, isLoading: loading } = useFinanceSummary();
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", justifyContent: "center" }}>
@@ -27,7 +27,7 @@ export default function RecentTransactionsWidget({ widget: _widget }: DashboardW
                 flexShrink: 0,
               }}
             >
-              <ArrowUpRight size={16} />
+              <DynamicIcon name="ArrowUpRight" size={16} />
             </div>
             <div>
               <div style={{ fontSize: "0.625rem", color: "var(--color-foreground-muted)", textTransform: "uppercase" }}>
@@ -54,7 +54,7 @@ export default function RecentTransactionsWidget({ widget: _widget }: DashboardW
                 flexShrink: 0,
               }}
             >
-              <ArrowDownRight size={16} />
+              <DynamicIcon name="ArrowDownRight" size={16} />
             </div>
             <div>
               <div style={{ fontSize: "0.625rem", color: "var(--color-foreground-muted)", textTransform: "uppercase" }}>

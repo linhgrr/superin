@@ -1,4 +1,4 @@
-import { CreditCard } from "lucide-react";
+import CreditCard from "lucide-react/dist/esm/icons/credit-card";
 
 import { SubscriptionStatus, SubscriptionTier } from "@/types/generated";
 import type { SubscriptionRead } from "@/types/generated";

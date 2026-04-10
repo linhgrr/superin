@@ -8,15 +8,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search } from "lucide-react";
 
+import { DynamicIcon } from "@/lib/icon-resolver";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { useAuth } from "@/hooks/useAuth";
 import {
   buildStaticCommands,
   buildInstalledAppCommands,
   CATEGORY_ORDER,
-  CATEGORY_LABELS,
   type CommandCategory,
   type CommandItem,
 } from "./command-definitions";
@@ -113,19 +112,30 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
     inputRef.current?.focus();
   }, []);
 
-  // Track recent commands
+  // Track recent commands — debounced to batch writes on rapid interactions
+  const pendingRecent = useRef<string[] | null>(null);
   const trackRecent = useCallback(
     (id: string) => {
       const next = [id, ...recentCommands.filter((c) => c !== id)].slice(0, MAX_RECENT);
       setRecentCommands(next);
-      try {
-        localStorage.setItem(STORAGE_KEYS.RECENT_COMMANDS, JSON.stringify(next));
-      } catch {
-        // Non-critical
-      }
+      pendingRecent.current = next;
     },
     [recentCommands]
   );
+
+  // Flush pending recent commands to localStorage (debounced)
+  useEffect(() => {
+    if (pendingRecent.current === null) return;
+    const toWrite = pendingRecent.current;
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem(STORAGE_KEYS.RECENT_COMMANDS, JSON.stringify(toWrite));
+      } catch {
+        // Non-critical
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [recentCommands]);
 
   const executeCommand = useCallback(
     (cmd: CommandItem) => {
@@ -218,7 +228,7 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
             borderBottom: "1px solid var(--color-border)",
           }}
         >
-          <Search size={22} style={{ color: "var(--color-foreground-muted)", flexShrink: 0 }} />
+          <DynamicIcon name="Search" size={22} style={{ color: "var(--color-foreground-muted)", flexShrink: 0 }} />
           <input
             ref={inputRef}
             type="text"

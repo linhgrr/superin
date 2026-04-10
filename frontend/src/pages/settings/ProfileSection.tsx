@@ -3,7 +3,10 @@
  */
 
 import { type ChangeEvent, useCallback, useMemo, useRef, useState } from "react";
-import { Camera, Globe, LogOut, User } from "lucide-react";
+import Camera from "lucide-react/dist/esm/icons/camera";
+import Globe from "lucide-react/dist/esm/icons/globe";
+import LogOut from "lucide-react/dist/esm/icons/log-out";
+import User from "lucide-react/dist/esm/icons/user";
 import { uploadProfileAvatar } from "@/api/auth";
 import { useToast } from "@/components/providers/ToastProvider";
 import { useAuth } from "@/hooks/useAuth";

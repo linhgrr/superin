@@ -2,7 +2,8 @@
  * AdminPage — platform administration console.
  */
 
-import { Shield, RefreshCw } from "lucide-react";
+import RefreshCw from "lucide-react/dist/esm/icons/refresh-cw";
+import Shield from "lucide-react/dist/esm/icons/shield";
 import { useState } from "react";
 import useSWR from "swr";
 

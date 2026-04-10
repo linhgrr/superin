@@ -9,9 +9,9 @@
  *   └── KeyboardSection      (shortcuts reference)
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, Keyboard, Palette, User } from "lucide-react";
+import { DynamicIcon } from "@/lib/icon-resolver";
 import { STORAGE_KEYS } from "@/constants";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/components/providers/ToastProvider";
@@ -33,10 +33,10 @@ type TabId = "profile" | "appearance" | "notifications" | "keyboard";
 const VALID_TABS: TabId[] = ["profile", "appearance", "notifications", "keyboard"];
 
 const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
-  { id: "profile", label: "Profile", icon: <User size={18} /> },
-  { id: "appearance", label: "Appearance", icon: <Palette size={18} /> },
-  { id: "notifications", label: "Notifications", icon: <Bell size={18} /> },
-  { id: "keyboard", label: "Keyboard", icon: <Keyboard size={18} /> },
+  { id: "profile", label: "Profile", icon: <DynamicIcon name="User" size={18} /> },
+  { id: "appearance", label: "Appearance", icon: <DynamicIcon name="Palette" size={18} /> },
+  { id: "notifications", label: "Notifications", icon: <DynamicIcon name="Bell" size={18} /> },
+  { id: "keyboard", label: "Keyboard", icon: <DynamicIcon name="Keyboard" size={18} /> },
 ];
 
 const OPEN_SETTINGS_EVENT = "shin:open-settings";
@@ -50,6 +50,7 @@ export default function SettingsPage() {
   const toast = useToast();
   const [activeTab, setActiveTab] = useState<TabId>("profile");
   const [isSaving, setIsSaving] = useState(false);
+  const [settingsSnapshot, setSettingsSnapshot] = useState<SettingsState | null>(null);
 
   // Load from localStorage
   const [settings, setSettings] = useState<SettingsState>(() => {
@@ -113,12 +114,31 @@ export default function SettingsPage() {
     return () => window.removeEventListener("storage", handler);
   }, [toast]);
 
+  const pendingSettings = useRef<SettingsState | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Debounce localStorage write — fires 300ms after the last settings change
+  useEffect(() => {
+    if (!settingsSnapshot) return;
+    timerRef.current = setTimeout(() => {
+      try {
+        if (pendingSettings.current) {
+          localStorage.setItem(STORAGE_KEYS.USER_SETTINGS, JSON.stringify(pendingSettings.current));
+        }
+      } catch (error) {
+        console.error("Failed to persist settings to localStorage", error);
+      }
+    }, 300);
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, [settingsSnapshot]);
+
   const saveSettings = useCallback(
     async (newSettings: Partial<SettingsState>) => {
       setIsSaving(true);
       const updated = { ...settings, ...newSettings };
       setSettings(updated);
-      localStorage.setItem(STORAGE_KEYS.USER_SETTINGS, JSON.stringify(updated));
+      pendingSettings.current = updated;
+      setSettingsSnapshot({ ...updated });
 
       if (newSettings.timezone) {
         try {

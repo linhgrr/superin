@@ -9,7 +9,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { ApiError } from "@/api/axios";
 import { APP_NAME } from "@/config";
-import { Eye, EyeOff, ArrowRight, Sparkles } from "lucide-react";
+import { DynamicIcon } from "@/lib/icon-resolver";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -112,7 +112,7 @@ export default function LoginPage() {
         {/* Brand */}
         <div className="login-brand">
           <div className="login-brand-icon">
-            <Sparkles size={28} />
+            <DynamicIcon name="Sparkles" size={28} />
           </div>
           <h1 className="login-brand-title">{APP_NAME}</h1>
           <p className="login-brand-subtitle">
@@ -205,7 +205,7 @@ export default function LoginPage() {
                     justifyContent: "center",
                   }}
                 >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  {showPassword ? <DynamicIcon name="EyeOff" size={18} /> : <DynamicIcon name="Eye" size={18} />}
                 </button>
               </div>
               {errors.password && <span className="login-error">{errors.password}</span>}
@@ -224,7 +224,7 @@ export default function LoginPage() {
               ) : (
                 <span style={{ display: "flex", alignItems: "center", gap: "0.5rem", justifyContent: "center" }}>
                   {mode === "login" ? "Sign In" : "Create Account"}
-                  <ArrowRight size={18} />
+                  <DynamicIcon name="ArrowRight" size={18} />
                 </span>
               )}
             </button>

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Loader2 } from "lucide-react";
+import { DynamicIcon } from "@/lib/icon-resolver";
 import type { SubTaskRead } from "../api";
 import SubtaskItem from "./SubtaskItem";
 
@@ -131,7 +131,7 @@ export default function SubtaskList({
               opacity: isAdding || !newTitle.trim() ? 0.6 : 1,
             }}
           >
-            {isAdding ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+            {isAdding ? <DynamicIcon name="Loader2" size={14} className="animate-spin" /> : <DynamicIcon name="Plus" size={14} />}
           </button>
           <button
             type="button"
@@ -179,7 +179,7 @@ export default function SubtaskList({
             e.currentTarget.style.color = "var(--color-foreground-muted)";
           }}
         >
-          <Plus size={14} />
+          <DynamicIcon name="Plus" size={14} />
           Add subtask
         </button>
       )}

@@ -1,52 +1,26 @@
 import type { DashboardWidgetRendererProps } from "../types";
-import { useCallback, useEffect, useState } from "react";
-import { listEvents, listCalendars, type CalendarRead, type EventRead } from "../api";
+import { useState } from "react";
+import { useCalendars, useEvents } from "../hooks/useCalendarSwr";
 import { useTimezone } from "@/shared/hooks/useTimezone";
 import Widget from "./Widget";
 
 export default function MonthViewWidget({ widget: _widget }: DashboardWidgetRendererProps) {
   const defaultCalendar = null;
   const showTimeBlockedTasks = true;
-  const [events, setEvents] = useState<EventRead[]>([]);
-  const [calendars, setCalendars] = useState<CalendarRead[]>([]);
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [isLoading, setIsLoading] = useState(true);
   const { getNow } = useTimezone();
-
-  const loadData = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      const year = currentDate.getFullYear();
-      const month = currentDate.getMonth();
-
-      const start = new Date(year, month, 1).toISOString();
-      const end = new Date(year, month + 1, 0).toISOString();
-
-      const [evts, cals] = await Promise.all([
-        listEvents({
-          start,
-          end,
-          calendar_id: defaultCalendar || undefined,
-          limit: 100,
-        }),
-        listCalendars(),
-      ]);
-
-      const filtered = showTimeBlockedTasks ? evts : evts.filter((e) => e.type !== "time_blocked_task");
-
-      setEvents(filtered);
-      setCalendars(cals);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [currentDate, defaultCalendar, showTimeBlockedTasks]);
-
-  useEffect(() => {
-    void loadData();
-  }, [loadData]);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
+  const start = new Date(year, month, 1).toISOString();
+  const end = new Date(year, month + 1, 0).toISOString();
+
+  const { data: rawEvents, isLoading: isEventsLoading } = useEvents(start, end, defaultCalendar ?? undefined, 100);
+  const { data: calendars = [] } = useCalendars();
+
+  const events = showTimeBlockedTasks
+    ? rawEvents ?? []
+    : (rawEvents ?? []).filter((e) => e.type !== "time_blocked_task");
 
   // Get first day of month and total days
   const firstDay = new Date(year, month, 1).getDay(); // 0 = Sunday
@@ -80,7 +54,7 @@ export default function MonthViewWidget({ widget: _widget }: DashboardWidgetRend
   const isCurrentMonth = todayMonth === month && todayYear === year;
 
   return (
-    <Widget isLoading={isLoading}>
+    <Widget isLoading={isEventsLoading}>
       <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
         {/* Header */}
         <div

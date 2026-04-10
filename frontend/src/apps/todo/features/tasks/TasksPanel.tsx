@@ -20,12 +20,10 @@ import Modal from "../../components/Modal";
 import SubtaskList from "../../components/SubtaskList";
 import RecurringRuleForm from "../../components/RecurringRuleForm";
 import type { RecurringFrequency } from "../../api";
-import { TaskFilters } from "./TaskFilters";
+import TaskFilters from "./TaskFilters";
 
 type TaskStatus = TaskRead["status"];
 type TaskFilter = "all" | TaskStatus;
-
-const TASK_FILTER_VALUES = ["all", "pending", "completed"] as const satisfies readonly TaskFilter[];
 
 type TaskListItem = TaskRead & {
   subtask_count?: number;

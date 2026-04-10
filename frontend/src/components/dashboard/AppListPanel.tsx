@@ -2,7 +2,7 @@
  * AppListPanel — Step 1 of AddWidgetDialog: select an app from the catalog.
  */
 
-import { LayoutGrid, X } from "lucide-react";
+import { memo } from "react";
 import type { AppRuntimeEntry } from "@/types/generated";
 import { DynamicIcon } from "@/lib/icon-resolver";
 
@@ -13,13 +13,13 @@ interface AppListPanelProps {
   onClose: () => void;
 }
 
-export function AppListPanel({ catalog, enabledWidgetIds, onSelectApp, onClose }: AppListPanelProps) {
+export const AppListPanel = memo(function AppListPanel({ catalog, enabledWidgetIds, onSelectApp, onClose }: AppListPanelProps) {
   return (
     <>
       <div className="dialog-header">
         <span className="dialog-title">Add Widget</span>
         <button type="button" className="btn btn-ghost btn-icon" onClick={onClose} style={{ marginLeft: "auto" }}>
-          <X size={18} />
+          <DynamicIcon name="X" size={18} />
         </button>
       </div>
 
@@ -53,7 +53,7 @@ export function AppListPanel({ catalog, enabledWidgetIds, onSelectApp, onClose }
                     {app.icon ? (
                       <DynamicIcon name={app.icon} size={18} strokeWidth={2} />
                     ) : (
-                      <LayoutGrid size={18} />
+                      <DynamicIcon name="LayoutGrid" size={18} strokeWidth={2} />
                     )}
                   </div>
 
@@ -63,8 +63,6 @@ export function AppListPanel({ catalog, enabledWidgetIds, onSelectApp, onClose }
                       {visibleCount}/{widgets.length} widgets visible
                     </div>
                   </div>
-
-                  <LayoutGrid size={18} style={{ color: "var(--color-foreground-muted)" }} />
                 </button>
               );
             })}
@@ -73,4 +71,4 @@ export function AppListPanel({ catalog, enabledWidgetIds, onSelectApp, onClose }
       </div>
     </>
   );
-}
+});

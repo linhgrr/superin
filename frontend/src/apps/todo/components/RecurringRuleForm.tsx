@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { Repeat, Loader2 } from "lucide-react";
+import { DynamicIcon } from "@/lib/icon-resolver";
 import type { CreateRecurringRuleRequest, RecurringFrequency } from "../api";
 
 interface RecurringRuleFormProps {
@@ -63,7 +63,7 @@ export default function RecurringRuleForm({ onSubmit, onCancel }: RecurringRuleF
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.25rem" }}>
-        <Repeat size={16} style={{ color: "var(--color-primary)" }} />
+        <DynamicIcon name="Repeat" size={16} style={{ color: "var(--color-primary)" }} />
         <span style={{ fontWeight: 500 }}>Make this task repeat</span>
       </div>
 
@@ -209,7 +209,7 @@ export default function RecurringRuleForm({ onSubmit, onCancel }: RecurringRuleF
           Cancel
         </button>
         <button type="submit" className="btn btn-primary" disabled={loading}>
-          {loading ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : "Set Recurring"}
+          {loading ? <DynamicIcon name="Loader2" size={14} style={{ animation: "spin 1s linear infinite" }} /> : "Set Recurring"}
         </button>
       </div>
     </form>

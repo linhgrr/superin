@@ -1,4 +1,4 @@
-import { AlertTriangle, Trash2, ListTodo } from "lucide-react";
+import { DynamicIcon } from "@/lib/icon-resolver";
 import type { TaskRead } from "../api";
 import { useTimezone } from "@/shared/hooks/useTimezone";
 import RecurringBadge from "./RecurringBadge";
@@ -75,7 +75,7 @@ export default function TaskRow({ task, onToggle, onDelete, onClick, selected }:
                 fontWeight: 500,
               }}
             >
-              <ListTodo size={10} />
+              <DynamicIcon name="ListTodo" size={10} />
               {task.subtask_completed ?? 0}/{task.subtask_count}
             </span>
           )}
@@ -104,7 +104,7 @@ export default function TaskRow({ task, onToggle, onDelete, onClick, selected }:
       </td>
       <td style={{ fontSize: "0.8125rem", color: overdue ? "var(--color-danger)" : "var(--color-foreground-muted)" }}>
         {task.due_date ? formatDate(task.due_date, { month: "short", day: "numeric" }) : "—"}
-        {overdue && <AlertTriangle size={12} style={{ display: "inline", color: "var(--color-danger)", marginLeft: "0.25rem" }} />}
+        {overdue && <DynamicIcon name="AlertTriangle" size={12} style={{ display: "inline", color: "var(--color-danger)", marginLeft: "0.25rem" }} />}
       </td>
       <td>
         <button
@@ -116,7 +116,7 @@ export default function TaskRow({ task, onToggle, onDelete, onClick, selected }:
           style={{ padding: "0.25rem 0.5rem", color: "var(--color-danger)" }}
           title="Delete task"
         >
-          <Trash2 size={14} />
+          <DynamicIcon name="Trash2" size={14} />
         </button>
       </td>
     </tr>

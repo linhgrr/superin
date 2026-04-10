@@ -6,10 +6,10 @@
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 
-import { useState } from "react";
-import { Plus, LayoutGrid } from "lucide-react";
+import { useCallback, useState } from "react";
 import { Responsive, verticalCompactor } from "react-grid-layout";
 
+import { DynamicIcon } from "@/lib/icon-resolver";
 import AddWidgetDialog from "@/components/dashboard/AddWidgetDialog";
 import {
   useWidgetPreferences,
@@ -62,7 +62,7 @@ export default function DashboardGrid({
           aria-label="Auto arrange widgets"
           style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
         >
-          <LayoutGrid size={16} />
+          <DynamicIcon name="LayoutGrid" size={16} />
           Auto Arrange
         </button>
         <AddWidgetButton
@@ -118,17 +118,19 @@ function AddWidgetButton({
   onToggleWidget,
 }: AddWidgetButtonProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const open = useCallback(() => setIsOpen(true), []);
+  const close = useCallback(() => setIsOpen(false), []);
 
   return (
     <>
       <button
         type="button"
         className="btn btn-secondary btn-sm"
-        onClick={() => setIsOpen(true)}
+        onClick={open}
         aria-label="Add widget"
         style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
       >
-        <Plus size={16} />
+        <DynamicIcon name="Plus" size={16} />
         Add Widget
       </button>
       {isOpen && (
@@ -137,7 +139,7 @@ function AddWidgetButton({
           enabledWidgetIds={enabledWidgetIds}
           busyWidgetId={busyWidgetId}
           onToggleWidget={onToggleWidget}
-          onClose={() => setIsOpen(false)}
+          onClose={close}
         />
       )}
     </>

@@ -1,43 +1,27 @@
-import { useState, useEffect } from "react";
-import { AlertCircle, Loader2 } from "lucide-react";
 import type { BudgetCategoryStatus, CheckBudgetResponse } from "../api";
-import { checkBudget } from "../api";
+import { useBudgetCheck } from "../hooks/useFinanceSwr";
+import { DynamicIcon } from "@/lib/icon-resolver";
 
 interface BudgetCheckPanelProps {
   categoryId?: string;
 }
 
 export default function BudgetCheckPanel({ categoryId }: BudgetCheckPanelProps) {
-  const [budgetData, setBudgetData] = useState<CheckBudgetResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: budgetData, error, isLoading } = useBudgetCheck(categoryId);
 
-  useEffect(() => {
-    async function fetchBudget() {
-      try {
-        const data = await checkBudget(categoryId ? { category_id: categoryId } : {});
-        setBudgetData(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load budget");
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchBudget();
-  }, [categoryId]);
-
-  if (loading) {
+  if (isLoading) {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "2rem" }}>
-        <Loader2 size={24} style={{ animation: "spin 1s linear infinite", color: "var(--color-foreground-muted)" }} />
+        <DynamicIcon name="Loader2" size={24} style={{ animation: "spin 1s linear infinite", color: "var(--color-foreground-muted)" }} />
       </div>
     );
   }
 
   if (error || !budgetData) {
+    const message = error instanceof Error ? error.message : "Failed to load budget data";
     return (
       <div style={{ padding: "1rem", color: "var(--color-danger)", fontSize: "0.875rem" }}>
-        {error || "Failed to load budget data"}
+        {message}
       </div>
     );
   }
@@ -179,7 +163,7 @@ export default function BudgetCheckPanel({ categoryId }: BudgetCheckPanelProps) 
                       fontWeight: 500,
                     }}
                     >
-                      <AlertCircle size={12} />
+                      <DynamicIcon name="AlertCircle" size={12} />
                     Over budget by {Math.abs(category.remaining ?? 0).toLocaleString()}
                   </span>
                 )}

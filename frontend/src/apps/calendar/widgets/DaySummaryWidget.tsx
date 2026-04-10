@@ -1,7 +1,7 @@
 import type { DashboardWidgetRendererProps } from "../types";
 import { useState, useEffect } from "react";
 import { listEvents, type EventRead } from "../api";
-import { Sun, Sunrise } from "lucide-react";
+import { DynamicIcon } from "@/lib/icon-resolver";
 import { useTimezone } from "@/shared/hooks/useTimezone";
 import { getTodayRange } from "@/shared/utils/timezone";
 
@@ -60,7 +60,7 @@ export default function DaySummaryWidget({ widget: _widget }: DashboardWidgetRen
                 flexShrink: 0,
               }}
             >
-              <Sun size={16} />
+              <DynamicIcon name="Sun" size={16} />
             </div>
             <div>
               <div style={{ fontSize: "0.625rem", color: "var(--color-foreground-muted)", textTransform: "uppercase" }}>
@@ -88,7 +88,7 @@ export default function DaySummaryWidget({ widget: _widget }: DashboardWidgetRen
                   flexShrink: 0,
                 }}
               >
-                <Sunrise size={16} />
+                <DynamicIcon name="Sunrise" size={16} />
               </div>
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: "0.625rem", color: "var(--color-foreground-muted)", textTransform: "uppercase" }}>
@@ -123,7 +123,7 @@ export default function DaySummaryWidget({ widget: _widget }: DashboardWidgetRen
                   flexShrink: 0,
                 }}
               >
-                <Sunrise size={16} />
+                <DynamicIcon name="Sunrise" size={16} />
               </div>
               <div style={{ fontSize: "0.75rem", color: "var(--color-foreground-muted)" }}>
                 No upcoming events

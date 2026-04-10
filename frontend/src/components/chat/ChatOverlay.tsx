@@ -7,7 +7,7 @@
  */
 
 import { lazy, useCallback, useEffect, useRef } from "react";
-import { X } from "lucide-react";
+import { DynamicIcon } from "@/lib/icon-resolver";
 
 const ChatPanel = lazy(() => import("./ChatPanel"));
 
@@ -51,7 +51,7 @@ export default function ChatOverlay({ onClose }: ChatOverlayProps) {
             aria-label="Close chat"
             type="button"
           >
-            <X size={18} />
+            <DynamicIcon name="X" size={18} />
           </button>
         </div>
 

@@ -2,14 +2,14 @@
  * KeyboardSection — keyboard shortcuts reference.
  */
 
-import { Command, Keyboard } from "lucide-react";
+import { DynamicIcon } from "@/lib/icon-resolver";
 import Section from "./Section";
 import { KEYBOARD_SHORTCUTS } from "./settings-constants";
 
 export default function KeyboardSection() {
   return (
     <Section
-      icon={<Keyboard size={20} />}
+      icon={<DynamicIcon name="Keyboard" size={20} />}
       title="Keyboard Shortcuts"
       description="Quick reference for all keyboard commands"
     >

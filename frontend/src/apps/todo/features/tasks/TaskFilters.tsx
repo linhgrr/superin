@@ -2,6 +2,7 @@
  * TaskFilters — 3-button filter bar (All / Today / Upcoming).
  */
 
+import { memo } from "react";
 import type { TaskFilter } from "./TasksPanel";
 
 const TASK_FILTER_VALUES = ["all", "pending", "completed"] as const satisfies readonly TaskFilter[];
@@ -12,7 +13,7 @@ interface TaskFiltersProps {
   onFilter: (f: TaskFilter) => void;
 }
 
-function TaskFilters({ filter, counts, onFilter }: TaskFiltersProps) {
+const TaskFilters = memo(function TaskFilters({ filter, counts, onFilter }: TaskFiltersProps) {
   return (
     <div
       style={{
@@ -62,6 +63,6 @@ function TaskFilters({ filter, counts, onFilter }: TaskFiltersProps) {
       ))}
     </div>
   );
-}
+});
 
-export { TaskFilters };
+export default TaskFilters;

@@ -11,7 +11,7 @@ import {
   ThreadPrimitive,
   useMessagePartText,
 } from "@assistant-ui/react";
-import { Zap, Send, Sparkles } from "lucide-react";
+import { DynamicIcon } from "@/lib/icon-resolver";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -61,7 +61,7 @@ function AssistantText() {
 function ToolCallBadge({ toolName, argsText }: { toolName: string; argsText?: string }) {
   return (
     <div className="tool-call-badge">
-      <Zap size={12} className="font-semibold" />
+      <DynamicIcon name="Zap" size={12} className="font-semibold" />
       <span>{toolName}</span>
       {argsText ? (
         <span className="opacity-70">
@@ -149,7 +149,7 @@ function ChatComposer() {
             className="chat-send-btn"
             style={{ flexShrink: 0 }}
           >
-            <Send size={16} />
+            <DynamicIcon name="Send" size={16} />
           </button>
         </ComposerPrimitive.Send>
       </ComposerPrimitive.Root>
@@ -168,7 +168,7 @@ export default function ChatThread() {
         <div>
           <div className="chat-header-title">
             <span className="flex items-center gap-2">
-              <Sparkles size={16} className="text-primary" />
+              <DynamicIcon name="Sparkles" size={16} className="text-primary" />
               Shin AI
             </span>
           </div>

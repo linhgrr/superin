@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { X } from "lucide-react";
+import { DynamicIcon } from "@/lib/icon-resolver";
 
 interface ModalProps {
   title: string;
@@ -43,7 +43,7 @@ export default function Modal({ title, onClose, children }: ModalProps) {
         >
           <h2 style={{ margin: 0, fontSize: "1.125rem", fontWeight: 600 }}>{title}</h2>
           <button className="btn btn-ghost" onClick={onClose} style={{ padding: "0.25rem" }}>
-            <X size={16} />
+            <DynamicIcon name="X" size={16} />
           </button>
         </div>
         {children}

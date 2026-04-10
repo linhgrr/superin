@@ -8,7 +8,7 @@
  */
 
 import { useMemo } from "react";
-import { Sparkles } from "lucide-react";
+import { DynamicIcon } from "@/lib/icon-resolver";
 
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { getSizeConfig } from "./layout-engine";
@@ -64,7 +64,7 @@ export default function DashboardPage() {
     return (
       <div className="empty-state" style={{ height: "60vh" }}>
         <div className="empty-state-icon">
-          <Sparkles size={32} />
+          <DynamicIcon name="Sparkles" size={32} />
         </div>
         <h3 className="empty-state-title">Welcome to Shin</h3>
         <p className="empty-state-description">

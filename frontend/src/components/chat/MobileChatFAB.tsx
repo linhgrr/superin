@@ -6,7 +6,7 @@
  */
 
 import { lazy, Suspense, useState } from "react";
-import { MessageCircle } from "lucide-react";
+import { DynamicIcon } from "@/lib/icon-resolver";
 import { useLocation } from "react-router-dom";
 import { ROUTES } from "@/constants";
 
@@ -29,7 +29,7 @@ export default function MobileChatFAB() {
         aria-label="Open chat"
         type="button"
       >
-        <MessageCircle size={22} strokeWidth={2} />
+        <DynamicIcon name="MessageCircle" size={22} strokeWidth={2} />
       </button>
 
       {isOpen && (

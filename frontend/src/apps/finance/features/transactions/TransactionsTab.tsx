@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Pencil } from "lucide-react";
+import { DynamicIcon } from "@/lib/icon-resolver";
 import { createTransaction, getTransactions, type TransactionRead, getWallets, getCategories, type WalletRead, type CategoryRead } from "../../api";
 import type { CreateTransactionRequest } from "../../api";
 import Modal from "../../components/Modal";
@@ -120,7 +120,7 @@ export default function TransactionsTab() {
                       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {transaction.note ?? "—"}
                       </span>
-                      <Pencil size={14} style={{ color: "var(--color-foreground-muted)", flexShrink: 0 }} />
+                      <DynamicIcon name="Pencil" size={14} style={{ color: "var(--color-foreground-muted)", flexShrink: 0 }} />
                     </div>
                   </td>
                 </tr>

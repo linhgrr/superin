@@ -1,9 +1,9 @@
 import type { DashboardWidgetRendererProps } from "../types";
-import { CheckCircle2, Circle } from "lucide-react";
 import { useTodoSummary } from "./useTodoSummary";
+import { DynamicIcon } from "@/lib/icon-resolver";
 
 export default function TaskListWidget({ widget: _widget }: DashboardWidgetRendererProps) {
-  const { summary, loading } = useTodoSummary();
+  const { data: summary, isLoading: loading } = useTodoSummary();
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", justifyContent: "center" }}>
@@ -26,7 +26,7 @@ export default function TaskListWidget({ widget: _widget }: DashboardWidgetRende
                 flexShrink: 0,
               }}
             >
-              <Circle size={16} />
+              <DynamicIcon name="Circle" size={16} />
             </div>
             <div>
               <div style={{ fontSize: "0.625rem", color: "var(--color-foreground-muted)", textTransform: "uppercase" }}>
@@ -53,7 +53,7 @@ export default function TaskListWidget({ widget: _widget }: DashboardWidgetRende
                 flexShrink: 0,
               }}
             >
-              <CheckCircle2 size={16} />
+              <DynamicIcon name="CheckCircle2" size={16} />
             </div>
             <div>
               <div style={{ fontSize: "0.625rem", color: "var(--color-foreground-muted)", textTransform: "uppercase" }}>

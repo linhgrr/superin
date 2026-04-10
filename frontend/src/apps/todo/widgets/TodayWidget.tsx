@@ -1,13 +1,13 @@
 import type { DashboardWidgetRendererProps } from "../types";
 import { useTodoSummary } from "./useTodoSummary";
-import { CalendarClock, AlertCircle } from "lucide-react";
+import { DynamicIcon } from "@/lib/icon-resolver";
 
 export default function TodayWidget({ widget: _widget }: DashboardWidgetRendererProps) {
-  const { summary, loading } = useTodoSummary();
+  const { data: summary, isLoading } = useTodoSummary();
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-      {loading ? (
+      {isLoading ? (
         <div className="stat-value" style={{ color: "var(--color-foreground-muted)" }}>—</div>
       ) : (
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
@@ -24,14 +24,14 @@ export default function TodayWidget({ widget: _widget }: DashboardWidgetRenderer
               flexShrink: 0,
             }}
           >
-            <CalendarClock size={20} />
+            <DynamicIcon name="CalendarClock" size={20} />
           </div>
           <div>
             <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem" }}>
               <span className="stat-value" style={{ color: "var(--color-foreground)", fontSize: "1.75rem" }}>
                 {summary?.due_today ?? 0}
               </span>
-              {!loading && summary && summary.overdue > 0 && (
+              {!isLoading && summary && summary.overdue > 0 && (
                 <span
                   style={{
                     display: "inline-flex",
@@ -41,7 +41,7 @@ export default function TodayWidget({ widget: _widget }: DashboardWidgetRenderer
                     color: "var(--color-danger)",
                   }}
                 >
-                  <AlertCircle size={12} />
+                  <DynamicIcon name="AlertCircle" size={12} />
                   {summary.overdue} overdue
                 </span>
               )}

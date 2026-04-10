@@ -2,19 +2,6 @@
  * Command definitions — static command builders that don't need runtime state.
  */
 
-import {
-  Command,
-  LayoutDashboard,
-  LogOut,
-  Moon,
-  Plus,
-  Settings,
-  Sparkles,
-  Store,
-  Sun,
-  User,
-} from "lucide-react";
-import { DynamicIcon } from "@/lib/icon-resolver";
 import type { AppRuntimeEntry } from "@/types/generated";
 import { STORAGE_KEYS } from "@/constants";
 
@@ -59,7 +46,7 @@ export function buildStaticCommands(
       id: "nav-dashboard",
       title: "Go to Dashboard",
       subtitle: "View your widgets and overview",
-      icon: <LayoutDashboard size={18} />,
+      icon: <DynamicIcon name="LayoutDashboard" size={18} />,
       shortcut: "G D",
       category: "apps",
       action: () => navigate("/dashboard"),
@@ -69,7 +56,7 @@ export function buildStaticCommands(
       id: "nav-store",
       title: "Go to App Store",
       subtitle: "Browse and install apps",
-      icon: <Store size={18} />,
+      icon: <DynamicIcon name="Store" size={18} />,
       shortcut: "G S",
       category: "apps",
       action: () => navigate("/store"),
@@ -80,7 +67,7 @@ export function buildStaticCommands(
       id: "action-add-widget",
       title: "Add Widget",
       subtitle: "Add a new widget to your dashboard",
-      icon: <Plus size={18} />,
+      icon: <DynamicIcon name="Plus" size={18} />,
       shortcut: "A W",
       category: "actions",
       action: () => {
@@ -93,7 +80,7 @@ export function buildStaticCommands(
       id: "action-toggle-theme",
       title: "Toggle Theme",
       subtitle: "Switch between light and dark mode",
-      icon: <Moon size={18} />,
+      icon: <DynamicIcon name="Moon" size={18} />,
       shortcut: "T T",
       category: "actions",
       action: () => {
@@ -130,7 +117,7 @@ export function buildStaticCommands(
       id: "settings",
       title: "Settings",
       subtitle: "Manage your preferences and account",
-      icon: <Settings size={18} />,
+      icon: <DynamicIcon name="Settings" size={18} />,
       category: "settings",
       action: () => navigate("/settings"),
       keywords: ["settings", "preferences", "options", "configuration"],
@@ -139,7 +126,7 @@ export function buildStaticCommands(
       id: "settings-theme",
       title: "Theme Settings",
       subtitle: "Change appearance preferences",
-      icon: <Sun size={18} />,
+      icon: <DynamicIcon name="Sun" size={18} />,
       category: "settings",
       action: () => {
         navigate("/settings");
@@ -151,7 +138,7 @@ export function buildStaticCommands(
       id: "settings-profile",
       title: "Profile Settings",
       subtitle: "Manage your account details",
-      icon: <User size={18} />,
+      icon: <DynamicIcon name="User" size={18} />,
       category: "settings",
       action: () => {
         navigate("/settings");
@@ -163,7 +150,7 @@ export function buildStaticCommands(
       id: "settings-logout",
       title: "Sign Out",
       subtitle: "Log out of your account",
-      icon: <LogOut size={18} />,
+      icon: <DynamicIcon name="LogOut" size={18} />,
       category: "settings",
       action: () => logout(),
       keywords: ["logout", "sign out", "exit", "account"],
@@ -173,7 +160,7 @@ export function buildStaticCommands(
       id: "help-shortcuts",
       title: "Keyboard Shortcuts",
       subtitle: "View all available shortcuts",
-      icon: <Command size={18} />,
+      icon: <DynamicIcon name="Command" size={18} />,
       shortcut: "?",
       category: "help",
       action: () => {
@@ -199,7 +186,7 @@ export function buildInstalledAppCommands(
     icon: app.icon ? (
       <DynamicIcon name={app.icon} size={18} />
     ) : (
-      <Sparkles size={18} />
+      <DynamicIcon name="Sparkles" size={18} />
     ),
     category: "apps" as const,
     action: () => navigate(`/apps/${app.id}`),

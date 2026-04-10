@@ -9,11 +9,10 @@
 
 import { memo, useMemo } from "react";
 import { NavLink } from "react-router-dom";
-import { LayoutDashboard, Store, Sparkles, Settings, Shield, CreditCard } from "lucide-react";
+import { DynamicIcon } from "@/lib/icon-resolver";
 import { ROUTES } from "@/constants";
 import { useAuth } from "@/hooks/useAuth";
 import { useWorkspace } from "@/hooks/useWorkspace";
-import { DynamicIcon } from "@/lib/icon-resolver";
 import { prefetchHandlers } from "@/lib/prefetch";
 import type { AppRuntimeEntry } from "@/types/generated";
 
@@ -58,7 +57,7 @@ function Sidebar() {
       {/* Brand */}
       <div className="sidebar-brand">
         <div className="sidebar-brand-icon">
-          <Sparkles size={18} />
+          <DynamicIcon name="Sparkles" size={18} />
         </div>
         <span className="sidebar-brand-text">Shin</span>
       </div>
@@ -70,7 +69,7 @@ function Sidebar() {
           to="/dashboard"
           className={({ isActive }) => `app-item${isActive ? " active" : ""}`}
         >
-          <LayoutDashboard size={18} strokeWidth={2} />
+          <DynamicIcon name="LayoutDashboard" size={18} />
           <span>Dashboard</span>
         </NavLink>
 
@@ -100,7 +99,7 @@ function Sidebar() {
           className={({ isActive }) => `app-item${isActive ? " active" : ""}`}
           style={{ marginBottom: "0.25rem" }}
         >
-          <Store size={18} strokeWidth={2} />
+          <DynamicIcon name="Store" size={18} />
           <span>App Store</span>
         </NavLink>
         <NavLink
@@ -108,7 +107,7 @@ function Sidebar() {
           className={({ isActive }) => `app-item${isActive ? " active" : ""}`}
           style={{ marginBottom: "0.25rem" }}
         >
-          <CreditCard size={18} strokeWidth={2} />
+          <DynamicIcon name="CreditCard" size={18} />
           <span>Billing</span>
         </NavLink>
         {isAdmin && (
@@ -117,7 +116,7 @@ function Sidebar() {
             className={({ isActive }) => `app-item${isActive ? " active" : ""}`}
             style={{ marginBottom: "0.25rem" }}
           >
-            <Shield size={18} strokeWidth={2} />
+            <DynamicIcon name="Shield" size={18} />
             <span>Admin</span>
           </NavLink>
         )}
@@ -125,7 +124,7 @@ function Sidebar() {
           to={ROUTES.SETTINGS}
           className={({ isActive }) => `app-item${isActive ? " active" : ""}`}
         >
-          <Settings size={18} strokeWidth={2} />
+          <DynamicIcon name="Settings" size={18} />
           <span>Settings</span>
         </NavLink>
       </div>

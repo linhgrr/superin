@@ -1,4 +1,4 @@
-import { Repeat } from "lucide-react";
+import { DynamicIcon } from "@/lib/icon-resolver";
 import type { RecurringFrequency } from "../api";
 
 interface RecurringBadgeProps {
@@ -31,7 +31,7 @@ export default function RecurringBadge({ frequency = "daily", isActive = true }:
       }}
       title={`Repeats ${frequency}`}
     >
-      <Repeat size={10} />
+      <DynamicIcon name="Repeat" size={10} />
       {FREQUENCY_LABELS[frequency]}
     </span>
   );

@@ -3,14 +3,19 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { X } from "lucide-react";
+import { DynamicIcon } from "@/lib/icon-resolver";
 import type { Toast } from "./toast-types";
 import {
   VARIANT_COLORS,
   VARIANT_BG,
-  VARIANT_ICONS,
+  VARIANT_ICON_NAMES,
   TOAST_DURATION_MS,
 } from "./toast-types";
+
+/** ms to wait after exit animation before removing the toast from DOM */
+const EXIT_ANIMATION_MS = 300;
+/** Progress bar refresh interval — 10fps is visually indistinguishable from 60fps */
+const PROGRESS_TICK_MS = 100;
 
 interface ToastItemProps {
   toast: Toast;
@@ -29,7 +34,7 @@ function ToastItem({ toast, onDismiss, index }: ToastItemProps) {
 
   const handleDismiss = useCallback(() => {
     setIsExiting(true);
-    setTimeout(() => onDismiss(toast.id), 300);
+    setTimeout(() => onDismiss(toast.id), EXIT_ANIMATION_MS);
   }, [onDismiss, toast.id]);
 
   useEffect(() => {
@@ -46,7 +51,7 @@ function ToastItem({ toast, onDismiss, index }: ToastItemProps) {
         clearInterval(interval);
         handleDismiss();
       }
-    }, 100); // 10fps — visually indistinguishable from 60fps for a progress bar
+    }, PROGRESS_TICK_MS);
 
     return () => clearInterval(interval);
   }, [duration, handleDismiss, isPaused]);
@@ -96,7 +101,7 @@ function ToastItem({ toast, onDismiss, index }: ToastItemProps) {
           justifyContent: "center",
         }}
       >
-        {VARIANT_ICONS[toast.variant]}
+        <DynamicIcon name={VARIANT_ICON_NAMES[toast.variant]} size={18} />
       </div>
 
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -165,7 +170,7 @@ function ToastItem({ toast, onDismiss, index }: ToastItemProps) {
           transition: "all 0.2s ease",
         }}
       >
-        <X size={16} />
+        <DynamicIcon name="X" size={16} />
       </button>
 
       <div

@@ -1,9 +1,9 @@
 import type { DashboardWidgetRendererProps } from "../types";
 import { useFinanceSummary } from "./useFinanceSummary";
-import { Receipt } from "lucide-react";
+import { DynamicIcon } from "@/lib/icon-resolver";
 
 export default function BudgetOverviewWidget({ widget: _widget }: DashboardWidgetRendererProps) {
-  const { summary, loading } = useFinanceSummary();
+  const { data: summary, isLoading: loading } = useFinanceSummary();
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", justifyContent: "center" }}>
@@ -24,7 +24,7 @@ export default function BudgetOverviewWidget({ widget: _widget }: DashboardWidge
               flexShrink: 0,
             }}
           >
-            <Receipt size={20} />
+            <DynamicIcon name="Receipt" size={20} />
           </div>
           <div>
             <div className="stat-value" style={{ color: "var(--color-foreground)", fontSize: "1.75rem" }}>

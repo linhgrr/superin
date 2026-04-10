@@ -8,12 +8,12 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { Search } from "lucide-react";
+import type { AppCatalogEntry, AppCategoryRead } from "@/types/generated";
 import { getCatalog, getCategories, installApp, uninstallApp } from "@/api/catalog";
+import { DynamicIcon } from "@/lib/icon-resolver";
 import { useToast } from "@/components/providers/ToastProvider";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { ROUTES, STORAGE_KEYS } from "@/constants";
-import type { AppCatalogEntry, AppCategoryRead } from "@/types/generated";
 import AppCard from "@/components/store/AppCard";
 import AppListItem from "@/components/store/AppListItem";
 import StoreFilters from "@/components/store/StoreFilters";
@@ -65,21 +65,15 @@ export default function StorePage() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [categories, setCategories] = useState<AppCategoryRead[]>([]);
 
-  // Fetch catalog
+  // Fetch catalog + categories in parallel
   useEffect(() => {
-    getCatalog()
-      .then((next) => {
-        setCatalog(next);
-        writeCatalogSnapshot(next);
+    void Promise.all([getCatalog(), getCategories()])
+      .then(([catalogData, categoriesData]) => {
+        setCatalog(catalogData);
+        setCategories(categoriesData);
+        writeCatalogSnapshot(catalogData);
       })
       .finally(() => setIsCatalogLoading(false));
-  }, []);
-
-  // Fetch categories
-  useEffect(() => {
-    getCategories().then(setCategories).catch(() => {
-      // Non-critical: categories are for display metadata
-    });
   }, []);
 
   const mergedCatalog = useMemo(
@@ -209,7 +203,7 @@ export default function StorePage() {
       {filtered.length === 0 ? (
         <div className="empty-state">
           <div className="empty-state-icon">
-            <Search size={32} />
+            <DynamicIcon name="Search" size={32} />
           </div>
           <h3 className="empty-state-title">No apps found</h3>
           <p className="empty-state-description">

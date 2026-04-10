@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Loader2 } from "lucide-react";
+import { DynamicIcon } from "@/lib/icon-resolver";
 import type { CategoryBreakdownResponse } from "../api";
 import { getCategoryBreakdown } from "../api";
 
@@ -30,7 +30,7 @@ export default function CategoryBreakdownChart({ month, year }: CategoryBreakdow
   if (loading) {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "2rem" }}>
-        <Loader2 size={24} style={{ animation: "spin 1s linear infinite", color: "var(--color-foreground-muted)" }} />
+        <DynamicIcon name="Loader2" size={24} style={{ animation: "spin 1s linear infinite", color: "var(--color-foreground-muted)" }} />
       </div>
     );
   }

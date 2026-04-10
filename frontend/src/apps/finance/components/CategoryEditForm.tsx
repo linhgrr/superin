@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { Trash2, AlertTriangle } from "lucide-react";
+import { DynamicIcon } from "@/lib/icon-resolver";
 import type { CategoryRead } from "../api";
 import { updateCategory, deleteCategory } from "../api";
 
@@ -66,7 +66,7 @@ export default function CategoryEditForm({ category, onSave, onCancel, onDelete 
             color: "var(--color-primary-foreground)",
           }}
         >
-          <AlertTriangle size={20} />
+          <DynamicIcon name="AlertTriangle" size={20} />
           <span>Are you sure? This will delete the category and cannot be undone.</span>
         </div>
         <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
@@ -189,7 +189,7 @@ export default function CategoryEditForm({ category, onSave, onCancel, onDelete 
             disabled={loading}
             style={{ color: "var(--color-danger)" }}
           >
-            <Trash2 size={16} />
+            <DynamicIcon name="Trash2" size={16} />
             Delete
           </button>
         )}

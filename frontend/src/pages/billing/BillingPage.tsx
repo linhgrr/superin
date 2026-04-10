@@ -2,7 +2,7 @@
  * BillingPage — self-service subscription management.
  */
 
-import { Loader2 } from "lucide-react";
+import Loader2 from "lucide-react/dist/esm/icons/loader-2";
 import { useState } from "react";
 import useSWR from "swr";
 

@@ -8,7 +8,6 @@ import {
   CATEGORY_LABELS,
   CATEGORY_ORDER,
   type CommandCategory,
-  type CommandItem,
 } from "./command-definitions";
 import type { CommandItem as ExtractedCommandItem } from "./command-definitions";
 

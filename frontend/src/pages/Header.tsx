@@ -5,7 +5,7 @@
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useOnboarding } from "@/components/providers/onboarding/OnboardingProvider";
-import { LogOut, Settings, Command, HelpCircle, PlayCircle } from "lucide-react";
+import { DynamicIcon } from "@/lib/icon-resolver";
 import { useState, useEffect, useRef, useCallback } from "react";
 
 interface HeaderProps {
@@ -31,17 +31,17 @@ function TourMenu() {
   }, []);
 
   const tours = [
-    { id: "welcome" as const, label: "Welcome Tour", icon: <HelpCircle size={14} /> },
-    { id: "dashboard" as const, label: "Dashboard Tour", icon: <PlayCircle size={14} /> },
-    { id: "apps" as const, label: "Apps Tour", icon: <PlayCircle size={14} /> },
-    { id: "chat" as const, label: "Chat Tour", icon: <PlayCircle size={14} /> },
-    { id: "store" as const, label: "Store Tour", icon: <PlayCircle size={14} /> },
+    { id: "welcome" as const, label: "Welcome Tour", icon: <DynamicIcon name="HelpCircle" size={14} /> },
+    { id: "dashboard" as const, label: "Dashboard Tour", icon: <DynamicIcon name="PlayCircle" size={14} /> },
+    { id: "apps" as const, label: "Apps Tour", icon: <DynamicIcon name="PlayCircle" size={14} /> },
+    { id: "chat" as const, label: "Chat Tour", icon: <DynamicIcon name="PlayCircle" size={14} /> },
+    { id: "store" as const, label: "Store Tour", icon: <DynamicIcon name="PlayCircle" size={14} /> },
   ];
 
   return (
     <div ref={dropdownRef} style={{ position: "relative" }}>
       <button className="btn btn-ghost btn-icon" onClick={() => setIsOpen(!isOpen)} title="Start Tour">
-        <HelpCircle size={16} />
+        <DynamicIcon name="HelpCircle" size={16} />
       </button>
 
       {isOpen && (
@@ -178,7 +178,7 @@ export default function Header({ title, showTourTrigger = true }: HeaderProps) {
           onClick={() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }))}
           title="Command Palette (Cmd+K)"
         >
-          <Command size={16} />
+          <DynamicIcon name="Command" size={16} />
         </button>
 
         {showTourTrigger && <TourMenu />}
@@ -246,7 +246,7 @@ export default function Header({ title, showTourTrigger = true }: HeaderProps) {
                     marginBottom: "0.25rem",
                   }}
                 >
-                  <Settings size={14} />
+                  <DynamicIcon name="Settings" size={14} />
                   Settings
                 </button>
                 <button
@@ -265,7 +265,7 @@ export default function Header({ title, showTourTrigger = true }: HeaderProps) {
                     gap: "0.5rem",
                   }}
                 >
-                  <LogOut size={14} />
+                  <DynamicIcon name="LogOut" size={14} />
                   Sign out
                 </button>
               </div>

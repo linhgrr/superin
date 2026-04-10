@@ -2,7 +2,7 @@
  * WidgetListPanel — Step 2 of AddWidgetDialog: toggle widgets for the selected app.
  */
 
-import { ArrowLeft, Eye, EyeOff, X } from "lucide-react";
+import { memo } from "react";
 import type { AppRuntimeEntry } from "@/types/generated";
 import { DynamicIcon } from "@/lib/icon-resolver";
 
@@ -39,7 +39,7 @@ interface WidgetListPanelProps {
   onClose: () => void;
 }
 
-export function WidgetListPanel({
+export const WidgetListPanel = memo(function WidgetListPanel({
   app,
   enabledWidgetIds,
   busyWidgetId,
@@ -54,7 +54,7 @@ export function WidgetListPanel({
     <>
       <div className="dialog-header">
         <button type="button" className="btn btn-ghost btn-icon" onClick={onBack} aria-label="Back to app list">
-          <ArrowLeft size={18} />
+          <DynamicIcon name="ArrowLeft" size={18} />
         </button>
         <div className="option-info" style={{ marginLeft: "0.5rem" }}>
           <span className="dialog-title">{app.name}</span>
@@ -63,7 +63,7 @@ export function WidgetListPanel({
           </div>
         </div>
         <button type="button" className="btn btn-ghost btn-icon" onClick={onClose} style={{ marginLeft: "auto" }}>
-          <X size={18} />
+          <DynamicIcon name="X" size={18} />
         </button>
       </div>
 
@@ -135,9 +135,9 @@ export function WidgetListPanel({
                       {isBusy ? (
                         <LoadingSpinner />
                       ) : isEnabled ? (
-                        <><EyeOff size={14} style={{ marginRight: "0.375rem" }} />Hide</>
+                        <><DynamicIcon name="EyeOff" size={14} style={{ marginRight: "0.375rem" }} />Hide</>
                       ) : (
-                        <><Eye size={14} style={{ marginRight: "0.375rem" }} />Show</>
+                        <><DynamicIcon name="Eye" size={14} style={{ marginRight: "0.375rem" }} />Show</>
                       )}
                     </button>
                   </div>
@@ -149,4 +149,4 @@ export function WidgetListPanel({
       </div>
     </>
   );
-}
+});

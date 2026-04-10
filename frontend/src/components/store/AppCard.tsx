@@ -3,7 +3,6 @@
  */
 
 import { useMemo } from "react";
-import { Download, Trash2 } from "lucide-react";
 import type { AppCatalogEntry, AppCategoryRead } from "@/types/generated";
 import { DynamicIcon } from "@/lib/icon-resolver";
 import { generateGradient } from "./generateGradient";
@@ -87,12 +86,12 @@ export default function AppCard({
           </span>
         ) : app.is_installed ? (
           <>
-            <Trash2 size={16} style={{ marginRight: "0.5rem" }} />
+            <DynamicIcon name="Trash2" size={16} style={{ marginRight: "0.5rem" }} />
             Uninstall
           </>
         ) : (
           <>
-            <Download size={16} style={{ marginRight: "0.5rem" }} />
+            <DynamicIcon name="Download" size={16} style={{ marginRight: "0.5rem" }} />
             Install
           </>
         )}

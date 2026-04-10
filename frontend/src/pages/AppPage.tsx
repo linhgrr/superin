@@ -8,7 +8,9 @@
 
 import { memo, useEffect, useState, type ComponentType } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Construction, Download, Loader2 } from "lucide-react";
+import Construction from "lucide-react/dist/esm/icons/construction";
+import Download from "lucide-react/dist/esm/icons/download";
+import Loader2 from "lucide-react/dist/esm/icons/loader-2";
 import { getAppMetadata, getLoadedAppView, loadAppViewComponent } from "@/lib/lazy-registry";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { ROUTES } from "@/constants";

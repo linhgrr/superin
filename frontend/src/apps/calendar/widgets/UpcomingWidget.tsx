@@ -1,38 +1,12 @@
 import type { DashboardWidgetRendererProps } from "../types";
-import { useCallback, useEffect, useState } from "react";
-import { listEvents, type EventRead } from "../api";
-import { Calendar } from "lucide-react";
+import { useUpcomingEvents } from "../hooks/useCalendarSwr";
 import { useTimezone } from "@/shared/hooks/useTimezone";
 import { getUserTimezone } from "@/shared/utils/timezone";
+import { DynamicIcon } from "@/lib/icon-resolver";
 
 export default function UpcomingWidget({ widget: _widget }: DashboardWidgetRendererProps) {
-  const maxItems = 3;
-  const calendarFilter = null;
-  const [events, setEvents] = useState<EventRead[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { data: events = [], isLoading } = useUpcomingEvents(3);
   const { timezone, formatDate, formatTime, isToday } = useTimezone();
-
-  const loadEvents = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      const now = new Date().toISOString();
-      const end = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-
-      const evts = await listEvents({
-        start: now,
-        end,
-        calendar_id: calendarFilter || undefined,
-        limit: maxItems,
-      });
-      setEvents(evts.slice(0, maxItems));
-    } finally {
-      setIsLoading(false);
-    }
-  }, [calendarFilter, maxItems]);
-
-  useEffect(() => {
-    void loadEvents();
-  }, [loadEvents]);
 
   const formatEventDate = (dateStr: string) => {
     // Use centralized isToday utility
@@ -72,7 +46,7 @@ export default function UpcomingWidget({ widget: _widget }: DashboardWidgetRende
               flexShrink: 0,
             }}
           >
-            <Calendar size={20} />
+            <DynamicIcon name="Calendar" size={20} />
           </div>
           <div style={{ fontSize: "0.875rem", color: "var(--color-foreground-muted)" }}>
             No upcoming events

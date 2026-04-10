@@ -1,4 +1,5 @@
-import { Check, Circle, Trash2 } from "lucide-react";
+import { memo } from "react";
+import { DynamicIcon } from "@/lib/icon-resolver";
 import type { SubTaskRead } from "../api";
 
 interface SubtaskItemProps {
@@ -8,7 +9,7 @@ interface SubtaskItemProps {
   disabled?: boolean;
 }
 
-export default function SubtaskItem({
+const SubtaskItem = memo(function SubtaskItem({
   subtask,
   onToggle,
   onDelete,
@@ -46,9 +47,9 @@ export default function SubtaskItem({
         title={subtask.completed ? "Mark as incomplete" : "Mark as complete"}
       >
         {subtask.completed ? (
-          <Check size={16} style={{ color: "var(--color-success)" }} />
+          <DynamicIcon name="Check" size={16} style={{ color: "var(--color-success)" }} />
         ) : (
-          <Circle size={16} style={{ color: "var(--color-foreground-muted)" }} />
+          <DynamicIcon name="Circle" size={16} style={{ color: "var(--color-foreground-muted)" }} />
         )}
       </button>
 
@@ -93,8 +94,10 @@ export default function SubtaskItem({
         }}
         title="Delete subtask"
       >
-        <Trash2 size={14} />
+        <DynamicIcon name="Trash2" size={14} />
       </button>
     </div>
   );
-}
+});
+
+export default SubtaskItem;

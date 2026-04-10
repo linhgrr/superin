@@ -1,10 +1,10 @@
 import type { DashboardWidgetRendererProps } from "../types";
 import { formatCurrency } from "../lib/formatCurrency";
 import { useFinanceSummary } from "./useFinanceSummary";
-import { Wallet } from "lucide-react";
+import { DynamicIcon } from "@/lib/icon-resolver";
 
 export default function TotalBalanceWidget({ widget: _widget }: DashboardWidgetRendererProps) {
-  const { summary, loading } = useFinanceSummary();
+  const { data: summary, isLoading: loading } = useFinanceSummary();
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", justifyContent: "center" }}>
@@ -25,7 +25,7 @@ export default function TotalBalanceWidget({ widget: _widget }: DashboardWidgetR
               flexShrink: 0,
             }}
           >
-            <Wallet size={20} />
+            <DynamicIcon name="Wallet" size={20} />
           </div>
           <div>
             <div className="stat-value" style={{ color: "var(--color-foreground)", fontSize: "1.75rem" }}>

@@ -2,7 +2,7 @@
  * NotificationsSection — email, push, and marketing notification preferences.
  */
 
-import { Bell } from "lucide-react";
+import { DynamicIcon } from "@/lib/icon-resolver";
 import Section from "./Section";
 import Toggle from "./Toggle";
 import type { SettingsState } from "./settings-constants";
@@ -18,7 +18,7 @@ export default function NotificationsSection({
 }: NotificationsSectionProps) {
   return (
     <Section
-      icon={<Bell size={20} />}
+      icon={<DynamicIcon name="Bell" size={20} />}
       title="Notifications"
       description="Choose what you want to be notified about"
     >

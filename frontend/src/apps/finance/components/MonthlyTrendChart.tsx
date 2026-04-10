@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Loader2, TrendingUp, TrendingDown } from "lucide-react";
+import { DynamicIcon } from "@/lib/icon-resolver";
 import type { MonthlyTrendResponse } from "../api";
 import { getMonthlyTrend } from "../api";
 
@@ -29,7 +29,7 @@ export default function MonthlyTrendChart({ months = 6 }: MonthlyTrendChartProps
   if (loading) {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "2rem" }}>
-        <Loader2 size={24} style={{ animation: "spin 1s linear infinite", color: "var(--color-foreground-muted)" }} />
+        <DynamicIcon name="Loader2" size={24} style={{ animation: "spin 1s linear infinite", color: "var(--color-foreground-muted)" }} />
       </div>
     );
   }
@@ -58,10 +58,10 @@ export default function MonthlyTrendChart({ months = 6 }: MonthlyTrendChartProps
       {/* Legend */}
       <div style={{ display: "flex", gap: "1rem", justifyContent: "center", fontSize: "0.75rem" }}>
         <span style={{ display: "flex", alignItems: "center", gap: "0.25rem", color: "var(--color-success)" }}>
-          <TrendingUp size={12} /> Income
+          <DynamicIcon name="TrendingUp" size={12} /> Income
         </span>
         <span style={{ display: "flex", alignItems: "center", gap: "0.25rem", color: "var(--color-danger)" }}>
-          <TrendingDown size={12} /> Expense
+          <DynamicIcon name="TrendingDown" size={12} /> Expense
         </span>
         <span style={{ display: "flex", alignItems: "center", gap: "0.25rem", color: "var(--color-primary)" }}>
           <div style={{ width: 8, height: 8, borderRadius: "50%", background: "currentColor" }} /> Net

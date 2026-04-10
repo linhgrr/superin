@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Pencil } from "lucide-react";
+import { DynamicIcon } from "@/lib/icon-resolver";
 import { createWallet, getWallets, type WalletRead } from "../../api";
 import type { CreateWalletRequest } from "../../api";
 import Modal from "../../components/Modal";
@@ -70,7 +70,7 @@ export default function WalletsTab() {
                 style={{ position: "absolute", top: "0.5rem", right: "0.5rem", padding: "0.25rem" }}
                 title="Edit wallet"
               >
-                <Pencil size={14} />
+                <DynamicIcon name="Pencil" size={14} />
               </button>
               <p style={{ fontWeight: 600, margin: "0 0 0.25rem" }}>{wallet.name}</p>
               <p

@@ -1,4 +1,6 @@
-import { CreditCard, Puzzle, Users } from "lucide-react";
+import CreditCard from "lucide-react/dist/esm/icons/credit-card";
+import Puzzle from "lucide-react/dist/esm/icons/puzzle";
+import Users from "lucide-react/dist/esm/icons/users";
 
 type AdminTab = "users" | "subscriptions" | "apps";
 

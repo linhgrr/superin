@@ -2,7 +2,7 @@
  * AppearanceSection — theme, density, and animation settings.
  */
 
-import { Moon, Monitor, Palette, Sun } from "lucide-react";
+import { DynamicIcon } from "@/lib/icon-resolver";
 import Section from "./Section";
 import Select from "./Select";
 import Toggle from "./Toggle";
@@ -15,9 +15,9 @@ interface AppearanceSectionProps {
 
 // Static option arrays — stable references, no re-creation on render
 const THEME_OPTIONS = [
-  { value: "light" as const, label: "Light", icon: <Sun size={16} /> },
-  { value: "dark" as const, label: "Dark", icon: <Moon size={16} /> },
-  { value: "system" as const, label: "System", icon: <Monitor size={16} /> },
+  { value: "light" as const, label: "Light", icon: <DynamicIcon name="Sun" size={16} /> },
+  { value: "dark" as const, label: "Dark", icon: <DynamicIcon name="Moon" size={16} /> },
+  { value: "system" as const, label: "System", icon: <DynamicIcon name="Monitor" size={16} /> },
 ];
 
 const DENSITY_OPTIONS = [

@@ -2,9 +2,8 @@
  * StoreFilters — search input, view mode toggle, and category filter chips.
  */
 
-import { Grid3X3, List, Search } from "lucide-react";
-import type { AppCategoryRead } from "@/types/generated";
 import { DynamicIcon } from "@/lib/icon-resolver";
+import type { AppCategoryRead } from "@/types/generated";
 
 interface StoreFiltersProps {
   searchQuery: string;
@@ -39,7 +38,8 @@ export default function StoreFilters({
       {/* Search + view toggle */}
       <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
         <div style={{ flex: 1, position: "relative", maxWidth: "400px" }}>
-          <Search
+          <DynamicIcon
+            name="Search"
             size={18}
             style={{
               position: "absolute",
@@ -68,14 +68,14 @@ export default function StoreFilters({
             onClick={() => onViewModeChange("grid")}
             title="Grid view"
           >
-            <Grid3X3 size={18} />
+            <DynamicIcon name="Grid3X3" size={18} />
           </button>
           <button
             className={`btn btn-icon ${viewMode === "list" ? "btn-secondary" : "btn-ghost"}`}
             onClick={() => onViewModeChange("list")}
             title="List view"
           >
-            <List size={18} />
+            <DynamicIcon name="List" size={18} />
           </button>
         </div>
       </div>

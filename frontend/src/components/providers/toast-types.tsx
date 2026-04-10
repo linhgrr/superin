@@ -2,8 +2,6 @@
  * Toast types and design tokens — shared between ToastProvider and ToastItem.
  */
 
-import { CheckCircle, XCircle, AlertTriangle, Info } from "lucide-react";
-
 export type ToastVariant = "success" | "error" | "warning" | "info";
 
 export interface ToastAction {
@@ -30,11 +28,12 @@ export interface ToastContextValue {
   };
 }
 
-export const VARIANT_ICONS: Record<ToastVariant, React.ReactNode> = {
-  success: <CheckCircle size={18} />,
-  error: <XCircle size={18} />,
-  warning: <AlertTriangle size={18} />,
-  info: <Info size={18} />,
+/** Icon name per toast variant — resolved lazily via DynamicIcon for code-splitting */
+export const VARIANT_ICON_NAMES: Record<ToastVariant, string> = {
+  success: "CheckCircle",
+  error: "XCircle",
+  warning: "AlertTriangle",
+  info: "Info",
 };
 
 export const VARIANT_COLORS: Record<ToastVariant, string> = {

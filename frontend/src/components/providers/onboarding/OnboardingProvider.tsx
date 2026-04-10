@@ -50,13 +50,20 @@ function OnboardingProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Persist state
+  // Persist state — debounced to avoid writing on every tour step
+  const pendingState = useRef<OnboardingState | null>(null);
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.ONBOARDING_STATE, JSON.stringify(state));
-    } catch {
-      // Non-critical: localStorage may be unavailable
-    }
+    pendingState.current = state;
+    const timer = setTimeout(() => {
+      try {
+        if (pendingState.current) {
+          localStorage.setItem(STORAGE_KEYS.ONBOARDING_STATE, JSON.stringify(pendingState.current));
+        }
+      } catch {
+        // Non-critical: localStorage may be unavailable
+      }
+    }, 500);
+    return () => clearTimeout(timer);
   }, [state]);
 
   // Stable callbacks using refs
