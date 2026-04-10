@@ -21,11 +21,7 @@ import remarkGfm from "remark-gfm";
 function TextPart() {
   const { text } = useMessagePartText();
   const textContent = typeof text === "string" ? text : String(text ?? "");
-  return (
-    <div className="prose prose-sm prose-invert max-w-none break-words leading-snug whitespace-pre-wrap">
-      {textContent}
-    </div>
-  );
+  return <div className="chat-text">{textContent}</div>;
 }
 
 /**
@@ -46,7 +42,7 @@ function AssistantText() {
   }
 
   return (
-    <div className="prose prose-sm prose-invert max-w-none break-words leading-tight whitespace-pre-wrap [&_p]:my-0 [&_ul]:my-0.5 [&_ol]:my-0.5 [&_li]:my-0 [&_ul_p]:my-0 [&_ol_p]:my-0 [&_li_p]:my-0">
+    <div className="chat-markdown">
       <ReactMarkdown remarkPlugins={[remarkGfm]}>{textContent}</ReactMarkdown>
       <MessagePartPrimitive.InProgress>
         <span className="inline-block w-2 h-4 ml-1 bg-primary animate-pulse" />
@@ -120,10 +116,12 @@ function AssistantMessage() {
         </div>
       </MessagePrimitive.Root>
 
-      {/* Error display — use message.status from ThreadPrimitive context */}
-      <ErrorPrimitive.Root className="mb-2 px-3.5 py-2.5 rounded-xl bg-danger/10 border border-danger/25 text-danger text-sm leading-snug">
-        <ErrorPrimitive.Message />
-      </ErrorPrimitive.Root>
+      {/* Error display — only render when this message has an actual error */}
+      <MessagePrimitive.Error>
+        <ErrorPrimitive.Root className="chat-error-message">
+          <ErrorPrimitive.Message />
+        </ErrorPrimitive.Root>
+      </MessagePrimitive.Error>
     </div>
   );
 }
