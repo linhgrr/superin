@@ -1,21 +1,19 @@
 /**
- * Header — Refined top navigation.
- *
- * Shows page title, quick actions, and user menu.
- * Simplified: Command Palette, Tour, and User menu only.
- * Theme moved to Settings page.
+ * Header — top navigation with user menu and tour trigger.
  */
 
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { useOnboarding } from "@/components/providers/OnboardingProvider";
+import { useOnboarding } from "@/components/providers/onboarding/OnboardingProvider";
 import { LogOut, Settings, Command, HelpCircle, PlayCircle } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 interface HeaderProps {
   title?: string;
   showTourTrigger?: boolean;
 }
+
+const HEADER_GIF_PATH = "/branding/header-title.gif";
 
 function TourMenu() {
   const { startTour, resetTours, isCompleted } = useOnboarding();
@@ -42,11 +40,7 @@ function TourMenu() {
 
   return (
     <div ref={dropdownRef} style={{ position: "relative" }}>
-      <button
-        className="btn btn-ghost btn-icon"
-        onClick={() => setIsOpen(!isOpen)}
-        title="Start Tour"
-      >
+      <button className="btn btn-ghost btn-icon" onClick={() => setIsOpen(!isOpen)} title="Start Tour">
         <HelpCircle size={16} />
       </button>
 
@@ -82,10 +76,7 @@ function TourMenu() {
             <button
               key={tour.id}
               className="btn"
-              onClick={() => {
-                startTour(tour.id);
-                setIsOpen(false);
-              }}
+              onClick={() => { startTour(tour.id); setIsOpen(false); }}
               style={{
                 width: "100%",
                 justifyContent: "flex-start",
@@ -109,10 +100,7 @@ function TourMenu() {
           <div style={{ borderTop: "1px solid var(--color-border)", margin: "0.5rem 0" }} />
           <button
             className="btn"
-            onClick={() => {
-              resetTours();
-              setIsOpen(false);
-            }}
+            onClick={() => { resetTours(); setIsOpen(false); }}
             style={{
               width: "100%",
               justifyContent: "flex-start",
@@ -147,35 +135,54 @@ export default function Header({ title, showTourTrigger = true }: HeaderProps) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  async function handleLogout() {
+  const handleLogout = useCallback(async () => {
     await logout();
     navigate("/login");
-  }
+  }, [logout, navigate]);
+
+  const userInitials = user?.name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase() ?? "";
 
   return (
     <header className="app-header">
-      {/* Title */}
-      <h1 className="app-header-title">
-        {title ?? "Dashboard"}
-      </h1>
+      <div
+        style={{
+          flex: 1,
+          minWidth: 0,
+          display: "flex",
+          alignItems: "center",
+        }}
+      >
+        <img
+          src={HEADER_GIF_PATH}
+          alt={title ?? "Dashboard"}
+          loading="eager"
+          style={{
+            height: "42px",
+            width: "auto",
+            maxWidth: "min(100%, 220px)",
+            objectFit: "contain",
+            borderRadius: "10px",
+          }}
+        />
+      </div>
 
-      {/* Right actions */}
       <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
         {/* Command Palette trigger */}
         <button
           className="btn btn-ghost btn-icon"
-          onClick={() => {
-            window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }));
-          }}
+          onClick={() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }))}
           title="Command Palette (Cmd+K)"
         >
           <Command size={16} />
         </button>
 
-        {/* Tour Menu */}
         {showTourTrigger && <TourMenu />}
 
-        {/* User menu */}
         {user && (
           <div ref={userMenuRef} style={{ position: "relative" }}>
             <button
@@ -198,7 +205,7 @@ export default function Header({ title, showTourTrigger = true }: HeaderProps) {
                   fontFamily: "var(--font-display)",
                 }}
               >
-                {user.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
+                {userInitials}
               </div>
             </button>
 
@@ -218,29 +225,13 @@ export default function Header({ title, showTourTrigger = true }: HeaderProps) {
                   animation: "fadeInScale 0.15s ease",
                 }}
               >
-                {/* User info */}
-                <div
-                  style={{
-                    padding: "0.75rem",
-                    borderBottom: "1px solid var(--color-border)",
-                    marginBottom: "0.5rem",
-                  }}
-                >
-                  <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--color-foreground)" }}>
-                    {user.name}
-                  </div>
-                  <div style={{ fontSize: "0.75rem", color: "var(--color-foreground-muted)", marginTop: "0.25rem" }}>
-                    {user.email}
-                  </div>
+                <div style={{ padding: "0.75rem", borderBottom: "1px solid var(--color-border)", marginBottom: "0.5rem" }}>
+                  <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--color-foreground)" }}>{user.name}</div>
+                  <div style={{ fontSize: "0.75rem", color: "var(--color-foreground-muted)", marginTop: "0.25rem" }}>{user.email}</div>
                 </div>
-
-                {/* Settings link */}
                 <button
                   className="btn"
-                  onClick={() => {
-                    navigate("/settings");
-                    setShowUserMenu(false);
-                  }}
+                  onClick={() => { navigate("/settings"); setShowUserMenu(false); }}
                   style={{
                     width: "100%",
                     justifyContent: "flex-start",
@@ -258,8 +249,6 @@ export default function Header({ title, showTourTrigger = true }: HeaderProps) {
                   <Settings size={14} />
                   Settings
                 </button>
-
-                {/* Logout */}
                 <button
                   className="btn"
                   onClick={handleLogout}
