@@ -4,7 +4,7 @@
 
 import { useEffect } from "react";
 
-import { clearActiveApps, setActiveApps } from "@/lib/lazy-registry";
+import { setActiveApps } from "@/lib/lazy-registry";
 import { preloadIcons } from "@/lib/icon-resolver";
 import { prefetchApps, primeAppAndWidget } from "@/lib/prefetch";
 import type { AppRuntimeEntry } from "@/types/generated";
@@ -60,5 +60,3 @@ export function useAppActivation(installedApps: AppRuntimeEntry[]) {
     };
   }, [installedApps]);
 }
-
-export { clearActiveApps };

@@ -32,7 +32,7 @@ export type { Layout };
 
 // ─── Preference map helpers ─────────────────────────────────────────────────────
 
-export function buildPreferenceMap(
+function buildPreferenceMap(
   preferences: WidgetPreferenceSchema[]
 ): Map<string, WidgetPreferenceSchema> {
   return new Map(preferences.map((p) => [p.widget_id, p] as const));

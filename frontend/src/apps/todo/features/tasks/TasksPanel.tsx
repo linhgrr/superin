@@ -25,7 +25,7 @@ import { TaskFilters } from "./TaskFilters";
 type TaskStatus = TaskRead["status"];
 type TaskFilter = "all" | TaskStatus;
 
-export const TASK_FILTER_VALUES = ["all", "pending", "completed"] as const satisfies readonly TaskFilter[];
+const TASK_FILTER_VALUES = ["all", "pending", "completed"] as const satisfies readonly TaskFilter[];
 
 type TaskListItem = TaskRead & {
   subtask_count?: number;

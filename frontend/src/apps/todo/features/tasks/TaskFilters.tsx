@@ -3,7 +3,8 @@
  */
 
 import type { TaskFilter } from "./TasksPanel";
-import { TASK_FILTER_VALUES } from "./TasksPanel";
+
+const TASK_FILTER_VALUES = ["all", "pending", "completed"] as const satisfies readonly TaskFilter[];
 
 interface TaskFiltersProps {
   filter: TaskFilter;
