@@ -177,33 +177,20 @@ export default function LoginPage() {
 
             <div className="login-form-group">
               <label className="login-label">Password</label>
-              <div style={{ position: "relative" }}>
+              <div className="login-password-wrap">
                 <input
                   type={showPassword ? "text" : "password"}
                   value={form.password}
                   onChange={(e) => setField("password")(e.target.value)}
                   placeholder={mode === "register" ? "At least 8 characters" : "Enter your password"}
                   autoComplete={mode === "login" ? "current-password" : "new-password"}
-                  className="login-input"
-                  style={{ paddingRight: "2.75rem" }}
+                  className="login-input login-input-password"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  style={{
-                    position: "absolute",
-                    right: "0.75rem",
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    padding: "0.25rem",
-                    color: "var(--color-foreground-muted)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
+                  className="login-password-toggle"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? <DynamicIcon name="EyeOff" size={18} /> : <DynamicIcon name="Eye" size={18} />}
                 </button>
@@ -217,8 +204,8 @@ export default function LoginPage() {
               disabled={isSubmitting}
             >
               {isSubmitting ? (
-                <span style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                  <span className="animate-spin">⏳</span>
+                <span className="login-submit-loading">
+                  <DynamicIcon name="Loader2" size={18} className="animate-spin" />
                   {mode === "login" ? "Signing in…" : "Creating account…"}
                 </span>
               ) : (

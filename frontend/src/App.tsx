@@ -14,8 +14,8 @@ import { BrowserRouter, Navigate, Route, Routes, useNavigate } from "react-route
 import { AppProviders } from "@/components/providers/AppProviders";
 import { DiscoveryInitializer } from "@/components/providers/DiscoveryInitializer";
 import { WorkspaceProvider } from "@/components/providers/WorkspaceProvider";
-import { STORAGE_KEYS } from "@/constants";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
+import { applyTheme, readStoredTheme } from "@/lib/theme";
 import AppShell from "@/pages/AppShell";
 
 const LoginPage = lazy(() => import("@/pages/LoginPage"));
@@ -37,25 +37,23 @@ const ChatPage = lazy(() => import("@/pages/ChatPage"));
 
 function ThemeLoader() {
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.USER_SETTINGS);
-    if (saved) {
-      try {
-        const settings = JSON.parse(saved);
-        const root = document.documentElement;
-        const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const syncTheme = () => applyTheme(readStoredTheme());
+    syncTheme();
 
-        if (settings.theme === "dark" || (settings.theme === "system" && systemDark)) {
-          root.classList.add("dark");
-          root.classList.remove("light");
-        } else if (settings.theme === "light") {
-          root.classList.add("light");
-          root.classList.remove("dark");
-        }
-        // If theme is "system" and not dark, or light, we keep default (no class)
-      } catch (error: unknown) {
-        console.error("Failed to parse saved theme settings", error);
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const onSystemThemeChange = () => {
+      if (readStoredTheme() === "system") {
+        syncTheme();
       }
+    };
+
+    if (typeof media.addEventListener === "function") {
+      media.addEventListener("change", onSystemThemeChange);
+      return () => media.removeEventListener("change", onSystemThemeChange);
     }
+
+    media.addListener(onSystemThemeChange);
+    return () => media.removeListener(onSystemThemeChange);
   }, []);
 
   return null;

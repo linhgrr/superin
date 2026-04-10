@@ -184,6 +184,13 @@ interface AuthConfig extends InternalAxiosRequestConfig {
 
 axiosInstance.interceptors.request.use(
   async (config: AuthConfig) => {
+    // Let browser generate multipart boundaries for FormData payloads.
+    // If JSON content-type leaks into these requests, File objects can be
+    // serialized incorrectly (e.g. `{ file: {} }`).
+    if (config.data instanceof FormData) {
+      config.headers.delete("Content-Type");
+    }
+
     // Skip auth for auth endpoints
     const url = config.url ?? "";
     if (isAuthRoute(url)) {

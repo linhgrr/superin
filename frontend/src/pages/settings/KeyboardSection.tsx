@@ -83,7 +83,7 @@ export default function KeyboardSection() {
           gap: "0.75rem",
         }}
       >
-        <Command size={18} style={{ color: "var(--color-primary)", flexShrink: 0 }} />
+        <DynamicIcon name="Command" size={18} style={{ color: "var(--color-primary)", flexShrink: 0 }} />
         <div style={{ fontSize: "0.875rem", color: "var(--color-foreground)" }}>
           <strong>Pro tip:</strong> Press{" "}
           <kbd

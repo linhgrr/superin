@@ -29,7 +29,7 @@ const DENSITY_OPTIONS = [
 export default function AppearanceSection({ settings, onSave }: AppearanceSectionProps) {
   return (
     <Section
-      icon={<Palette size={20} />}
+      icon={<DynamicIcon name="Palette" size={20} />}
       title="Appearance"
       description="Customize how Shin looks and feels"
     >

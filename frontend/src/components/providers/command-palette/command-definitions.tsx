@@ -3,7 +3,8 @@
  */
 
 import type { AppRuntimeEntry } from "@/types/generated";
-import { STORAGE_KEYS } from "@/constants";
+import { applyTheme, persistTheme } from "@/lib/theme";
+import { DynamicIcon } from "@/lib/icon-resolver";
 
 export type CommandCategory = "apps" | "actions" | "settings" | "help";
 
@@ -84,29 +85,11 @@ export function buildStaticCommands(
       shortcut: "T T",
       category: "actions",
       action: () => {
-        const root = document.documentElement;
-        const isDark = root.classList.contains("dark");
+        const isDark = document.documentElement.classList.contains("dark");
         const newTheme = isDark ? "light" : "dark";
 
-        root.classList.remove("light", "dark");
-        root.classList.add(newTheme);
-
-        // Sync to localStorage so SettingsPage reflects the change
-        const saved = localStorage.getItem(STORAGE_KEYS.USER_SETTINGS);
-        if (saved) {
-          try {
-            const settings = JSON.parse(saved);
-            settings.theme = newTheme;
-            localStorage.setItem(STORAGE_KEYS.USER_SETTINGS, JSON.stringify(settings));
-          } catch {
-            // Non-critical: localStorage may be unavailable
-          }
-        } else {
-          localStorage.setItem(
-            STORAGE_KEYS.USER_SETTINGS,
-            JSON.stringify({ theme: newTheme })
-          );
-        }
+        applyTheme(newTheme);
+        persistTheme(newTheme);
 
         window.dispatchEvent(new CustomEvent("shin:theme-changed", { detail: newTheme }));
       },

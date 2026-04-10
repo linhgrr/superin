@@ -16,6 +16,7 @@ import { STORAGE_KEYS } from "@/constants";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/components/providers/ToastProvider";
 import { updateUserSettings } from "@/api/auth";
+import { applyTheme } from "@/lib/theme";
 import {
   DEFAULT_SETTINGS,
   type SettingsState,
@@ -68,12 +69,7 @@ export default function SettingsPage() {
 
   // Apply theme to <html>
   useEffect(() => {
-    const root = document.documentElement;
-    const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const isDark =
-      settings.theme === "dark" || (settings.theme === "system" && systemDark);
-    root.classList.toggle("dark", isDark);
-    root.classList.toggle("light", !isDark);
+    applyTheme(settings.theme);
   }, [settings.theme]);
 
   // Listen for custom event to open a specific tab

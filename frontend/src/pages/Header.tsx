@@ -123,6 +123,7 @@ export default function Header({ title, showTourTrigger = true }: HeaderProps) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -146,6 +147,15 @@ export default function Header({ title, showTourTrigger = true }: HeaderProps) {
     .join("")
     .slice(0, 2)
     .toUpperCase() ?? "";
+  const avatarUrl =
+    typeof user?.avatar_url === "string" && user.avatar_url.trim().length > 0
+      ? user.avatar_url
+      : null;
+  const showAvatarImage = Boolean(avatarUrl && !avatarLoadFailed);
+
+  useEffect(() => {
+    setAvatarLoadFailed(false);
+  }, [avatarUrl]);
 
   return (
     <header className="app-header">
@@ -188,25 +198,40 @@ export default function Header({ title, showTourTrigger = true }: HeaderProps) {
             <button
               className="btn btn-ghost btn-icon"
               onClick={() => setShowUserMenu(!showUserMenu)}
-              title={user.name}
+              title={user.name ?? "User"}
             >
-              <div
-                style={{
-                  width: "32px",
-                  height: "32px",
-                  borderRadius: "10px",
-                  background: "linear-gradient(135deg, var(--color-primary) 0%, oklch(0.72 0.24 45) 100%)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "0.75rem",
-                  fontWeight: 700,
-                  color: "white",
-                  fontFamily: "var(--font-display)",
-                }}
-              >
-                {userInitials}
-              </div>
+              {showAvatarImage ? (
+                <img
+                  src={avatarUrl!}
+                  alt={`${user.name ?? "User"} avatar`}
+                  onError={() => setAvatarLoadFailed(true)}
+                  style={{
+                    width: "32px",
+                    height: "32px",
+                    borderRadius: "10px",
+                    objectFit: "cover",
+                    border: "1px solid var(--color-border)",
+                  }}
+                />
+              ) : (
+                <div
+                  style={{
+                    width: "32px",
+                    height: "32px",
+                    borderRadius: "10px",
+                    background: "linear-gradient(135deg, var(--color-primary) 0%, oklch(0.72 0.24 45) 100%)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "0.75rem",
+                    fontWeight: 700,
+                    color: "white",
+                    fontFamily: "var(--font-display)",
+                  }}
+                >
+                  {userInitials}
+                </div>
+              )}
             </button>
 
             {showUserMenu && (

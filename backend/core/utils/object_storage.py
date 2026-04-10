@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from urllib.parse import quote
 
 import boto3
@@ -22,14 +23,29 @@ def normalize_endpoint(endpoint: str | None, *, default_scheme: str) -> str | No
     return f"{default_scheme}://{endpoint.rstrip('/')}"
 
 
+def is_running_in_kubernetes() -> bool:
+    """Detect Kubernetes runtime via injected service env var."""
+    return bool(os.getenv("KUBERNETES_SERVICE_HOST"))
+
+
 def get_upload_endpoint() -> str:
-    endpoint = normalize_endpoint(
+    internal_endpoint = normalize_endpoint(
         settings.object_storage_endpoint_internal,
         default_scheme="http",
-    ) or normalize_endpoint(
+    )
+    external_endpoint = normalize_endpoint(
         settings.object_storage_endpoint_external,
         default_scheme="https",
     )
+
+    # In-cluster runtime should use the internal service DNS.
+    # Local/dev runtime should use the external endpoint to avoid
+    # unresolved `*.svc.cluster.local` hostnames.
+    if is_running_in_kubernetes():
+        endpoint = internal_endpoint or external_endpoint
+    else:
+        endpoint = external_endpoint or internal_endpoint
+
     if not endpoint:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

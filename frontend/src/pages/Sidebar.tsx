@@ -96,7 +96,8 @@ function Sidebar() {
       <div style={{ marginTop: "auto", padding: "1rem", borderTop: "1px solid var(--color-border)" }}>
         <NavLink
           to={ROUTES.STORE}
-          className={({ isActive }) => `app-item${isActive ? " active" : ""}`}
+          className={({ isActive }) => `app-item sidebar-utility-item${isActive ? " active" : ""}`}
+          title="App Store"
           style={{ marginBottom: "0.25rem" }}
         >
           <DynamicIcon name="Store" size={18} />
@@ -104,7 +105,8 @@ function Sidebar() {
         </NavLink>
         <NavLink
           to={ROUTES.BILLING}
-          className={({ isActive }) => `app-item${isActive ? " active" : ""}`}
+          className={({ isActive }) => `app-item sidebar-utility-item${isActive ? " active" : ""}`}
+          title="Billing"
           style={{ marginBottom: "0.25rem" }}
         >
           <DynamicIcon name="CreditCard" size={18} />
@@ -113,7 +115,8 @@ function Sidebar() {
         {isAdmin && (
           <NavLink
             to={ROUTES.ADMIN}
-            className={({ isActive }) => `app-item${isActive ? " active" : ""}`}
+            className={({ isActive }) => `app-item sidebar-utility-item${isActive ? " active" : ""}`}
+            title="Admin"
             style={{ marginBottom: "0.25rem" }}
           >
             <DynamicIcon name="Shield" size={18} />
@@ -122,7 +125,8 @@ function Sidebar() {
         )}
         <NavLink
           to={ROUTES.SETTINGS}
-          className={({ isActive }) => `app-item${isActive ? " active" : ""}`}
+          className={({ isActive }) => `app-item sidebar-utility-item${isActive ? " active" : ""}`}
+          title="Settings"
         >
           <DynamicIcon name="Settings" size={18} />
           <span>Settings</span>
