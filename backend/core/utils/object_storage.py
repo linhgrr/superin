@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import os
-from urllib.parse import quote
+import socket
+from urllib.parse import quote, urlparse
 
 import boto3
 from botocore.client import Config as BotoConfig
@@ -28,6 +29,19 @@ def is_running_in_kubernetes() -> bool:
     return bool(os.getenv("KUBERNETES_SERVICE_HOST"))
 
 
+def _is_endpoint_resolvable(endpoint: str) -> bool:
+    parsed = urlparse(endpoint)
+    hostname = parsed.hostname
+    if not hostname:
+        return False
+
+    try:
+        socket.getaddrinfo(hostname, parsed.port)
+        return True
+    except OSError:
+        return False
+
+
 def get_upload_endpoint() -> str:
     internal_endpoint = normalize_endpoint(
         settings.object_storage_endpoint_internal,
@@ -38,20 +52,27 @@ def get_upload_endpoint() -> str:
         default_scheme="https",
     )
 
-    # In-cluster runtime should use the internal service DNS.
-    # Local/dev runtime should use the external endpoint to avoid
-    # unresolved `*.svc.cluster.local` hostnames.
-    if is_running_in_kubernetes():
-        endpoint = internal_endpoint or external_endpoint
+    if settings.hf_space:
+        ordered_candidates = [external_endpoint, internal_endpoint]
+    elif is_running_in_kubernetes():
+        ordered_candidates = [internal_endpoint, external_endpoint]
     else:
-        endpoint = external_endpoint or internal_endpoint
+        ordered_candidates = [external_endpoint, internal_endpoint]
 
-    if not endpoint:
+    candidates = [endpoint for endpoint in ordered_candidates if endpoint]
+    if not candidates:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Object storage endpoint is not configured.",
         )
-    return endpoint
+
+    for endpoint in candidates:
+        if _is_endpoint_resolvable(endpoint):
+            return endpoint
+
+    # If DNS checks fail for all options, still return the preferred candidate
+    # so callers get a concrete endpoint error instead of config masking.
+    return candidates[0]
 
 
 def get_public_base_url() -> str:

@@ -17,7 +17,6 @@ from apps.finance.repository import (
 )
 from core.models import User
 from core.utils.timezone import get_user_timezone_context
-from shared.beanie_utils import aggregate_to_list
 
 
 class FinanceService:
@@ -606,7 +605,7 @@ class FinanceService:
             }},
             {"$sort": {"_id.year": -1, "_id.month": -1}},
         ]
-        results = await aggregate_to_list(Transaction, pipeline)
+        results = await Transaction.aggregate(pipeline).to_list()
 
         # Merge income/expense per month
         monthly_data: dict[tuple[int, int], dict[str, float]] = {}

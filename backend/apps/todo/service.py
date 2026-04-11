@@ -7,7 +7,6 @@ from apps.todo.models import RecurringRule, SubTask, Task
 from apps.todo.repository import RecurringRuleRepository, SubTaskRepository, TaskRepository
 from core.models import User
 from core.utils.timezone import get_user_timezone_context
-from shared.beanie_utils import aggregate_to_list
 
 
 class TaskService:
@@ -283,7 +282,7 @@ class TaskService:
                 ],
             }},
         ]
-        results = await aggregate_to_list(Task, pipeline)
+        results = await Task.aggregate(pipeline).to_list()
         facets = results[0] if results else {}
 
         def _count(key: str) -> int:

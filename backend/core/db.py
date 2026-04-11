@@ -1,13 +1,13 @@
 """Beanie MongoDB initialization and connection management."""
 
-from pymongo import AsyncMongoClient
+from motor.motor_asyncio import AsyncIOMotorClient
 
 from core.config import settings
 from core.utils.index_contract import validate_index_contract
 
 # ─── Global client (set during lifespan) ──────────────────────────────────────
 
-_client: AsyncMongoClient | None = None
+_client: AsyncIOMotorClient | None = None
 
 
 async def init_db() -> None:
@@ -17,7 +17,7 @@ async def init_db() -> None:
     Plugin models are appended via get_plugin_models() after discovery.
     """
     global _client
-    _client = AsyncMongoClient(settings.mongodb_uri)
+    _client = AsyncIOMotorClient(settings.mongodb_uri)
 
     # Import here to avoid circular imports
     from beanie import init_beanie
@@ -56,7 +56,7 @@ async def close_db() -> None:
     """Close the MongoDB client. Call once at server shutdown."""
     global _client
     if _client is not None:
-        await _client.close()
+        _client.close()
         _client = None
 
 
