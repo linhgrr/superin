@@ -14,7 +14,7 @@ import {
   deleteTask as apiDeleteTask,
   getSubtasks as apiGetSubtasks,
   getTasks as apiGetTasks,
-  getTodoSummary as apiGetTodoSummary,
+  getSummary as apiGetTodoSummary,
   toggleTask as apiToggleTask,
   completeSubtask as apiCompleteSubtask,
   uncompleteSubtask as apiUncompleteSubtask,

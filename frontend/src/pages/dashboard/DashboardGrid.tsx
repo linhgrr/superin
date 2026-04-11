@@ -18,7 +18,7 @@ import {
   ROW_HEIGHT,
 } from "./useWidgetPreferences";
 import WidgetCard from "./WidgetCard";
-import WidgetContent from "./WidgetContent";
+import LazyWidget from "@/components/LazyWidget";
 
 interface DashboardGridProps {
   installedApps: import("@/types/generated").AppRuntimeEntry[];
@@ -92,8 +92,8 @@ export default function DashboardGrid({
       >
         {visibleWidgets.map(({ widgetId, appId, widget }) => (
           <div key={widgetId} className="rgl-item-view">
-            <WidgetCard widget={widget}>
-              <WidgetContent appId={appId} widgetId={widgetId} widget={widget} />
+            <WidgetCard widget={widget} widgetId={widgetId}>
+              <LazyWidget appId={appId} widgetId={widgetId} widget={widget} />
             </WidgetCard>
           </div>
         ))}

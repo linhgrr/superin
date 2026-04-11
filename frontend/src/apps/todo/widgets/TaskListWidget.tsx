@@ -1,70 +1,61 @@
 import type { DashboardWidgetRendererProps } from "../types";
-import { useTodoSummary } from "./useTodoSummary";
+import { getWidgetData, type TaskListWidgetData } from "../api";
 import { DynamicIcon } from "@/lib/icon-resolver";
+import { useWidgetData } from "@/lib/widget-data";
 
-export default function TaskListWidget({ widget: _widget }: DashboardWidgetRendererProps) {
-  const { data: summary, isLoading: loading } = useTodoSummary();
+const TASK_RENDER_LIMIT = 3;
+
+export default function TaskListWidget({ widget }: DashboardWidgetRendererProps) {
+  const { data, isLoading } = useWidgetData<TaskListWidgetData>(
+    "todo",
+    widget.id,
+    () => getWidgetData(widget.id) as Promise<TaskListWidgetData>
+  );
 
   return (
-    <div style={{ height: "100%", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-      {loading ? (
+    <div style={{ height: "100%", display: "flex", flexDirection: "column", justifyContent: "center", gap: "0.5rem" }}>
+      {isLoading ? (
         <div className="stat-value" style={{ color: "var(--color-foreground-muted)" }}>—</div>
+      ) : (data?.items?.length ?? 0) === 0 ? (
+        <div style={{ color: "var(--color-foreground-muted)", fontSize: "0.875rem" }}>No tasks in this view</div>
       ) : (
-        <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-          {/* Pending */}
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+        data.items.slice(0, TASK_RENDER_LIMIT).map((item) => (
+          <div key={item.id} style={{ display: "flex", alignItems: "center", gap: "0.625rem" }}>
             <div
               style={{
-                width: "32px",
-                height: "32px",
-                borderRadius: "8px",
-                background: "var(--color-warning-muted, oklch(0.75 0.18 75 / 0.15))",
+                width: "28px",
+                height: "28px",
+                borderRadius: "999px",
+                background: item.priority === "high"
+                  ? "var(--color-danger-muted, oklch(0.63 0.24 25 / 0.15))"
+                  : "var(--color-warning-muted, oklch(0.75 0.18 75 / 0.15))",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                color: "var(--color-warning)",
+                color: item.priority === "high" ? "var(--color-danger)" : "var(--color-warning)",
                 flexShrink: 0,
               }}
             >
-              <DynamicIcon name="Circle" size={16} />
+              <DynamicIcon name={item.status === "completed" ? "CheckCircle2" : "Circle"} size={14} />
             </div>
-            <div>
-              <div style={{ fontSize: "0.625rem", color: "var(--color-foreground-muted)", textTransform: "uppercase" }}>
-                Pending
+            <div style={{ minWidth: 0 }}>
+              <div
+                style={{
+                  fontSize: "0.8125rem",
+                  fontWeight: 500,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {item.title}
               </div>
-              <div style={{ fontSize: "1.125rem", fontWeight: 600, color: "var(--color-foreground)" }}>
-                {summary?.pending ?? 0}
-              </div>
-            </div>
-          </div>
-
-          {/* Completed */}
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <div
-              style={{
-                width: "32px",
-                height: "32px",
-                borderRadius: "8px",
-                background: "var(--color-success-muted, oklch(0.72 0.19 145 / 0.15))",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "var(--color-success)",
-                flexShrink: 0,
-              }}
-            >
-              <DynamicIcon name="CheckCircle2" size={16} />
-            </div>
-            <div>
-              <div style={{ fontSize: "0.625rem", color: "var(--color-foreground-muted)", textTransform: "uppercase" }}>
-                Done
-              </div>
-              <div style={{ fontSize: "1.125rem", fontWeight: 600, color: "var(--color-success)" }}>
-                {summary?.completed ?? 0}
+              <div style={{ fontSize: "0.6875rem", color: "var(--color-foreground-muted)" }}>
+                {data.filter} view
               </div>
             </div>
           </div>
-        </div>
+        ))
       )}
     </div>
   );

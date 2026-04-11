@@ -1,21 +1,25 @@
 import type { DashboardWidgetRendererProps } from "../types";
-import { useUpcomingEvents } from "../hooks/useCalendarSwr";
+import { getWidgetData, type UpcomingWidgetData, type EventRead } from "../api";
+import { DynamicIcon } from "@/lib/icon-resolver";
+import { useWidgetData } from "@/lib/widget-data";
 import { useTimezone } from "@/shared/hooks/useTimezone";
 import { getUserTimezone } from "@/shared/utils/timezone";
-import { DynamicIcon } from "@/lib/icon-resolver";
 
-export default function UpcomingWidget({ widget: _widget }: DashboardWidgetRendererProps) {
-  const { data: events = [], isLoading } = useUpcomingEvents(3);
+export default function UpcomingWidget({ widget }: DashboardWidgetRendererProps) {
+  const { data, isLoading } = useWidgetData<UpcomingWidgetData>(
+    "calendar",
+    widget.id,
+    () => getWidgetData(widget.id) as Promise<UpcomingWidgetData>
+  );
   const { timezone, formatDate, formatTime, isToday } = useTimezone();
 
+  const events = data?.items ?? [];
+
   const formatEventDate = (dateStr: string) => {
-    // Use centralized isToday utility
     if (isToday(dateStr)) return "Today";
 
-    // Check for tomorrow using timezone-aware comparison
     const date = new Date(dateStr);
     const tz = timezone || getUserTimezone();
-
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
 
@@ -54,7 +58,7 @@ export default function UpcomingWidget({ widget: _widget }: DashboardWidgetRende
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-          {events.map((event) => (
+          {events.map((event: EventRead) => (
             <div
               key={event.id}
               style={{

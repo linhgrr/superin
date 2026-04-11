@@ -35,7 +35,8 @@ export function mergePreferenceUpdates(
       app_id: appId,
       enabled: update.enabled ?? existing?.enabled ?? false,
       sort_order: update.sort_order ?? existing?.sort_order ?? 0,
-      config: update.config ?? existing?.config ?? {},
+      grid_x: update.grid_x ?? existing?.grid_x ?? 0,
+      grid_y: update.grid_y ?? existing?.grid_y ?? 0,
       size_w: update.size_w ?? existing?.size_w ?? null,
       size_h: update.size_h ?? existing?.size_h ?? null,
     });

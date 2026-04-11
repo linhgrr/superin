@@ -31,6 +31,7 @@ export interface WorkspaceContextValue {
   replaceWidgetPreferences: (preferences: WidgetPreferenceSchema[]) => void;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function toRuntimeApp(app: AppCatalogEntry): AppRuntimeEntry {
   return {
     id: app.id,
@@ -160,7 +161,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
               app_id: app.id,
               enabled: true,
               sort_order: index,
-              config: {},
+              grid_x: 0,
+              grid_y: index * 2,
               size_w: null,
               size_h: null,
             });

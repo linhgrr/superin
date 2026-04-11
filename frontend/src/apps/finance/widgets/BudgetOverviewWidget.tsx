@@ -1,13 +1,19 @@
 import type { DashboardWidgetRendererProps } from "../types";
-import { useFinanceSummary } from "./useFinanceSummary";
-import { DynamicIcon } from "@/lib/icon-resolver";
 
-export default function BudgetOverviewWidget({ widget: _widget }: DashboardWidgetRendererProps) {
-  const { data: summary, isLoading: loading } = useFinanceSummary();
+import { getWidgetData, type BudgetOverviewWidgetData } from "../api";
+import { DynamicIcon } from "@/lib/icon-resolver";
+import { useWidgetData } from "@/lib/widget-data";
+
+export default function BudgetOverviewWidget({ widget }: DashboardWidgetRendererProps) {
+  const { data, isLoading } = useWidgetData<BudgetOverviewWidgetData>(
+    "finance",
+    widget.id,
+    () => getWidgetData(widget.id) as Promise<BudgetOverviewWidgetData>
+  );
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-      {loading ? (
+      {isLoading ? (
         <div style={{ color: "var(--color-foreground-muted)", fontSize: "0.875rem" }}>Loading…</div>
       ) : (
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
@@ -28,10 +34,12 @@ export default function BudgetOverviewWidget({ widget: _widget }: DashboardWidge
           </div>
           <div>
             <div className="stat-value" style={{ color: "var(--color-foreground)", fontSize: "1.75rem" }}>
-              {summary?.transaction_count ?? 0}
+              {data?.over_budget_count ?? 0}
             </div>
             <div style={{ fontSize: "0.75rem", color: "var(--color-foreground-muted)", marginTop: "0.125rem" }}>
-              Transactions this month
+              {data?.remaining_budget != null
+                ? `${Math.max(data.remaining_budget, 0).toLocaleString()} left this month`
+                : "Tracked budgets this month"}
             </div>
           </div>
         </div>

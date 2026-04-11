@@ -23,17 +23,6 @@ export function getSizeConfig(
 
 // ─── Preference equality ──────────────────────────────────────────────────────
 
-function serializePreferenceConfig(
-  config: WidgetPreferenceSchema["config"] | null | undefined
-): string {
-  if (!config) return "";
-  // Programmer-defined keys — simple ASCII sort is sufficient and faster than localeCompare
-  const entries = Object.entries(config).sort(([left], [right]) =>
-    left < right ? -1 : left > right ? 1 : 0
-  );
-  return JSON.stringify(entries);
-}
-
 export function arePreferencesEqual(
   left: WidgetPreferenceSchema | undefined,
   right: WidgetPreferenceSchema | undefined
@@ -46,10 +35,10 @@ export function arePreferencesEqual(
     left.app_id === right.app_id &&
     left.enabled === right.enabled &&
     left.sort_order === right.sort_order &&
+    left.grid_x === right.grid_x &&
+    left.grid_y === right.grid_y &&
     left.size_w === right.size_w &&
-    left.size_h === right.size_h &&
-    serializePreferenceConfig(left.config) ===
-      serializePreferenceConfig(right.config)
+    left.size_h === right.size_h
   );
 }
 
@@ -71,8 +60,8 @@ export function arePreferenceMapsEqual(
 function getSavedGridPosition(
   pref: WidgetPreferenceSchema | undefined
 ): { x: number; y: number } | null {
-  const savedX = pref?.config?.gridX;
-  const savedY = pref?.config?.gridY;
+  const savedX = pref?.grid_x;
+  const savedY = pref?.grid_y;
   if (typeof savedX === "number" && typeof savedY === "number") {
     return { x: savedX, y: savedY };
   }

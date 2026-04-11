@@ -89,26 +89,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/auth/permissions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get My Permissions
-         * @description Return current user's effective permissions from backend matrix.
-         */
-        get: operations["get_my_permissions_api_auth_permissions_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/auth/me/settings": {
         parameters: {
             query?: never;
@@ -582,6 +562,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/apps/calendar/widgets/{widget_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Widget Data */
+        get: operations["get_widget_data_api_apps_calendar_widgets__widget_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/apps/calendar/widgets/{widget_id}/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Widget Config */
+        put: operations["update_widget_config_api_apps_calendar_widgets__widget_id__config_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/apps/calendar/widgets/{widget_id}/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Widget Options */
+        get: operations["get_widget_options_api_apps_calendar_widgets__widget_id__options_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/apps/calendar/events": {
         parameters: {
             query?: never;
@@ -829,6 +860,57 @@ export interface paths {
         };
         /** List Widgets */
         get: operations["list_widgets_api_apps_finance_widgets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/apps/finance/widgets/{widget_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Widget Data */
+        get: operations["get_widget_data_api_apps_finance_widgets__widget_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/apps/finance/widgets/{widget_id}/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Widget Config */
+        put: operations["update_widget_config_api_apps_finance_widgets__widget_id__config_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/apps/finance/widgets/{widget_id}/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Widget Options */
+        get: operations["get_widget_options_api_apps_finance_widgets__widget_id__options_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1113,6 +1195,57 @@ export interface paths {
         };
         /** List Widgets */
         get: operations["list_widgets_api_apps_todo_widgets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/apps/todo/widgets/{widget_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Widget Data */
+        get: operations["get_widget_data_api_apps_todo_widgets__widget_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/apps/todo/widgets/{widget_id}/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Widget Config */
+        put: operations["update_widget_config_api_apps_todo_widgets__widget_id__config_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/apps/todo/widgets/{widget_id}/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Widget Options */
+        get: operations["get_widget_options_api_apps_todo_widgets__widget_id__options_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1716,6 +1849,23 @@ export interface components {
              */
             file: string;
         };
+        /** BudgetOverviewWidgetData */
+        BudgetOverviewWidgetData: {
+            /** Total Budget */
+            total_budget: number;
+            /** Total Spent */
+            total_spent: number;
+            /** Remaining Budget */
+            remaining_budget?: number | null;
+            /** Category Count */
+            category_count: number;
+            /** Over Budget Count */
+            over_budget_count: number;
+            /** Month */
+            month: number;
+            /** Year */
+            year: number;
+        };
         /** CalendarActionResponse */
         CalendarActionResponse: {
             /** Success */
@@ -1870,6 +2020,15 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /** CalendarMonthDaySummary */
+        CalendarMonthDaySummary: {
+            /** Day */
+            day: number;
+            /** Event Count */
+            event_count: number;
+            /** Event Titles */
+            event_titles?: string[];
         };
         /** CalendarRecurringRuleRead */
         CalendarRecurringRuleRead: {
@@ -2028,6 +2187,12 @@ export interface components {
              * @default 0
              */
             order: number;
+        };
+        /** DaySummaryWidgetData */
+        DaySummaryWidgetData: {
+            /** Today Count */
+            today_count: number;
+            next_event?: components["schemas"]["CalendarEventRead"] | null;
         };
         /** FinanceActionResponse */
         FinanceActionResponse: {
@@ -2304,29 +2469,29 @@ export interface components {
             /** Password */
             password: string;
         };
+        /** MonthViewWidgetData */
+        MonthViewWidgetData: {
+            /** Month */
+            month: number;
+            /** Year */
+            year: number;
+            /** Month Label */
+            month_label: string;
+            /** Start Offset */
+            start_offset: number;
+            /** Days In Month */
+            days_in_month: number;
+            /** Days */
+            days?: components["schemas"]["CalendarMonthDaySummary"][];
+            /** Calendars */
+            calendars?: components["schemas"]["CalendarCalendarRead"][];
+        };
         /**
          * PaymentProvider
          * @description Supported payment providers.
          * @enum {string}
          */
         PaymentProvider: "stripe" | "payos";
-        /**
-         * PermissionKey
-         * @description Platform permission keys used by backend and frontend.
-         * @enum {string}
-         */
-        PermissionKey: "chat_ai_unlimited" | "admin_users_view" | "admin_subscriptions_view" | "admin_apps_manage";
-        /** PermissionListRead */
-        PermissionListRead: {
-            /** Items */
-            items: components["schemas"]["PermissionRead"][];
-        };
-        /** PermissionRead */
-        PermissionRead: {
-            key: components["schemas"]["PermissionKey"];
-            /** Allowed */
-            allowed: boolean;
-        };
         /**
          * PreferenceUpdate
          * @description Update payload for a single widget preference.
@@ -2338,14 +2503,29 @@ export interface components {
             enabled?: boolean | null;
             /** Sort Order */
             sort_order?: number | null;
-            /** Config */
-            config?: {
-                [key: string]: unknown;
-            } | null;
+            /** Grid X */
+            grid_x?: number | null;
+            /** Grid Y */
+            grid_y?: number | null;
             /** Size W */
             size_w?: number | null;
             /** Size H */
             size_h?: number | null;
+        };
+        /** RecentTransactionsWidgetData */
+        RecentTransactionsWidgetData: {
+            /** Items */
+            items?: components["schemas"]["FinanceTransactionRead"][];
+            /** Income This Month */
+            income_this_month: number;
+            /** Expense This Month */
+            expense_this_month: number;
+            /**
+             * Scope
+             * @default all-wallets
+             * @enum {string}
+             */
+            scope: "all-wallets" | "single-wallet";
         };
         /** RegisterRequest */
         RegisterRequest: {
@@ -2391,6 +2571,26 @@ export interface components {
          * @enum {string}
          */
         SubscriptionTier: "free" | "paid";
+        /** TaskListWidgetData */
+        TaskListWidgetData: {
+            /**
+             * Filter
+             * @enum {string}
+             */
+            filter: "all" | "today" | "high";
+            /** Items */
+            items?: components["schemas"]["TodoTaskRead"][];
+            /** Total */
+            total: number;
+        };
+        /** TodayWidgetData */
+        TodayWidgetData: {
+            /** Due Today */
+            due_today: number;
+            /** Overdue */
+            overdue: number;
+            next_due_task?: components["schemas"]["TodoTaskRead"] | null;
+        };
         /** TodoActionResponse */
         TodoActionResponse: {
             /** Success */
@@ -2640,6 +2840,22 @@ export interface components {
             token_type: "bearer";
             user: components["schemas"]["UserPublic"];
         };
+        /** TotalBalanceWidgetData */
+        TotalBalanceWidgetData: {
+            /** Total Balance */
+            total_balance: number;
+            /** Wallet Name */
+            wallet_name?: string | null;
+            /** Currency */
+            currency?: string | null;
+            /** Wallet Count */
+            wallet_count: number;
+        };
+        /** UpcomingWidgetData */
+        UpcomingWidgetData: {
+            /** Items */
+            items?: components["schemas"]["CalendarEventRead"][];
+        };
         /** UpdateCategoryRequest */
         UpdateCategoryRequest: {
             /** Name */
@@ -2720,6 +2936,34 @@ export interface components {
             message?: string | null;
         };
         /**
+         * WidgetDataConfigSchema
+         * @description Persisted per-widget data config.
+         */
+        WidgetDataConfigSchema: {
+            /** Id */
+            _id?: string | null;
+            /** User Id */
+            user_id: string;
+            /** Widget Id */
+            widget_id: string;
+            /** Config */
+            config?: {
+                [key: string]: unknown;
+            };
+        };
+        /**
+         * WidgetDataConfigUpdate
+         * @description Update payload for widget data config.
+         */
+        WidgetDataConfigUpdate: {
+            /** Widget Id */
+            widget_id: string;
+            /** Config */
+            config?: {
+                [key: string]: unknown;
+            };
+        };
+        /**
          * WidgetManifestSchema
          * @description A single widget definition — referenced in AppManifestSchema.widgets.
          */
@@ -2771,10 +3015,16 @@ export interface components {
              * @default 0
              */
             sort_order: number;
-            /** Config */
-            config?: {
-                [key: string]: unknown;
-            };
+            /**
+             * Grid X
+             * @default 0
+             */
+            grid_x: number;
+            /**
+             * Grid Y
+             * @default 0
+             */
+            grid_y: number;
             /** Size W */
             size_w?: number | null;
             /** Size H */
@@ -2795,6 +3045,8 @@ export interface components {
             installed_apps?: components["schemas"]["AppRuntimeEntry"][];
             /** Widget Preferences */
             widget_preferences?: components["schemas"]["WidgetPreferenceSchema"][];
+            /** Widget Data Configs */
+            widget_data_configs?: components["schemas"]["WidgetDataConfigSchema"][];
         };
     };
     responses: never;
@@ -2947,26 +3199,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserPublic"];
-                };
-            };
-        };
-    };
-    get_my_permissions_api_auth_permissions_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PermissionListRead"];
                 };
             };
         };
@@ -3730,6 +3962,105 @@ export interface operations {
             };
         };
     };
+    get_widget_data_api_apps_calendar_widgets__widget_id__get: {
+        parameters: {
+            query?: {
+                month_offset?: number;
+            };
+            header?: never;
+            path: {
+                widget_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonthViewWidgetData"] | components["schemas"]["UpcomingWidgetData"] | components["schemas"]["DaySummaryWidgetData"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_widget_config_api_apps_calendar_widgets__widget_id__config_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                widget_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WidgetDataConfigUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WidgetDataConfigSchema"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_widget_options_api_apps_calendar_widgets__widget_id__options_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                widget_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigFieldSchema"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_events_api_apps_calendar_events_get: {
         parameters: {
             query?: {
@@ -4268,6 +4599,103 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WidgetManifestSchema"][];
+                };
+            };
+        };
+    };
+    get_widget_data_api_apps_finance_widgets__widget_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                widget_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TotalBalanceWidgetData"] | components["schemas"]["BudgetOverviewWidgetData"] | components["schemas"]["RecentTransactionsWidgetData"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_widget_config_api_apps_finance_widgets__widget_id__config_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                widget_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WidgetDataConfigUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WidgetDataConfigSchema"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_widget_options_api_apps_finance_widgets__widget_id__options_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                widget_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigFieldSchema"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -4987,6 +5415,103 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WidgetManifestSchema"][];
+                };
+            };
+        };
+    };
+    get_widget_data_api_apps_todo_widgets__widget_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                widget_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskListWidgetData"] | components["schemas"]["TodayWidgetData"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_widget_config_api_apps_todo_widgets__widget_id__config_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                widget_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WidgetDataConfigUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WidgetDataConfigSchema"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_widget_options_api_apps_todo_widgets__widget_id__options_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                widget_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigFieldSchema"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

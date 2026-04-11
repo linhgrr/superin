@@ -4,8 +4,8 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import {
-  listCalendars,
-  listEvents,
+  getCalendars,
+  getEvents,
   createEvent,
   type CalendarRead,
   type CreateEventRequest,
@@ -49,8 +49,8 @@ export default function CalendarScreen() {
       const end = weekDates[6].toISOString();
 
       const [cals, evts] = await Promise.all([
-        listCalendars(),
-        listEvents({ start, end, calendar_id: selectedCalendar || undefined, limit: 200 }),
+        getCalendars(),
+        getEvents({ start, end, calendar_id: selectedCalendar || undefined, limit: 200 }),
       ]);
       setCalendars(cals);
       setEvents(evts);

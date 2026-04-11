@@ -16,7 +16,7 @@ import {
   deleteWallet as apiDeleteWallet,
   getCategories as apiGetCategories,
   getCategoryBreakdown as apiGetCategoryBreakdown,
-  getFinanceSummary as apiGetFinanceSummary,
+  getSummary as apiGetFinanceSummary,
   getMonthlyTrend as apiGetMonthlyTrend,
   getTransactions as apiGetTransactions,
   getWallets as apiGetWallets,

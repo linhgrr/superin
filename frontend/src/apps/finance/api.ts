@@ -5,6 +5,8 @@
 
 import { appRequest } from "@/api/apps";
 import type {
+  BudgetOverviewWidgetData,
+  ConfigFieldSchema,
   FinanceActionResponse,
   FinanceBudgetCategoryStatus,
   FinanceBudgetOverviewResponse,
@@ -23,6 +25,10 @@ import type {
   FinanceUpdateWalletRequest,
   FinanceWalletRead,
   PreferenceUpdate,
+  RecentTransactionsWidgetData,
+  TotalBalanceWidgetData,
+  WidgetDataConfigSchema,
+  WidgetDataConfigUpdate,
   WidgetManifestSchema,
   WidgetPreferenceSchema,
 } from "@/types/generated";
@@ -52,7 +58,9 @@ export type UpdatePreferencesResponse = WidgetPreferenceSchema[];
 export type GetTransactionsResponse = TransactionRead[];
 export type SearchTransactionsResponse = TransactionRead[];
 export type GetWalletsResponse = WalletRead[];
-export type ListWidgetsResponse = WidgetManifestSchema[];
+export type GetWidgetsResponse = WidgetManifestSchema[];
+export type GetWidgetDataResponse = TotalBalanceWidgetData | BudgetOverviewWidgetData | RecentTransactionsWidgetData;
+export type GetWidgetOptionsResponse = ConfigFieldSchema[];
 
 export interface GetCategoryBreakdownParams {
   month?: number | null;
@@ -140,7 +148,7 @@ export async function updatePreferences(request: PreferenceUpdate[]): Promise<Up
   return appRequest<UpdatePreferencesResponse>("finance", `/preferences`, { method: "PUT", body: request });
 }
 
-export async function getFinanceSummary(): Promise<SummaryResponse> {
+export async function getSummary(): Promise<SummaryResponse> {
   return appRequest<SummaryResponse>("finance", `/summary`);
 }
 
@@ -223,6 +231,18 @@ export async function updateWallet(wallet_id: string, request: UpdateWalletReque
   return appRequest<WalletRead>("finance", `/wallets/${encodeURIComponent(String(wallet_id))}`, { method: "PATCH", body: request });
 }
 
-export async function listWidgets(): Promise<ListWidgetsResponse> {
-  return appRequest<ListWidgetsResponse>("finance", `/widgets`);
+export async function getWidgets(): Promise<GetWidgetsResponse> {
+  return appRequest<GetWidgetsResponse>("finance", `/widgets`);
+}
+
+export async function getWidgetData(widget_id: string): Promise<GetWidgetDataResponse> {
+  return appRequest<GetWidgetDataResponse>("finance", `/widgets/${encodeURIComponent(String(widget_id))}`);
+}
+
+export async function updateWidgetConfig(widget_id: string, request: WidgetDataConfigUpdate): Promise<WidgetDataConfigSchema> {
+  return appRequest<WidgetDataConfigSchema>("finance", `/widgets/${encodeURIComponent(String(widget_id))}/config`, { method: "PUT", body: request });
+}
+
+export async function getWidgetOptions(widget_id: string): Promise<GetWidgetOptionsResponse> {
+  return appRequest<GetWidgetOptionsResponse>("finance", `/widgets/${encodeURIComponent(String(widget_id))}/options`);
 }

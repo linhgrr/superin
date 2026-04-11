@@ -11,7 +11,6 @@ export const AUTH_ROUTES = {
   ME: "/auth/me",
   ME_AVATAR: "/auth/me/avatar",
   SETTINGS: "/auth/me/settings",
-  PERMISSIONS: "/auth/permissions",
   REFRESH: "/auth/refresh",
   REGISTER: "/auth/register",
 } as const;
@@ -29,7 +28,6 @@ export const API_PATHS = {
   ME: "/api/auth/me",
   ME_AVATAR: "/api/auth/me/avatar",
   SETTINGS: "/api/auth/me/settings",
-  PERMISSIONS: "/api/auth/permissions",
   REFRESH: "/api/auth/refresh",
   REGISTER: "/api/auth/register",
   CATALOG_APPS: "/api/catalog",

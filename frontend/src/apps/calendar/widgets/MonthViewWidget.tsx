@@ -1,49 +1,26 @@
 import type { DashboardWidgetRendererProps } from "../types";
-import { useState } from "react";
-import { useCalendars, useEvents } from "../hooks/useCalendarSwr";
+import { useCallback, useState } from "react";
+import { getWidgetData, type MonthViewWidgetData } from "../api";
+import { useWidgetData } from "@/lib/widget-data";
 import { useTimezone } from "@/shared/hooks/useTimezone";
-import Widget from "./Widget";
 
-export default function MonthViewWidget({ widget: _widget }: DashboardWidgetRendererProps) {
-  const defaultCalendar = null;
-  const showTimeBlockedTasks = true;
-  const [currentDate, setCurrentDate] = useState(new Date());
+
+export default function MonthViewWidget({ widget }: DashboardWidgetRendererProps) {
+  const [monthOffset, setMonthOffset] = useState(0);
   const { getNow } = useTimezone();
 
-  const year = currentDate.getFullYear();
-  const month = currentDate.getMonth();
-  const start = new Date(year, month, 1).toISOString();
-  const end = new Date(year, month + 1, 0).toISOString();
+  const { data, isLoading } = useWidgetData<MonthViewWidgetData>(
+    "calendar",
+    widget.id,
+    () => getWidgetData(widget.id, { month_offset: monthOffset }) as Promise<MonthViewWidgetData>
+  );
 
-  const { data: rawEvents, isLoading: isEventsLoading } = useEvents(start, end, defaultCalendar ?? undefined, 100);
-  const { data: calendars = [] } = useCalendars();
-
-  const events = showTimeBlockedTasks
-    ? rawEvents ?? []
-    : (rawEvents ?? []).filter((e) => e.type !== "time_blocked_task");
-
-  // Get first day of month and total days
-  const firstDay = new Date(year, month, 1).getDay(); // 0 = Sunday
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-  // Adjust for Monday start (0 = Monday)
-  const startOffset = firstDay === 0 ? 6 : firstDay - 1;
-
-  const monthNames = [
-    "January", "February", "March", "April",
-    "May", "June", "July", "August",
-    "September", "October", "November", "December",
-  ];
-
-  const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-
-  // Group events by date
-  const eventsByDay = events.reduce((acc, event) => {
-    const day = new Date(event.start_datetime).getDate();
-    if (!acc[day]) acc[day] = [];
-    acc[day].push(event);
-    return acc;
-  }, {} as Record<number, EventRead[]>);
+  const navigateMonth = useCallback(
+    (delta: number) => {
+      setMonthOffset((prev) => prev + delta);
+    },
+    []
+  );
 
   // Get "today" in user's timezone for highlighting
   const [todayDateStr] = getNow();
@@ -51,154 +28,180 @@ export default function MonthViewWidget({ widget: _widget }: DashboardWidgetRend
   const today = todayDate.getDate();
   const todayMonth = todayDate.getMonth();
   const todayYear = todayDate.getFullYear();
+
+  const month = data?.month != null ? data.month - 1 : todayMonth; // API returns 1-indexed
+  const year = data?.year ?? todayYear;
+  const monthLabel = data?.month_label ?? "";
+  const startOffset = data?.start_offset ?? 0;
+  const daysInMonth = data?.days_in_month ?? 0;
+  const days = data?.days ?? [];
   const isCurrentMonth = todayMonth === month && todayYear === year;
 
+  const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+  // Build a lookup from day number to summary
+  const dayMap = new Map(days.map((d) => [d.day, d]));
+
+  const showLoading = isLoading || isNavigating;
+
   return (
-    <Widget isLoading={isEventsLoading}>
-      <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-        {/* Header */}
-        <div
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      {/* Header — always visible for navigation */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "1rem",
+        }}
+      >
+        <button
+          onClick={() => navigateMonth(-1)}
+          disabled={showLoading}
           style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: "1rem",
+            padding: "0.375rem 0.75rem",
+            background: "var(--color-surface)",
+            border: "1px solid var(--color-border)",
+            borderRadius: "6px",
+            cursor: showLoading ? "not-allowed" : "pointer",
+            fontSize: "0.875rem",
+            opacity: showLoading ? 0.5 : 1,
           }}
         >
-          <button
-            onClick={() => setCurrentDate(new Date(year, month - 1, 1))}
+          ←
+        </button>
+        <div style={{ fontWeight: 600, fontSize: "1rem" }}>
+          {monthLabel || "Loading…"}
+        </div>
+        <button
+          onClick={() => navigateMonth(1)}
+          disabled={showLoading}
+          style={{
+            padding: "0.375rem 0.75rem",
+            background: "var(--color-surface)",
+            border: "1px solid var(--color-border)",
+            borderRadius: "6px",
+            cursor: showLoading ? "not-allowed" : "pointer",
+            fontSize: "0.875rem",
+            opacity: showLoading ? 0.5 : 1,
+          }}
+        >
+          →
+        </button>
+      </div>
+
+      {showLoading && !data ? (
+        <div style={{ color: "var(--color-foreground-muted)", fontSize: "0.875rem", textAlign: "center", padding: "1rem" }}>
+          Loading…
+        </div>
+      ) : (
+        <>
+          {/* Day headers */}
+          <div
             style={{
-              padding: "0.375rem 0.75rem",
-              background: "var(--color-surface)",
-              border: "1px solid var(--color-border)",
-              borderRadius: "6px",
-              cursor: "pointer",
-              fontSize: "0.875rem",
+              display: "grid",
+              gridTemplateColumns: "repeat(7, 1fr)",
+              gap: "4px",
+              marginBottom: "0.5rem",
             }}
           >
-            ←
-          </button>
-          <div style={{ fontWeight: 600, fontSize: "1rem" }}>
-            {monthNames[month]} {year}
-          </div>
-          <button
-            onClick={() => setCurrentDate(new Date(year, month + 1, 1))}
-            style={{
-              padding: "0.375rem 0.75rem",
-              background: "var(--color-surface)",
-              border: "1px solid var(--color-border)",
-              borderRadius: "6px",
-              cursor: "pointer",
-              fontSize: "0.875rem",
-            }}
-          >
-            →
-          </button>
-        </div>
-
-        {/* Day headers */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(7, 1fr)",
-            gap: "4px",
-            marginBottom: "0.5rem",
-          }}
-        >
-          {dayNames.map((day) => (
-            <div
-              key={day}
-              style={{
-                textAlign: "center",
-                fontSize: "0.75rem",
-                fontWeight: 600,
-                color: "var(--color-foreground-muted)",
-                padding: "0.25rem",
-              }}
-            >
-              {day}
-            </div>
-          ))}
-        </div>
-
-        {/* Calendar grid */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(7, 1fr)",
-            gap: "4px",
-            flex: 1,
-          }}
-        >
-          {/* Empty cells before first day */}
-          {Array.from({ length: startOffset }).map((_, i) => (
-            <div key={`empty-${i}`} style={{ aspectRatio: "1" }} />
-          ))}
-
-          {/* Day cells */}
-          {Array.from({ length: daysInMonth }).map((_, i) => {
-            const day = i + 1;
-            const dayEvents = eventsByDay[day] || [];
-            const isToday = isCurrentMonth && day === today;
-
-            return (
+            {dayNames.map((day) => (
               <div
                 key={day}
                 style={{
-                  aspectRatio: "1",
+                  textAlign: "center",
+                  fontSize: "0.75rem",
+                  fontWeight: 600,
+                  color: "var(--color-foreground-muted)",
                   padding: "0.25rem",
-                  background: isToday ? "var(--color-primary-muted)" : "var(--color-surface)",
-                  borderRadius: "6px",
-                  border: isToday ? "1px solid var(--color-primary)" : "1px solid var(--color-border)",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "2px",
-                  cursor: "pointer",
-                  transition: "all 0.15s",
                 }}
               >
+                {day}
+              </div>
+            ))}
+          </div>
+
+          {/* Calendar grid */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(7, 1fr)",
+              gap: "4px",
+              flex: 1,
+              opacity: isLoading ? 0.5 : 1,
+              transition: "opacity 0.15s",
+            }}
+          >
+            {/* Empty cells before first day */}
+            {Array.from({ length: startOffset }).map((_, i) => (
+              <div key={`empty-${i}`} style={{ aspectRatio: "1" }} />
+            ))}
+
+            {/* Day cells */}
+            {Array.from({ length: daysInMonth }).map((_, i) => {
+              const day = i + 1;
+              const daySummary = dayMap.get(day);
+              const eventCount = daySummary?.event_count ?? 0;
+              const eventTitles = daySummary?.event_titles ?? [];
+              const isDayToday = isCurrentMonth && day === today;
+
+              return (
                 <div
+                  key={day}
                   style={{
-                    fontSize: "0.75rem",
-                    fontWeight: isToday ? 600 : 400,
-                    color: isToday ? "var(--color-primary)" : "var(--color-foreground)",
-                    textAlign: "right",
+                    aspectRatio: "1",
+                    padding: "0.25rem",
+                    background: isDayToday ? "var(--color-primary-muted)" : "var(--color-surface)",
+                    borderRadius: "6px",
+                    border: isDayToday ? "1px solid var(--color-primary)" : "1px solid var(--color-border)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "2px",
+                    cursor: "pointer",
+                    transition: "all 0.15s",
                   }}
                 >
-                  {day}
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: "1px", flex: 1 }}>
-                  {dayEvents.slice(0, 3).map((event) => {
-                    const calendar = calendars.find((c) => c.id === event.calendar_id);
-                    return (
+                  <div
+                    style={{
+                      fontSize: "0.75rem",
+                      fontWeight: isDayToday ? 600 : 400,
+                      color: isDayToday ? "var(--color-primary)" : "var(--color-foreground)",
+                      textAlign: "right",
+                    }}
+                  >
+                    {day}
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "1px", flex: 1 }}>
+                    {eventTitles.slice(0, 3).map((title, idx) => (
                       <div
-                        key={event.id}
+                        key={idx}
                         style={{
                           height: "4px",
-                          background: calendar?.color || "var(--color-primary)",
+                          background: "var(--color-primary)",
                           borderRadius: "2px",
                         }}
-                        title={event.title}
+                        title={title}
                       />
-                    );
-                  })}
-                  {dayEvents.length > 3 && (
-                    <div
-                      style={{
-                        fontSize: "0.625rem",
-                        color: "var(--color-foreground-muted)",
-                        textAlign: "center",
-                      }}
-                    >
-                      +{dayEvents.length - 3}
-                    </div>
-                  )}
+                    ))}
+                    {eventCount > 3 && (
+                      <div
+                        style={{
+                          fontSize: "0.625rem",
+                          color: "var(--color-foreground-muted)",
+                          textAlign: "center",
+                        }}
+                      >
+                        +{eventCount - 3}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </Widget>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
   );
 }
+

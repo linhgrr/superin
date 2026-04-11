@@ -5,7 +5,10 @@
 
 import { appRequest } from "@/api/apps";
 import type {
+  ConfigFieldSchema,
   PreferenceUpdate,
+  TaskListWidgetData,
+  TodayWidgetData,
   TodoActionResponse,
   TodoCreateRecurringRuleRequest,
   TodoCreateSubTaskRequest,
@@ -16,6 +19,8 @@ import type {
   TodoTaskDetailRead,
   TodoTaskRead,
   TodoUpdateTaskRequest,
+  WidgetDataConfigSchema,
+  WidgetDataConfigUpdate,
   WidgetManifestSchema,
   WidgetPreferenceSchema,
 } from "@/types/generated";
@@ -37,10 +42,12 @@ export type GetPreferencesResponse = WidgetPreferenceSchema[];
 export type UpdatePreferencesResponse = WidgetPreferenceSchema[];
 export type GetRecurringRulesResponse = RecurringRuleRead[];
 export type GetTasksResponse = TaskRead[];
-export type GetArchivedTasksResponse = TaskRead[];
+export type GetArchivedResponse = TaskRead[];
 export type SearchTasksResponse = TaskRead[];
 export type GetSubtasksResponse = SubTaskRead[];
-export type ListWidgetsResponse = WidgetManifestSchema[];
+export type GetWidgetsResponse = WidgetManifestSchema[];
+export type GetWidgetDataResponse = TaskListWidgetData | TodayWidgetData;
+export type GetWidgetOptionsResponse = ConfigFieldSchema[];
 
 export interface GetTasksParams {
   status?: "pending" | "completed" | null;
@@ -49,7 +56,7 @@ export interface GetTasksParams {
   limit?: number;
 }
 
-export interface GetArchivedTasksParams {
+export interface GetArchivedParams {
   limit?: number;
 }
 
@@ -87,7 +94,7 @@ export async function uncompleteSubtask(subtask_id: string): Promise<SubTaskRead
   return appRequest<SubTaskRead>("todo", `/subtasks/${encodeURIComponent(String(subtask_id))}/uncomplete`, { method: "PATCH" });
 }
 
-export async function getTodoSummary(): Promise<SummaryResponse> {
+export async function getSummary(): Promise<SummaryResponse> {
   return appRequest<SummaryResponse>("todo", `/summary`);
 }
 
@@ -113,13 +120,13 @@ export async function createTask(request: CreateTaskRequest): Promise<TaskRead> 
   return appRequest<TaskRead>("todo", `/tasks`, { method: "POST", body: request });
 }
 
-export async function getArchivedTasks(params: GetArchivedTasksParams = {}): Promise<GetArchivedTasksResponse> {
+export async function getArchived(params: GetArchivedParams = {}): Promise<GetArchivedResponse> {
   const query = new URLSearchParams();
   if (params.limit !== undefined && params.limit !== null) {
     query.set("limit", String(params.limit));
   }
   const suffix = query.toString();
-  return appRequest<GetArchivedTasksResponse>("todo", `/tasks/archived/list${suffix ? `?${suffix}` : ""}`);
+  return appRequest<GetArchivedResponse>("todo", `/tasks/archived/list${suffix ? `?${suffix}` : ""}`);
 }
 
 export async function searchTasks(params: SearchTasksParams): Promise<SearchTasksResponse> {
@@ -173,7 +180,7 @@ export async function removeTag(task_id: string, tag: string): Promise<TaskRead>
   return appRequest<TaskRead>("todo", `/tasks/${encodeURIComponent(String(task_id))}/tags/${encodeURIComponent(String(tag))}`, { method: "DELETE" });
 }
 
-export async function addTag(task_id: string, tag: string): Promise<TaskRead> {
+export async function createTag(task_id: string, tag: string): Promise<TaskRead> {
   return appRequest<TaskRead>("todo", `/tasks/${encodeURIComponent(String(task_id))}/tags/${encodeURIComponent(String(tag))}`, { method: "POST" });
 }
 
@@ -181,6 +188,18 @@ export async function toggleTask(task_id: string): Promise<TaskRead> {
   return appRequest<TaskRead>("todo", `/tasks/${encodeURIComponent(String(task_id))}/toggle`, { method: "PATCH" });
 }
 
-export async function listWidgets(): Promise<ListWidgetsResponse> {
-  return appRequest<ListWidgetsResponse>("todo", `/widgets`);
+export async function getWidgets(): Promise<GetWidgetsResponse> {
+  return appRequest<GetWidgetsResponse>("todo", `/widgets`);
+}
+
+export async function getWidgetData(widget_id: string): Promise<GetWidgetDataResponse> {
+  return appRequest<GetWidgetDataResponse>("todo", `/widgets/${encodeURIComponent(String(widget_id))}`);
+}
+
+export async function updateWidgetConfig(widget_id: string, request: WidgetDataConfigUpdate): Promise<WidgetDataConfigSchema> {
+  return appRequest<WidgetDataConfigSchema>("todo", `/widgets/${encodeURIComponent(String(widget_id))}/config`, { method: "PUT", body: request });
+}
+
+export async function getWidgetOptions(widget_id: string): Promise<GetWidgetOptionsResponse> {
+  return appRequest<GetWidgetOptionsResponse>("todo", `/widgets/${encodeURIComponent(String(widget_id))}/options`);
 }

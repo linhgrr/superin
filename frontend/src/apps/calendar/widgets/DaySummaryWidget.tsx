@@ -1,43 +1,16 @@
 import type { DashboardWidgetRendererProps } from "../types";
-import { useState, useEffect } from "react";
-import { listEvents, type EventRead } from "../api";
+import { getWidgetData, type DaySummaryWidgetData } from "../api";
 import { DynamicIcon } from "@/lib/icon-resolver";
+import { useWidgetData } from "@/lib/widget-data";
 import { useTimezone } from "@/shared/hooks/useTimezone";
-import { getTodayRange } from "@/shared/utils/timezone";
 
-export default function DaySummaryWidget({ widget: _widget }: DashboardWidgetRendererProps) {
-  const [todayCount, setTodayCount] = useState(0);
-  const [nextEvent, setNextEvent] = useState<EventRead | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+export default function DaySummaryWidget({ widget }: DashboardWidgetRendererProps) {
+  const { data, isLoading } = useWidgetData<DaySummaryWidgetData>(
+    "calendar",
+    widget.id,
+    () => getWidgetData(widget.id) as Promise<DaySummaryWidgetData>
+  );
   const { formatTime } = useTimezone();
-
-  useEffect(() => {
-    loadEvents();
-  }, []);
-
-  async function loadEvents() {
-    try {
-      setIsLoading(true);
-
-      // Use timezone-aware today range
-      const { start: todayStart, end: todayEnd } = getTodayRange();
-      const now = new Date();
-
-      const tomorrowEnd = new Date(todayEnd);
-      tomorrowEnd.setDate(tomorrowEnd.getDate() + 1);
-
-      // Fetch in parallel
-      const [todayEvents, upcoming] = await Promise.all([
-        listEvents({ start: todayStart, end: todayEnd, limit: 100 }),
-        listEvents({ start: now.toISOString(), end: tomorrowEnd.toISOString(), limit: 1 }),
-      ]);
-
-      setTodayCount(todayEvents.length);
-      setNextEvent(upcoming[0] || null);
-    } finally {
-      setIsLoading(false);
-    }
-  }
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", justifyContent: "center" }}>
@@ -67,13 +40,13 @@ export default function DaySummaryWidget({ widget: _widget }: DashboardWidgetRen
                 Today
               </div>
               <div style={{ fontSize: "1.125rem", fontWeight: 600, color: "var(--color-foreground)" }}>
-                {todayCount} events
+                {data?.today_count ?? 0} events
               </div>
             </div>
           </div>
 
           {/* Next event */}
-          {nextEvent ? (
+          {data?.next_event ? (
             <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flex: 1, minWidth: 0 }}>
               <div
                 style={{
@@ -92,7 +65,7 @@ export default function DaySummaryWidget({ widget: _widget }: DashboardWidgetRen
               </div>
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: "0.625rem", color: "var(--color-foreground-muted)", textTransform: "uppercase" }}>
-                  Next · {formatTime(nextEvent.start_datetime)}
+                  Next · {formatTime(data.next_event.start_datetime)}
                 </div>
                 <div
                   style={{
@@ -104,7 +77,7 @@ export default function DaySummaryWidget({ widget: _widget }: DashboardWidgetRen
                     whiteSpace: "nowrap",
                   }}
                 >
-                  {nextEvent.title}
+                  {data.next_event.title}
                 </div>
               </div>
             </div>

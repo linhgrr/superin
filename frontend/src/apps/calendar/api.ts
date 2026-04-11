@@ -15,7 +15,13 @@ import type {
   CalendarScheduleTaskRequest,
   CalendarUpdateCalendarRequest,
   CalendarUpdateEventRequest,
+  ConfigFieldSchema,
+  DaySummaryWidgetData,
+  MonthViewWidgetData,
   PreferenceUpdate,
+  UpcomingWidgetData,
+  WidgetDataConfigSchema,
+  WidgetDataConfigUpdate,
   WidgetManifestSchema,
   WidgetPreferenceSchema,
 } from "@/types/generated";
@@ -31,14 +37,18 @@ export type ScheduleTaskRequest = CalendarScheduleTaskRequest;
 export type UpdateCalendarRequest = CalendarUpdateCalendarRequest;
 export type UpdateEventRequest = CalendarUpdateEventRequest;
 
-export type ListCalendarsResponse = CalendarRead[];
+export type RecurringFrequency = RecurringRuleRead["frequency"];
+
+export type GetCalendarsResponse = CalendarRead[];
 export type CheckConflictsResponse = EventRead[];
-export type ListEventsResponse = EventRead[];
+export type GetEventsResponse = EventRead[];
 export type SearchEventsResponse = EventRead[];
 export type GetPreferencesResponse = WidgetPreferenceSchema[];
 export type UpdatePreferencesResponse = WidgetPreferenceSchema[];
-export type ListRecurringRulesResponse = RecurringRuleRead[];
-export type ListWidgetsResponse = WidgetManifestSchema[];
+export type GetRecurringRulesResponse = RecurringRuleRead[];
+export type GetWidgetsResponse = WidgetManifestSchema[];
+export type GetWidgetDataResponse = MonthViewWidgetData | UpcomingWidgetData | DaySummaryWidgetData;
+export type GetWidgetOptionsResponse = ConfigFieldSchema[];
 
 export interface CheckConflictsParams {
   start: string;
@@ -46,7 +56,7 @@ export interface CheckConflictsParams {
   exclude_event_id?: string | null;
 }
 
-export interface ListEventsParams {
+export interface GetEventsParams {
   start?: string | null;
   end?: string | null;
   calendar_id?: string | null;
@@ -58,8 +68,12 @@ export interface SearchEventsParams {
   limit?: number;
 }
 
-export async function listCalendars(): Promise<ListCalendarsResponse> {
-  return appRequest<ListCalendarsResponse>("calendar", `/calendars`);
+export interface GetWidgetDataParams {
+  month_offset?: number;
+}
+
+export async function getCalendars(): Promise<GetCalendarsResponse> {
+  return appRequest<GetCalendarsResponse>("calendar", `/calendars`);
 }
 
 export async function createCalendar(request: CreateCalendarRequest): Promise<CalendarRead> {
@@ -89,7 +103,7 @@ export async function checkConflicts(params: CheckConflictsParams): Promise<Chec
   return appRequest<CheckConflictsResponse>("calendar", `/conflicts/check${suffix ? `?${suffix}` : ""}`);
 }
 
-export async function listEvents(params: ListEventsParams = {}): Promise<ListEventsResponse> {
+export async function getEvents(params: GetEventsParams = {}): Promise<GetEventsResponse> {
   const query = new URLSearchParams();
   if (params.start !== undefined && params.start !== null) {
     query.set("start", String(params.start));
@@ -104,7 +118,7 @@ export async function listEvents(params: ListEventsParams = {}): Promise<ListEve
     query.set("limit", String(params.limit));
   }
   const suffix = query.toString();
-  return appRequest<ListEventsResponse>("calendar", `/events${suffix ? `?${suffix}` : ""}`);
+  return appRequest<GetEventsResponse>("calendar", `/events${suffix ? `?${suffix}` : ""}`);
 }
 
 export async function createEvent(request: CreateEventRequest): Promise<EventRead> {
@@ -147,8 +161,8 @@ export async function updatePreferences(request: PreferenceUpdate[]): Promise<Up
   return appRequest<UpdatePreferencesResponse>("calendar", `/preferences`, { method: "PUT", body: request });
 }
 
-export async function listRecurringRules(): Promise<ListRecurringRulesResponse> {
-  return appRequest<ListRecurringRulesResponse>("calendar", `/recurring`);
+export async function getRecurringRules(): Promise<GetRecurringRulesResponse> {
+  return appRequest<GetRecurringRulesResponse>("calendar", `/recurring`);
 }
 
 export async function stopRecurringRule(rule_id: string): Promise<RecurringRuleRead> {
@@ -159,6 +173,23 @@ export async function scheduleTask(task_id: string, request: ScheduleTaskRequest
   return appRequest<EventRead>("calendar", `/tasks/${encodeURIComponent(String(task_id))}/schedule`, { method: "POST", body: request });
 }
 
-export async function listWidgets(): Promise<ListWidgetsResponse> {
-  return appRequest<ListWidgetsResponse>("calendar", `/widgets`);
+export async function getWidgets(): Promise<GetWidgetsResponse> {
+  return appRequest<GetWidgetsResponse>("calendar", `/widgets`);
+}
+
+export async function getWidgetData(widget_id: string, params: GetWidgetDataParams = {}): Promise<GetWidgetDataResponse> {
+  const query = new URLSearchParams();
+  if (params.month_offset !== undefined && params.month_offset !== null) {
+    query.set("month_offset", String(params.month_offset));
+  }
+  const suffix = query.toString();
+  return appRequest<GetWidgetDataResponse>("calendar", `/widgets/${encodeURIComponent(String(widget_id))}${suffix ? `?${suffix}` : ""}`);
+}
+
+export async function updateWidgetConfig(widget_id: string, request: WidgetDataConfigUpdate): Promise<WidgetDataConfigSchema> {
+  return appRequest<WidgetDataConfigSchema>("calendar", `/widgets/${encodeURIComponent(String(widget_id))}/config`, { method: "PUT", body: request });
+}
+
+export async function getWidgetOptions(widget_id: string): Promise<GetWidgetOptionsResponse> {
+  return appRequest<GetWidgetOptionsResponse>("calendar", `/widgets/${encodeURIComponent(String(widget_id))}/options`);
 }

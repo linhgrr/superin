@@ -201,8 +201,8 @@ export function useWidgetPreferences({
         const defaultConfig = getSizeConfig(resolved.widget.size);
         const nextSizeW = item.w !== defaultConfig.width ? item.w : null;
         const nextSizeH = item.h !== defaultConfig.rglH ? item.h : null;
-        const prevGridX = existing?.config?.gridX as number | undefined;
-        const prevGridY = existing?.config?.gridY as number | undefined;
+        const prevGridX = existing?.grid_x;
+        const prevGridY = existing?.grid_y;
 
         if (
           prevGridX === item.x &&
@@ -215,7 +215,8 @@ export function useWidgetPreferences({
 
         updates.push({
           widget_id: item.i,
-          config: { ...(existing?.config ?? {}), gridX: item.x, gridY: item.y },
+          grid_x: item.x,
+          grid_y: item.y,
           size_w: nextSizeW,
           size_h: nextSizeH,
         });
@@ -279,7 +280,7 @@ export function useWidgetPreferences({
   const handleWidgetVisibilityChange = useCallback(
     async (widgetId: string, enabled: boolean) => {
       setBusyWidgetId(widgetId);
-      const existing = prefs.get(widgetId);
+
       const nextPlacement = enabled
         ? getNextWidgetPlacement(currentLayoutRef.current)
         : null;
@@ -287,9 +288,7 @@ export function useWidgetPreferences({
         {
           widget_id: widgetId,
           enabled,
-          ...(nextPlacement
-            ? { config: { ...(existing?.config ?? {}), gridX: nextPlacement.x, gridY: nextPlacement.y } }
-            : {}),
+          ...(nextPlacement ? { grid_x: nextPlacement.x, grid_y: nextPlacement.y } : {}),
         },
       ];
       applyUpdatesLocally(updates);
@@ -307,7 +306,7 @@ export function useWidgetPreferences({
         setBusyWidgetId(null);
       }
     },
-    [applyUpdatesLocally, getNextWidgetPlacement, onCommit, persistUpdates, prefs]
+    [applyUpdatesLocally, getNextWidgetPlacement, onCommit, persistUpdates]
   );
 
   const handleAutoRearrange = useCallback(
@@ -317,11 +316,8 @@ export function useWidgetPreferences({
       currentLayoutRef.current = newLayout;
       const updates: PreferenceUpdate[] = newLayout.map((item) => ({
         widget_id: item.i,
-        config: {
-          ...(prefs.get(item.i)?.config ?? {}),
-          gridX: item.x,
-          gridY: item.y,
-        },
+        grid_x: item.x,
+        grid_y: item.y,
       }));
       applyUpdatesLocally(updates);
       try {

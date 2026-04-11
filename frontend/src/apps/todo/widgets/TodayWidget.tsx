@@ -1,9 +1,14 @@
 import type { DashboardWidgetRendererProps } from "../types";
-import { useTodoSummary } from "./useTodoSummary";
+import { getWidgetData, type TodayWidgetData } from "../api";
 import { DynamicIcon } from "@/lib/icon-resolver";
+import { useWidgetData } from "@/lib/widget-data";
 
-export default function TodayWidget({ widget: _widget }: DashboardWidgetRendererProps) {
-  const { data: summary, isLoading } = useTodoSummary();
+export default function TodayWidget({ widget }: DashboardWidgetRendererProps) {
+  const { data, isLoading } = useWidgetData<TodayWidgetData>(
+    "todo",
+    widget.id,
+    () => getWidgetData(widget.id) as Promise<TodayWidgetData>
+  );
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", justifyContent: "center" }}>
@@ -29,9 +34,9 @@ export default function TodayWidget({ widget: _widget }: DashboardWidgetRenderer
           <div>
             <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem" }}>
               <span className="stat-value" style={{ color: "var(--color-foreground)", fontSize: "1.75rem" }}>
-                {summary?.due_today ?? 0}
+                {data?.due_today ?? 0}
               </span>
-              {!isLoading && summary && summary.overdue > 0 && (
+              {!isLoading && data && data.overdue > 0 && (
                 <span
                   style={{
                     display: "inline-flex",
@@ -42,12 +47,12 @@ export default function TodayWidget({ widget: _widget }: DashboardWidgetRenderer
                   }}
                 >
                   <DynamicIcon name="AlertCircle" size={12} />
-                  {summary.overdue} overdue
+                  {data.overdue} overdue
                 </span>
               )}
             </div>
             <div style={{ fontSize: "0.75rem", color: "var(--color-foreground-muted)", marginTop: "0.125rem" }}>
-              Tasks due today
+              {data?.next_due_task?.title ?? "Tasks due today"}
             </div>
           </div>
         </div>
