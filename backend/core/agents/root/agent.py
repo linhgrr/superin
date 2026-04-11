@@ -33,6 +33,7 @@ from .prompts import build_available_apps_context, build_system_prompt
 from .tools import (
     _build_ask_tool,
     _build_install_app_tool,
+    _build_memory_tools,
     _build_platform_info_tool,
     _build_uninstall_app_tool,
 )
@@ -86,6 +87,7 @@ def _extract_args(args_str: Any) -> dict:
 @dataclass
 class ParsedMessage:
     """Result of parsing a frontend message into LangChain format."""
+
     langchain_message: BaseMessage | None = None
     user_content: str = ""
     warnings: list[str] = field(default_factory=list)
@@ -112,9 +114,7 @@ class MessageParser:
         else:
             return ParsedMessage()
 
-    async def _parse_user_message(
-        self, content: Any, msg_id: str | None
-    ) -> ParsedMessage:
+    async def _parse_user_message(self, content: Any, msg_id: str | None) -> ParsedMessage:
         """Parse user message with sanitization."""
         if isinstance(content, list):
             text_parts = []
@@ -138,9 +138,15 @@ class MessageParser:
         self, content: Any, msg_id: str | None, tool_calls: list[dict]
     ) -> ParsedMessage:
         """Parse assistant message with tool calls."""
-        content_str = " ".join(
-            p.get("text", "") for p in content if isinstance(p, dict) and p.get("type") == "text"
-        ) if isinstance(content, list) else str(content)
+        content_str = (
+            " ".join(
+                p.get("text", "")
+                for p in content
+                if isinstance(p, dict) and p.get("type") == "text"
+            )
+            if isinstance(content, list)
+            else str(content)
+        )
 
         # Parse tool calls from message parts or explicit tool_calls field
         lc_tool_calls = self._extract_tool_calls(tool_calls)
@@ -150,12 +156,14 @@ class MessageParser:
             for p in content:
                 if isinstance(p, dict) and p.get("type") in ("tool-call", "tool_call"):
                     raw_args = p.get("args") or p.get("arguments") or p.get("input") or {}
-                    lc_tool_calls.append({
-                        "name": p.get("toolName") or p.get("name"),
-                        "args": raw_args,
-                        "id": p.get("toolCallId") or p.get("id"),
-                        "type": ChatEventType.TOOL_CALL,
-                    })
+                    lc_tool_calls.append(
+                        {
+                            "name": p.get("toolName") or p.get("name"),
+                            "args": raw_args,
+                            "id": p.get("toolCallId") or p.get("id"),
+                            "type": ChatEventType.TOOL_CALL,
+                        }
+                    )
 
         return ParsedMessage(
             langchain_message=AIMessage(
@@ -173,12 +181,14 @@ class MessageParser:
             args_str = fn.get("arguments") or tc.get("args") or tc.get("input") or {}
             args = _extract_args(args_str)
 
-            lc_tool_calls.append({
-                "name": fn.get("name") or tc.get("toolName") or tc.get("name"),
-                "args": args,
-                "id": tc.get("id") or tc.get("toolCallId"),
-                "type": ChatEventType.TOOL_CALL,
-            })
+            lc_tool_calls.append(
+                {
+                    "name": fn.get("name") or tc.get("toolName") or tc.get("name"),
+                    "args": args,
+                    "id": tc.get("id") or tc.get("toolCallId"),
+                    "type": ChatEventType.TOOL_CALL,
+                }
+            )
         return lc_tool_calls
 
     def _parse_tool_message(self, content: Any, msg_id: str | None) -> ParsedMessage:
@@ -209,13 +219,16 @@ class MessageParser:
                 content=content_str,
                 tool_call_id=content.get("tool_call_id", "") if isinstance(content, dict) else "",
                 id=msg_id,
-            ) if content_str else None
+            )
+            if content_str
+            else None
         )
 
 
 @dataclass
 class StreamEvent:
     """Stream event for frontend consumption."""
+
     type: str
     content: str | None = None
     tool_name: str | None = None
@@ -358,6 +371,7 @@ class RootAgent:
             _build_platform_info_tool(),
             _build_install_app_tool(),
             _build_uninstall_app_tool(),
+            *_build_memory_tools(),
         ]
 
     async def _get_user_tools(self, user_id: str) -> list[BaseTool]:
@@ -374,10 +388,7 @@ class RootAgent:
             )
             return self._base_tools or self._build_base_tools()
 
-        tools = [
-            t for app_id, t in self._all_ask_tools.items()
-            if app_id in installed_app_ids
-        ]
+        tools = [t for app_id, t in self._all_ask_tools.items() if app_id in installed_app_ids]
         tools.extend(self._base_tools or self._build_base_tools())
         return tools
 
@@ -403,8 +414,6 @@ class RootAgent:
             self._graphs.popitem(last=False)
 
         return graph
-
-
 
     async def astream(
         self,
@@ -435,9 +444,7 @@ class RootAgent:
         event_handler = EventStreamHandler(tools)
 
         try:
-            langchain_messages = await self._build_message_list(
-                user_id, messages, thread
-            )
+            langchain_messages = await self._build_message_list(user_id, messages, thread)
 
             # Run graph and yield stream events
             async for event_dict in self._run_graph_stream(
@@ -463,7 +470,9 @@ class RootAgent:
         current_date, current_time = get_user_local_time(user) if user else ("", "")
         if current_date:
             langchain_messages.append(
-                SystemMessage(content=f"Current date: {current_date}, current time: {current_time}.")
+                SystemMessage(
+                    content=f"Current date: {current_date}, current time: {current_time}."
+                )
             )
         try:
             installed_app_ids = set(await list_installed_app_ids(user_id))

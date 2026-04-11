@@ -165,7 +165,123 @@ def _build_platform_info_tool() -> BaseTool:
             return str(result.get("data", ""))
 
         error = result.get("error", {})
-        message = error.get("message") if isinstance(error, dict) else "Unexpected platform info error."
+        message = (
+            error.get("message") if isinstance(error, dict) else "Unexpected platform info error."
+        )
         return str(message)
 
     return get_platform_info
+
+
+def _build_memory_tools() -> list[BaseTool]:
+    """Build tools for long-term user memory backed by MongoDBStore.
+
+    The store uses namespaces (user_id, "memories", category) to organize
+    facts per user.  Content is sanitized before storage (ASI06 defense).
+    """
+
+    @tool(
+        "save_memory",
+        description=(
+            "Save an important fact or preference about the user for future conversations. "
+            "Use this proactively when the user shares personal preferences, important dates, "
+            "habits, goals, or any information worth remembering long-term. "
+            "Provide a clear, concise content string and a category to organize it "
+            "(e.g. 'preferences', 'personal', 'work', 'goals')."
+        ),
+    )
+    async def save_memory(content: str, category: str = "general") -> dict[str, Any]:
+        from datetime import UTC, datetime
+        from uuid import uuid4
+
+        from core.db import get_store
+        from core.utils.sanitizer import sanitize_for_memory
+
+        async def operation() -> dict[str, Any]:
+            user_id = get_user_context()
+            if not user_id:
+                raise ValueError("Missing user context for save_memory")
+
+            store = get_store()
+            namespace = (user_id, "memories", category)
+            key = f"mem_{uuid4().hex[:8]}"
+            sanitized = sanitize_for_memory(content)
+            await store.aput(
+                namespace,
+                key,
+                {
+                    "content": sanitized,
+                    "category": category,
+                    "saved_at": datetime.now(UTC).isoformat(),
+                },
+            )
+            return {
+                "ok": True,
+                "message": f"Memory saved in category '{category}'.",
+                "key": key,
+            }
+
+        result = await safe_tool_call(operation, action="saving a memory")
+        return _unwrap_safe_tool_result(result)
+
+    @tool(
+        "recall_memories",
+        description=(
+            "Recall previously saved information about the user. "
+            "Use this to check for relevant context before answering questions "
+            "about user preferences, history, or previously discussed topics. "
+            "Optionally filter by category (e.g. 'preferences', 'personal', 'work'). "
+            "Omit category to recall all saved memories."
+        ),
+    )
+    async def recall_memories(category: str | None = None) -> dict[str, Any]:
+        from core.db import get_store
+
+        async def operation() -> dict[str, Any]:
+            user_id = get_user_context()
+            if not user_id:
+                raise ValueError("Missing user context for recall_memories")
+
+            store = get_store()
+            if category:
+                namespace: tuple[str, ...] = (user_id, "memories", category)
+            else:
+                namespace = (user_id, "memories")
+            items = await store.asearch(namespace, limit=20)
+            memories = [item.value for item in items]
+            return {
+                "ok": True,
+                "memories": memories,
+                "count": len(memories),
+            }
+
+        result = await safe_tool_call(operation, action="recalling memories")
+        return _unwrap_safe_tool_result(result)
+
+    @tool(
+        "delete_memory",
+        description=(
+            "Delete a specific saved memory by its key and category. "
+            "Use when the user asks to forget something or correct previously saved information."
+        ),
+    )
+    async def delete_memory(key: str, category: str = "general") -> dict[str, Any]:
+        from core.db import get_store
+
+        async def operation() -> dict[str, Any]:
+            user_id = get_user_context()
+            if not user_id:
+                raise ValueError("Missing user context for delete_memory")
+
+            store = get_store()
+            namespace = (user_id, "memories", category)
+            await store.adelete(namespace, key)
+            return {
+                "ok": True,
+                "message": f"Memory '{key}' deleted from category '{category}'.",
+            }
+
+        result = await safe_tool_call(operation, action="deleting a memory")
+        return _unwrap_safe_tool_result(result)
+
+    return [save_memory, recall_memories, delete_memory]

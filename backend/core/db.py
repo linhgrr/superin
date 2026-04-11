@@ -3,13 +3,15 @@
 from langgraph.checkpoint.mongodb.aio import AsyncMongoDBSaver
 from langgraph.store.mongodb import MongoDBStore
 from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import MongoClient
 
 from core.config import settings
 from core.utils.index_contract import validate_index_contract
 
-# ─── Global client (set during lifespan) ──────────────────────────────────────
+# ─── Global clients (set during lifespan) ─────────────────────────────────────
 
 _client: AsyncIOMotorClient | None = None
+_sync_client: MongoClient | None = None  # Required by MongoDBStore (sync pymongo)
 _checkpointer: AsyncMongoDBSaver | None = None
 _store: MongoDBStore | None = None
 
@@ -20,14 +22,15 @@ async def init_db() -> None:
     Call once at server startup (inside lifespan).
     Plugin models are appended via get_plugin_models() after discovery.
     """
-    global _client, _checkpointer, _store
+    global _client, _sync_client, _checkpointer, _store
     _client = AsyncIOMotorClient(settings.mongodb_uri)
 
-    # Initialize LangGraph checkpointer and store
-    from pymongo import MongoClient
-    # Note: MongoDBStore currently requires a sync MongoClient under the hood for some operations,
-    # but provides async methods (aget, aput). The AsyncMongoDBSaver takes an AsyncIOMotorClient.
+    # Initialize LangGraph checkpointer (async) and eagerly create indexes
     _checkpointer = AsyncMongoDBSaver(_client, db_name=settings.mongodb_database)
+    await _checkpointer._setup()  # ensure checkpoint indexes exist at startup
+
+    # Initialize LangGraph store (long-term memory)
+    # MongoDBStore requires a sync MongoClient; async ops run via thread pool.
     _sync_client = MongoClient(settings.mongodb_uri)
     store_collection = _sync_client[settings.mongodb_database]["agent_store"]
     _store = MongoDBStore(store_collection)
@@ -66,11 +69,14 @@ async def init_db() -> None:
 
 
 async def close_db() -> None:
-    """Close the MongoDB client. Call once at server shutdown."""
-    global _client, _checkpointer, _store
+    """Close all MongoDB clients. Call once at server shutdown."""
+    global _client, _sync_client, _checkpointer, _store
     if _client is not None:
         _client.close()
         _client = None
+    if _sync_client is not None:
+        _sync_client.close()
+        _sync_client = None
     _checkpointer = None
     _store = None
 

@@ -37,7 +37,9 @@ def build_system_prompt() -> str:
     if not PLUGIN_REGISTRY:
         return (
             "You are Rin-chan, a helpful AI assistant in the Superin platform. "
-            "Respond directly to the user."
+            "Respond directly to the user. "
+            "You have a long-term memory system — use save_memory to remember important facts "
+            "the user shares, and recall_memories to check for context before answering personalized questions."
         )
 
     return """<identity>
@@ -67,4 +69,14 @@ Before executing destructive operations (delete wallet, delete task, transfer mo
 - Wait for confirmation before proceeding
 - If user cancels, acknowledge and stop
 </destructive_operations>
+
+<memory>
+You have a long-term memory system that persists across conversations.
+- Use save_memory to store important facts the user shares (preferences, dates, habits, goals, personal info).
+- Use recall_memories before answering personalized questions to check for relevant saved context.
+- Be proactive: when the user tells you something memorable, save it without being asked.
+- Do NOT save trivial or temporary details (e.g. "what time is it", "hello").
+- Use meaningful categories: 'preferences', 'personal', 'work', 'goals', 'habits', etc.
+- Use delete_memory when the user asks to forget or correct something.
+</memory>
 </instructions>"""

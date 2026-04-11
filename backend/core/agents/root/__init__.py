@@ -14,12 +14,19 @@ Hierarchy:
 
 Message persistence:
   - LangGraph's `MongoDBSaver` checkpointer handles short-term conversation thread state.
-  - LangGraph's `MongoDBStore` handles long-term persistent knowledge.
+  - LangGraph's `MongoDBStore` handles long-term persistent knowledge via memory tools
+    (save_memory, recall_memories, delete_memory).
   - Each child AppAgent is a stateless LangGraph specialist invoked by the root agent.
 """
 
 from .agent import RootAgent, root_agent
 from .prompts import build_system_prompt
-from .tools import _build_ask_tool
+from .tools import _build_ask_tool, _build_memory_tools
 
-__all__ = ["RootAgent", "root_agent", "build_system_prompt", "_build_ask_tool"]
+__all__ = [
+    "RootAgent",
+    "root_agent",
+    "build_system_prompt",
+    "_build_ask_tool",
+    "_build_memory_tools",
+]
