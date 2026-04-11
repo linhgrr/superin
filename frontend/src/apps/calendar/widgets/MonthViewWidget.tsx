@@ -42,7 +42,7 @@ export default function MonthViewWidget({ widget }: DashboardWidgetRendererProps
   // Build a lookup from day number to summary
   const dayMap = new Map(days.map((d) => [d.day, d]));
 
-  const showLoading = isLoading || isNavigating;
+  const showLoading = isLoading;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>

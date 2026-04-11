@@ -86,7 +86,7 @@ async def get_today_widget_data(
         raise HTTPException(status_code=404, detail="User not found")
 
     summary = await task_service.get_summary(user)
-    tasks = await task_service.list_tasks(user_id, TaskStatus.PENDING, None, None, False, 50)
+    tasks = await task_service.list_tasks(user_id, "pending", None, None, False, 50)
     next_due_task = next(
         (
             task for task in tasks
