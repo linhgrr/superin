@@ -1,12 +1,14 @@
-"""Plugin registry — singleton store for all registered app plugins.
+"""Plugin registry — singleton store for app metadata and widget contracts.
 
 Plugins call register_plugin() in their __init__.py.
 The platform reads PLUGIN_REGISTRY at startup to mount routers, expose catalog, etc.
 """
 
-from typing import TYPE_CHECKING, TypedDict
+from collections.abc import Awaitable, Callable
+from typing import TYPE_CHECKING, Any, TypedDict
 
 from fastapi import APIRouter
+from pydantic import BaseModel
 
 if TYPE_CHECKING:
     from core.agents.base_app import BaseAppAgent
@@ -44,6 +46,8 @@ class CategoryEntry(TypedDict):
 
 
 CATEGORY_REGISTRY: dict[str, CategoryEntry] = {}
+WIDGET_CONFIG_MODELS: dict[str, type[BaseModel]] = {}
+WIDGET_DATA_HANDLERS: dict[str, Callable[[str, BaseModel], Awaitable[Any]]] = {}
 
 
 def register_category(
@@ -72,6 +76,19 @@ def list_categories() -> list[CategoryEntry]:
 def get_category(category_id: str) -> CategoryEntry | None:
     """Get category metadata by id."""
     return CATEGORY_REGISTRY.get(category_id)
+
+
+def register_widget_config_model(widget_id: str, model: type[BaseModel]) -> None:
+    """Register the Pydantic config model for a widget."""
+    WIDGET_CONFIG_MODELS[widget_id] = model
+
+
+def register_widget_data_handler(
+    widget_id: str,
+    handler: Callable[[str, BaseModel], Awaitable[Any]],
+) -> None:
+    """Register the async data handler for a widget."""
+    WIDGET_DATA_HANDLERS[widget_id] = handler
 
 
 # ─── Plugin Registration ───────────────────────────────────────────────────────

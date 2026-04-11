@@ -61,7 +61,8 @@ async def test_update_multiple_preferences_upserts_missing_rows(monkeypatch) -> 
             PreferenceUpdate(
                 widget_id="finance.total-balance",
                 enabled=True,
-                config={"gridX": 0, "gridY": 4},
+                grid_x=0,
+                grid_y=4,
             )
         ],
         "finance",
@@ -77,13 +78,16 @@ async def test_update_multiple_preferences_upserts_missing_rows(monkeypatch) -> 
     assert operation._filter["widget_id"] == "finance.total-balance"
     assert operation._doc["$set"] == {
         "enabled": True,
-        "config": {"gridX": 0, "gridY": 4},
+        "grid_x": 0,
+        "grid_y": 4,
     }
     assert operation._doc["$setOnInsert"] == {
         "user_id": operation._filter["user_id"],
         "app_id": "finance",
         "widget_id": "finance.total-balance",
         "sort_order": 0,
+        "grid_x": 0,
+        "grid_y": 0,
         "size_w": None,
         "size_h": None,
     }

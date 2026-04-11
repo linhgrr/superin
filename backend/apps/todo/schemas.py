@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, time
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -107,3 +108,27 @@ class TodoActionResponse(BaseModel):
     success: bool
     id: str
     message: str | None = None
+
+
+class TaskListWidgetConfig(BaseModel):
+    filter: Literal["all", "today", "high"] = "all"
+    limit: int = Field(default=5, ge=1, le=20)
+
+
+class TaskListWidgetData(BaseModel):
+    filter: Literal["all", "today", "high"]
+    items: list[TodoTaskRead] = Field(default_factory=list)
+    total: int
+
+
+class TodayWidgetConfig(BaseModel):
+    include_overdue: bool = True
+
+
+class TodayWidgetData(BaseModel):
+    due_today: int
+    overdue: int
+    next_due_task: TodoTaskRead | None = None
+
+
+TodoWidgetDataResponse = TaskListWidgetData | TodayWidgetData

@@ -25,8 +25,11 @@ def _apply_update_to_preference(
     if update.sort_order is not None:
         pref.sort_order = update.sort_order
 
-    if update.config is not None:
-        pref.config = update.config
+    if update.grid_x is not None:
+        pref.grid_x = update.grid_x
+
+    if update.grid_y is not None:
+        pref.grid_y = update.grid_y
 
     if update.size_w is not None:
         pref.size_w = update.size_w
@@ -48,7 +51,7 @@ def _build_update_document(
     payload = update.model_dump(exclude_unset=True)
     set_payload = {
         key: payload[key]
-        for key in ("enabled", "sort_order", "config", "size_w", "size_h")
+        for key in ("enabled", "sort_order", "grid_x", "grid_y", "size_w", "size_h")
         if key in payload
     }
     insert_defaults = {
@@ -57,7 +60,8 @@ def _build_update_document(
         "widget_id": update.widget_id,
         "enabled": False,
         "sort_order": 0,
-        "config": {},
+        "grid_x": 0,
+        "grid_y": 0,
         "size_w": None,
         "size_h": None,
     }
@@ -178,7 +182,8 @@ def preference_to_schema(
         app_id=pref.app_id,
         enabled=pref.enabled,
         sort_order=pref.sort_order,
-        config=pref.config,
+        grid_x=pref.grid_x,
+        grid_y=pref.grid_y,
         size_w=pref.size_w,
         size_h=pref.size_h,
     )

@@ -161,10 +161,10 @@ class WidgetPreferenceSchema(BaseModel):
     app_id: str
     enabled: bool = False
     sort_order: int = 0  # Sequential ordering for widget list (not grid position)
-    config: dict = Field(default_factory=dict)
-    # Custom dimensions - override manifest default
-    size_w: int | None = Field(default=None, ge=2, le=12)  # Grid width (2-12)
-    size_h: int | None = Field(default=None, ge=1, le=6)  # Grid height (1-6)
+    grid_x: int = Field(default=0, ge=0)
+    grid_y: int = Field(default=0, ge=0)
+    size_w: int | None = Field(default=None, ge=2, le=12)
+    size_h: int | None = Field(default=None, ge=1, le=6)
 
     model_config = {"populate_by_name": True}
 
@@ -175,10 +175,28 @@ class PreferenceUpdate(BaseModel):
     widget_id: str
     enabled: bool | None = None
     sort_order: int | None = None
-    config: dict | None = None
-    # Custom dimensions - override manifest default
-    size_w: int | None = Field(default=None, ge=2, le=12)  # Grid width (2-12)
-    size_h: int | None = Field(default=None, ge=1, le=6)  # Grid height (1-6)
+    grid_x: int | None = Field(default=None, ge=0)
+    grid_y: int | None = Field(default=None, ge=0)
+    size_w: int | None = Field(default=None, ge=2, le=12)
+    size_h: int | None = Field(default=None, ge=1, le=6)
+
+
+class WidgetDataConfigSchema(BaseModel):
+    """Persisted per-widget data config."""
+
+    id: str | None = Field(default=None, alias="_id")
+    user_id: str
+    widget_id: str
+    config: dict = Field(default_factory=dict)
+
+    model_config = {"populate_by_name": True}
+
+
+class WidgetDataConfigUpdate(BaseModel):
+    """Update payload for widget data config."""
+
+    widget_id: str
+    config: dict = Field(default_factory=dict)
 
 
 # ─── App / Plugin ──────────────────────────────────────────────────────────────
@@ -275,6 +293,7 @@ class WorkspaceBootstrap(BaseModel):
 
     installed_apps: list[AppRuntimeEntry] = Field(default_factory=list)
     widget_preferences: list[WidgetPreferenceSchema] = Field(default_factory=list)
+    widget_data_configs: list[WidgetDataConfigSchema] = Field(default_factory=list)
 
 
 # ─── Chat / Agent ──────────────────────────────────────────────────────────────

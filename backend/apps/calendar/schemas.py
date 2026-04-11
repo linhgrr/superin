@@ -113,3 +113,44 @@ class CalendarActionResponse(BaseModel):
     success: bool
     id: str
     message: str | None = None
+
+
+class MonthViewWidgetConfig(BaseModel):
+    default_calendar: str | None = None
+    show_time_blocked_tasks: bool = True
+
+class CalendarMonthDaySummary(BaseModel):
+    day: int
+    event_count: int
+    event_titles: list[str] = Field(default_factory=list)
+
+
+class MonthViewWidgetData(BaseModel):
+    month: int
+    year: int
+    month_label: str
+    start_offset: int
+    days_in_month: int
+    days: list[CalendarMonthDaySummary] = Field(default_factory=list)
+    calendars: list[CalendarCalendarRead] = Field(default_factory=list)
+
+
+class UpcomingWidgetConfig(BaseModel):
+    max_items: int = Field(default=5, ge=1, le=10)
+    calendar_filter: str | None = None
+
+
+class UpcomingWidgetData(BaseModel):
+    items: list[CalendarEventRead] = Field(default_factory=list)
+
+
+class DaySummaryWidgetConfig(BaseModel):
+    horizon_days: int = Field(default=1, ge=1, le=7)
+
+
+class DaySummaryWidgetData(BaseModel):
+    today_count: int
+    next_event: CalendarEventRead | None = None
+
+
+CalendarWidgetDataResponse = MonthViewWidgetData | UpcomingWidgetData | DaySummaryWidgetData

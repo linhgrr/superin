@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -153,3 +154,47 @@ class FinanceMonthlyTrendResponse(BaseModel):
 
 
 FinanceBudgetCheckResponse = FinanceBudgetCategoryStatus | FinanceBudgetOverviewResponse
+
+
+class TotalBalanceWidgetConfig(BaseModel):
+    account_id: str | None = None
+
+
+class TotalBalanceWidgetData(BaseModel):
+    total_balance: float
+    wallet_name: str | None = None
+    currency: str | None = None
+    wallet_count: int
+
+
+class BudgetOverviewWidgetConfig(BaseModel):
+    include_categories_without_budget: bool = False
+
+
+class BudgetOverviewWidgetData(BaseModel):
+    total_budget: float
+    total_spent: float
+    remaining_budget: float | None = None
+    category_count: int
+    over_budget_count: int
+    month: int
+    year: int
+
+
+class RecentTransactionsWidgetConfig(BaseModel):
+    limit: int = Field(default=5, ge=1, le=20)
+    wallet_id: str | None = None
+
+
+class RecentTransactionsWidgetData(BaseModel):
+    items: list[FinanceTransactionRead] = Field(default_factory=list)
+    income_this_month: float
+    expense_this_month: float
+    scope: Literal["all-wallets", "single-wallet"] = "all-wallets"
+
+
+FinanceWidgetDataResponse = (
+    TotalBalanceWidgetData
+    | BudgetOverviewWidgetData
+    | RecentTransactionsWidgetData
+)

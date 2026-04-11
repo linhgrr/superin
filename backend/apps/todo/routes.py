@@ -1,10 +1,16 @@
 """Todo plugin FastAPI routes."""
 
+from datetime import datetime
+
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from apps.todo.enums import TaskPriority, TaskStatus
 from apps.todo.schemas import (
+    TaskListWidgetConfig,
+    TaskListWidgetData,
+    TodayWidgetConfig,
+    TodayWidgetData,
     TodoActionResponse,
     TodoCreateRecurringRuleRequest,
     TodoCreateSubTaskRequest,
@@ -15,17 +21,86 @@ from apps.todo.schemas import (
     TodoTaskDetailRead,
     TodoTaskRead,
     TodoUpdateTaskRequest,
+    TodoWidgetDataResponse,
 )
 from apps.todo.service import task_service
 from core.auth.dependencies import get_current_user
-from core.models import WidgetPreference
+from core.models import User, WidgetPreference
+from core.registry import WIDGET_DATA_HANDLERS
+from core.widget_config import resolve_widget_config, upsert_widget_config
 from shared.preference_utils import (
     preference_to_schema,
     update_multiple_preferences,
 )
-from shared.schemas import PreferenceUpdate, WidgetManifestSchema, WidgetPreferenceSchema
+from shared.schemas import (
+    ConfigFieldSchema,
+    PreferenceUpdate,
+    WidgetDataConfigSchema,
+    WidgetDataConfigUpdate,
+    WidgetManifestSchema,
+    WidgetPreferenceSchema,
+)
 
 router = APIRouter()
+
+
+def _get_widget_manifest(widget_id: str) -> WidgetManifestSchema:
+    from apps.todo.manifest import todo_manifest
+
+    for widget in todo_manifest.widgets:
+        if widget.id == widget_id:
+            return widget
+    raise HTTPException(status_code=404, detail=f"Widget '{widget_id}' not found")
+
+
+async def get_task_list_widget_data(
+    user_id: str,
+    config: TaskListWidgetConfig,
+) -> TaskListWidgetData:
+    tasks = await task_service.list_tasks(user_id, None, None, None, False, max(config.limit * 3, 20))
+    today_key = datetime.now().date().isoformat()
+
+    if config.filter == "today":
+        items = [
+            task for task in tasks
+            if task.get("due_date") and str(task["due_date"]).startswith(today_key)
+        ]
+    elif config.filter == "high":
+        items = [task for task in tasks if task.get("priority") == "high"]
+    else:
+        items = tasks
+
+    return TaskListWidgetData(
+        filter=config.filter,
+        items=items[: config.limit],
+        total=len(items),
+    )
+
+
+async def get_today_widget_data(
+    user_id: str,
+    config: TodayWidgetConfig,
+) -> TodayWidgetData:
+    user = await User.get(user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    summary = await task_service.get_summary(user)
+    tasks = await task_service.list_tasks(user_id, TaskStatus.PENDING, None, None, False, 50)
+    next_due_task = next(
+        (
+            task for task in tasks
+            if task.get("due_date") is not None
+        ),
+        None,
+    )
+
+    overdue = summary["overdue"] if config.include_overdue else 0
+    return TodayWidgetData(
+        due_today=summary["due_today"],
+        overdue=overdue,
+        next_due_task=next_due_task,
+    )
 
 
 # ─── Widgets ──────────────────────────────────────────────────────────────────
@@ -35,6 +110,47 @@ async def list_widgets() -> list[WidgetManifestSchema]:
     from apps.todo.manifest import todo_manifest
 
     return todo_manifest.widgets
+
+
+@router.get("/widgets/{widget_id}", response_model=TodoWidgetDataResponse)
+async def get_widget_data(
+    widget_id: str,
+    user_id: str = Depends(get_current_user),
+) -> TodoWidgetDataResponse:
+    _get_widget_manifest(widget_id)
+    handler = WIDGET_DATA_HANDLERS.get(widget_id)
+    if handler is None:
+        raise HTTPException(status_code=404, detail=f"Widget '{widget_id}' is not registered")
+    config = await resolve_widget_config(user_id, widget_id)
+    return await handler(user_id, config)
+
+
+@router.put("/widgets/{widget_id}/config", response_model=WidgetDataConfigSchema)
+async def update_widget_config(
+    widget_id: str,
+    update: WidgetDataConfigUpdate,
+    user_id: str = Depends(get_current_user),
+) -> WidgetDataConfigSchema:
+    _get_widget_manifest(widget_id)
+    if update.widget_id != widget_id:
+        raise HTTPException(status_code=400, detail="Payload widget_id must match path widget_id")
+
+    doc = await upsert_widget_config(user_id, widget_id, update.config)
+    return WidgetDataConfigSchema(
+        id=str(doc.id),
+        user_id=str(doc.user_id),
+        widget_id=doc.widget_id,
+        config=doc.config,
+    )
+
+
+@router.get("/widgets/{widget_id}/options", response_model=list[ConfigFieldSchema])
+async def get_widget_options(
+    widget_id: str,
+    user_id: str = Depends(get_current_user),
+) -> list[ConfigFieldSchema]:
+    del user_id
+    return [field.model_copy(deep=True) for field in _get_widget_manifest(widget_id).config_fields]
 
 
 # ─── Tasks ────────────────────────────────────────────────────────────────────

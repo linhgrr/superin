@@ -1,6 +1,7 @@
 """Calendar plugin FastAPI routes."""
 
-from datetime import datetime
+from calendar import month_name, monthrange
+from datetime import datetime, timedelta
 
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -12,21 +13,173 @@ from apps.calendar.schemas import (
     CalendarCreateEventRequest,
     CalendarCreateRecurringRuleRequest,
     CalendarEventRead,
+    CalendarMonthDaySummary,
     CalendarRecurringRuleRead,
     CalendarScheduleTaskRequest,
     CalendarUpdateCalendarRequest,
     CalendarUpdateEventRequest,
+    CalendarWidgetDataResponse,
+    DaySummaryWidgetConfig,
+    DaySummaryWidgetData,
+    MonthViewWidgetConfig,
+    MonthViewWidgetData,
+    UpcomingWidgetConfig,
+    UpcomingWidgetData,
 )
 from apps.calendar.service import calendar_service
 from core.auth.dependencies import get_current_user
-from core.models import WidgetPreference
+from core.models import User, WidgetPreference
+from core.registry import WIDGET_DATA_HANDLERS
+from core.utils.timezone import get_user_timezone_context
+from core.widget_config import resolve_widget_config, upsert_widget_config
 from shared.preference_utils import (
     preference_to_schema,
     update_multiple_preferences,
 )
-from shared.schemas import PreferenceUpdate, WidgetManifestSchema, WidgetPreferenceSchema
+from shared.schemas import (
+    ConfigFieldSchema,
+    PreferenceUpdate,
+    SelectOption,
+    WidgetDataConfigSchema,
+    WidgetDataConfigUpdate,
+    WidgetManifestSchema,
+    WidgetPreferenceSchema,
+)
 
 router = APIRouter()
+
+
+def _get_widget_manifest(widget_id: str) -> WidgetManifestSchema:
+    from apps.calendar.manifest import calendar_manifest
+
+    for widget in calendar_manifest.widgets:
+        if widget.id == widget_id:
+            return widget
+    raise HTTPException(status_code=404, detail=f"Widget '{widget_id}' not found")
+
+
+def _add_month_offset(now_local: datetime, month_offset: int) -> tuple[int, int]:
+    month_index = (now_local.year * 12 + (now_local.month - 1)) + month_offset
+    year = month_index // 12
+    month = month_index % 12 + 1
+    return year, month
+
+
+async def _resolve_widget_options(
+    user_id: str,
+    widget: WidgetManifestSchema,
+) -> list[ConfigFieldSchema]:
+    calendars = await calendar_service.list_calendars(user_id)
+    calendar_options = [
+        SelectOption(label=calendar["name"], value=calendar["id"])
+        for calendar in calendars
+    ]
+
+    fields: list[ConfigFieldSchema] = []
+    for field in widget.config_fields:
+        next_field = field.model_copy(deep=True)
+        if next_field.options_source == "calendar.calendars":
+            next_field.options = calendar_options
+        fields.append(next_field)
+    return fields
+
+
+async def get_month_view_widget_data(
+    user_id: str,
+    config: MonthViewWidgetConfig,
+    month_offset: int = 0,
+) -> MonthViewWidgetData:
+    user = await User.get(user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    ctx = get_user_timezone_context(user)
+    now_local = ctx.now_local()
+    year, month = _add_month_offset(now_local, month_offset)
+    start_local = now_local.replace(
+        year=year,
+        month=month,
+        day=1,
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
+    )
+    days_in_month = monthrange(year, month)[1]
+    if month == 12:
+        next_month_start = start_local.replace(year=year + 1, month=1)
+    else:
+        next_month_start = start_local.replace(month=month + 1)
+    end_local = next_month_start - timedelta(microseconds=1)
+
+    events = await calendar_service.list_events(
+        user_id,
+        start_local.astimezone().astimezone(start_local.tzinfo),
+        end_local.astimezone().astimezone(end_local.tzinfo),
+        config.default_calendar,
+        200,
+    )
+    if not config.show_time_blocked_tasks:
+        events = [event for event in events if event["type"] != "time_blocked_task"]
+
+    day_map: dict[int, list[dict]] = {}
+    for event in events:
+        event_day = datetime.fromisoformat(str(event["start_datetime"])).day
+        day_map.setdefault(event_day, []).append(event)
+
+    calendars = await calendar_service.list_calendars(user_id)
+    first_day = datetime(year, month, 1).weekday()
+    return MonthViewWidgetData(
+        month=month,
+        year=year,
+        month_label=f"{month_name[month]} {year}",
+        start_offset=first_day,
+        days_in_month=days_in_month,
+        days=[
+            CalendarMonthDaySummary(
+                day=day,
+                event_count=len(day_map.get(day, [])),
+                event_titles=[event["title"] for event in day_map.get(day, [])[:3]],
+            )
+            for day in range(1, days_in_month + 1)
+        ],
+        calendars=calendars,
+    )
+
+
+async def get_upcoming_widget_data(
+    user_id: str,
+    config: UpcomingWidgetConfig,
+) -> UpcomingWidgetData:
+    start = datetime.utcnow()
+    end = start + timedelta(days=30)
+    items = await calendar_service.list_events(
+        user_id,
+        start,
+        end,
+        config.calendar_filter,
+        config.max_items,
+    )
+    return UpcomingWidgetData(items=items[: config.max_items])
+
+
+async def get_day_summary_widget_data(
+    user_id: str,
+    config: DaySummaryWidgetConfig,
+) -> DaySummaryWidgetData:
+    user = await User.get(user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    ctx = get_user_timezone_context(user)
+    today = ctx.today_range()
+    horizon_end = today.end + timedelta(days=max(config.horizon_days - 1, 0))
+    today_events = await calendar_service.list_events(user_id, today.start, today.end, None, 100)
+    upcoming = await calendar_service.list_events(user_id, today.start, horizon_end, None, 1)
+    return DaySummaryWidgetData(
+        today_count=len(today_events),
+        next_event=upcoming[0] if upcoming else None,
+    )
 
 
 # ─── Widgets ──────────────────────────────────────────────────────────────────
@@ -35,6 +188,52 @@ router = APIRouter()
 async def list_widgets() -> list[WidgetManifestSchema]:
     from apps.calendar.manifest import calendar_manifest
     return calendar_manifest.widgets
+
+
+@router.get("/widgets/{widget_id}", response_model=CalendarWidgetDataResponse)
+async def get_widget_data(
+    widget_id: str,
+    month_offset: int = 0,
+    user_id: str = Depends(get_current_user),
+) -> CalendarWidgetDataResponse:
+    _get_widget_manifest(widget_id)
+    handler = WIDGET_DATA_HANDLERS.get(widget_id)
+    if handler is None:
+        raise HTTPException(status_code=404, detail=f"Widget '{widget_id}' is not registered")
+    config = await resolve_widget_config(user_id, widget_id)
+    # Pass transient query params to handler if supported
+    kwargs = {}
+    if widget_id == "calendar.month-view":
+        kwargs["month_offset"] = month_offset
+    return await handler(user_id, config, **kwargs)
+
+
+@router.put("/widgets/{widget_id}/config", response_model=WidgetDataConfigSchema)
+async def update_widget_config(
+    widget_id: str,
+    update: WidgetDataConfigUpdate,
+    user_id: str = Depends(get_current_user),
+) -> WidgetDataConfigSchema:
+    _get_widget_manifest(widget_id)
+    if update.widget_id != widget_id:
+        raise HTTPException(status_code=400, detail="Payload widget_id must match path widget_id")
+
+    doc = await upsert_widget_config(user_id, widget_id, update.config)
+    return WidgetDataConfigSchema(
+        id=str(doc.id),
+        user_id=str(doc.user_id),
+        widget_id=doc.widget_id,
+        config=doc.config,
+    )
+
+
+@router.get("/widgets/{widget_id}/options", response_model=list[ConfigFieldSchema])
+async def get_widget_options(
+    widget_id: str,
+    user_id: str = Depends(get_current_user),
+) -> list[ConfigFieldSchema]:
+    widget = _get_widget_manifest(widget_id)
+    return await _resolve_widget_options(user_id, widget)
 
 
 # ─── Events ───────────────────────────────────────────────────────────────────

@@ -57,17 +57,17 @@ class UserAppInstallation(Document):
 
 
 class WidgetPreference(Document):
-    """User-specific widget configuration and position on dashboard."""
+    """User-specific widget layout state on dashboard."""
 
     user_id: PydanticObjectId
     widget_id: str  # e.g. "finance.total-balance"
     app_id: str
     enabled: bool = False
     sort_order: int = 0  # Sequential ordering for widget list (not grid position)
-    config: dict = Field(default_factory=dict)
-    # Custom dimensions - override manifest default
-    size_w: int | None = Field(default=None, ge=2, le=12)  # Grid width (2-12)
-    size_h: int | None = Field(default=None, ge=1, le=6)  # Grid height (1-6)
+    grid_x: int = Field(default=0, ge=0)
+    grid_y: int = Field(default=0, ge=0)
+    size_w: int | None = Field(default=None, ge=2, le=12)
+    size_h: int | None = Field(default=None, ge=1, le=6)
 
     class Settings:
         name = "widget_preferences"
@@ -75,6 +75,24 @@ class WidgetPreference(Document):
             IndexModel(
                 [("user_id", 1), ("widget_id", 1)],
                 name="widget_preferences_user_id_widget_id_unique",
+                unique=True,
+            ),
+        ]
+
+
+class WidgetDataConfig(Document):
+    """Per-widget data configuration validated against registered widget schemas."""
+
+    user_id: PydanticObjectId
+    widget_id: str
+    config: dict = Field(default_factory=dict)
+
+    class Settings:
+        name = "widget_data_configs"
+        indexes = [
+            IndexModel(
+                [("user_id", 1), ("widget_id", 1)],
+                name="widget_data_configs_user_widget_unique",
                 unique=True,
             ),
         ]

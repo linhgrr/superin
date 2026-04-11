@@ -8,12 +8,17 @@ from beanie.operators import In
 from fastapi import Depends, HTTPException, Request
 
 from core.auth.dependencies import get_current_user
-from core.models import User, UserAppInstallation, WidgetPreference
+from core.models import User, UserAppInstallation, WidgetDataConfig, WidgetPreference
 from core.registry import get_plugin
 from shared.enums import InstallationStatus, SubscriptionTier, UserRole
 from shared.permissions import meets_minimum_tier
 from shared.preference_utils import preference_to_schema
-from shared.schemas import AppRuntimeEntry, WidgetPreferenceSchema, WorkspaceBootstrap
+from shared.schemas import (
+    AppRuntimeEntry,
+    WidgetDataConfigSchema,
+    WidgetPreferenceSchema,
+    WorkspaceBootstrap,
+)
 
 if TYPE_CHECKING:
     pass
@@ -88,9 +93,25 @@ async def build_workspace_bootstrap(user_id: str) -> WorkspaceBootstrap:
     installed_apps = await list_installed_apps(user_id)
     installed_app_ids = [app.id for app in installed_apps]
     widget_preferences = await list_workspace_preferences(user_id, installed_app_ids)
+
+    # Load widget data configs for all installed apps
+    widget_data_configs = await WidgetDataConfig.find(
+        WidgetDataConfig.user_id == PydanticObjectId(user_id),
+    ).to_list()
+    widget_data_config_schemas = [
+        WidgetDataConfigSchema(
+            id=str(doc.id),
+            user_id=str(doc.user_id),
+            widget_id=doc.widget_id,
+            config=doc.config,
+        )
+        for doc in widget_data_configs
+    ]
+
     return WorkspaceBootstrap(
         installed_apps=installed_apps,
         widget_preferences=widget_preferences,
+        widget_data_configs=widget_data_config_schemas,
     )
 
 

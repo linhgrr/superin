@@ -8,7 +8,7 @@ from beanie import PydanticObjectId
 from beanie.operators import In
 
 from core.db import get_db
-from core.models import User, UserAppInstallation, WidgetPreference, utc_now
+from core.models import User, UserAppInstallation, WidgetDataConfig, WidgetPreference, utc_now
 from core.registry import get_plugin
 from core.subscriptions.model import Subscription
 from shared.enums import (
@@ -130,7 +130,7 @@ async def uninstall_app_for_user(user_id: str, app_id: str) -> dict[str, str]:
 
 
 async def _seed_widget_preferences(user_id: str, app_id: str, widgets: list[Any]) -> None:
-    """Create missing widget preferences for an installed app."""
+    """Create missing widget preferences and widget data configs for an installed app."""
     widget_ids = [widget.id for widget in widgets]
     if not widget_ids:
         return
@@ -148,10 +148,29 @@ async def _seed_widget_preferences(user_id: str, app_id: str, widgets: list[Any]
             app_id=app_id,
             enabled=True,
             sort_order=index,
-            config={},
+            grid_x=0,
+            grid_y=index * 2,
         )
         for index, widget in enumerate(widgets)
         if widget.id not in existing_ids
     ]
     if to_insert:
         await WidgetPreference.insert_many(to_insert)
+
+    # Seed empty WidgetDataConfig for each new widget
+    existing_configs = await WidgetDataConfig.find(
+        WidgetDataConfig.user_id == PydanticObjectId(user_id),
+    ).to_list()
+    existing_config_ids = {doc.widget_id for doc in existing_configs}
+
+    configs_to_insert = [
+        WidgetDataConfig(
+            user_id=PydanticObjectId(user_id),
+            widget_id=widget.id,
+            config={},
+        )
+        for widget in widgets
+        if widget.id not in existing_config_ids
+    ]
+    if configs_to_insert:
+        await WidgetDataConfig.insert_many(configs_to_insert)

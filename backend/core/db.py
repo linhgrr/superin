@@ -28,6 +28,7 @@ async def init_db() -> None:
         TokenBlacklist,
         User,
         UserAppInstallation,
+        WidgetDataConfig,
         WidgetPreference,
     )
     from core.registry import get_plugin_models
@@ -43,6 +44,7 @@ async def init_db() -> None:
             UserAppInstallation,
             AppCategory,
             WidgetPreference,
+            WidgetDataConfig,
             TokenBlacklist,
             ConversationMessage,
             Subscription,

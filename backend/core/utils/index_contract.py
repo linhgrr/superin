@@ -59,6 +59,12 @@ INDEX_REQUIREMENTS: tuple[IndexRequirement, ...] = (
         unique=True,
     ),
     IndexRequirement(
+        collection="widget_data_configs",
+        index_name="widget_data_configs_user_widget_unique",
+        key=(("user_id", 1), ("widget_id", 1)),
+        unique=True,
+    ),
+    IndexRequirement(
         collection="token_blacklist",
         index_name="token_blacklist_jti_unique",
         key=(("jti", 1),),
