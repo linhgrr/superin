@@ -204,33 +204,6 @@
         ]
       }
     },
-    "/api/auth/permissions": {
-      "get": {
-        "tags": [
-          "auth"
-        ],
-        "summary": "Get My Permissions",
-        "description": "Return current user's effective permissions from backend matrix.",
-        "operationId": "get_my_permissions_api_auth_permissions_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PermissionListRead"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
-    },
     "/api/auth/me/settings": {
       "patch": {
         "tags": [
@@ -1426,6 +1399,182 @@
         ]
       }
     },
+    "/api/apps/calendar/widgets/{widget_id}": {
+      "get": {
+        "tags": [
+          "calendar"
+        ],
+        "summary": "Get Widget Data",
+        "operationId": "get_widget_data_api_apps_calendar_widgets__widget_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "widget_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Widget Id"
+            }
+          },
+          {
+            "name": "month_offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "title": "Month Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/MonthViewWidgetData"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UpcomingWidgetData"
+                    },
+                    {
+                      "$ref": "#/components/schemas/DaySummaryWidgetData"
+                    }
+                  ],
+                  "title": "Response Get Widget Data Api Apps Calendar Widgets  Widget Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/apps/calendar/widgets/{widget_id}/config": {
+      "put": {
+        "tags": [
+          "calendar"
+        ],
+        "summary": "Update Widget Config",
+        "operationId": "update_widget_config_api_apps_calendar_widgets__widget_id__config_put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "widget_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Widget Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WidgetDataConfigUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WidgetDataConfigSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/apps/calendar/widgets/{widget_id}/options": {
+      "get": {
+        "tags": [
+          "calendar"
+        ],
+        "summary": "Get Widget Options",
+        "operationId": "get_widget_options_api_apps_calendar_widgets__widget_id__options_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "widget_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Widget Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ConfigFieldSchema"
+                  },
+                  "title": "Response Get Widget Options Api Apps Calendar Widgets  Widget Id  Options Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/apps/calendar/events": {
       "get": {
         "tags": [
@@ -2352,6 +2501,172 @@
             "HTTPBearer": []
           }
         ]
+      }
+    },
+    "/api/apps/finance/widgets/{widget_id}": {
+      "get": {
+        "tags": [
+          "finance"
+        ],
+        "summary": "Get Widget Data",
+        "operationId": "get_widget_data_api_apps_finance_widgets__widget_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "widget_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Widget Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/TotalBalanceWidgetData"
+                    },
+                    {
+                      "$ref": "#/components/schemas/BudgetOverviewWidgetData"
+                    },
+                    {
+                      "$ref": "#/components/schemas/RecentTransactionsWidgetData"
+                    }
+                  ],
+                  "title": "Response Get Widget Data Api Apps Finance Widgets  Widget Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/apps/finance/widgets/{widget_id}/config": {
+      "put": {
+        "tags": [
+          "finance"
+        ],
+        "summary": "Update Widget Config",
+        "operationId": "update_widget_config_api_apps_finance_widgets__widget_id__config_put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "widget_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Widget Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WidgetDataConfigUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WidgetDataConfigSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/apps/finance/widgets/{widget_id}/options": {
+      "get": {
+        "tags": [
+          "finance"
+        ],
+        "summary": "Get Widget Options",
+        "operationId": "get_widget_options_api_apps_finance_widgets__widget_id__options_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "widget_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Widget Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ConfigFieldSchema"
+                  },
+                  "title": "Response Get Widget Options Api Apps Finance Widgets  Widget Id  Options Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/apps/finance/wallets": {
@@ -3582,6 +3897,169 @@
             "HTTPBearer": []
           }
         ]
+      }
+    },
+    "/api/apps/todo/widgets/{widget_id}": {
+      "get": {
+        "tags": [
+          "todo"
+        ],
+        "summary": "Get Widget Data",
+        "operationId": "get_widget_data_api_apps_todo_widgets__widget_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "widget_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Widget Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/TaskListWidgetData"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TodayWidgetData"
+                    }
+                  ],
+                  "title": "Response Get Widget Data Api Apps Todo Widgets  Widget Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/apps/todo/widgets/{widget_id}/config": {
+      "put": {
+        "tags": [
+          "todo"
+        ],
+        "summary": "Update Widget Config",
+        "operationId": "update_widget_config_api_apps_todo_widgets__widget_id__config_put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "widget_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Widget Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WidgetDataConfigUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WidgetDataConfigSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/apps/todo/widgets/{widget_id}/options": {
+      "get": {
+        "tags": [
+          "todo"
+        ],
+        "summary": "Get Widget Options",
+        "operationId": "get_widget_options_api_apps_todo_widgets__widget_id__options_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "widget_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Widget Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ConfigFieldSchema"
+                  },
+                  "title": "Response Get Widget Options Api Apps Todo Widgets  Widget Id  Options Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/apps/todo/tasks": {
@@ -5367,6 +5845,55 @@
         ],
         "title": "Body_update_avatar_api_auth_me_avatar_post"
       },
+      "BudgetOverviewWidgetData": {
+        "properties": {
+          "total_budget": {
+            "type": "number",
+            "title": "Total Budget"
+          },
+          "total_spent": {
+            "type": "number",
+            "title": "Total Spent"
+          },
+          "remaining_budget": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remaining Budget"
+          },
+          "category_count": {
+            "type": "integer",
+            "title": "Category Count"
+          },
+          "over_budget_count": {
+            "type": "integer",
+            "title": "Over Budget Count"
+          },
+          "month": {
+            "type": "integer",
+            "title": "Month"
+          },
+          "year": {
+            "type": "integer",
+            "title": "Year"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_budget",
+          "total_spent",
+          "category_count",
+          "over_budget_count",
+          "month",
+          "year"
+        ],
+        "title": "BudgetOverviewWidgetData"
+      },
       "CalendarActionResponse": {
         "properties": {
           "success": {
@@ -5786,6 +6313,31 @@
           "updated_at"
         ],
         "title": "CalendarEventRead"
+      },
+      "CalendarMonthDaySummary": {
+        "properties": {
+          "day": {
+            "type": "integer",
+            "title": "Day"
+          },
+          "event_count": {
+            "type": "integer",
+            "title": "Event Count"
+          },
+          "event_titles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Event Titles"
+          }
+        },
+        "type": "object",
+        "required": [
+          "day",
+          "event_count"
+        ],
+        "title": "CalendarMonthDaySummary"
       },
       "CalendarRecurringRuleRead": {
         "properties": {
@@ -6296,6 +6848,29 @@
           "name"
         ],
         "title": "CreateCategoryRequest"
+      },
+      "DaySummaryWidgetData": {
+        "properties": {
+          "today_count": {
+            "type": "integer",
+            "title": "Today Count"
+          },
+          "next_event": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalendarEventRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "today_count"
+        ],
+        "title": "DaySummaryWidgetData"
       },
       "FinanceActionResponse": {
         "properties": {
@@ -7039,6 +7614,53 @@
         ],
         "title": "LoginRequest"
       },
+      "MonthViewWidgetData": {
+        "properties": {
+          "month": {
+            "type": "integer",
+            "title": "Month"
+          },
+          "year": {
+            "type": "integer",
+            "title": "Year"
+          },
+          "month_label": {
+            "type": "string",
+            "title": "Month Label"
+          },
+          "start_offset": {
+            "type": "integer",
+            "title": "Start Offset"
+          },
+          "days_in_month": {
+            "type": "integer",
+            "title": "Days In Month"
+          },
+          "days": {
+            "items": {
+              "$ref": "#/components/schemas/CalendarMonthDaySummary"
+            },
+            "type": "array",
+            "title": "Days"
+          },
+          "calendars": {
+            "items": {
+              "$ref": "#/components/schemas/CalendarCalendarRead"
+            },
+            "type": "array",
+            "title": "Calendars"
+          }
+        },
+        "type": "object",
+        "required": [
+          "month",
+          "year",
+          "month_label",
+          "start_offset",
+          "days_in_month"
+        ],
+        "title": "MonthViewWidgetData"
+      },
       "PaymentProvider": {
         "type": "string",
         "enum": [
@@ -7047,50 +7669,6 @@
         ],
         "title": "PaymentProvider",
         "description": "Supported payment providers."
-      },
-      "PermissionKey": {
-        "type": "string",
-        "enum": [
-          "chat_ai_unlimited",
-          "admin_users_view",
-          "admin_subscriptions_view",
-          "admin_apps_manage"
-        ],
-        "title": "PermissionKey",
-        "description": "Platform permission keys used by backend and frontend."
-      },
-      "PermissionListRead": {
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/PermissionRead"
-            },
-            "type": "array",
-            "title": "Items"
-          }
-        },
-        "type": "object",
-        "required": [
-          "items"
-        ],
-        "title": "PermissionListRead"
-      },
-      "PermissionRead": {
-        "properties": {
-          "key": {
-            "$ref": "#/components/schemas/PermissionKey"
-          },
-          "allowed": {
-            "type": "boolean",
-            "title": "Allowed"
-          }
-        },
-        "type": "object",
-        "required": [
-          "key",
-          "allowed"
-        ],
-        "title": "PermissionRead"
       },
       "PreferenceUpdate": {
         "properties": {
@@ -7120,17 +7698,29 @@
             ],
             "title": "Sort Order"
           },
-          "config": {
+          "grid_x": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "type": "integer",
+                "minimum": 0.0
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Config"
+            "title": "Grid X"
+          },
+          "grid_y": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grid Y"
           },
           "size_w": {
             "anyOf": [
@@ -7165,6 +7755,40 @@
         ],
         "title": "PreferenceUpdate",
         "description": "Update payload for a single widget preference."
+      },
+      "RecentTransactionsWidgetData": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/FinanceTransactionRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "income_this_month": {
+            "type": "number",
+            "title": "Income This Month"
+          },
+          "expense_this_month": {
+            "type": "number",
+            "title": "Expense This Month"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "all-wallets",
+              "single-wallet"
+            ],
+            "title": "Scope",
+            "default": "all-wallets"
+          }
+        },
+        "type": "object",
+        "required": [
+          "income_this_month",
+          "expense_this_month"
+        ],
+        "title": "RecentTransactionsWidgetData"
       },
       "RegisterRequest": {
         "properties": {
@@ -7282,6 +7906,64 @@
         ],
         "title": "SubscriptionTier",
         "description": "Subscription tier \u2014 determines which features are accessible."
+      },
+      "TaskListWidgetData": {
+        "properties": {
+          "filter": {
+            "type": "string",
+            "enum": [
+              "all",
+              "today",
+              "high"
+            ],
+            "title": "Filter"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TodoTaskRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "filter",
+          "total"
+        ],
+        "title": "TaskListWidgetData"
+      },
+      "TodayWidgetData": {
+        "properties": {
+          "due_today": {
+            "type": "integer",
+            "title": "Due Today"
+          },
+          "overdue": {
+            "type": "integer",
+            "title": "Overdue"
+          },
+          "next_due_task": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TodoTaskRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "due_today",
+          "overdue"
+        ],
+        "title": "TodayWidgetData"
       },
       "TodoActionResponse": {
         "properties": {
@@ -8089,6 +8771,59 @@
         ],
         "title": "TokenResponse"
       },
+      "TotalBalanceWidgetData": {
+        "properties": {
+          "total_balance": {
+            "type": "number",
+            "title": "Total Balance"
+          },
+          "wallet_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wallet Name"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "wallet_count": {
+            "type": "integer",
+            "title": "Wallet Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_balance",
+          "wallet_count"
+        ],
+        "title": "TotalBalanceWidgetData"
+      },
+      "UpcomingWidgetData": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CalendarEventRead"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "title": "UpcomingWidgetData"
+      },
       "UpdateCategoryRequest": {
         "properties": {
           "name": {
@@ -8280,6 +9015,60 @@
         ],
         "title": "WebhookAck"
       },
+      "WidgetDataConfigSchema": {
+        "properties": {
+          "_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "user_id": {
+            "type": "string",
+            "title": "User Id"
+          },
+          "widget_id": {
+            "type": "string",
+            "title": "Widget Id"
+          },
+          "config": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Config"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "widget_id"
+        ],
+        "title": "WidgetDataConfigSchema",
+        "description": "Persisted per-widget data config."
+      },
+      "WidgetDataConfigUpdate": {
+        "properties": {
+          "widget_id": {
+            "type": "string",
+            "title": "Widget Id"
+          },
+          "config": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Config"
+          }
+        },
+        "type": "object",
+        "required": [
+          "widget_id"
+        ],
+        "title": "WidgetDataConfigUpdate",
+        "description": "Update payload for widget data config."
+      },
       "WidgetManifestSchema": {
         "properties": {
           "id": {
@@ -8362,10 +9151,17 @@
             "title": "Sort Order",
             "default": 0
           },
-          "config": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Config"
+          "grid_x": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Grid X",
+            "default": 0
+          },
+          "grid_y": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Grid Y",
+            "default": 0
           },
           "size_w": {
             "anyOf": [
@@ -8430,6 +9226,13 @@
             },
             "type": "array",
             "title": "Widget Preferences"
+          },
+          "widget_data_configs": {
+            "items": {
+              "$ref": "#/components/schemas/WidgetDataConfigSchema"
+            },
+            "type": "array",
+            "title": "Widget Data Configs"
           }
         },
         "type": "object",

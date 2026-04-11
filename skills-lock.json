@@ -36,6 +36,11 @@
       "sourceType": "github",
       "computedHash": "e7fb3a7334214c6baa5d520e9d4360419933445f36fcf29cc217e0ec988a78e1"
     },
+    "simplify": {
+      "source": "aaddrick/claude-desktop-debian",
+      "sourceType": "github",
+      "computedHash": "d5a0d3abe237ecfb257247a1f4cc06949802ef8aed8ca0546c4472d2581aff74"
+    },
     "superdesign": {
       "source": "superdesigndev/superdesign-skill",
       "sourceType": "github",

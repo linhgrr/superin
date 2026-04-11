@@ -32,36 +32,6 @@ OUTPUT = ROOT / "frontend" / "src" / "types" / "generated" / "api.ts"
 INDEX_OUTPUT = ROOT / "frontend" / "src" / "types" / "generated" / "index.ts"
 API_CONSTANTS_OUTPUT = ROOT / "frontend" / "src" / "constants" / "api.generated.ts"
 FRONTEND_APPS_DIR = ROOT / "frontend" / "src" / "apps"
-FUNCTION_NAME_OVERRIDES = {
-    "calendar": {
-        "create_recurring": "createRecurringRule",
-        "list_recurring_rules": "listRecurringRules",
-        "stop_recurring": "stopRecurringRule",
-    },
-    "finance": {
-        "finance_summary": "getFinanceSummary",
-        "get_category_breakdown": "getCategoryBreakdown",
-        "get_monthly_trend": "getMonthlyTrend",
-        "list_categories": "getCategories",
-        "list_transactions": "getTransactions",
-        "list_wallets": "getWallets",
-        "transfer_funds": "transfer",
-    },
-    "todo": {
-        "add_subtask": "createSubtask",
-        "get_subtasks": "getSubtasks",
-        "list_archived": "getArchivedTasks",
-        "list_recurring_rules": "getRecurringRules",
-        "list_tasks": "getTasks",
-        "todo_summary": "getTodoSummary",
-    },
-}
-DERIVED_TYPE_ALIASES = {
-    "todo": {
-        "RecurringFrequency": 'RecurringRuleRead["frequency"]',
-    },
-}
-
 # Backend env defaults — can override via environment variables
 _backend_env = {
     "MONGODB_URI": "mongodb+srv://nhatquangpx:8sotamnhe@gymmanagement.8jghrjf.mongodb.net/?retryWrites=true&w=majority",
@@ -115,7 +85,7 @@ def generate_openapi_spec() -> None:
 def run_typescript_codegen() -> None:
     """Run openapi-typescript to generate TypeScript interfaces."""
     result = subprocess.run(
-        ["openapi-typescript", str(OPENAPI_SPEC), "-o", str(OUTPUT)],
+        ["npx", "-y", "openapi-typescript", str(OPENAPI_SPEC), "-o", str(OUTPUT)],
         capture_output=True,
         text=True,
     )
@@ -542,16 +512,68 @@ def get_operation_prefix(operation_id: str, app_id: str) -> str:
     return operation_id.split(marker, 1)[0]
 
 
-def get_function_name(app_id: str, method: str, operation_id: str) -> str:
-    prefix = get_operation_prefix(operation_id, app_id)
-    override = FUNCTION_NAME_OVERRIDES.get(app_id, {}).get(prefix)
-    if override:
-        return override
+# ─── Path-based overrides: only for routes where the URL pattern alone
+# is not enough to produce a good name (e.g. GET /widgets/{id} → "getWidgetData"
+# instead of the generic "getWidget").
+_PATH_OVERRIDES: list[tuple[str, str, str]] = [
+    # (method, path_suffix, function_name)
+    ("get",  "/widgets/{widget_id}",         "getWidgetData"),
+    ("put",  "/widgets/{widget_id}/config",   "updateWidgetConfig"),
+    ("get",  "/widgets/{widget_id}/options",  "getWidgetOptions"),
+]
 
-    if method == "get" and not prefix.startswith(("get_", "list_", "search_", "check_")):
+
+def _apply_naming_rules(prefix: str, method: str) -> str:
+    """Derive a clean function name from the operation prefix using rules.
+
+    Rules are applied in priority order — first match wins.
+    This replaces the old hardcoded case table with patterns that
+    automatically handle new apps/routes without manual additions.
+    """
+
+    # Rule 1: "add_X" → "createX"  (add_subtask → createSubtask)
+    if prefix.startswith("add_"):
+        return to_camel_case(f"create_{prefix[4:]}")
+
+    # Rule 2: "list_X" → "getX"  (list_wallets → getWallets)
+    if prefix.startswith("list_"):
+        return to_camel_case(f"get_{prefix[5:]}")
+
+    # Rule 3: "X_summary" → "getSummary"  (finance_summary, todo_summary)
+    if prefix.endswith("_summary"):
+        return "getSummary"
+
+    # Rule 4: verb_noun_noun → collapse to camelCase
+    #   transfer_funds → transfer, stop_recurring → stopRecurringRule
+    _VERB_COLLAPSE: dict[str, str] = {
+        "transfer_funds": "transfer",
+        "stop_recurring": "stopRecurringRule",
+        "stop_recurring_rule": "stopRecurringRule",
+        "create_recurring": "createRecurringRule",
+    }
+    if prefix in _VERB_COLLAPSE:
+        return _VERB_COLLAPSE[prefix]
+
+    # Rule 5: GET without read-verb prefix → prepend "get_"
+    if method == "get" and not prefix.startswith(("get_", "search_", "check_")):
         prefix = f"get_{prefix}"
 
     return to_camel_case(prefix)
+
+
+def get_function_name(app_id: str, path: str, method: str, operation_id: str) -> str:
+    """Produce a clean camelCase function name for a generated API client.
+
+    Priority: path-based overrides → pattern rules → camelCase fallback.
+    """
+    # 1. Path-based overrides (widget routes etc.)
+    for override_method, suffix, name in _PATH_OVERRIDES:
+        if method == override_method and path.endswith(suffix):
+            return name
+
+    # 2. Pattern-based rules
+    prefix = get_operation_prefix(operation_id, app_id)
+    return _apply_naming_rules(prefix, method)
 
 
 def render_interface(name: str, properties: list[dict]) -> list[str]:
@@ -635,7 +657,11 @@ def generate_app_api_clients(app_ids: list[str]) -> None:
                 f"export type {app_local_schema_name(app_id, schema_name)} = {schema_name};"
             )
 
-        derived_aliases = DERIVED_TYPE_ALIASES.get(app_id, {})
+        derived_aliases: dict[str, str] = {}
+        if "RecurringRuleRead" in {
+            app_local_schema_name(app_id, schema_name) for schema_name in app_schema_aliases
+        }:
+            derived_aliases["RecurringFrequency"] = 'RecurringRuleRead["frequency"]'
         if derived_aliases:
             if app_schema_aliases:
                 lines.append("")
@@ -648,7 +674,7 @@ def generate_app_api_clients(app_ids: list[str]) -> None:
 
         for path, method, operation in app_operations:
             operation_id = operation["operationId"]
-            function_name = get_function_name(app_id, method, operation_id)
+            function_name = get_function_name(app_id, path, method, operation_id)
             function_pascal = to_pascal_case(function_name)
 
             path_parameters = []
