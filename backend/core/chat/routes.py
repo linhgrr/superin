@@ -50,7 +50,7 @@ async def chat_stream(request: Request, user_id: str = Depends(get_current_user)
 
         try:
             async for event in root_agent.astream(
-                user_id, messages, thread_id=thread_id, skip_db_load=True
+                user_id, messages, thread_id=thread_id
             ):
                 event_type = event.get("type")
 

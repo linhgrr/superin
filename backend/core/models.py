@@ -5,7 +5,6 @@ Plugin-specific models live in backend/apps/{app_id}/models.py.
 """
 
 from datetime import UTC, datetime
-from typing import Literal
 
 from beanie import Document, PydanticObjectId
 from pydantic import Field
@@ -127,25 +126,3 @@ class AppCategory(Document):
             IndexModel([("name", 1)], name="app_categories_name_unique", unique=True),
         ]
 
-
-class ConversationMessage(Document):
-    """Persisted chat history for the root agent orchestrator."""
-
-    user_id: PydanticObjectId
-    thread_id: str
-    role: Literal["user", "assistant"]
-    content: str
-    created_at: datetime = Field(default_factory=utc_now)
-
-    class Settings:
-        name = "conversation_messages"
-        indexes = [
-            IndexModel(
-                [("user_id", 1), ("thread_id", 1), ("created_at", 1)],
-                name="conversation_messages_user_thread_created_at",
-            ),
-            IndexModel(
-                [("thread_id", 1), ("created_at", 1)],
-                name="conversation_messages_thread_created_at",
-            ),
-        ]

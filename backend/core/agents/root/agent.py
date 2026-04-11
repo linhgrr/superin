@@ -19,9 +19,10 @@ from langchain_core.tools import BaseTool
 from langgraph.prebuilt import create_react_agent
 
 from core.config import settings
-from core.models import ConversationMessage, User
+from core.db import get_checkpointer, get_store
+from core.models import User
 from core.registry import PLUGIN_REGISTRY
-from core.utils.sanitizer import sanitize_for_memory_async, sanitize_user_content_async
+from core.utils.sanitizer import sanitize_user_content_async
 from core.utils.timezone import get_user_local_time
 from core.workspace.service import list_installed_app_ids
 from shared.agent_context import clear_agent_context, set_thread_context, set_user_context
@@ -392,6 +393,8 @@ class RootAgent:
             model=get_llm(),
             tools=tools,
             prompt=self._system_prompt or None,
+            checkpointer=get_checkpointer(),
+            store=get_store(),
         )
         self._graphs[tool_names] = graph
 
@@ -401,64 +404,29 @@ class RootAgent:
 
         return graph
 
-    async def _load_history(self, user_id: str, thread_id: str) -> list[ConversationMessage]:
-        """Load the most recent message history from MongoDB for a thread.
 
-        Capped to MAX_HISTORY_MESSAGES to prevent OOM and context overflow.
-        Messages are returned in chronological order (oldest-first).
-        """
-        return await ConversationMessage.find(
-            {
-                "user_id": PydanticObjectId(user_id),
-                "thread_id": thread_id,
-            },
-        ).sort("-created_at").limit(MAX_HISTORY_MESSAGES).to_list()
-
-    async def _save_messages(
-        self,
-        user_id: str,
-        thread_id: str,
-        user_content: str,
-        assistant_content: str,
-    ) -> None:
-        """Persist user + assistant messages to MongoDB after streaming completes.
-
-        Content is sanitized before storage to prevent ASI06: Memory Poisoning.
-        """
-        sanitized_user = await sanitize_for_memory_async(user_content)
-        sanitized_assistant = await sanitize_for_memory_async(assistant_content)
-
-        if sanitized_user:
-            await ConversationMessage(
-                user_id=PydanticObjectId(user_id),
-                thread_id=thread_id,
-                role="user",
-                content=sanitized_user,
-            ).insert()
-        if sanitized_assistant:
-            await ConversationMessage(
-                user_id=PydanticObjectId(user_id),
-                thread_id=thread_id,
-                role="assistant",
-                content=sanitized_assistant,
-            ).insert()
 
     async def astream(
         self,
         user_id: str,
         messages: list[dict[str, Any]],
         thread_id: str | None = None,
-        skip_db_load: bool = False,
     ) -> AsyncGenerator[dict[str, Any], None]:
         """
         Stream data-stream events for the frontend chat UI.
 
-        If skip_db_load is False (default): loads history from MongoDB,
-        merges with incoming messages, then saves new messages back to DB.
-        If skip_db_load is True: only uses the incoming messages (frontend
-        sends the full history, e.g. when using assistant-ui's Thread runtime).
+        History is automatically managed by LangGraph's checkpointer.
+        Incoming messages are dynamically appended to the state before execution.
         """
-        thread = thread_id or f"user:{user_id}"
+        if thread_id:
+            # Enforce user isolation in thread IDs to block horizontal access
+            if not thread_id.startswith(f"user:{user_id}"):
+                thread = f"user:{user_id}:{thread_id}"
+            else:
+                thread = thread_id
+        else:
+            thread = f"user:{user_id}"
+
         set_user_context(user_id)
         set_thread_context(thread)
 
@@ -468,41 +436,16 @@ class RootAgent:
 
         try:
             langchain_messages = await self._build_message_list(
-                user_id, messages, thread, skip_db_load
+                user_id, messages, thread
             )
-
-            # Extract the last user message for persistence
-            last_user_content = ""
-            for msg in reversed(messages):
-                if msg.get("role") == "user":
-                    content = msg.get("content", "")
-                    if isinstance(content, list):
-                        last_user_content = " ".join(
-                            p.get("text", "") for p in content
-                            if isinstance(p, dict) and p.get("type") == "text"
-                        )
-                    else:
-                        last_user_content = str(content)
-                    break
 
             # Run graph and yield stream events
             async for event_dict in self._run_graph_stream(
-                graph, thread, event_handler, langchain_messages
+                graph, thread, user_id, event_handler, langchain_messages
             ):
                 yield event_dict
 
-            # Persist to MongoDB (fire-and-forget, don't block the stream end)
-            pending_save = asyncio.create_task(
-                self._save_messages(user_id, thread, last_user_content, event_handler.assistant_buffer)
-            )
-
             yield {"type": ChatEventType.DONE}
-
-            # Ensure the DB write completes before the response closes
-            try:
-                await pending_save
-            except Exception:
-                logger.exception("Failed to persist conversation messages")
         finally:
             clear_agent_context()
 
@@ -511,7 +454,6 @@ class RootAgent:
         user_id: str,
         messages: list[dict[str, Any]],
         thread: str,
-        skip_db_load: bool,
     ) -> list[BaseMessage]:
         """Build LangChain message list from frontend messages and history."""
         langchain_messages: list[BaseMessage] = []
@@ -535,17 +477,7 @@ class RootAgent:
             SystemMessage(content=build_available_apps_context(installed_app_ids))
         )
 
-        # Load history from DB if not skipping
-        if not skip_db_load:
-            history = await self._load_history(user_id, thread)
-            # _load_history returns newest-first (for efficient LIMIT),
-            # reverse to chronological order for the LLM.
-            for msg in reversed(history):
-                langchain_messages.append(
-                    HumanMessage(content=msg.content) if msg.role == "user" else AIMessage(content=msg.content)
-                )
-
-        # Parse frontend messages
+        # Parse frontend messages (history is automatically loaded by the checkpointer)
         parser = MessageParser()
         for msg in messages:
             parsed = await parser.parse(msg)
@@ -566,12 +498,16 @@ class RootAgent:
         self,
         graph: Any,
         thread: str,
+        user_id: str,
         event_handler: EventStreamHandler,
         langchain_messages: list[BaseMessage],
     ) -> AsyncGenerator[dict[str, Any], None]:
         """Run graph and yield stream events."""
         config = {
-            "configurable": {"thread_id": thread},
+            "configurable": {
+                "thread_id": thread,
+                "user_id": user_id,
+            },
             "recursion_limit": 50,
         }
 

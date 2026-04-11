@@ -13,10 +13,8 @@ Hierarchy:
         └── Tool: ask_todo      ──→ TodoAgent    (child graph, app-scoped thread)
 
 Message persistence:
-  - ConversationMessage (core/models.py) stores full history in MongoDB.
-  - RootAgent can load history for non-assistant-ui callers.
-  - assistant-ui callers send full message history, so the chat route skips DB reload.
-  - After streaming completes, new user/assistant turns are saved back to DB.
+  - LangGraph's `MongoDBSaver` checkpointer handles short-term conversation thread state.
+  - LangGraph's `MongoDBStore` handles long-term persistent knowledge.
   - Each child AppAgent is a stateless LangGraph specialist invoked by the root agent.
 """
 

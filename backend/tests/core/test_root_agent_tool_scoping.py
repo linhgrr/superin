@@ -1,4 +1,3 @@
-from beanie import PydanticObjectId
 from langchain_core.tools import tool
 
 from core.agents.root.agent import EventStreamHandler, RootAgent
@@ -131,43 +130,6 @@ def test_event_stream_handler_surfaces_multiple_parallel_root_tool_calls() -> No
     assert handler.active_delegations == set()
 
 
-async def test_load_history_scopes_by_user_and_thread(monkeypatch) -> None:
-    agent = RootAgent()
-    expected_user_id = "507f1f77bcf86cd799439011"
-    captured: dict[str, object] = {}
-
-    class FakeCursor:
-        def sort(self, field: str):
-            captured["sort"] = field
-            return self
-
-        def limit(self, value: int):
-            captured["limit"] = value
-            return self
-
-        async def to_list(self):
-            return []
-
-    def fake_find(query: dict[str, object]):
-        captured["query"] = query
-        return FakeCursor()
-
-    monkeypatch.setattr(
-        "core.agents.root.agent.ConversationMessage.find",
-        staticmethod(fake_find),
-    )
-
-    history = await agent._load_history(expected_user_id, "thread-1")
-
-    assert history == []
-    assert captured["query"] == {
-        "user_id": PydanticObjectId(expected_user_id),
-        "thread_id": "thread-1",
-    }
-    assert captured["sort"] == "-created_at"
-    assert captured["limit"] == 50
-
-
 def _finance_manifest() -> AppManifestSchema:
     return AppManifestSchema(
         id="finance",
@@ -247,7 +209,6 @@ async def test_build_message_list_includes_user_installed_status(monkeypatch) ->
         "507f1f77bcf86cd799439011",
         [],
         "thread-1",
-        skip_db_load=True,
     )
 
     assert len(messages) == 1
