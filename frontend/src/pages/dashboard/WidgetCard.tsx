@@ -59,7 +59,10 @@ const WidgetCard = memo(function WidgetCard({
             justifyContent: "space-between",
           }}
         >
-          <span>{widget.name}</span>
+          <span style={{ display: "flex", alignItems: "center", gap: "0.375rem" }}>
+            {widget.icon && <DynamicIcon name={widget.icon} size={14} />}
+            <span>{widget.name}</span>
+          </span>
           {hasSettings && (
             <button
               onClick={(e) => {

@@ -24,7 +24,8 @@ Hệ thống hỗ trợ true plug-n-play cho plugins:
 **Backend:**
 - Auto-discovery qua `backend/core/discovery.py` — tự scan và import tất cả folders trong `backend/apps/`
 - Mỗi app tự đăng ký qua `register_plugin()` trong `__init__.py`
-- **Platform code** (core/, shared/) KHÔNG ĐƯỢC import từ bất kỳ app nào trong `apps/`
+- **Apps được phép import từ platform code** (`core/`, `shared/`, `core/utils/`). Apps có thể dùng `User`, `utc_now()`, `get_user_timezone_context()`, v.v. — đây là chiều import hợp lệ.
+- **Platform code tuyệt đối không biết về apps** — `core/`, `shared/` không được import từ `apps/`. Nếu một app thay đổi, platform không được rebuild hay redeploy.
 
 **Frontend:**
 - Auto-discovery qua Vite glob import trong `src/lib/discovery.ts`
@@ -215,7 +216,7 @@ cd frontend && npm run build
 
 ### ⚠️ ABSOLUTE RULES - Never Violate
 
-1. **Platform agnostic to Apps** — Platform code (`src/lib/`, `src/components/`, `backend/core/`, `backend/shared/`) KHÔNG ĐƯỢC import từ bất kỳ app nào
+1. **Platform agnostic to Apps** — Platform code (`src/lib/`, `src/components/`, `src/hooks/`, `backend/core/`, `backend/shared/`) tuyệt đối không được import từ app nào. **Chiều ngược lại (app → platform) là hợp lệ:** apps được phép import từ `shared/utils/timezone.ts`, `useTimezone`, `core.utils.timezone`, `User`, `utc_now()`, v.v.
 2. **App containment** — Mỗi app chứa tất cả code của mình trong `src/apps/{app_id}/`
 3. **Apps có thể import từ nhau** — Cross-app integration được phép (vd: calendar import từ todo)
 4. **`src/shared/` là cầu nối hợp lệ** — `shared/utils/` và `shared/hooks/` dành cho pure utilities (timezone, formatters). Apps được phép import từ đây. Không bao giờ để app-specific logic ở `shared/`.
@@ -230,7 +231,7 @@ cd frontend && npm run build
 
 **Backend lưu UTC, hiển thị theo user timezone.** Mọi tính toán date/time phải đi qua timezone context — không dùng `datetime.now()` trực tiếp (nếu cần lấy UTC global, hãy dùng `core.models.utc_now()`).
 
-- **Backend (User Time):** Dùng `get_user_timezone_context(user)` từ `core/timezone.py`. Luôn dùng `ctx.now_utc()` hoặc `ctx.now_local()`. Dùng `ctx.today_range()`, `ctx.month_range()` cho date-range queries (due date, "income this month").
+- **Backend (User Time):** Dùng `get_user_timezone_context(user)` từ `core/utils/timezone.py`. Luôn dùng `ctx.now_utc()` hoặc `ctx.now_local()`. Dùng `ctx.today_range()`, `ctx.month_range()` cho date-range queries (due date, "income this month").
 - **Backend (Database/MongoDB):** Beanie/Motor mặc định thỉnh thoảng biến Datetime mất timezone (thành Naive). Rất dễ bị crash `TypeError: can't compare offset-naive and offset-aware datetimes`.
   - Luôn sử dụng `ensure_aware_utc(dt)` (từ `core.utils.timezone`) để gắn lại múi giờ UTC nếu nghi ngờ dt lấy từ MongoDB lên bị mất múi giờ.
   - Khi cần query MongoDB thủ công bằng range filter, dùng `ensure_naive_utc(dt)` để gỡ tzinfo gởi xuống DB để compare chính xác.

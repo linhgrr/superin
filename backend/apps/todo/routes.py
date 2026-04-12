@@ -1,6 +1,5 @@
 """Todo plugin FastAPI routes."""
 
-from datetime import datetime
 
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -27,6 +26,7 @@ from apps.todo.service import task_service
 from core.auth.dependencies import get_current_user
 from core.models import User, WidgetPreference
 from core.registry import WIDGET_DATA_HANDLERS
+from core.utils.timezone import get_user_timezone_context
 from core.widget_config import resolve_widget_config, upsert_widget_config
 from shared.preference_utils import (
     preference_to_schema,
@@ -58,12 +58,13 @@ async def get_task_list_widget_data(
     config: TaskListWidgetConfig,
 ) -> TaskListWidgetData:
     tasks = await task_service.list_tasks(user_id, None, None, None, False, max(config.limit * 3, 20))
-    today_key = datetime.now().date().isoformat()
-
     if config.filter == "today":
+        user = await User.get(PydanticObjectId(user_id))
+        ctx = get_user_timezone_context(user)
+        start, end = ctx.today_range()
         items = [
             task for task in tasks
-            if task.get("due_date") and str(task["due_date"]).startswith(today_key)
+            if task.get("due_date") and start <= task["due_date"] <= end
         ]
     elif config.filter == "high":
         items = [task for task in tasks if task.get("priority") == "high"]

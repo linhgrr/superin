@@ -1,7 +1,7 @@
 """Calendar plugin FastAPI routes."""
 
 from calendar import month_name, monthrange
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -151,7 +151,7 @@ async def get_upcoming_widget_data(
     user_id: str,
     config: UpcomingWidgetConfig,
 ) -> UpcomingWidgetData:
-    start = datetime.utcnow()
+    start = datetime.now(UTC)
     end = start + timedelta(days=30)
     items = await calendar_service.list_events(
         user_id,

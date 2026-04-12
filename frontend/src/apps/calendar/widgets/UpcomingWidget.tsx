@@ -3,7 +3,7 @@ import { getWidgetData, type UpcomingWidgetData, type EventRead } from "../api";
 import { DynamicIcon } from "@/lib/icon-resolver";
 import { useWidgetData } from "@/lib/widget-data";
 import { useTimezone } from "@/shared/hooks/useTimezone";
-import { getUserTimezone } from "@/shared/utils/timezone";
+import { utcToLocalDate } from "@/shared/utils/timezone";
 
 export default function UpcomingWidget({ widget }: DashboardWidgetRendererProps) {
   const { data, isLoading } = useWidgetData<UpcomingWidgetData>(
@@ -11,22 +11,21 @@ export default function UpcomingWidget({ widget }: DashboardWidgetRendererProps)
     widget.id,
     () => getWidgetData(widget.id) as Promise<UpcomingWidgetData>
   );
-  const { timezone, formatDate, formatTime, isToday } = useTimezone();
+  const { formatDate, formatTime, isToday } = useTimezone();
 
   const events = data?.items ?? [];
 
   const formatEventDate = (dateStr: string) => {
     if (isToday(dateStr)) return "Today";
 
-    const date = new Date(dateStr);
-    const tz = timezone || getUserTimezone();
+    const dateInTz = utcToLocalDate(dateStr);
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowInTz = utcToLocalDate(tomorrow.toISOString());
 
-    const dateInTz = new Date(date.toLocaleString("en-US", { timeZone: tz }));
-    const tomorrowInTz = new Date(tomorrow.toLocaleString("en-US", { timeZone: tz }));
-
-    if (dateInTz.toDateString() === tomorrowInTz.toDateString()) return "Tomorrow";
+    if (dateInTz && tomorrowInTz && dateInTz.toDateString() === tomorrowInTz.toDateString()) {
+      return "Tomorrow";
+    }
 
     return formatDate(dateStr, { weekday: "short", month: "short", day: "numeric" });
   };

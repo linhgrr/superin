@@ -4,6 +4,7 @@ import { formatCurrency } from "../lib/formatCurrency";
 import { getWidgetData, type RecentTransactionsWidgetData } from "../api";
 import { DynamicIcon } from "@/lib/icon-resolver";
 import { useWidgetData } from "@/lib/widget-data";
+import { useTimezone } from "@/shared/hooks/useTimezone";
 
 const RECENT_TRANSACTION_RENDER_LIMIT = 3;
 
@@ -13,6 +14,7 @@ export default function RecentTransactionsWidget({ widget }: DashboardWidgetRend
     widget.id,
     () => getWidgetData(widget.id) as Promise<RecentTransactionsWidgetData>
   );
+  const { formatDate } = useTimezone();
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", justifyContent: "center", gap: "0.5rem" }}>
@@ -60,7 +62,7 @@ export default function RecentTransactionsWidget({ widget }: DashboardWidgetRend
                     {item.note || "Untitled transaction"}
                   </div>
                   <div style={{ fontSize: "0.6875rem", color: "var(--color-foreground-muted)" }}>
-                    {new Date(item.date).toLocaleDateString()}
+                  {formatDate(item.date)}
                   </div>
                 </div>
               </div>
