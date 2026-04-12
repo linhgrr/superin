@@ -81,6 +81,20 @@ export default function AppListItem({
           <span className="badge badge-neutral" style={{ fontSize: "0.625rem", padding: "0.125rem 0.5rem" }}>
             {category.name}
           </span>
+          {app.requires_tier && app.requires_tier !== "free" && (
+            <span
+              className="badge"
+              style={{
+                fontSize: "0.625rem",
+                padding: "0.125rem 0.5rem",
+                background: "var(--color-primary)",
+                color: "white",
+                border: "none",
+              }}
+            >
+              PRO
+            </span>
+          )}
         </div>
         <p
           style={{

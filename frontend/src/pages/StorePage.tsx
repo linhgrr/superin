@@ -144,10 +144,23 @@ export default function StorePage() {
         });
       }
       await refreshWorkspace();
-    } catch {
-      toast.error(`Failed to ${nextInstalled ? "install" : "uninstall"} ${app.name}`, {
-        description: "Please try again later",
-      });
+    } catch (err) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const error = err as any;
+      const detail = error?.response?.data?.detail || error?.response?.data?.error || error.message || "Please try again later";
+      if (typeof detail === "string" && detail.toLowerCase().includes("requires a paid subscription")) {
+        toast.error(`Premium Required`, {
+          description: `The ${app.name} app requires a Pro subscription to install.`,
+          action: {
+            label: "Upgrade",
+            onClick: () => { window.location.href = ROUTES.BILLING; },
+          },
+        });
+      } else {
+        toast.error(`Failed to ${nextInstalled ? "install" : "uninstall"} ${app.name}`, {
+          description: typeof detail === "string" ? detail : "Please try again later",
+        });
+      }
       setAppInstalled(app, app.is_installed); // revert
       await refreshWorkspace();
     } finally {

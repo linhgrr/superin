@@ -61,6 +61,20 @@ export default function AppCard({
             >
               {category.name}
             </span>
+            {app.requires_tier && app.requires_tier !== "free" && (
+              <span
+                className="badge"
+                style={{
+                  fontSize: "0.625rem",
+                  padding: "0.125rem 0.5rem",
+                  background: "var(--color-primary)",
+                  color: "white",
+                  border: "none",
+                }}
+              >
+                PRO
+              </span>
+            )}
             <span>v{app.version}</span>
           </div>
         </div>
