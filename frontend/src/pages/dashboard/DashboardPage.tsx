@@ -8,7 +8,7 @@
  */
 
 import { useMemo } from "react";
-import { DynamicIcon } from "@/lib/icon-resolver";
+
 
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { getSizeConfig } from "./layout-engine";
@@ -63,8 +63,8 @@ export default function DashboardPage() {
   if (allWidgets.length === 0) {
     return (
       <div className="empty-state" style={{ height: "60vh" }}>
-        <div className="empty-state-icon">
-          <DynamicIcon name="Sparkles" size={32} />
+        <div className="empty-state-icon" style={{ background: "transparent", boxShadow: "none", width: "auto", height: "auto" }}>
+          <img src="/branding/logo.png" alt="Shin Logo" style={{ width: "48px", height: "auto", opacity: 0.5 }} />
         </div>
         <h3 className="empty-state-title">Welcome to Shin</h3>
         <p className="empty-state-description">

@@ -56,8 +56,8 @@ function Sidebar() {
     <aside className="sidebar">
       {/* Brand */}
       <div className="sidebar-brand">
-        <div className="sidebar-brand-icon">
-          <DynamicIcon name="Sparkles" size={18} />
+        <div className="sidebar-brand-icon" style={{ background: "transparent", boxShadow: "none" }}>
+          <img src="/branding/logo.png" alt="Shin Logo" style={{ width: "24px", height: "auto" }} />
         </div>
         <span className="sidebar-brand-text">Shin</span>
       </div>

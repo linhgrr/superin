@@ -111,8 +111,8 @@ export default function LoginPage() {
       <div className="login-card">
         {/* Brand */}
         <div className="login-brand">
-          <div className="login-brand-icon">
-            <DynamicIcon name="Sparkles" size={28} />
+          <div className="login-brand-icon" style={{ background: "transparent", boxShadow: "none" }}>
+            <img src="/branding/logo.png" alt="Shin Logo" style={{ width: "36px", height: "auto" }} />
           </div>
           <h1 className="login-brand-title">{APP_NAME}</h1>
           <p className="login-brand-subtitle">
