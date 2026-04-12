@@ -2,6 +2,12 @@
    WIDGET GRID — Dynamic Layout
    ═══════════════════════════════════════════════════════════════════════════════ */
 
+/* Theme Logo Toggles */
+.theme-logo-light { display: block; }
+.theme-logo-dark { display: none; }
+html.dark .theme-logo-light { display: none; }
+html.dark .theme-logo-dark { display: block; }
+
 .widget-grid {
   display: grid;
   grid-template-columns: repeat(12, 1fr);

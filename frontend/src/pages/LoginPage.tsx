@@ -112,7 +112,8 @@ export default function LoginPage() {
         {/* Brand */}
         <div className="login-brand">
           <div className="login-brand-icon" style={{ background: "transparent", boxShadow: "none" }}>
-            <img src="/branding/logo.png" alt="Shin Logo" style={{ width: "36px", height: "auto" }} />
+            <img src="/branding/logo.png" alt="Logo" className="theme-logo-light" style={{ width: "36px", height: "auto" }} />
+            <img src="/branding/logo-white.png" alt="Logo" className="theme-logo-dark" style={{ width: "36px", height: "auto" }} />
           </div>
           <h1 className="login-brand-title">{APP_NAME}</h1>
           <p className="login-brand-subtitle">
