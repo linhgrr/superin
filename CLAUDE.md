@@ -228,9 +228,12 @@ cd frontend && npm run build
 
 ### Datetime Conventions
 
-**Backend lưu UTC, hiển thị theo user timezone.** Mọi tính toán date/time phải đi qua timezone context — không dùng `datetime.now()` trực tiếp.
+**Backend lưu UTC, hiển thị theo user timezone.** Mọi tính toán date/time phải đi qua timezone context — không dùng `datetime.now()` trực tiếp (nếu cần lấy UTC global, hãy dùng `core.models.utc_now()`).
 
-- **Backend:** Dùng `get_user_timezone_context(user)` từ `core/timezone.py`. Luôn dùng `ctx.now_utc()` hoặc `ctx.now_local()` thay vì `datetime.now()`. Dùng `ctx.today_range()`, `ctx.month_range()` cho date-range queries (due date, "income this month").
+- **Backend (User Time):** Dùng `get_user_timezone_context(user)` từ `core/timezone.py`. Luôn dùng `ctx.now_utc()` hoặc `ctx.now_local()`. Dùng `ctx.today_range()`, `ctx.month_range()` cho date-range queries (due date, "income this month").
+- **Backend (Database/MongoDB):** Beanie/Motor mặc định thỉnh thoảng biến Datetime mất timezone (thành Naive). Rất dễ bị crash `TypeError: can't compare offset-naive and offset-aware datetimes`.
+  - Luôn sử dụng `ensure_aware_utc(dt)` (từ `core.utils.timezone`) để gắn lại múi giờ UTC nếu nghi ngờ dt lấy từ MongoDB lên bị mất múi giờ.
+  - Khi cần query MongoDB thủ công bằng range filter, dùng `ensure_naive_utc(dt)` để gỡ tzinfo gởi xuống DB để compare chính xác.
 - **Frontend:** Dùng `shared/utils/timezone.ts` để convert UTC → local khi hiển thị. Không tính toán timezone ở FE — chỉ convert để hiển thị, logic nghiệp vụ luôn ở BE.
 
 ### Backend `shared/` Conventions

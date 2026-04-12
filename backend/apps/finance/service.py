@@ -16,7 +16,7 @@ from apps.finance.repository import (
     finance_transaction,
 )
 from core.models import User
-from core.utils.timezone import get_user_timezone_context
+from core.utils.timezone import get_user_timezone_context, ensure_naive_utc
 
 
 class FinanceService:
@@ -430,7 +430,7 @@ class FinanceService:
         start_of_month, _ = ctx.month_range()
 
         # Filter transactions at DB level by date range
-        start_naive = start_of_month.replace(tzinfo=None)
+        start_naive = ensure_naive_utc(start_of_month)
         txs = await self.transactions.find_by_user(
             user_id, start_date=start_naive, skip=0, limit=10000
         )
@@ -455,7 +455,7 @@ class FinanceService:
         start_of_month, _ = ctx.month_range()
 
         # Run independent queries concurrently with DB-level date filtering
-        start_naive = start_of_month.replace(tzinfo=None)
+        start_naive = ensure_naive_utc(start_of_month)
         categories, txs = await asyncio.gather(
             self.categories.find_by_user(user_id),
             self.transactions.find_by_user(

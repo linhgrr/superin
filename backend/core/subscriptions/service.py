@@ -782,6 +782,8 @@ async def _cancel_stripe_subscription(provider_subscription_id: str) -> None:
         )
 
 
+from core.utils.timezone import ensure_aware_utc
+
 def _is_payos_subscription_expired(sub: Subscription, *, now: datetime | None = None) -> bool:
     if sub.provider != PaymentProvider.PAYOS:
         return False
@@ -790,13 +792,8 @@ def _is_payos_subscription_expired(sub: Subscription, *, now: datetime | None = 
     if sub.expires_at is None:
         return False
         
-    expires = sub.expires_at
-    if expires.tzinfo is None:
-        expires = expires.replace(tzinfo=UTC)
-        
-    reference_time = now or datetime.now(UTC)
-    if reference_time.tzinfo is None:
-        reference_time = reference_time.replace(tzinfo=UTC)
+    expires = ensure_aware_utc(sub.expires_at)
+    reference_time = ensure_aware_utc(now or datetime.now(UTC))
         
     return expires <= reference_time
 

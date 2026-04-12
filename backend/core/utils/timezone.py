@@ -25,6 +25,29 @@ from pytz.tzinfo import DstTzInfo, StaticTzInfo
 
 from core.models import User
 
+
+def ensure_aware_utc(dt: datetime) -> datetime:
+    """Ensure a datetime is timezone-aware and set to UTC.
+    
+    If the datetime is naive (missing timezone info), it is assumed to be UTC
+    and made aware. If it already has timezone info, it is converted to UTC.
+    """
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC)
+
+
+def ensure_naive_utc(dt: datetime) -> datetime:
+    """Ensure a datetime is timezone-naive but based on UTC time.
+    
+    This is useful for MongoDB/Beanie queries where stored times might
+    be naive UTC. If it has timezone info, it converts to UTC then strips it.
+    """
+    if dt.tzinfo is not None:
+        return dt.astimezone(UTC).replace(tzinfo=None)
+    return dt
+
+
 # Common timezone names for reference
 COMMON_TIMEZONES = {
     "UTC": "UTC",
@@ -114,8 +137,7 @@ class UserTimezoneContext:
         if dt is None:
             return None
         # Ensure the datetime is timezone-aware (assume UTC if naive)
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=UTC)
+        dt = ensure_aware_utc(dt)
         return dt.astimezone(self.tz)
 
     def local_to_utc(self, dt: datetime) -> datetime:
@@ -214,9 +236,9 @@ class UserTimezoneContext:
 
         today = self.today_range()
         # Convert to naive for comparison if needed
-        start = today.start.replace(tzinfo=None) if today.start.tzinfo else today.start
-        end = today.end.replace(tzinfo=None) if today.end.tzinfo else today.end
-        utc_dt_naive = utc_dt.replace(tzinfo=None) if utc_dt.tzinfo else utc_dt
+        start = ensure_naive_utc(today.start)
+        end = ensure_naive_utc(today.end)
+        utc_dt_naive = ensure_naive_utc(utc_dt)
         return start <= utc_dt_naive <= end
 
     def is_past(self, utc_dt: datetime | None) -> bool:

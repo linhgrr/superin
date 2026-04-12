@@ -8,10 +8,10 @@ def normalize_name_key(name: str) -> str:
     return name.strip().casefold()
 
 
+from core.utils.timezone import ensure_naive_utc
+
 def to_naive_datetime(dt: datetime | None) -> datetime | None:
-    """Convert timezone-aware datetimes to naive datetimes for Mongo comparisons."""
+    """Convert timezone-aware datetimes to naive datetimes in UTC for Mongo comparisons."""
     if dt is None:
         return None
-    if dt.tzinfo is not None:
-        return dt.astimezone().replace(tzinfo=None)
-    return dt
+    return ensure_naive_utc(dt)
