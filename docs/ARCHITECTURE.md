@@ -1,8 +1,8 @@
-# Shin SuperApp Architecture
+# Superin Architecture
 
 ## Overview
 
-Shin SuperApp is a plugin-based platform with:
+Superin is a plugin-based platform with:
 - React + Vite frontend
 - FastAPI + LangGraph backend
 - MongoDB persistence via Beanie

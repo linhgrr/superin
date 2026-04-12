@@ -181,7 +181,7 @@ function CommandPaletteWrapper({ children }: { children: React.ReactNode }) {
           navigate("/settings");
           // Dispatch event to switch to keyboard tab
           setTimeout(() => {
-            window.dispatchEvent(new CustomEvent("shin:open-settings", { detail: "keyboard" }));
+            window.dispatchEvent(new CustomEvent("superin:open-settings", { detail: "keyboard" }));
           }, 100);
         }
       }

@@ -1,4 +1,4 @@
-# Shin SuperApp v2.1 — Implementation Plan
+# Superin v2.1 — Implementation Plan
 
 > **For Claude:** Use superpowers:executing-plans to implement task-by-task.
 > **Goal:** Complete greenfield rewrite: Next.js → React+Vite + FastAPI + Beanie + assistant-ui.

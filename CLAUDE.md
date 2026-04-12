@@ -1,13 +1,13 @@
-# Shin SuperApp — Claude Reference
+# Superin — Claude Reference
 
-> **Dự án:** Shin SuperApp v2.1 — Plugin-based SuperApp platform
+> **Dự án:** Superin v2.1 — Plugin-based SuperApp platform
 > **Tech Stack:** React 19 + Vite + FastAPI + Beanie + LangGraph + assistant-ui
 
 ---
 
 ## 1. Project Overview
 
-Shin SuperApp là nền tảng plugin-based với:
+Superin là nền tảng plugin-based với:
 - **Frontend:** React + Vite + Tailwind v4 + HeroUI v3 + assistant-ui
 - **Backend:** FastAPI + LangGraph + Beanie ODM + MongoDB
 - **Chat:** SSE streaming qua assistant-stream protocol

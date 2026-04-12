@@ -159,7 +159,7 @@ function ChatComposer() {
     <div className="chat-input-container" style={{ width: "100%" }}>
       <ComposerPrimitive.Root style={{ display: "flex", alignItems: "flex-end", gap: "0.5rem", width: "100%" }}>
         <ComposerPrimitive.Input
-          placeholder="Ask Shin anything... (Enter to send, Shift+Enter for new line)"
+          placeholder="Ask Rin-chan anything... (Enter to send, Shift+Enter for new line)"
           maxRows={5}
           className="chat-input"
           style={{ flex: 1, minWidth: 0 }}
@@ -191,7 +191,7 @@ export default function ChatThread() {
           <div className="chat-header-title">
             <span className="flex items-center gap-2">
               <DynamicIcon name="Sparkles" size={16} className="text-primary" />
-              Shin AI
+              Superin AI
             </span>
           </div>
           <div className="chat-header-subtitle">Powered by RootAgent</div>

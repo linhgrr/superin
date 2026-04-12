@@ -62,8 +62,8 @@ export default defineConfig(({ mode }) => {
           enabled: mode !== "production",
         },
         manifest: {
-          name: "Shin SuperApp",
-          short_name: "Shin",
+          name: "Superin",
+          short_name: "Superin",
           description: "Your personal AI-powered SuperApp",
           theme_color: "#b05c32",
           background_color: "#1a1712",

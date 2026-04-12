@@ -1,8 +1,8 @@
 {
-  "name": "shin-superin",
+  "name": "superin",
   "version": "2.1.0",
   "private": true,
-  "description": "Shin Superin — plug-and-play Superin platform",
+  "description": "Superin — plug-and-play Superin platform",
   "scripts": {
     "commit": "cz",
     "lint:frontend": "cd frontend && npm run lint",

@@ -35,7 +35,7 @@ FRONTEND_APPS_DIR = ROOT / "frontend" / "src" / "apps"
 # Backend env defaults — can override via environment variables
 _backend_env = {
     "MONGODB_URI": "mongodb+srv://nhatquangpx:8sotamnhe@gymmanagement.8jghrjf.mongodb.net/?retryWrites=true&w=majority",
-    "JWT_SECRET": "shin-superin-dev-secret",
+    "JWT_SECRET": "superin-dev-secret",
     "OPENAI_API_KEY": "fw_HToZECoeccNqkpq69XUi1a",
     "OPENAI_BASE_URL": "https://api.fireworks.ai/inference/v1",
 }

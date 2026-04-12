@@ -89,6 +89,6 @@ calendar_manifest = AppManifestSchema(
     models=["Event", "Calendar", "RecurringRule"],
     category="productivity",
     tags=["calendar", "events", "schedule", "time-blocking", "recurring"],
-    author="Shin Team",
+    author="Superin Team",
     requires_tier=SubscriptionTier.PAID,
 )

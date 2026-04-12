@@ -73,5 +73,5 @@ todo_manifest = AppManifestSchema(
     models=["Task", "SubTask", "RecurringRule"],
     category="productivity",
     tags=["tasks", "productivity", "reminders", "todo", "subtasks", "recurring"],
-    author="Shin Team",
+    author="Superin Team",
 )

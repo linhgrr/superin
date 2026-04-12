@@ -191,7 +191,7 @@ async def lifespan(app: FastAPI):
 def create_app() -> FastAPI:
     """Factory — useful for testing (pass app to TestClient)."""
     app = FastAPI(
-        title="Shin SuperApp",
+        title="Superin",
         version="2.1.0",
         lifespan=lifespan,
     )

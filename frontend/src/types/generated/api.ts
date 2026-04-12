@@ -2876,9 +2876,7 @@ export interface components {
              * Settings
              * @description User settings object (e.g., {timezone: 'Asia/Ho_Chi_Minh'})
              */
-            settings?: {
-                [key: string]: unknown;
-            };
+            settings?: Record<string, never>;
         };
         /**
          * UserPublic
@@ -2895,9 +2893,7 @@ export interface components {
             avatar_url?: string | null;
             role: components["schemas"]["UserRole"];
             /** Settings */
-            settings?: {
-                [key: string]: unknown;
-            };
+            settings?: Record<string, never>;
         };
         /**
          * UserRole
@@ -2947,9 +2943,7 @@ export interface components {
             /** Widget Id */
             widget_id: string;
             /** Config */
-            config?: {
-                [key: string]: unknown;
-            };
+            config?: Record<string, never>;
         };
         /**
          * WidgetDataConfigUpdate
@@ -2959,9 +2953,7 @@ export interface components {
             /** Widget Id */
             widget_id: string;
             /** Config */
-            config?: {
-                [key: string]: unknown;
-            };
+            config?: Record<string, never>;
         };
         /**
          * WidgetManifestSchema
@@ -3339,9 +3331,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": Record<string, never>;
                 };
             };
             /** @description Validation Error */
@@ -3429,9 +3419,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": Record<string, never>;
                 };
             };
             /** @description Validation Error */
@@ -3464,9 +3452,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": Record<string, never>;
                 };
             };
             /** @description Validation Error */

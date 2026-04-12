@@ -91,7 +91,7 @@ export function buildStaticCommands(
         applyTheme(newTheme);
         persistTheme(newTheme);
 
-        window.dispatchEvent(new CustomEvent("shin:theme-changed", { detail: newTheme }));
+        window.dispatchEvent(new CustomEvent("superin:theme-changed", { detail: newTheme }));
       },
       keywords: ["theme", "dark", "light", "mode", "toggle", "appearance"],
     },

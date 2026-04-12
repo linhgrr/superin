@@ -480,7 +480,7 @@ Không dùng `/v1/` prefix. API version implicit trong backend version.
 
 ```python
 # FastAPI app title
-app = FastAPI(title="Shin SuperApp", version="2.1.0")
+app = FastAPI(title="Superin", version="2.1.0")
 
 # Schema versioning — thêm field, không remove
 # Nếu break: tạo schema mới (WalletV2Schema) hoặc tăng major version

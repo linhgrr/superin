@@ -33,5 +33,5 @@ export const WIDGET_SIZE_COLUMNS: Record<string, number> = {
 
 // ─── App ────────────────────────────────────────────────────────────────────
 
-export const APP_NAME = import.meta.env.VITE_APP_NAME ?? "Shin SuperApp";
+export const APP_NAME = import.meta.env.VITE_APP_NAME ?? "Superin";
 export const APP_VERSION = "2.1.0";

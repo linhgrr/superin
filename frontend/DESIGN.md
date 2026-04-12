@@ -1,4 +1,4 @@
-# Shin Superin Design System
+# Superin Design System
 
 This document is the source of truth for visual design and theme behavior in the frontend.
 
@@ -47,7 +47,7 @@ Supported modes:
 
 Runtime behavior is centralized in `src/lib/theme.ts`:
 
-- `readStoredTheme()` reads `shin_settings.theme` from localStorage.
+- `readStoredTheme()` reads `superin_settings.theme` from localStorage.
 - `applyTheme(theme)` sets deterministic root classes on `<html>`:
   - adds exactly one of `.dark` / `.light`
   - removes the opposite class

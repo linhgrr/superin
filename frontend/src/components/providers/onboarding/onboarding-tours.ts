@@ -11,7 +11,7 @@ export const TOURS: Record<TourId, DriveStep[]> = {
     {
       element: ".sidebar-brand",
       popover: {
-        title: "Welcome to Shin SuperApp!",
+        title: "Welcome to Superin!",
         description: "Your personal AI-powered workspace. Let's take a quick tour to get you started.",
         side: "right",
         align: "start",
@@ -39,7 +39,7 @@ export const TOURS: Record<TourId, DriveStep[]> = {
       element: ".chat-container",
       popover: {
         title: "AI Assistant — Your Digital Partner",
-        description: "Chat naturally with Shin AI to manage tasks, track expenses, create calendar events, or ask questions. It understands context and can take actions across all your apps.",
+        description: "Chat naturally with Superin AI to manage tasks, track expenses, create calendar events, or ask questions. It understands context and can take actions across all your apps.",
         side: "left",
         align: "center",
       },
@@ -152,7 +152,7 @@ export const TOURS: Record<TourId, DriveStep[]> = {
     {
       element: ".chat-header",
       popover: {
-        title: "Shin AI — Powered by RootAgent",
+        title: "Superin AI — Powered by RootAgent",
         description: "Our AI understands context from all your apps. It can cross-reference data and take intelligent actions on your behalf.",
         side: "left",
         align: "start",

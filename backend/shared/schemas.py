@@ -229,7 +229,7 @@ class AppManifestSchema(BaseModel):
     ] = "other"
     tags: list[str] = []
     screenshots: list[str] = []
-    author: str = "Shin Team"
+    author: str = "Superin Team"
     homepage: str = ""
     requires_auth: bool = True
     requires_tier: SubscriptionTier = SubscriptionTier.FREE

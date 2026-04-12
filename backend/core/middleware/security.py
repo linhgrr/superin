@@ -49,7 +49,7 @@ SECURITY_HEADERS = {
         "usb=()"
     ),
     # Remove server identification
-    "Server": "Shin-SuperApp",
+    "Server": "Superin",
 }
 
 # HSTS header (only in production with HTTPS)

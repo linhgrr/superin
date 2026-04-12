@@ -22,7 +22,7 @@ if (!root) throw new Error("Root element not found");
 const updateApp = registerSW({
   onNeedRefresh() {
     const shouldRefresh = window.confirm(
-      "A new version of Shin is available. Reload to update?"
+      "A new version of Superin is available. Reload to update?"
     );
     if (shouldRefresh) updateApp(true);
   },

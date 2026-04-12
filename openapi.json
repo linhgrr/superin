@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Shin SuperApp",
+    "title": "Superin",
     "version": "2.1.0"
   },
   "paths": {
@@ -456,7 +456,6 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "additionalProperties": true,
                   "title": "Response Delete Category Api Catalog Categories  Category Id  Delete"
                 }
               }
@@ -530,7 +529,6 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
                   "type": "object",
                   "title": "Response Install App Api Catalog Install Post"
                 }
@@ -579,7 +577,6 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
                   "type": "object",
                   "title": "Response Uninstall App Api Catalog Uninstall Post"
                 }
@@ -8881,7 +8878,6 @@
       "UpdateUserSettingsRequest": {
         "properties": {
           "settings": {
-            "additionalProperties": true,
             "type": "object",
             "title": "Settings",
             "description": "User settings object (e.g., {timezone: 'Asia/Ho_Chi_Minh'})"
@@ -8920,7 +8916,6 @@
             "$ref": "#/components/schemas/UserRole"
           },
           "settings": {
-            "additionalProperties": true,
             "type": "object",
             "title": "Settings"
           }
@@ -9037,7 +9032,6 @@
             "title": "Widget Id"
           },
           "config": {
-            "additionalProperties": true,
             "type": "object",
             "title": "Config"
           }
@@ -9057,7 +9051,6 @@
             "title": "Widget Id"
           },
           "config": {
-            "additionalProperties": true,
             "type": "object",
             "title": "Config"
           }

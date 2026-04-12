@@ -1409,7 +1409,7 @@ tr:hover td {
 }
 
 /* Overlay */
-.shin-onboarding-popover {
+.superin-onboarding-popover {
   background: linear-gradient(
     165deg,
     var(--color-surface) 0%,
@@ -1425,14 +1425,14 @@ tr:hover td {
 }
 
 /* Progress bar */
-.shin-tour-progress {
+.superin-tour-progress {
   display: flex;
   align-items: center;
   gap: 0.75rem;
   margin-bottom: 1rem;
 }
 
-.shin-tour-progress-bar {
+.superin-tour-progress-bar {
   flex: 1;
   height: 4px;
   background: var(--color-border);
@@ -1440,14 +1440,14 @@ tr:hover td {
   overflow: hidden;
 }
 
-.shin-tour-progress-fill {
+.superin-tour-progress-fill {
   height: 100%;
   background: var(--color-primary);
   border-radius: 2px;
   transition: width 0.3s ease;
 }
 
-.shin-tour-progress-text {
+.superin-tour-progress-text {
   font-size: 0.6875rem;
   font-weight: 600;
   color: var(--color-foreground-muted);
@@ -1455,7 +1455,7 @@ tr:hover td {
 }
 
 /* Title */
-.shin-onboarding-popover h2 {
+.superin-onboarding-popover h2 {
   font-family: var(--font-heading) !important;
   font-size: 1.125rem !important;
   font-weight: 600 !important;
@@ -1465,7 +1465,7 @@ tr:hover td {
 }
 
 /* Description */
-.shin-onboarding-popover p {
+.superin-onboarding-popover p {
   font-size: 0.9375rem !important;
   color: var(--color-foreground-muted) !important;
   line-height: 1.6 !important;

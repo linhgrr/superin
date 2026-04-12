@@ -40,8 +40,8 @@ const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
   { id: "keyboard", label: "Keyboard", icon: <DynamicIcon name="Keyboard" size={18} /> },
 ];
 
-const OPEN_SETTINGS_EVENT = "shin:open-settings";
-const THEME_CHANGED_EVENT = "shin:theme-changed";
+const OPEN_SETTINGS_EVENT = "superin:open-settings";
+const THEME_CHANGED_EVENT = "superin:theme-changed";
 
 // ─── Page ───────────────────────────────────────────────────────────────────
 

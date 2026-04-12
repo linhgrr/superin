@@ -31,7 +31,7 @@ export default function AppearanceSection({ settings, onSave }: AppearanceSectio
     <Section
       icon={<DynamicIcon name="Palette" size={20} />}
       title="Appearance"
-      description="Customize how Shin looks and feels"
+      description="Customize how Superin looks and feels"
     >
       <Select
         label="Theme"

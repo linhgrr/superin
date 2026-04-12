@@ -2,7 +2,7 @@
 
 ## Current Contract
 
-Shin SuperApp uses `@assistant-ui/react-data-stream` on the frontend and
+Superin uses `@assistant-ui/react-data-stream` on the frontend and
 `assistant-stream` on the backend.
 
 The backend is the source of truth for:

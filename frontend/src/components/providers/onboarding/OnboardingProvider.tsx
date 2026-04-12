@@ -115,7 +115,7 @@ function OnboardingProvider({ children }: { children: ReactNode }) {
         overlayClickBehavior: "close",
         stagePadding: 4,
         stageRadius: 12,
-        popoverClass: "shin-onboarding-popover",
+        popoverClass: "superin-onboarding-popover",
         nextBtnText: "Next →",
         prevBtnText: "← Previous",
         doneBtnText: "Finish",
@@ -140,12 +140,12 @@ function OnboardingProvider({ children }: { children: ReactNode }) {
           setDriverObj(null);
         },
         onPopoverRender: (popover, { state }) => {
-          popover.wrapper.classList.add("shin-tour-step");
+          popover.wrapper.classList.add("superin-tour-step");
 
           let progressContainer = popover.wrapper.querySelector(".driver-popover-progress") as HTMLElement | null;
           if (!progressContainer) {
             progressContainer = document.createElement("div");
-            progressContainer.className = "driver-popover-progress shin-tour-progress";
+            progressContainer.className = "driver-popover-progress superin-tour-progress";
           }
 
           const stepsArray = d.getConfig().steps ?? [];
@@ -155,10 +155,10 @@ function OnboardingProvider({ children }: { children: ReactNode }) {
           const percent = Math.round((currentStep / totalSteps) * 100);
 
           progressContainer.innerHTML = `
-            <div class="shin-tour-progress-bar">
-              <div class="shin-tour-progress-fill" style="width: ${percent}%"></div>
+            <div class="superin-tour-progress-bar">
+              <div class="superin-tour-progress-fill" style="width: ${percent}%"></div>
             </div>
-            <span class="shin-tour-progress-text">${String(currentStep)} / ${String(totalSteps)}</span>
+            <span class="superin-tour-progress-text">${String(currentStep)} / ${String(totalSteps)}</span>
           `;
 
           const title = popover.title;

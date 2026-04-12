@@ -1,4 +1,4 @@
-# Shin SuperApp Plugin Development Guide
+# Superin Plugin Development Guide
 
 ## Goal
 

@@ -336,7 +336,7 @@ summary_widget = WidgetManifestSchema(
     models=["{entity_name}"],
     category="other",
     tags=["{app_id}"],
-    author="Shin Team",
+    author="Superin Team",
 )
 ''',
         overwrite=False,

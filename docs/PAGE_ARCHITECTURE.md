@@ -1,4 +1,4 @@
-# Shin SuperApp v2.1 — Page Architecture
+# Superin v2.1 — Page Architecture
 
 > **Mục tiêu:** Mỗi app có cấu trúc page riêng, dùng chung layout component của dashboard.
 

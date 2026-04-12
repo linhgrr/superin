@@ -77,6 +77,6 @@ finance_manifest = AppManifestSchema(
     models=["Wallet", "Transaction", "Category"],
     category="finance",
     tags=["finance", "budget", "wallets", "transactions", "analytics"],
-    author="Shin Team",
+    author="Superin Team",
     requires_tier=SubscriptionTier.PAID,
 )

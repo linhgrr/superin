@@ -1,4 +1,4 @@
-# Shin SuperApp — Interface Definitions
+# Superin — Interface Definitions
 
 > **Purpose:** This file defines all **typed contracts** that every plugin author and
 > platform developer must obey. The TypeScript types are **generated from** these
@@ -153,7 +153,7 @@ class AppManifestSchema(BaseModel):
     ] = "other"
     tags: list[str] = []
     screenshots: list[str] = []  # URLs
-    author: str = "Shin Team"
+    author: str = "Superin Team"
     homepage: str = ""
     requires_auth: bool = True
 

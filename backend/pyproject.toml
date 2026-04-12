@@ -1,7 +1,7 @@
 [project]
-name = "shin-superin"
+name = "superin"
 version = "2.1.0"
-description = "Shin SuperApp — plug-and-play SuperApp platform"
+description = "Superin — SuperApp platform"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115.0",

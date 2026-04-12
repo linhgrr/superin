@@ -67,7 +67,7 @@ export default function DashboardPage() {
           <img src="/branding/logo.png" alt="Logo" className="theme-logo-light" style={{ width: "48px", height: "auto", opacity: 0.5 }} />
           <img src="/branding/logo-white.png" alt="Logo" className="theme-logo-dark" style={{ width: "48px", height: "auto", opacity: 0.5 }} />
         </div>
-        <h3 className="empty-state-title">Welcome to Shin</h3>
+        <h3 className="empty-state-title">Welcome to Superin</h3>
         <p className="empty-state-description">
           Your dashboard is empty. Visit the{" "}
           <a

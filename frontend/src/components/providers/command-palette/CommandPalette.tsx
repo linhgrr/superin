@@ -50,11 +50,11 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
   }, []);
 
   const openAddWidget = useCallback(() => {
-    dispatchCustom(new CustomEvent("shin:open-add-widget"));
+    dispatchCustom(new CustomEvent("superin:open-add-widget"));
   }, [dispatchCustom]);
 
   const openSettings = useCallback((tab: string) => {
-    dispatchCustom(new CustomEvent("shin:open-settings", { detail: tab }));
+    dispatchCustom(new CustomEvent("superin:open-settings", { detail: tab }));
   }, [dispatchCustom]);
 
   // Build commands
