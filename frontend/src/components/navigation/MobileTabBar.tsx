@@ -15,6 +15,7 @@ const TABS = [
   { to: ROUTES.DASHBOARD, label: "Dashboard", Icon: "LayoutDashboard" as const },
   { to: ROUTES.STORE, label: "Store", Icon: "Store" as const },
   { to: ROUTES.CHAT, label: "Chat", Icon: "MessageCircle" as const },
+  { to: ROUTES.BILLING, label: "Billing", Icon: "CreditCard" as const },
   { to: ROUTES.SETTINGS, label: "Settings", Icon: "Settings" as const },
 ] as const;
 

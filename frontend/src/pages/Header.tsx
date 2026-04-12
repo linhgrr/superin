@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useOnboarding } from "@/components/providers/onboarding/OnboardingProvider";
 import { DynamicIcon } from "@/lib/icon-resolver";
 import { useState, useEffect, useRef, useCallback } from "react";
+import { ROUTES } from "@/constants";
 
 interface HeaderProps {
   title?: string;
@@ -273,6 +274,26 @@ export default function Header({ title, showTourTrigger = true }: HeaderProps) {
                 >
                   <DynamicIcon name="Settings" size={14} />
                   Settings
+                </button>
+                <button
+                  className="btn"
+                  onClick={() => { navigate(ROUTES.BILLING); setShowUserMenu(false); }}
+                  style={{
+                    width: "100%",
+                    justifyContent: "flex-start",
+                    background: "transparent",
+                    color: "var(--color-foreground)",
+                    padding: "0.5rem 0.75rem",
+                    fontSize: "0.8125rem",
+                    borderRadius: "8px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                    marginBottom: "0.25rem",
+                  }}
+                >
+                  <DynamicIcon name="CreditCard" size={14} />
+                  Billing
                 </button>
                 <button
                   className="btn"
