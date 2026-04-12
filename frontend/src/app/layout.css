@@ -207,6 +207,7 @@
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   position: relative;
   z-index: 100;
+  padding-top: env(safe-area-inset-top, 0px);
 }
 
 .sidebar-brand {
@@ -309,7 +310,9 @@
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 .app-header {
-  height: 64px;
+  --header-height: calc(64px + env(safe-area-inset-top, 0px));
+  height: var(--header-height);
+  padding-top: env(safe-area-inset-top, 0px);
   border-bottom: 1px solid var(--color-border);
   display: flex;
   align-items: center;

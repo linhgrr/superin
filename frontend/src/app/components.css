@@ -1033,6 +1033,7 @@ tr:hover td {
     radial-gradient(ellipse at 80% 80%, oklch(from var(--color-info) l c h / 0.05) 0%, transparent 50%),
     var(--color-background);
   padding: 1rem;
+  padding-top: env(safe-area-inset-top, 1rem);
   position: relative;
   overflow: hidden;
 }
