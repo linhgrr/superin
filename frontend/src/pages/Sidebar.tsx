@@ -57,9 +57,10 @@ function Sidebar() {
       {/* Brand */}
       <div className="sidebar-brand">
         <div className="sidebar-brand-icon" style={{ background: "transparent", boxShadow: "none" }}>
-          <img src="/branding/logo.png" alt="Shin Logo" style={{ width: "24px", height: "auto" }} />
+          <img src="/branding/logo.png" alt="Logo" className="theme-logo-light" style={{ width: "24px", height: "auto" }} />
+          <img src="/branding/logo-white.png" alt="Logo" className="theme-logo-dark" style={{ width: "24px", height: "auto" }} />
         </div>
-        <span className="sidebar-brand-text">Shin</span>
+        <span className="sidebar-brand-text">Superin</span>
       </div>
 
       {/* Navigation */}
