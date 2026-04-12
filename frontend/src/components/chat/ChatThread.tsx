@@ -194,7 +194,7 @@ export default function ChatThread() {
               Superin AI
             </span>
           </div>
-          <div className="chat-header-subtitle">Powered by RootAgent</div>
+          <div className="chat-header-subtitle">Powered by Linhdz</div>
         </div>
       </div>
 

@@ -152,7 +152,7 @@ export const TOURS: Record<TourId, DriveStep[]> = {
     {
       element: ".chat-header",
       popover: {
-        title: "Superin AI — Powered by RootAgent",
+        title: "Superin AI — Powered by Linhdz",
         description: "Our AI understands context from all your apps. It can cross-reference data and take intelligent actions on your behalf.",
         side: "left",
         align: "start",
