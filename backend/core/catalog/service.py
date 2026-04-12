@@ -8,7 +8,8 @@ from beanie import PydanticObjectId
 from beanie.operators import In
 
 from core.db import get_db
-from core.models import User, UserAppInstallation, WidgetDataConfig, WidgetPreference, utc_now
+from core.models import User, UserAppInstallation, WidgetDataConfig, WidgetPreference
+from core.utils.timezone import utc_now
 from core.registry import get_plugin
 from core.subscriptions.model import Subscription
 from shared.enums import (

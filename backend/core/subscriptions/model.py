@@ -6,7 +6,7 @@ from beanie import Document, PydanticObjectId
 from pydantic import Field
 from pymongo import IndexModel
 
-from core.models import utc_now
+from core.utils.timezone import utc_now
 from shared.enums import PaymentProvider, SubscriptionStatus, SubscriptionTier
 
 

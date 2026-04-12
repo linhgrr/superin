@@ -17,13 +17,22 @@ Usage:
     date_str = ctx.format_date(utc_datetime)
 """
 
+from __future__ import annotations
+
 from datetime import UTC, datetime, time, timedelta
 from typing import NamedTuple
 
 import pytz
 from pytz.tzinfo import DstTzInfo, StaticTzInfo
 
-from core.models import User
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from core.models import User
+
+
+def utc_now() -> datetime:
+    """Get the current time in UTC."""
+    return datetime.now(UTC)
 
 
 def ensure_aware_utc(dt: datetime) -> datetime:

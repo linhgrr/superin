@@ -12,10 +12,9 @@ from pymongo import IndexModel
 
 from shared.enums import InstallationStatus, UserRole
 
+from typing import Any
 
-def utc_now() -> datetime:
-    return datetime.now(UTC)
-
+from core.utils.timezone import utc_now
 
 class User(Document):
     """Platform user account."""
