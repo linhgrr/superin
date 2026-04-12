@@ -511,7 +511,7 @@ async def _create_payos_checkout(user_id: str, request: CheckoutRequest) -> Chec
             )
         payload["expiredAt"] = int(time.time()) + expire_seconds
 
-    payload["signature"] = _create_payos_signature_from_object(payload, checksum_key)
+    payload["signature"] = _create_payos_signature_for_payment_request(payload, checksum_key)
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         response = await client.post(
@@ -684,6 +684,26 @@ def _create_payos_signature_from_object(data: dict[str, Any], checksum_key: str)
     return hmac.new(
         checksum_key.encode("utf-8"),
         query_string.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+
+
+def _create_payos_signature_for_payment_request(data: dict[str, Any], checksum_key: str) -> str:
+    """Create a signature specifically for the create-payment-link request.
+    
+    According to PayOS docs, only amount, cancelUrl, description, orderCode, 
+    and returnUrl must be included in the signature string for checkout creation.
+    """
+    amount = data.get("amount", "")
+    cancel_url = data.get("cancelUrl", "")
+    description = data.get("description", "")
+    order_code = data.get("orderCode", "")
+    return_url = data.get("returnUrl", "")
+    
+    data_str = f"amount={amount}&cancelUrl={cancel_url}&description={description}&orderCode={order_code}&returnUrl={return_url}"
+    return hmac.new(
+        checksum_key.encode("utf-8"),
+        data_str.encode("utf-8"),
         hashlib.sha256,
     ).hexdigest()
 

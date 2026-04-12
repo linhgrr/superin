@@ -59,7 +59,7 @@ export default function BillingPage() {
   return (
     <div style={{ display: "grid", gap: "1rem", maxWidth: "720px" }}>
       <PlanCard subscription={subscription} />
-      <UpgradePanel disabled={busyKey !== null} onCheckout={handleCheckout} />
+      <UpgradePanel subscription={subscription} disabled={busyKey !== null} onCheckout={handleCheckout} />
       <CancelPanel subscription={subscription} disabled={busyKey !== null} onCancel={handleCancel} />
     </div>
   );
