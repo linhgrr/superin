@@ -789,8 +789,16 @@ def _is_payos_subscription_expired(sub: Subscription, *, now: datetime | None = 
         return False
     if sub.expires_at is None:
         return False
+        
+    expires = sub.expires_at
+    if expires.tzinfo is None:
+        expires = expires.replace(tzinfo=UTC)
+        
     reference_time = now or datetime.now(UTC)
-    return sub.expires_at <= reference_time
+    if reference_time.tzinfo is None:
+        reference_time = reference_time.replace(tzinfo=UTC)
+        
+    return expires <= reference_time
 
 
 async def _downgrade_expired_payos_subscription(
