@@ -267,24 +267,12 @@ def sanitize_for_memory(content: str) -> str:
 async def sanitize_for_memory_async(content: str) -> str:
     """Sanitize content before storing in persistent memory (async version).
 
-    Runs the CPU-intensive sanitization in a thread pool
-to avoid blocking the event loop.
+    Delegates to the synchronous `sanitize_for_memory` via `asyncio.to_thread`
+    so that all sanitization logic (including .strip()) is applied consistently.
     """
     if not content:
         return ""
-
-    # Run both sanitization steps in thread pool
-    sanitized = await asyncio.to_thread(sanitize_user_content, content)
-    sanitized_content = sanitized[0] if isinstance(sanitized, tuple) else sanitized
-
-    # nh3 is Rust-based and fast, but still run in thread for consistency
-    return await asyncio.to_thread(
-        nh3.clean,
-        sanitized_content,
-        tags=set(),
-        attributes={},
-        url_schemes=set(),
-    )
+    return await asyncio.to_thread(sanitize_for_memory, content)
 
 
 def sanitize_db_content_for_llm(

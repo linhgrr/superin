@@ -18,8 +18,8 @@ DEFAULT_CALENDAR_COLOR = "oklch(0.70 0.18 250)"  # Blue-ish
 @asynccontextmanager
 async def calendar_transaction() -> AsyncIterator[AsyncClientSession]:
     """Yield a Mongo session with an active transaction for calendar mutations."""
-    async with get_db().client.start_session() as session:
-        async with await session.start_transaction():
+    async with await get_db().client.start_session() as session:
+        async with session.start_transaction():
             yield session
 
 

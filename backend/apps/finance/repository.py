@@ -17,8 +17,8 @@ from shared.normalization import normalize_name_key
 @asynccontextmanager
 async def finance_transaction() -> AsyncIterator[AsyncClientSession]:
     """Yield a Mongo session with an active transaction for finance mutations."""
-    async with get_db().client.start_session() as session:
-        async with await session.start_transaction():
+    async with await get_db().client.start_session() as session:
+        async with session.start_transaction():
             yield session
 
 

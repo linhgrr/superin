@@ -2,10 +2,10 @@
 
 import asyncio
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
-from concurrent.futures import ThreadPoolExecutor
 
 from fastapi import Depends, FastAPI
 from fastapi.exceptions import RequestValidationError
@@ -110,11 +110,37 @@ async def lifespan(app: FastAPI):
     # 1. Init DB (needed for verify_plugins and agent)
     await init_db()
 
-    # 2. Refresh RootAgent system prompt from discovered manifests
+    # 2. Init Redis for rate limiting (optional — falls back to in-memory)
+    from core.utils.limiter import set_redis_client, tiered_limiter
+    _redis = None
+    if settings.redis_url:
+        try:
+            from fastapi_limiter import FastAPILimiter
+            from redis.asyncio import from_url as redis_from_url
+            _redis = await redis_from_url(
+                settings.redis_url,
+                encoding="utf-8",
+                decode_responses=True,
+            )
+            await FastAPILimiter.init(_redis)
+            set_redis_client(_redis)
+            tiered_limiter.set_redis(_redis)
+            logger.info("✓ Redis rate limiting enabled (%s)", settings.redis_url)
+        except Exception:
+            logger.warning(
+                "⚠️  Redis connection failed — rate limiting falls back to in-memory (not safe for multi-worker)",
+                exc_info=True,
+            )
+    else:
+        logger.warning(
+            "⚠️  REDIS_URL not set — using in-memory rate limiting (NOT safe for multi-worker deployments)",
+        )
+
+    # 3. Refresh RootAgent system prompt from discovered manifests
     from core.agents.root import root_agent
     root_agent.refresh()
 
-    # 3. Verify plugins before accepting any requests
+    # 4. Verify plugins before accepting any requests
     errors, warnings = verify_plugins()
     for w in warnings:
         logger.warning("⚠️  %s", w)
@@ -149,8 +175,15 @@ async def lifespan(app: FastAPI):
         expiry_cron_stop_event.set()
         await expiry_cron_task
 
+    if _redis is not None:
+        try:
+            await _redis.aclose()
+        except Exception:
+            pass
+
     await close_db()
     logger.info("✓ Server shutdown complete")
+
 
 
 # ─── App factory ────────────────────────────────────────────────────────────────
@@ -163,31 +196,33 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # ── Middleware ─────────────────────────────────────────────────────────
+    # ── Middleware ───────────────────────────────────────────
     # Security headers first (processed last on response)
     app.add_middleware(SecurityHeadersMiddleware)
 
     # CORS - hardened configuration
-    # In production, explicitly list allowed origins instead of using wildcard
     cors_origins = settings.cors_origins
-    # Ensure no wildcard origins in production
-    if "*" in cors_origins and settings.hf_space is not True:
-        logger.warning("CORS wildcard (*) not recommended for production")
+    # Fail hard: wildcard + credentials = security hole (any site can make auth'd requests)
+    if "*" in cors_origins and not settings.hf_space:
+        raise RuntimeError(
+            "CORS wildcard (*) with allow_credentials=True is a critical security misconfiguration. "
+            "Set CORS_ORIGINS to a specific list of allowed origins, or set HF_SPACE=true to bypass."
+        )
 
     app.add_middleware(
         CORSMiddleware,
         allow_origins=cors_origins,
         allow_credentials=True,
-        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],  # Specific methods only
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
         allow_headers=[
             "Authorization",
             "Content-Type",
             "Accept",
             "X-Requested-With",
             "Origin",
-        ],  # Specific headers only
+        ],
         expose_headers=["Content-Type", "Authorization"],
-        max_age=600,  # Cache preflight for 10 minutes
+        max_age=600,
     )
     app.add_middleware(RequestLoggingMiddleware)
 

@@ -744,13 +744,14 @@ async def initialize_clean_database() -> None:
     from core.discovery import discover_apps  # type: ignore
     from core.models import (  # type: ignore
         AppCategory,
-        ConversationMessage,
         TokenBlacklist,
         User,
         UserAppInstallation,
+        WidgetDataConfig,
         WidgetPreference,
     )
     from core.registry import get_plugin_models  # type: ignore
+    from core.subscriptions.model import Subscription, SubscriptionWebhookEvent  # type: ignore
 
     client, database_name = _db_connection()
     try:
@@ -763,8 +764,10 @@ async def initialize_clean_database() -> None:
                 UserAppInstallation,
                 AppCategory,
                 WidgetPreference,
+                WidgetDataConfig,
                 TokenBlacklist,
-                ConversationMessage,
+                Subscription,
+                SubscriptionWebhookEvent,
                 *get_plugin_models(),
             ],
         )

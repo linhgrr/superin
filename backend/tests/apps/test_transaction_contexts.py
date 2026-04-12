@@ -1,4 +1,3 @@
-from contextlib import asynccontextmanager
 from types import SimpleNamespace
 
 import pytest
@@ -13,18 +12,18 @@ class FakeSession:
         self.transaction_entered = False
         self.transaction_exited = False
 
-    async def start_transaction(self):
+    def start_transaction(self):
         self.transaction_started = True
+        outer = self
 
-        @asynccontextmanager
-        async def transaction_cm():
-            self.transaction_entered = True
-            try:
-                yield self
-            finally:
-                self.transaction_exited = True
+        class TransactionWrapper:
+            async def __aenter__(self):
+                outer.transaction_entered = True
+                return outer
+            async def __aexit__(self, exc_type, exc_val, exc_tb):
+                outer.transaction_exited = True
 
-        return transaction_cm()
+        return TransactionWrapper()
 
 
 class FakeClient:
@@ -33,16 +32,17 @@ class FakeClient:
         self.session_entered = False
         self.session_exited = False
 
-    def start_session(self):
-        @asynccontextmanager
-        async def session_cm():
-            self.session_entered = True
-            try:
-                yield self._session
-            finally:
-                self.session_exited = True
+    async def start_session(self):
+        outer = self
 
-        return session_cm()
+        class SessionWrapper:
+            async def __aenter__(self):
+                outer.session_entered = True
+                return outer._session
+            async def __aexit__(self, exc_type, exc_val, exc_tb):
+                outer.session_exited = True
+
+        return SessionWrapper()
 
 
 @pytest.mark.parametrize(

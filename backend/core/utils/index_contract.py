@@ -72,7 +72,7 @@ INDEX_REQUIREMENTS: tuple[IndexRequirement, ...] = (
     ),
     IndexRequirement(
         collection="token_blacklist",
-        index_name="token_blacklist_expires_at",
+        index_name="token_blacklist_ttl",
         key=(("expires_at", 1),),
         unique=False,
     ),

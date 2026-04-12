@@ -212,16 +212,20 @@ class MessageParser:
                         )
                     )
 
-        # Fallback for string content
         content_str = str(content) if not isinstance(content, list) else ""
+        if not content_str:
+            return ParsedMessage(langchain_message=None)
+
+        tool_call_id = content.get("tool_call_id", "") if isinstance(content, dict) else ""
+        if not tool_call_id:
+            return ParsedMessage(langchain_message=None)
+
         return ParsedMessage(
             langchain_message=ToolMessage(
                 content=content_str,
-                tool_call_id=content.get("tool_call_id", "") if isinstance(content, dict) else "",
+                tool_call_id=tool_call_id,
                 id=msg_id,
             )
-            if content_str
-            else None
         )
 
 
@@ -347,7 +351,9 @@ class RootAgent:
     def __init__(self) -> None:
         self._system_prompt = ""
         self._all_ask_tools: dict[str, BaseTool] = {}
-        self._base_tools: list[BaseTool] = self._build_base_tools()
+        # _base_tools is built in refresh() which is always called during lifespan startup.
+        # L1: Do NOT call _build_base_tools() here — refresh() will do it.
+        self._base_tools: list[BaseTool] = []
         # LRU-bounded graph cache keyed by sorted tool names.
         self._graphs: OrderedDict[tuple[str, ...], Any] = OrderedDict()
 
@@ -393,11 +399,14 @@ class RootAgent:
         return tools
 
     def _get_graph(self, tools: list[BaseTool]) -> Any:
-        """Get or create LangGraph for given tools (LRU cache, max MAX_CACHED_GRAPHS)."""
+        """Get or create LangGraph for given tools (LRU cache, max MAX_CACHED_GRAPHS).
+
+        H2: Uses SHA256 (not MD5) for FIPS-compliant environments.
+        """
         import hashlib
-        sys_hash = hashlib.md5((self._system_prompt or "").encode()).hexdigest()
+        sys_hash = hashlib.sha256((self._system_prompt or "").encode()).hexdigest()
         cache_key = (sys_hash, tuple(sorted(t.name for t in tools)))
-        
+
         if cache_key in self._graphs:
             # Move to end (most-recently-used)
             self._graphs.move_to_end(cache_key)

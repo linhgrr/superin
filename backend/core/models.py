@@ -98,7 +98,11 @@ class WidgetDataConfig(Document):
 
 
 class TokenBlacklist(Document):
-    """Revoked JWT tokens (for logout / token invalidation)."""
+    """Revoked JWT tokens (for logout / token invalidation).
+
+    MongoDB auto-deletes documents when `expires_at` passes via the TTL index.
+    No manual cleanup is needed.
+    """
 
     jti: str  # JWT ID — unique per token
     revoked_at: datetime = Field(default_factory=utc_now)
@@ -108,7 +112,12 @@ class TokenBlacklist(Document):
         name = "token_blacklist"
         indexes = [
             IndexModel([("jti", 1)], name="token_blacklist_jti_unique", unique=True),
-            IndexModel([("expires_at", 1)], name="token_blacklist_expires_at"),
+            # TTL index: MongoDB automatically removes documents after expires_at
+            IndexModel(
+                [("expires_at", 1)],
+                name="token_blacklist_ttl",
+                expireAfterSeconds=0,
+            ),
         ]
 
 

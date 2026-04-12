@@ -9,6 +9,7 @@ import {
   MessagePrimitive,
   MessagePartPrimitive,
   ThreadPrimitive,
+  useMessage,
   useMessagePartText,
 } from "@assistant-ui/react";
 import { DynamicIcon } from "@/lib/icon-resolver";
@@ -25,6 +26,19 @@ function TextPart() {
 }
 
 /**
+ * ThinkingDots — Animated waiting indicator while agent is processing
+ */
+function ThinkingDots() {
+  return (
+    <span className="chat-thinking-dots" aria-label="Thinking…">
+      <span />
+      <span />
+      <span />
+    </span>
+  );
+}
+
+/**
  * AssistantText — Markdown text renderer with streaming support
  */
 function AssistantText() {
@@ -32,13 +46,7 @@ function AssistantText() {
   const textContent = typeof text === "string" ? text : String(text ?? "");
 
   if (!textContent) {
-    return (
-      <span className="flex items-center gap-2">
-        <span className="animate-pulse">●</span>
-        <span className="animate-pulse [animation-delay:0.2s]">●</span>
-        <span className="animate-pulse [animation-delay:0.4s]">●</span>
-      </span>
-    );
+    return <ThinkingDots />;
   }
 
   return (
@@ -87,6 +95,40 @@ function UserMessage() {
 }
 
 /**
+ * AssistantMessageContent — Inner content with thinking indicator logic
+ * Uses useMessage to detect in-progress state when no text has arrived yet.
+ */
+function AssistantMessageContent() {
+  const message = useMessage();
+  // Determine if we should show the thinking dots:
+  // Message is still streaming (in_progress) AND has no text part with content yet
+  const hasTextContent = message.content.some(
+    (part) => part.type === "text" && typeof part.text === "string" && part.text.length > 0
+  );
+  const isInProgress = message.status.type === "running";
+  const showThinking = isInProgress && !hasTextContent;
+
+  return (
+    <>
+      {showThinking && <ThinkingDots />}
+      <MessagePrimitive.Parts>
+        {({ part }) => {
+          if (part.type === "text") return <AssistantText />;
+          if (part.type === "tool-call") {
+            return (
+              <div className="flex flex-wrap gap-1.5 mt-1">
+                <ToolCallBadge toolName={part.toolName} argsText={part.argsText} />
+              </div>
+            );
+          }
+          return null;
+        }}
+      </MessagePrimitive.Parts>
+    </>
+  );
+}
+
+/**
  * AssistantMessage — Message bubble for assistant role with tool calls
  */
 function AssistantMessage() {
@@ -94,25 +136,7 @@ function AssistantMessage() {
     <div className="animate-fade-in-scale">
       <MessagePrimitive.Root className="flex justify-start mb-2">
         <div className="message-bubble message-bubble-assistant">
-          <MessagePrimitive.Parts>
-            {({ part }) => {
-              // Text content
-              if (part.type === "text") {
-                return <AssistantText />;
-              }
-
-              // Tool call badges
-              if (part.type === "tool-call") {
-                return (
-                  <div className="flex flex-wrap gap-1.5 mt-1">
-                    <ToolCallBadge toolName={part.toolName} argsText={part.argsText} />
-                  </div>
-                );
-              }
-
-              return null;
-            }}
-          </MessagePrimitive.Parts>
+          <AssistantMessageContent />
         </div>
       </MessagePrimitive.Root>
 

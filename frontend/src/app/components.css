@@ -617,6 +617,34 @@ tr:hover td {
   font-style: italic;
 }
 
+/* ─── Thinking Dots ─────────────────────────────────────────────────────────── */
+
+@keyframes thinking-bounce {
+  0%, 60%, 100% { transform: translateY(0);    opacity: 0.4; }
+  30%           { transform: translateY(-5px); opacity: 1; }
+}
+
+.chat-thinking-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 0;
+  line-height: 1;
+}
+
+.chat-thinking-dots span {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-foreground-muted);
+  animation: thinking-bounce 1.2s ease-in-out infinite;
+}
+
+.chat-thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+.chat-thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+
 .tool-call-badge {
   display: inline-flex;
   align-items: center;

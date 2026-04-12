@@ -8,13 +8,14 @@ Lazy import avoids requiring OPENAI_API_KEY at import time.
 import importlib
 import inspect
 import logging
+import threading
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
 _llm: Any | None = None
 _patch_guard: bool = False
-
+_lock = threading.Lock()
 
 def _to_safe_int(value: Any) -> int:
     """Convert nullable/unknown token counters to a safe integer."""
@@ -82,30 +83,35 @@ def get_llm() -> Any:
         ChatOpenAI instance configured from settings.
     """
     global _llm, _patch_guard
-    if _llm is None:
-        from langchain_openai import ChatOpenAI
+    # Fast path: avoid lock acquisition when already initialized
+    if _llm is not None:
+        return _llm
+    with _lock:
+        # Double-checked locking: re-check under lock to prevent double init
+        if _llm is None:
+            from langchain_openai import ChatOpenAI
 
-        from core.config import settings
+            from core.config import settings
 
-        logger.info("🔗 LLM init — base_url=%s model=%s", settings.openai_base_url, settings.openai_model)
-        if not _patch_guard:
-            _patch_langchain_openai_usage_metadata()
-            _patch_guard = True
-        extra_headers: dict[str, str] = {}
-        # Skip ngrok browser warning page when calling through ngrok tunnel
-        if "ngrok" in settings.openai_base_url.lower():
-            extra_headers["ngrok-skip-browser-warning"] = "1"
-        _llm = ChatOpenAI(
-            api_key=settings.openai_api_key,
-            base_url=settings.openai_base_url,
-            model=settings.openai_model,
-            temperature=0,
-            timeout=settings.llm_request_timeout_seconds,
-            max_retries=1,
-            # Some OpenAI-compatible providers omit completion token usage in
-            # stream chunks. Disabling streamed usage avoids downstream
-            # `langchain_openai` crashes when token counts are null.
-            stream_usage=False,
-            model_kwargs={"extra_headers": extra_headers} if extra_headers else {},
-        )
+            logger.info("🔗 LLM init — base_url=%s model=%s", settings.openai_base_url, settings.openai_model)
+            if not _patch_guard:
+                _patch_langchain_openai_usage_metadata()
+                _patch_guard = True
+            extra_headers: dict[str, str] = {}
+            # Skip ngrok browser warning page when calling through ngrok tunnel
+            if "ngrok" in settings.openai_base_url.lower():
+                extra_headers["ngrok-skip-browser-warning"] = "1"
+            _llm = ChatOpenAI(
+                api_key=settings.openai_api_key,
+                base_url=settings.openai_base_url,
+                model=settings.openai_model,
+                temperature=0,
+                timeout=settings.llm_request_timeout_seconds,
+                max_retries=1,
+                # Some OpenAI-compatible providers omit completion token usage in
+                # stream chunks. Disabling streamed usage avoids downstream
+                # `langchain_openai` crashes when token counts are null.
+                stream_usage=False,
+                model_kwargs={"extra_headers": extra_headers} if extra_headers else {},
+            )
     return _llm

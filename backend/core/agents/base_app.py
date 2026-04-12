@@ -73,6 +73,18 @@ class BaseAppAgent:
 
     @property
     def graph(self) -> CompiledStateGraph:
+        """Return or build the compiled child agent graph.
+
+        H1 DESIGN NOTE: Child agents intentionally have NO checkpointer or store.
+        - They are stateless per-delegation: each `delegate()` call passes a fresh
+          single-message input, so there is no multi-turn state to persist.
+        - The root agent's checkpointer (MongoDB) handles all cross-turn persistence.
+        - This graph is a SINGLETON shared across all users (no user data stored here).
+
+        WARNING: If you add a checkpointer here in the future, you MUST also add
+        per-user thread isolation (thread_id scoped to user_id) to prevent data leakage
+        between users. See RootAgent.astream() for the correct pattern.
+        """
         if self._graph is None:
             self._graph = create_react_agent(
                 model=get_llm(),
@@ -94,6 +106,9 @@ class BaseAppAgent:
             raise RuntimeError(f"{self.app_id} agent invoked without user context")
 
         parent_thread_id = thread_id
+        # M7: Child thread_id is scoped under the parent thread (which is already user-scoped
+        # via 'user:{user_id}:...' prefix enforced by RootAgent.astream). This provides an
+        # additional logical namespace but does NOT add security since child agents are stateless.
         child_thread_id = f"{thread_id}:{self.app_id}"
         set_user_context(user_id)
         set_thread_context(child_thread_id)

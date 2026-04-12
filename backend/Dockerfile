@@ -24,4 +24,9 @@ USER appuser
 
 EXPOSE 7860
 
-CMD ["sh", "-c", "uvicorn core.main:app --host 0.0.0.0 --port ${PORT}"]
+# L2: Use exec form so uvicorn is PID 1 and receives SIGTERM directly for graceful shutdown.
+# The PORT env var is baked in as 7860 (override at runtime via -e PORT=xxxx if needed).
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:7860/health')" || exit 1
+
+CMD ["sh", "-c", "exec uvicorn core.main:app --host 0.0.0.0 --port ${PORT:-7860}"]

@@ -6,6 +6,10 @@
 fastapi==0.115.0
 uvicorn[standard]==0.34.0
 
+# Rate Limiting (Redis-backed, multi-worker safe)
+fastapi-limiter==0.1.6
+redis[hiredis]==5.2.1
+
 # Data Validation
 pydantic==2.10.4
 pydantic-settings==2.7.0

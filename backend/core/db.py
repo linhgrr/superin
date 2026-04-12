@@ -25,9 +25,22 @@ async def init_db() -> None:
     global _client, _sync_client, _checkpointer, _store
     _client = AsyncIOMotorClient(settings.mongodb_uri)
 
-    # Initialize LangGraph checkpointer (async) and eagerly create indexes
+    # Initialize LangGraph checkpointer (async) and eagerly create indexes.
+    # H6: _setup() is a private method in langgraph-checkpoint-mongodb < 0.3.0.
+    # It ensures checkpoint collection indexes exist at startup (idempotent).
+    # Pinned in requirements.txt: langgraph-checkpoint-mongodb<0.3.0
     _checkpointer = AsyncMongoDBSaver(_client, db_name=settings.mongodb_database)
-    await _checkpointer._setup()  # ensure checkpoint indexes exist at startup
+    try:
+        setup_fn = getattr(_checkpointer, "setup", None) or getattr(_checkpointer, "_setup", None)
+        if setup_fn is not None:
+            await setup_fn()
+    except Exception:
+        import logging as _logging
+        _logging.getLogger(__name__).warning(
+            "LangGraph checkpointer setup() failed (index creation skipped). "
+            "This may indicate a version mismatch with langgraph-checkpoint-mongodb.",
+            exc_info=True,
+        )
 
     # Initialize LangGraph store (long-term memory)
     # MongoDBStore requires a sync MongoClient; async ops run via thread pool.

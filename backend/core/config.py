@@ -45,6 +45,10 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["http://localhost:5173"]
     admin_emails: list[str] = []
 
+    # ─── Redis (for multi-worker rate limiting) ───────────────────────────────
+    # If not set, rate limiting falls back to in-memory (single-worker only).
+    redis_url: str | None = None
+
     # ─── Deployment ──────────────────────────────────────────────────────────
     hf_space: bool = False
     subscription_expiry_cron_enabled: bool = True

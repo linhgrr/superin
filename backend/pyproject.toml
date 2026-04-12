@@ -25,6 +25,9 @@ dependencies = [
     # Security & Sanitization
     "nh3>=0.3.4",            # HTML sanitization (Rust-based)
     "confusables>=1.2.0",    # Homoglyph detection
+    # Rate Limiting (Redis-backed, multi-worker safe)
+    "fastapi-limiter>=0.1.6",
+    "redis[hiredis]>=5.2.0",
 ]
 
 [project.optional-dependencies]

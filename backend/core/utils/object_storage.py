@@ -88,19 +88,45 @@ def build_public_object_url(*, bucket: str, object_key: str) -> str:
 
 
 def get_s3_client():
+    """Return a cached S3 client singleton.
+
+    H5: Reuses the boto3 connection pool across requests.
+    The client is thread-safe for concurrent reads and writes per AWS docs.
+    """
     if not settings.object_storage_access_key or not settings.object_storage_secret_key:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Object storage credentials are not configured.",
         )
-    return boto3.client(
-        "s3",
+    return _get_s3_client_cached(
         endpoint_url=get_upload_endpoint(),
         region_name=settings.object_storage_region,
         aws_access_key_id=settings.object_storage_access_key,
         aws_secret_access_key=settings.object_storage_secret_key,
+        addressing_style=settings.object_storage_addressing_style,
+    )
+
+
+from functools import lru_cache  # noqa: E402  (import after constants to avoid circular)
+
+
+@lru_cache(maxsize=1)
+def _get_s3_client_cached(
+    *,
+    endpoint_url: str,
+    region_name: str,
+    aws_access_key_id: str,
+    aws_secret_access_key: str,
+    addressing_style: str,
+):
+    return boto3.client(
+        "s3",
+        endpoint_url=endpoint_url,
+        region_name=region_name,
+        aws_access_key_id=aws_access_key_id,
+        aws_secret_access_key=aws_secret_access_key,
         config=BotoConfig(
             signature_version="s3v4",
-            s3={"addressing_style": settings.object_storage_addressing_style},
+            s3={"addressing_style": addressing_style},
         ),
     )

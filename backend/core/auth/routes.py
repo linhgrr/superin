@@ -3,7 +3,17 @@
 import logging
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Cookie, Depends, File, HTTPException, Response, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Cookie,
+    Depends,
+    File,
+    HTTPException,
+    Request,
+    Response,
+    UploadFile,
+    status,
+)
 
 from core.auth.avatar_storage import upload_avatar
 from core.auth.dependencies import (
@@ -13,10 +23,10 @@ from core.auth.dependencies import (
     get_current_user,
 )
 from core.auth.schemas import LoginRequest, RegisterRequest, UpdateUserSettingsRequest
-from core.constants import AUTH_COOKIE_MAX_AGE_SECONDS, AUTH_COOKIE_NAME
-from core.middleware.logging import login_limiter
+from core.constants import AUTH_COOKIE_MAX_AGE_SECONDS, AUTH_COOKIE_NAME, RATE_LIMIT_LOGIN
 from core.models import TokenBlacklist, User
 from core.security import get_password_hash, verify_password
+from core.utils.limiter import check_login_rate
 from shared.schemas import TokenResponse, UserPublic
 
 router = APIRouter()
@@ -83,11 +93,22 @@ async def register(request: RegisterRequest, response: Response) -> TokenRespons
 
 
 @router.post("/login")
-async def login(request: LoginRequest, response: Response) -> TokenResponse:
-    if not login_limiter.allow(request.email):
+async def login(request: LoginRequest, http_request: Request, response: Response) -> TokenResponse:
+    # Rate limit by IP + email (dual key: prevents both brute-force and account lockout abuse)
+    # Fix2: now async + Redis-backed via tiered_limiter (multi-worker safe)
+    client_ip = (
+        http_request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
+        or (http_request.client.host if http_request.client else "unknown")
+    )
+    allowed, rate_err = await check_login_rate(
+        ip=client_ip,
+        email=request.email,
+        limit=RATE_LIMIT_LOGIN,
+    )
+    if not allowed:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Too many login attempts. Try again in a minute.",
+            detail=rate_err or "Too many login attempts. Try again in a minute.",
         )
 
     user = await User.find_one(User.email == request.email)
