@@ -5,6 +5,7 @@ import logging
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+from concurrent.futures import ThreadPoolExecutor
 
 from fastapi import Depends, FastAPI
 from fastapi.exceptions import RequestValidationError
@@ -102,6 +103,10 @@ async def _run_subscription_expiry_cron(stop_event: asyncio.Event) -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Server lifecycle: startup → serve → shutdown."""
+    # 0. Tune default thread pool to prevent MongoDBStore sync operations from starving async threads
+    loop = asyncio.get_running_loop()
+    loop.set_default_executor(ThreadPoolExecutor(max_workers=100))
+
     # 1. Init DB (needed for verify_plugins and agent)
     await init_db()
 

@@ -7,7 +7,7 @@ import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 
 import { useCallback, useState } from "react";
-import { Responsive, verticalCompactor } from "react-grid-layout";
+import { Responsive } from "react-grid-layout";
 
 import { DynamicIcon } from "@/lib/icon-resolver";
 import AddWidgetDialog from "@/components/dashboard/AddWidgetDialog";
@@ -17,6 +17,7 @@ import {
   GRID_BREAKPOINTS,
   ROW_HEIGHT,
 } from "./useWidgetPreferences";
+import { getSizeConfig } from "./layout-engine";
 import WidgetCard from "./WidgetCard";
 import LazyWidget from "@/components/LazyWidget";
 
@@ -44,26 +45,24 @@ export default function DashboardGrid({
     handleAutoRearrange,
   } = useWidgetPreferences({ installedApps, workspacePreferences, onCommit });
 
+  const MOBILE_BREAKPOINT = 1024;
+  const DEFAULT_AUTO_HEIGHT = "200px";
+  const isMobileLayout = containerWidth <= MOBILE_BREAKPOINT;
+
   return (
     <div ref={containerRef} style={{ animation: "fadeIn 0.4s ease" }}>
       {/* Action bar */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "flex-end",
-          gap: "0.5rem",
-          marginBottom: "1rem",
-        }}
-      >
+      <div className="dashboard-action-bar">
         <button
           type="button"
           className="btn btn-ghost btn-sm"
           onClick={() => handleAutoRearrange(visibleWidgets)}
           aria-label="Auto arrange widgets"
-          style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
         >
-          <DynamicIcon name="LayoutGrid" size={16} />
-          Auto Arrange
+          <span className="btn-auto-arrange-content">
+            <DynamicIcon name="LayoutGrid" size={16} />
+            Auto Arrange
+          </span>
         </button>
         <AddWidgetButton
           installedApps={installedApps}
@@ -74,30 +73,53 @@ export default function DashboardGrid({
       </div>
 
       {/* Grid */}
-      <Responsive
-        className="dashboard-grid-layout"
-        layouts={responsiveLayouts}
-        breakpoints={GRID_BREAKPOINTS}
-        cols={GRID_COLS}
-        rowHeight={ROW_HEIGHT}
-        width={containerWidth}
-        compactor={verticalCompactor}
-        dragConfig={{ enabled: true }}
-        resizeConfig={{ enabled: true, handles: ["se"] }}
-        onLayoutChange={handleLayoutChange}
-        onDragStop={handleLayoutCommit}
-        onResizeStop={handleLayoutCommit}
-        margin={[16, 16]}
-        containerPadding={[0, 0]}
-      >
-        {visibleWidgets.map(({ widgetId, appId, widget }) => (
-          <div key={widgetId} className="rgl-item-view">
-            <WidgetCard widget={widget} widgetId={widgetId}>
-              <LazyWidget appId={appId} widgetId={widgetId} widget={widget} />
-            </WidgetCard>
-          </div>
-        ))}
-      </Responsive>
+      {isMobileLayout ? (
+        <div className="dashboard-mobile-layout">
+          {visibleWidgets.map(({ widgetId, appId, widget }) => {
+            const config = getSizeConfig(widget.size);
+            const minHeight = config.height === "auto" ? DEFAULT_AUTO_HEIGHT : config.height;
+            
+            return (
+              <div 
+                key={widgetId} 
+                className="mobile-widget-wrapper"
+                style={{ minHeight }}
+              >
+                <WidgetCard widget={widget} widgetId={widgetId}>
+                  <LazyWidget appId={appId} widgetId={widgetId} widget={widget} />
+                </WidgetCard>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <Responsive
+          className="dashboard-grid-layout"
+          layouts={responsiveLayouts}
+          breakpoints={GRID_BREAKPOINTS}
+          cols={GRID_COLS}
+          rowHeight={ROW_HEIGHT}
+          width={containerWidth}
+          compactType="vertical"
+          useCSSTransforms={true}
+          preventCollision={false}
+          dragConfig={{ enabled: true, threshold: 3 }}
+          resizeConfig={{ enabled: true, handles: ["se", "s", "e"] }}
+          onLayoutChange={handleLayoutChange}
+          onDragStop={handleLayoutCommit}
+          onResizeStop={handleLayoutCommit}
+          margin={[16, 16]}
+          containerPadding={[0, 0]}
+        >
+          {visibleWidgets.map(({ widgetId, appId, widget }) => (
+            <div key={widgetId} className="rgl-item-view">
+              <WidgetCard widget={widget} widgetId={widgetId}>
+                <LazyWidget appId={appId} widgetId={widgetId} widget={widget} />
+              </WidgetCard>
+            </div>
+          ))}
+        </Responsive>
+      )}
     </div>
   );
 }

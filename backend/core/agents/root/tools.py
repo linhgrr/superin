@@ -231,10 +231,11 @@ def _build_memory_tools() -> list[BaseTool]:
             "Use this to check for relevant context before answering questions "
             "about user preferences, history, or previously discussed topics. "
             "Optionally filter by category (e.g. 'preferences', 'personal', 'work'). "
-            "Omit category to recall all saved memories."
+            "Omit category to recall all saved memories. "
+            "Use the offset parameter to paginate through results if count reaches 20."
         ),
     )
-    async def recall_memories(category: str | None = None) -> dict[str, Any]:
+    async def recall_memories(category: str | None = None, offset: int = 0) -> dict[str, Any]:
         from core.db import get_store
 
         async def operation() -> dict[str, Any]:
@@ -247,8 +248,8 @@ def _build_memory_tools() -> list[BaseTool]:
                 namespace: tuple[str, ...] = (user_id, "memories", category)
             else:
                 namespace = (user_id, "memories")
-            items = await store.asearch(namespace, limit=20)
-            memories = [item.value for item in items]
+            items = await store.asearch(namespace, limit=20, offset=offset)
+            memories = [{"key": item.key, **(item.value if isinstance(item.value, dict) else {"content": item.value})} for item in items]
             return {
                 "ok": True,
                 "memories": memories,

@@ -12,7 +12,12 @@ AUTH_COOKIE_MAX_AGE_SECONDS = 7 * 24 * 60 * 60  # 7 days
 # ─── Rate Limiting ────────────────────────────────────────────────────────────
 
 RATE_LIMIT_LOGIN = 5       # per minute per email
-RATE_LIMIT_CHAT = 30      # per minute per user
+RATE_LIMIT_CHAT_FREE = 5   # per minute per user
+RATE_LIMIT_CHAT_DAILY_FREE = 50   # per day per user
+
+RATE_LIMIT_CHAT_PAID = 30  # per minute per user
+RATE_LIMIT_CHAT_DAILY_PAID = 1000 # per day per user
+
 RATE_LIMIT_DEFAULT = 120  # per minute per user
 
 

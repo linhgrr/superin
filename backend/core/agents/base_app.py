@@ -103,7 +103,6 @@ class BaseAppAgent:
                 self.graph.ainvoke(
                     {"messages": [{"role": "user", "content": question}]},
                     config={
-                        "configurable": {"thread_id": child_thread_id},
                         "recursion_limit": AGENT_RECURSION_LIMIT,
                     },
                 ),

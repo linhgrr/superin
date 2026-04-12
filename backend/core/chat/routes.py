@@ -9,8 +9,16 @@ from fastapi.responses import StreamingResponse
 
 from core.agents.root import root_agent
 from core.auth.dependencies import get_current_user
-from core.constants import CHAT_STREAM_FRIENDLY_ERROR_TEXT
-from shared.enums import ChatEventType
+from core.constants import (
+    CHAT_STREAM_FRIENDLY_ERROR_TEXT,
+    RATE_LIMIT_CHAT_FREE,
+    RATE_LIMIT_CHAT_DAILY_FREE,
+    RATE_LIMIT_CHAT_PAID,
+    RATE_LIMIT_CHAT_DAILY_PAID,
+)
+from core.subscriptions.service import get_effective_tier
+from core.utils.rate_limit import chat_rate_limiter
+from shared.enums import ChatEventType, SubscriptionTier
 
 logger = logging.getLogger(__name__)
 
@@ -42,11 +50,27 @@ async def chat_stream(request: Request, user_id: str = Depends(get_current_user)
     body = await request.json()
     messages = body.get("messages", [])
     thread_id = body.get("threadId") or body.get("thread_id")
+    
+    tier = await get_effective_tier(user_id)
+    if tier == SubscriptionTier.PAID:
+        limits = [(RATE_LIMIT_CHAT_PAID, 60), (RATE_LIMIT_CHAT_DAILY_PAID, 86400)]
+    else:
+        limits = [(RATE_LIMIT_CHAT_FREE, 60), (RATE_LIMIT_CHAT_DAILY_FREE, 86400)]
 
     async def event_stream():
         message_id = body.get("unstable_assistantMessageId") or f"msg_{uuid4().hex}"
 
         yield _encode_chunk({"type": "start", "messageId": message_id})
+
+        is_allowed, limit_error_message = chat_rate_limiter.check_limit(user_id, limits)
+        if not is_allowed:
+            friendly_err = f"{limit_error_message} Please upgrade to Paid or try again later." if tier != SubscriptionTier.PAID else limit_error_message
+            yield _encode_chunk({
+                "type": ChatEventType.ERROR,
+                "errorText": friendly_err,
+            })
+            yield _encode_done()
+            return
 
         try:
             async for event in root_agent.astream(

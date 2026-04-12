@@ -394,11 +394,14 @@ class RootAgent:
 
     def _get_graph(self, tools: list[BaseTool]) -> Any:
         """Get or create LangGraph for given tools (LRU cache, max MAX_CACHED_GRAPHS)."""
-        tool_names = tuple(sorted(t.name for t in tools))
-        if tool_names in self._graphs:
+        import hashlib
+        sys_hash = hashlib.md5((self._system_prompt or "").encode()).hexdigest()
+        cache_key = (sys_hash, tuple(sorted(t.name for t in tools)))
+        
+        if cache_key in self._graphs:
             # Move to end (most-recently-used)
-            self._graphs.move_to_end(tool_names)
-            return self._graphs[tool_names]
+            self._graphs.move_to_end(cache_key)
+            return self._graphs[cache_key]
 
         graph = create_react_agent(
             model=get_llm(),
@@ -407,7 +410,7 @@ class RootAgent:
             checkpointer=get_checkpointer(),
             store=get_store(),
         )
-        self._graphs[tool_names] = graph
+        self._graphs[cache_key] = graph
 
         # Evict oldest (least-recently-used) entry if over limit
         if len(self._graphs) > MAX_CACHED_GRAPHS:
