@@ -89,7 +89,11 @@ export default function CalendarScreen() {
   // → JS interprets all args as LOCAL time → .toISOString() produces correct UTC
   const handleCreateEvent = useCallback(
     async (formData: EventFormData) => {
-      if (!newEventDate || calendars.length === 0) return;
+      if (!newEventDate) return;
+      if (calendars.length === 0) {
+        toast.error("Please create a calendar first.");
+        return;
+      }
       
       const start_hour = Math.floor(formData.startMinutes / 60);
       const start_min = formData.startMinutes % 60;
@@ -107,12 +111,15 @@ export default function CalendarScreen() {
           location: formData.location || null,
           type: CALENDAR_EVENT_TYPE,
         });
+        toast.success("Event created successfully");
         setShowCreateModal(false);
-      } catch (err) {
+      } catch (err: any) {
         console.error("Failed to create event:", err);
+        const errorMessage = err?.message || err?.detail || "Failed to create event";
+        toast.error(errorMessage);
       }
     },
-    [newEventDate, calendars],
+    [newEventDate, calendars, toast],
   );
 
   const handleUpdateEvent = useCallback(

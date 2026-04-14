@@ -29,8 +29,8 @@ function manualChunks(id: string): string | undefined {
     return "chat";
   }
 
-  if (id.includes("lucide-react/dynamicIconImports")) {
-    return "dynamic-icons";
+  if (id.includes("lucide-react")) {
+    return "lucide-icons";
   }
 
   if (id.includes("react-grid-layout") || id.includes("react-resizable")) {
@@ -174,6 +174,7 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: "dist",
       sourcemap: true,
+      modulePreload: false,
       rollupOptions: {
         output: {
           manualChunks,

@@ -178,6 +178,9 @@ class CalendarService:
     async def list_calendars(self, user_id: str) -> list[dict]:
         """List all user calendars."""
         calendars = await self.calendars.find_by_user(user_id)
+        if not calendars:
+            await self.on_install(user_id)
+            calendars = await self.calendars.find_by_user(user_id)
         return [_calendar_to_dict(c) for c in calendars]
 
     async def get_calendar(self, calendar_id: str, user_id: str) -> dict | None:

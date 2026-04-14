@@ -213,7 +213,7 @@ export function CreateEventModal({ date, calendars, onClose, onCreate, onUpdate,
   };
 
   const durationText = formatDuration(startMinutes, endMinutes);
-  const isValid = title.trim() && endMinutes > startMinutes;
+  const isValid = Boolean(title.trim() && calendarId && endMinutes > startMinutes);
 
   return (
     <div
@@ -231,8 +231,7 @@ export function CreateEventModal({ date, calendars, onClose, onCreate, onUpdate,
       }}
       onClick={onClose}
     >
-      <form
-        onSubmit={handleSubmit}
+      <div
         onClick={(e) => e.stopPropagation()}
         style={{
           background: "var(--color-surface)",
@@ -245,235 +244,274 @@ export function CreateEventModal({ date, calendars, onClose, onCreate, onUpdate,
           boxShadow: "0 4px 24px rgba(0,0,0,0.2)",
         }}
       >
-        <h3 style={{ margin: "0 0 1rem", fontSize: "1.125rem" }}>
-          {initialEvent ? "Edit Event" : "Add Event"}
-        </h3>
-
-        <div style={{ marginBottom: "1rem" }}>
-          <label
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+          <h2 style={{ fontSize: "1.125rem", fontWeight: 600, color: "var(--color-foreground)" }}>
+            {initialEvent ? "Edit Event" : "Create Event"}
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
             style={{
-              display: "block",
-              fontSize: "0.75rem",
+              background: "transparent",
+              border: "none",
               color: "var(--color-foreground-muted)",
-              marginBottom: "0.25rem",
+              cursor: "pointer",
+              padding: "0.25rem",
+              borderRadius: "4px",
             }}
+            aria-label="Close"
           >
-            Date
-          </label>
-          <div style={{ fontSize: "0.875rem", fontWeight: 500 }}>
-            {formatDate(date, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
-          </div>
+            ×
+          </button>
         </div>
 
-        <div style={{ marginBottom: "1rem" }}>
-          <label
-            style={{
-              display: "block",
-              fontSize: "0.75rem",
-              color: "var(--color-foreground-muted)",
-              marginBottom: "0.25rem",
-            }}
-          >
-            Event Title *
-          </label>
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="e.g., Team meeting, Doctor appointment..."
-            autoFocus
-            style={{
-              width: "100%",
-              padding: "0.75rem",
-              border: "1px solid var(--color-border)",
-              borderRadius: "8px",
-              fontSize: "0.875rem",
-              background: "var(--color-surface-elevated)",
-            }}
-          />
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", opacity: isAllDay ? 0.5 : 1, pointerEvents: isAllDay ? "none" : "auto" }}>
-          <TimeInput
-            label="Start Time"
-            value={startMinutes}
-            onChange={handleStartChange}
-          />
-          <TimeInput
-            label="End Time"
-            value={endMinutes}
-            onChange={(v) => setEndMinutes(v)}
-            earliest={startMinutes + 1}
-          />
-        </div>
-
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", marginTop: "0.5rem" }}>
-          {!isAllDay ? (
-            <div style={{ fontSize: "0.75rem", color: "var(--color-foreground-muted)" }}>
-              Duration: {durationText}
-            </div>
-          ) : (
-            <div />
-          )}
-          
-          <label style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem", fontSize: "0.875rem", cursor: "pointer" }}>
-            <input 
-              type="checkbox" 
-              checked={isAllDay} 
-              onChange={(e) => setIsAllDay(e.target.checked)} 
-              style={{ width: "auto", margin: 0, cursor: "pointer" }}
-            />
-            All-day event
-          </label>
-        </div>
-
-        <div style={{ marginBottom: "1rem" }}>
-          <label
-            style={{
-              display: "block",
-              fontSize: "0.75rem",
-              color: "var(--color-foreground-muted)",
-              marginBottom: "0.25rem",
-            }}
-          >
-            Calendar *
-          </label>
-          <select
-            value={calendarId}
-            onChange={(e) => setCalendarId(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "0.75rem",
-              border: "1px solid var(--color-border)",
-              borderRadius: "8px",
-              fontSize: "0.875rem",
-              background: "var(--color-surface-elevated)",
-              color: "var(--color-foreground)",
-            }}
-          >
-            {calendars.map(c => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-        </div>
-        
-        <div style={{ marginBottom: "1rem" }}>
-          <label
-            style={{
-              display: "block",
-              fontSize: "0.75rem",
-              color: "var(--color-foreground-muted)",
-              marginBottom: "0.25rem",
-            }}
-          >
-            Location
-          </label>
-          <input
-            type="text"
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-            placeholder="Add location"
-            style={{
-              width: "100%",
-              padding: "0.75rem",
-              border: "1px solid var(--color-border)",
-              borderRadius: "8px",
-              fontSize: "0.875rem",
-              background: "var(--color-surface-elevated)",
-              color: "var(--color-foreground)",
-            }}
-          />
-        </div>
-
-        <div style={{ marginBottom: "1.5rem" }}>
-          <label
-            style={{
-              display: "block",
-              fontSize: "0.75rem",
-              color: "var(--color-foreground-muted)",
-              marginBottom: "0.25rem",
-            }}
-          >
-            Description
-          </label>
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Add description"
-            rows={3}
-            style={{
-              width: "100%",
-              padding: "0.75rem",
-              border: "1px solid var(--color-border)",
-              borderRadius: "8px",
-              fontSize: "0.875rem",
-              background: "var(--color-surface-elevated)",
-              color: "var(--color-foreground)",
-              resize: "vertical",
-            }}
-          />
-        </div>
-
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "1rem" }}>
-          {initialEvent && onDelete ? (
-            <button
-              type="button"
-              onClick={() => {
-                onDelete(initialEvent.id);
-              }}
-              style={{
-                padding: "0.625rem 1rem",
-                border: "1px solid var(--color-danger-muted-border)",
-                background: "var(--color-danger-muted-bg)",
-                color: "var(--color-danger)",
-                borderRadius: "8px",
-                cursor: "pointer",
-                fontSize: "0.875rem",
-                fontWeight: 500,
-              }}
-            >
-              Delete
-            </button>
-          ) : (
-            <div />
-          )}
-
-          <div style={{ display: "flex", gap: "0.75rem" }}>
+        {calendars.length === 0 ? (
+          <div style={{ padding: "2rem", textAlign: "center", color: "var(--color-foreground-muted)" }}>
+            <p style={{ marginBottom: "1rem" }}>You need a calendar to create events.</p>
             <button
               type="button"
               onClick={onClose}
               style={{
-                padding: "0.625rem 1rem",
-                border: "1px solid var(--color-border)",
-                background: "transparent",
+                padding: "0.5rem 1rem",
+                background: "var(--color-surface-hover)",
                 color: "var(--color-foreground)",
-                borderRadius: "8px",
-                cursor: "pointer",
-                fontSize: "0.875rem",
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={!isValid}
-              style={{
-                padding: "0.625rem 1rem",
                 border: "none",
-                background: "var(--color-primary)",
-                color: "white",
-                borderRadius: "8px",
-                cursor: isValid ? "pointer" : "not-allowed",
-                fontSize: "0.875rem",
-                fontWeight: 500,
-                opacity: isValid ? 1 : 0.5,
+                borderRadius: "6px",
+                cursor: "pointer",
               }}
             >
-              {initialEvent ? "Update Event" : "Add Event"}
+              Close
             </button>
           </div>
-        </div>
-      </form>
+        ) : (
+          <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+            <div style={{ marginBottom: "1rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "0.75rem",
+                  color: "var(--color-foreground-muted)",
+                  marginBottom: "0.25rem",
+                }}
+              >
+                Date
+              </label>
+              <div style={{ fontSize: "0.875rem", fontWeight: 500 }}>
+                {formatDate(date, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: "1rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "0.75rem",
+                  color: "var(--color-foreground-muted)",
+                  marginBottom: "0.25rem",
+                }}
+              >
+                Event Title *
+              </label>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="e.g., Team meeting, Doctor appointment..."
+                autoFocus
+                style={{
+                  width: "100%",
+                  padding: "0.75rem",
+                  border: "1px solid var(--color-border)",
+                  borderRadius: "8px",
+                  fontSize: "0.875rem",
+                  background: "var(--color-surface-elevated)",
+                }}
+              />
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", opacity: isAllDay ? 0.5 : 1, pointerEvents: isAllDay ? "none" : "auto" }}>
+              <TimeInput
+                label="Start Time"
+                value={startMinutes}
+                onChange={handleStartChange}
+              />
+              <TimeInput
+                label="End Time"
+                value={endMinutes}
+                onChange={(v) => setEndMinutes(v)}
+                earliest={startMinutes + 1}
+              />
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", marginTop: "0.5rem" }}>
+              {!isAllDay ? (
+                <div style={{ fontSize: "0.75rem", color: "var(--color-foreground-muted)" }}>
+                  Duration: {formatDuration(startMinutes, endMinutes)}
+                </div>
+              ) : (
+                <div />
+              )}
+              
+              <label style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem", fontSize: "0.875rem", cursor: "pointer" }}>
+                <input 
+                  type="checkbox" 
+                  checked={isAllDay} 
+                  onChange={(e) => setIsAllDay(e.target.checked)} 
+                  style={{ width: "auto", margin: 0, cursor: "pointer" }}
+                />
+                All-day event
+              </label>
+            </div>
+
+            <div style={{ marginBottom: "1rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "0.75rem",
+                  color: "var(--color-foreground-muted)",
+                  marginBottom: "0.25rem",
+                }}
+              >
+                Calendar *
+              </label>
+              <select
+                value={calendarId}
+                onChange={(e) => setCalendarId(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "0.75rem",
+                  border: "1px solid var(--color-border)",
+                  borderRadius: "8px",
+                  fontSize: "0.875rem",
+                  background: "var(--color-surface-elevated)",
+                  color: "var(--color-foreground)",
+                }}
+              >
+                {calendars.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+            
+            <div style={{ marginBottom: "1rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "0.75rem",
+                  color: "var(--color-foreground-muted)",
+                  marginBottom: "0.25rem",
+                }}
+              >
+                Location
+              </label>
+              <input
+                type="text"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                placeholder="Add location"
+                style={{
+                  width: "100%",
+                  padding: "0.75rem",
+                  border: "1px solid var(--color-border)",
+                  borderRadius: "8px",
+                  fontSize: "0.875rem",
+                  background: "var(--color-surface-elevated)",
+                  color: "var(--color-foreground)",
+                }}
+              />
+            </div>
+
+            <div style={{ marginBottom: "1.5rem" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "0.75rem",
+                  color: "var(--color-foreground-muted)",
+                  marginBottom: "0.25rem",
+                }}
+              >
+                Description
+              </label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Add description"
+                rows={3}
+                style={{
+                  width: "100%",
+                  padding: "0.75rem",
+                  border: "1px solid var(--color-border)",
+                  borderRadius: "8px",
+                  fontSize: "0.875rem",
+                  background: "var(--color-surface-elevated)",
+                  color: "var(--color-foreground)",
+                  resize: "vertical",
+                }}
+              />
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "1rem" }}>
+              {initialEvent && onDelete ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onDelete(initialEvent.id);
+                  }}
+                  style={{
+                    padding: "0.625rem 1rem",
+                    border: "1px solid var(--color-danger-muted-border)",
+                    background: "var(--color-danger-muted-bg)",
+                    color: "var(--color-danger)",
+                    borderRadius: "8px",
+                    cursor: "pointer",
+                    fontSize: "0.875rem",
+                    fontWeight: 500,
+                  }}
+                >
+                  Delete
+                </button>
+              ) : (
+                <div />
+              )}
+
+              <div style={{ display: "flex", gap: "0.75rem" }}>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  style={{
+                    padding: "0.625rem 1rem",
+                    border: "1px solid var(--color-border)",
+                    background: "transparent",
+                    color: "var(--color-foreground)",
+                    borderRadius: "8px",
+                    cursor: "pointer",
+                    fontSize: "0.875rem",
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!isValid}
+                  style={{
+                    padding: "0.625rem 1rem",
+                    border: "none",
+                    background: "var(--color-primary)",
+                    color: "white",
+                    borderRadius: "8px",
+                    cursor: isValid ? "pointer" : "not-allowed",
+                    fontSize: "0.875rem",
+                    fontWeight: 500,
+                    opacity: isValid ? 1 : 0.5,
+                  }}
+                >
+                  {initialEvent ? "Update Event" : "Add Event"}
+                </button>
+              </div>
+            </div>
+          </form>
+        )}
+      </div>
     </div>
   );
 }
