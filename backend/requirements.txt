@@ -70,6 +70,9 @@ orjson==3.10.12
 # Object Storage (S3-compatible)
 boto3==1.35.90
 
+# Logging
+loguru==0.7.3
+
 # HTTP Tools
 click==8.1.8
 
