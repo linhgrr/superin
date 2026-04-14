@@ -44,7 +44,7 @@ def _build_ask_tool(app_id: str, agent: BaseAppAgent, agent_description: str) ->
                 raise ValueError(f"Missing thread context for ask_{app_id}")
             return await agent.delegate(question, thread_id)
 
-        result = await safe_tool_call(operation, action=f"delegating to {app_id}")
+        result = await safe_tool_call(operation, action=f"delegating to {app_id}", localize=False)
         return _unwrap_safe_tool_result(result)
 
     return ask_app
@@ -195,7 +195,7 @@ def _build_memory_tools() -> list[BaseTool]:
         from uuid import uuid4
 
         from core.db import get_store
-        from core.utils.sanitizer import sanitize_for_memory
+        from core.utils.sanitizer import sanitize_for_memory_async
 
         async def operation() -> dict[str, Any]:
             user_id = get_user_context()
@@ -205,7 +205,7 @@ def _build_memory_tools() -> list[BaseTool]:
             store = get_store()
             namespace = (user_id, "memories", category)
             key = f"mem_{uuid4().hex[:8]}"
-            sanitized = sanitize_for_memory(content)
+            sanitized = await sanitize_for_memory_async(content)
             await store.aput(
                 namespace,
                 key,
