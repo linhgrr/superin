@@ -3,7 +3,7 @@ import { getWidgetData, type UpcomingWidgetData, type EventRead } from "../api";
 import { DynamicIcon } from "@/lib/icon-resolver";
 import { useWidgetData } from "@/lib/widget-data";
 import { useTimezone } from "@/shared/hooks/useTimezone";
-import { utcToLocalDate } from "@/shared/utils/timezone";
+import { utcToLocalDate } from "@/shared/utils/datetime";
 
 export default function UpcomingWidget({ widget }: DashboardWidgetRendererProps) {
   const { data, isLoading } = useWidgetData<UpcomingWidgetData>(
@@ -11,18 +11,20 @@ export default function UpcomingWidget({ widget }: DashboardWidgetRendererProps)
     widget.id,
     () => getWidgetData(widget.id) as Promise<UpcomingWidgetData>
   );
-  const { formatDate, formatTime, isToday } = useTimezone();
+  const { formatDate, formatTime, isToday, getNow } = useTimezone();
 
   const events = data?.items ?? [];
 
   const formatEventDate = (dateStr: string) => {
     if (isToday(dateStr)) return "Today";
 
-    const dateInTz = utcToLocalDate(dateStr);
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowInTz = utcToLocalDate(tomorrow.toISOString());
+    // Compute "tomorrow" in the user's timezone (not browser system time)
+    const [todayDateStr] = getNow();
+    const [y, m, d] = todayDateStr.split("-").map(Number);
+    const tomorrowDate = new Date(y, m - 1, d + 1); // user-tz midnight
+    const tomorrowInTz = utcToLocalDate(tomorrowDate.toISOString());
 
+    const dateInTz = utcToLocalDate(dateStr);
     if (dateInTz && tomorrowInTz && dateInTz.toDateString() === tomorrowInTz.toDateString()) {
       return "Tomorrow";
     }

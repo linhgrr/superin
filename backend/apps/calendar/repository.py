@@ -1,8 +1,11 @@
 """Calendar plugin data access layer."""
 
+from __future__ import annotations
+
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime
+from datetime import datetime
 
 from beanie import PydanticObjectId
 from pymongo.asynchronous.client_session import AsyncClientSession
@@ -10,7 +13,9 @@ from pymongo.asynchronous.client_session import AsyncClientSession
 from apps.calendar.enums import EventType, RecurrenceFrequency
 from apps.calendar.models import Calendar, Event, RecurringRule
 from core.db import get_db
-from shared.normalization import normalize_name_key, to_naive_datetime
+from core.utils.timezone import ensure_naive_utc, normalize_name_key, utc_now
+
+logger = logging.getLogger(__name__)
 
 # Default color for new calendars
 DEFAULT_CALENDAR_COLOR = "oklch(0.70 0.18 250)"  # Blue-ish
@@ -40,8 +45,8 @@ class EventRepository:
         if calendar_id:
             conditions.append(Event.calendar_id == PydanticObjectId(calendar_id))
 
-        start_naive = to_naive_datetime(start)
-        end_naive = to_naive_datetime(end)
+        start_naive = ensure_naive_utc(start)
+        end_naive = ensure_naive_utc(end)
 
         if start_naive and end_naive:
             conditions.append(Event.start_datetime < end_naive)
@@ -102,10 +107,12 @@ class EventRepository:
         session: AsyncClientSession | None = None,
     ) -> list[Event]:
         """Find events overlapping with given time range."""
+        start_naive = ensure_naive_utc(start)
+        end_naive = ensure_naive_utc(end)
         conditions = [
             Event.user_id == PydanticObjectId(user_id),
-            Event.start_datetime < end,
-            Event.end_datetime > start,
+            Event.start_datetime < end_naive,
+            Event.end_datetime > start_naive,
         ]
 
         if exclude_event_id:
@@ -123,6 +130,7 @@ class EventRepository:
         description: str | None = None,
         location: str | None = None,
         is_all_day: bool = False,
+        timezone: str = "UTC",
         type_: EventType = "event",
         task_id: str | None = None,
         color: str | None = None,
@@ -139,6 +147,7 @@ class EventRepository:
             description=description,
             location=location,
             is_all_day=is_all_day,
+            timezone=timezone,
             type=type_,
             task_id=PydanticObjectId(task_id) if task_id else None,
             color=color,
@@ -146,6 +155,14 @@ class EventRepository:
         )
         await event.insert(session=session)
         return event
+
+    # Fields that callers are allowed to update via update()
+    _ALLOWED_UPDATE_FIELDS = frozenset({
+        "title", "description", "location",
+        "start_datetime", "end_datetime", "calendar_id",
+        "is_all_day", "color", "reminders", "is_recurring",
+        "type",
+    })
 
     async def update(
         self,
@@ -155,9 +172,9 @@ class EventRepository:
         **kwargs,
     ) -> Event:
         for key, value in kwargs.items():
-            if hasattr(event, key) and value is not None:
+            if key in self._ALLOWED_UPDATE_FIELDS and value is not None:
                 setattr(event, key, value)
-        event.updated_at = datetime.now(UTC)
+        event.updated_at = utc_now()
         await event.save(session=session)
         return event
 
@@ -201,6 +218,7 @@ class CalendarRepository:
         *,
         session: AsyncClientSession | None = None,
     ) -> int:
+        """Count calendars for a user."""
         return await Calendar.find(
             Calendar.user_id == PydanticObjectId(user_id),
             session=session,
@@ -278,6 +296,11 @@ class CalendarRepository:
         await calendar.insert(session=session)
         return calendar
 
+    # Fields that callers are allowed to update via update()
+    _ALLOWED_UPDATE_FIELDS = frozenset({
+        "name", "color", "is_visible", "is_default",
+    })
+
     async def update(
         self,
         calendar: Calendar,
@@ -286,10 +309,10 @@ class CalendarRepository:
         **kwargs,
     ) -> Calendar:
         for key, value in kwargs.items():
-            if hasattr(calendar, key) and value is not None:
+            if key in self._ALLOWED_UPDATE_FIELDS and value is not None:
                 setattr(calendar, key, value)
         if "name" in kwargs and kwargs["name"] is not None:
-            calendar.name_key = normalize_name_key(calendar.name)
+            calendar.name_key = normalize_name_key(kwargs["name"])
         await calendar.save(session=session)
         return calendar
 
@@ -376,10 +399,19 @@ class RecurringRuleRepository:
         *,
         session: AsyncClientSession | None = None,
     ) -> RecurringRule:
-        """Increment occurrence count and update last generated date."""
+        """Increment occurrence count and update last generated date atomically."""
+        now = utc_now()
+        await RecurringRule.get_pymongo_collection().update_one(
+            {"_id": rule.id},
+            {
+                "$inc": {"occurrence_count": 1},
+                "$set": {"last_generated_date": now},
+            },
+            session=session,
+        )
+        # Mutate in-memory — DB was already updated atomically, no reload needed
         rule.occurrence_count += 1
-        rule.last_generated_date = datetime.now(UTC)
-        await rule.save(session=session)
+        rule.last_generated_date = now
         return rule
 
     async def deactivate(

@@ -7,6 +7,7 @@ from langchain_core.tools import tool
 from apps.finance.enums import TransactionType
 from apps.finance.service import finance_service
 from core.models import User
+from core.utils.timezone import ensure_aware_utc
 from shared.agent_context import get_user_context
 from shared.tool_results import safe_tool_call
 
@@ -416,7 +417,7 @@ async def finance_add_transaction(
     """
     async def operation() -> dict:
         user_id = get_user_context()
-        dt = datetime.fromisoformat(date) if date else datetime.now(UTC)
+        dt = ensure_aware_utc(datetime.fromisoformat(date)) if date else datetime.now(UTC)
         return await finance_service.add_transaction(
             user_id, wallet_id, category_id, type_, amount, dt, note
         )

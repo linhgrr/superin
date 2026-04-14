@@ -799,7 +799,9 @@ def generate_app_dashboard_renderers(manifests: dict[str, dict]) -> None:
             [
                 '} as const satisfies Record<string, ComponentType<DashboardWidgetRendererProps>>;',
                 "",
-                "export default createDashboardWidgetRenderer(WIDGET_COMPONENTS);",
+                f"const {to_pascal_case(app_id)}DashboardWidget = createDashboardWidgetRenderer(WIDGET_COMPONENTS);",
+                "",
+                "export default " + f"{to_pascal_case(app_id)}DashboardWidget" + ";",
                 "",
             ]
         )

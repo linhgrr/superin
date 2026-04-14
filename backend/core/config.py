@@ -59,10 +59,10 @@ class Settings(BaseSettings):
 
     # ─── AI (OpenAI-compatible / Fireworks) ───────────────────────────────────
     openai_api_key: str = ""
-    openai_base_url: str = "https://api.fireworks.ai/inference/v1"
-    openai_model: str = "accounts/fireworks/routers/kimi-k2p5-turbo"
+    openai_base_url: str = ""
+    openai_model: str = ""
     llm_request_timeout_seconds: float = 60.0
-    llm_stream_idle_timeout_seconds: float = 90.0
+    llm_stream_idle_timeout_seconds: float = 120.0
 
     # ─── Object Storage (S3-compatible) ───────────────────────────────────────
     object_storage_access_key: str | None = None

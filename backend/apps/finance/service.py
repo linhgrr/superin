@@ -1,7 +1,7 @@
 """Finance plugin business logic — thin wrappers over repository."""
 
 import asyncio
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from beanie import PydanticObjectId
 from pymongo.asynchronous.client_session import AsyncClientSession
@@ -16,7 +16,7 @@ from apps.finance.repository import (
     finance_transaction,
 )
 from core.models import User
-from core.utils.timezone import get_user_timezone_context, ensure_naive_utc
+from core.utils.timezone import ensure_naive_utc, get_user_timezone_context
 
 
 class FinanceService:
@@ -547,22 +547,35 @@ class FinanceService:
     # ─── Statistics & Analytics ───────────────────────────────────────────────────
 
     async def get_category_breakdown(self, user_id: str, month: int | None = None, year: int | None = None) -> dict:
-        """Get spending breakdown by category for a specific month."""
-        now = datetime.now(UTC)
-        target_month = month if month else now.month
-        target_year = year if year else now.year
+        """Get spending breakdown by category for a specific month.
 
-        # Get date range
-        start_date = datetime(target_year, target_month, 1)
-        if target_month == 12:
-            end_date = datetime(target_year + 1, 1, 1)
+        Month/year are interpreted in the user's local timezone.
+        When not provided, defaults to the current month in the user's timezone.
+        """
+        user = await User.get(user_id)
+        ctx = get_user_timezone_context(user)
+
+        if month is not None and year is not None:
+            # User specified month/year — interpret as their local month
+            target_month = month
+            target_year = year
         else:
-            end_date = datetime(target_year, target_month + 1, 1)
+            # Default to current month in user's local timezone
+            now_local = ctx.now_local()
+            target_month = now_local.month
+            target_year = now_local.year
+
+        # Build local start/end of the month, then convert to UTC for DB queries
+        start_local = datetime(target_year, target_month, 1, tzinfo=ctx.tz)
+        if target_month == 12:
+            end_local = datetime(target_year + 1, 1, 1, tzinfo=ctx.tz) - timedelta(seconds=1)
+        else:
+            end_local = datetime(target_year, target_month + 1, 1, tzinfo=ctx.tz) - timedelta(seconds=1)
 
         # Use DB-level date filtering and run queries concurrently
         txs, categories = await asyncio.gather(
             self.transactions.find_by_user(
-                user_id, type_="expense", start_date=start_date, end_date=end_date, skip=0, limit=10000
+                user_id, type_="expense", start_date=start_local, end_date=end_local, skip=0, limit=10000
             ),
             self.categories.find_by_user(user_id)
         )

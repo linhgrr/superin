@@ -13,7 +13,7 @@ Hierarchy:
         └── Tool: ask_todo      ──→ TodoAgent    (child graph, app-scoped thread)
 
 Message persistence:
-  - LangGraph's `MongoDBSaver` checkpointer handles short-term conversation thread state.
+  - `conversation_messages` stores canonical user/assistant thread history.
   - LangGraph's `MongoDBStore` handles long-term persistent knowledge via memory tools
     (save_memory, recall_memories, delete_memory).
   - Each child AppAgent is a stateless LangGraph specialist invoked by the root agent.

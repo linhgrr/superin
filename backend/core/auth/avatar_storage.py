@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from uuid import uuid4
 
@@ -71,9 +72,10 @@ async def upload_avatar(user_id: str, upload_file: UploadFile) -> str:
     prefix = settings.object_storage_avatar_prefix.strip("/")
     object_key = f"{prefix}/{user_id}/{uuid4().hex}{extension}"
 
-    s3_client = get_s3_client()
     try:
-        s3_client.put_object(
+        s3_client = await asyncio.to_thread(get_s3_client)
+        await asyncio.to_thread(
+            s3_client.put_object,
             Bucket=bucket,
             Key=object_key,
             Body=data,

@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import os
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
@@ -103,12 +104,16 @@ async def _run_subscription_expiry_cron(stop_event: asyncio.Event) -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Server lifecycle: startup → serve → shutdown."""
-    # 0. Tune default thread pool to prevent MongoDBStore sync operations from starving async threads
+    # 0. Bound the shared executor used by libraries that still offload sync work.
+    # Avoid the previous fixed 100-thread pool while keeping enough capacity for
+    # MongoDBStore and explicit asyncio.to_thread() call sites.
     loop = asyncio.get_running_loop()
-    loop.set_default_executor(ThreadPoolExecutor(max_workers=100))
+    executor = ThreadPoolExecutor(max_workers=min(32, max(8, (os.cpu_count() or 1) * 4)))
+    loop.set_default_executor(executor)
 
     # 1. Init DB (needed for verify_plugins and agent)
     await init_db()
+    from core.subscriptions.service import close_payment_http_client, get_payment_http_client
 
     # 2. Init Redis for rate limiting (optional — falls back to in-memory)
     from core.utils.limiter import set_redis_client, tiered_limiter
@@ -154,6 +159,7 @@ async def lifespan(app: FastAPI):
         )
 
     logger.info("✓ Server ready — all plugins verified")
+    await get_payment_http_client()
 
     expiry_cron_stop_event = asyncio.Event()
     expiry_cron_task: asyncio.Task[None] | None = None
@@ -180,6 +186,9 @@ async def lifespan(app: FastAPI):
             await _redis.aclose()
         except Exception:
             pass
+
+    await close_payment_http_client()
+    executor.shutdown(wait=False, cancel_futures=False)
 
     await close_db()
     logger.info("✓ Server shutdown complete")

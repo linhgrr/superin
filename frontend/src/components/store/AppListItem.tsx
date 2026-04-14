@@ -54,7 +54,6 @@ export default function AppListItem({
           color: "white",
           flexShrink: 0,
           fontFamily: "var(--font-display)",
-          boxShadow: "0 2px 8px oklch(0 0 0 / 0.2)",
         }}
       >
         {app.icon ? (

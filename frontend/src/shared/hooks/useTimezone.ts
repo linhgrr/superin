@@ -10,37 +10,96 @@
  *
  * Apps that need timezone logic import from here (shared/) instead of platform/hooks/.
  * Platform code (src/hooks/, src/lib/) remains off-limits for apps.
+ *
+ * ── When to use this hook vs direct utils ─────────────────────────────────────
+ *
+ *   useTimezone()    → React components that need reactive timezone (auto-updates
+ *                       when user changes timezone via setTimezone())
+ *   direct import    → Non-React code, outside React render cycle
+ *
+ * ── React components MUST use this hook for: ─────────────────────────────────
+ *
+ *   formatTime / formatDate / formatDateTime
+ *   isToday / isPast / isSameDayAs
+ *   getHourMinute / getWeekBoundaries
+ *   getDayRange / getTodayRange
+ *   getLocalNow
+ *
+ * ── Pure utilities (no React needed) can use direct import from timezone.ts ───
+ *
+ *   buildUtcIsoString / buildUtcIsoStringFromDate
+ *   getUserTimezone / setUserTimezone / clearUserTimezone
+ *   COMMON_TIMEZONES / DEFAULT_TIMEZONE
  */
 
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import {
-  formatDateTime as formatDateTimeUtil,
-  formatDate as formatDateUtil,
   formatTime as formatTimeUtil,
+  formatDate as formatDateUtil,
+  formatDateTime as formatDateTimeUtil,
   isToday as isTodayUtil,
   isPast as isPastUtil,
+  isSameDayAs as isSameDayAsUtil,
+  isSameDayInTimezone as isSameDayInTimezoneUtil,
+  getHourMinute as getHourMinuteUtil,
+  getWeekDates as getWeekDatesUtil,
+  getDayRange as getDayRangeUtil,
+  getTodayRange as getTodayRangeUtil,
+  getWeekBoundaries as getWeekBoundariesUtil,
+  getLocalNow as getLocalNowUtil,
   getUserTimezone,
   setUserTimezone,
-  getLocalDateTimeStrings,
-} from '@/shared/utils/timezone';
+  type DateInput,
+} from '@/shared/utils/datetime';
 
 export interface UseTimezoneReturn {
   /** Current user timezone name (e.g., "Asia/Ho_Chi_Minh") */
   timezone: string;
   /** Update the timezone setting */
   setTimezone: (tz: string) => void;
-  /** Format UTC datetime string for display */
-  formatDateTime: (utcString: string | Date | null | undefined, options?: Intl.DateTimeFormatOptions) => string;
-  /** Format date only (no time) */
-  formatDate: (utcString: string | Date | null | undefined, options?: Intl.DateTimeFormatOptions) => string;
-  /** Format time only (no date) */
-  formatTime: (utcString: string | Date | null | undefined, options?: Intl.DateTimeFormatOptions) => string;
-  /** Check if datetime is today in user's timezone */
-  isToday: (utcString: string | Date | null | undefined) => boolean;
-  /** Check if datetime is in the past */
-  isPast: (utcString: string | Date | null | undefined) => boolean;
-  /** Get current date/time strings in user's timezone */
+
+  // ── Formatters (user timezone) ────────────────────────────────────────────
+  /** Format UTC datetime as time string (HH:MM) */
+  formatTime: (utcString: DateInput, options?: Intl.DateTimeFormatOptions) => string;
+  /** Format UTC datetime as date string */
+  formatDate: (utcString: DateInput, options?: Intl.DateTimeFormatOptions) => string;
+  /** Format UTC datetime as full datetime string */
+  formatDateTime: (utcString: DateInput, options?: Intl.DateTimeFormatOptions) => string;
+
+  // ── Comparisons ────────────────────────────────────────────────────────────
+  /** True if UTC datetime falls on today in user timezone */
+  isToday: (utcString: DateInput) => boolean;
+  /** True if UTC datetime is in the past (user local time) */
+  isPast: (utcString: DateInput) => boolean;
+  /** True if UTC datetime falls on the same calendar day as `date` (user tz) */
+  isSameDayAs: (utcString: DateInput, date: Date) => boolean;
+
+  // ── Extraction ─────────────────────────────────────────────────────────────
+  /** Extract hour/minute from UTC datetime in user timezone (for time pickers) */
+  getHourMinute: (utcString: DateInput) => { hour: number; minute: number } | null;
+
+  /**
+   * Check if two Date objects are the same calendar day in user timezone.
+   * Use for comparing a day-column Date with a UTC datetime Date.
+   */
+  isSameDayInTimezone: (d1: Date, d2: Date) => boolean;
+
+  // ── Ranges ─────────────────────────────────────────────────────────────────
+  /** UTC ISO string range for today in user timezone */
+  getTodayRange: () => { start: string; end: string };
+  /** UTC ISO string range for a specific day in user timezone */
+  getDayRange: (date: Date) => { start: string; end: string };
+  /** Week boundaries (Mon-Sun) in user timezone */
+  getWeekBoundaries: (date: Date) => {
+    mondayLocal: Date;
+    sundayLocal: Date;
+    weekDatesLocal: Date[];
+    weekDatesUtcIso: string[];
+  };
+
+  // ── Current time ───────────────────────────────────────────────────────────
+  /** Current date/time strings in user timezone */
   getNow: () => [string, string];
 }
 
@@ -55,10 +114,10 @@ export function useTimezone(): UseTimezoneReturn {
 
   // Sync with user settings when available
   useEffect(() => {
-    const timezone = user?.settings?.timezone;
-    if (typeof timezone === "string" && timezone.length > 0) {
-      setUserTimezone(timezone);
-      setTimezoneState(timezone);
+    const tz = user?.settings?.timezone;
+    if (typeof tz === 'string' && tz.length > 0) {
+      setUserTimezone(tz);
+      setTimezoneState(tz);
     }
   }, [user?.settings?.timezone]);
 
@@ -67,44 +126,89 @@ export function useTimezone(): UseTimezoneReturn {
     setTimezoneState(tz);
   }, []);
 
-  const formatDateTime = useCallback(
-    (utcString: string | Date | null | undefined, options?: Intl.DateTimeFormatOptions) =>
-      formatDateTimeUtil(utcString, options),
-    []
+  const formatTime = useCallback(
+    (utcString: DateInput, options?: Intl.DateTimeFormatOptions) =>
+      formatTimeUtil(utcString, timezone, options),
+    [timezone],
   );
 
   const formatDate = useCallback(
-    (utcString: string | Date | null | undefined, options?: Intl.DateTimeFormatOptions) =>
-      formatDateUtil(utcString, options),
-    []
+    (utcString: DateInput, options?: Intl.DateTimeFormatOptions) =>
+      formatDateUtil(utcString, timezone, options),
+    [timezone],
   );
 
-  const formatTime = useCallback(
-    (utcString: string | Date | null | undefined, options?: Intl.DateTimeFormatOptions) =>
-      formatTimeUtil(utcString, options),
-    []
+  const formatDateTime = useCallback(
+    (utcString: DateInput, options?: Intl.DateTimeFormatOptions) =>
+      formatDateTimeUtil(utcString, timezone, options),
+    [timezone],
   );
 
   const isToday = useCallback(
-    (utcString: string | Date | null | undefined) => isTodayUtil(utcString),
-    []
+    (utcString: DateInput) => isTodayUtil(utcString, timezone),
+    [timezone],
   );
 
   const isPast = useCallback(
-    (utcString: string | Date | null | undefined) => isPastUtil(utcString),
-    []
+    (utcString: DateInput) => isPastUtil(utcString, timezone),
+    [timezone],
   );
 
-  const getNow = useCallback(() => getLocalDateTimeStrings(), []);
+  const isSameDayAs = useCallback(
+    (utcString: DateInput, date: Date) => isSameDayAsUtil(utcString, date, timezone),
+    [timezone],
+  );
+
+  const isSameDayInTimezone = useCallback(
+    (d1: Date, d2: Date) => isSameDayInTimezoneUtil(d1, d2, timezone),
+    [timezone],
+  );
+
+  const getHourMinute = useCallback(
+    (utcString: DateInput) => getHourMinuteUtil(utcString, timezone),
+    [timezone],
+  );
+
+  const getWeekDates = useCallback(
+    (date: Date) => getWeekDatesUtil(date, timezone),
+    [timezone],
+  );
+
+  const getTodayRange = useCallback(
+    () => getTodayRangeUtil(timezone),
+    [timezone],
+  );
+
+  const getDayRange = useCallback(
+    (date: Date) => getDayRangeUtil(date, timezone),
+    [timezone],
+  );
+
+  const getWeekBoundaries = useCallback(
+    (date: Date) => getWeekBoundariesUtil(date, timezone),
+    [timezone],
+  );
+
+  const getNow = useCallback(() => {
+    const result = getLocalNowUtil(timezone);
+    return [result.date, result.time];
+  }, [timezone]);
 
   return {
     timezone,
     setTimezone,
-    formatDateTime,
-    formatDate,
     formatTime,
+    formatDate,
+    formatDateTime,
     isToday,
     isPast,
+    isSameDayAs,
+    isSameDayInTimezone,
+    getHourMinute,
+    getWeekDates,
+    getTodayRange,
+    getDayRange,
+    getWeekBoundaries,
     getNow,
   };
 }

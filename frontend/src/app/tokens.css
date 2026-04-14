@@ -1,72 +1,65 @@
-/* Superin — Refined Industrial Minimalism Design System */
-
-/* Tailwind v4 @theme — defines all CSS custom properties.
-   In v4, @theme auto-generates equivalent CSS variables, so :root{}
-   duplication is removed. */
+/* Superin — Linear-Inspired Precision Design System (Coral Accent) */
 
 @theme {
   /* ═══════════════════════════════════════════════════════════════════════════════
-     COLOR SYSTEM — Warm Dark with Coral Accents
+     COLOR SYSTEM — Precision Dark Mode (from DESIGN.md) + Coral Accents
      ═══════════════════════════════════════════════════════════════════════════════ */
 
-  /* Primary — Coral/Orange warmth */
+  /* Primary — Coral/Orange warmth (Retained as per user request) */
   --color-primary: oklch(0.68 0.22 35);
   --color-primary-hover: oklch(0.75 0.24 35);
   --color-primary-foreground: oklch(0.98 0 0);
   --color-primary-muted: oklch(0.68 0.22 35 / 0.15);
-
-  /* Secondary end-stop for primary gradient (lighter coral) */
   --color-primary-end: oklch(0.72 0.24 45);
 
-  /* Semantic */
-  --color-success: oklch(0.75 0.18 145);
+  /* Semantic - from DESIGN.md */
+  --color-success: #27a644;
+  --color-success-muted-bg: rgba(39, 166, 68, 0.15);
   --color-warning: oklch(0.78 0.16 85);
-  --color-danger: oklch(0.62 0.22 25);
-  --color-info: oklch(0.65 0.15 250);
-
-  /* Background — Warm dark */
-  --color-background: oklch(0.12 0.01 40);
-  --color-background-elevated: oklch(0.16 0.015 40);
-  --color-background-sunken: oklch(0.09 0.008 40);
-
-  /* Foreground */
-  --color-foreground: oklch(0.95 0.005 40);
-  --color-foreground-muted: oklch(0.65 0.01 40);
-  --color-foreground-subtle: oklch(0.45 0.01 40);
-
-  /* Surfaces — Glassmorphism ready */
-  --color-surface: oklch(0.15 0.012 40);
-  --color-surface-elevated: oklch(0.20 0.015 40);
-  --color-surface-floating: oklch(0.24 0.018 40);
-  --color-surface-transparent: oklch(0.15 0.012 40 / 0.85);
-
-  /* Borders — Subtle depth */
-  --color-border: oklch(0.22 0.015 40);
-  --color-border-subtle: oklch(0.18 0.012 40);
-  --color-border-highlight: oklch(0.30 0.02 40);
-
-  /* Interaction */
-  --color-ring: oklch(0.68 0.22 35);
-  --color-ring-offset: oklch(0.12 0.01 40);
-
-  /* Primary at various opacities for use in gradients/overlays */
-  --color-primary-glow: oklch(0.68 0.22 35);
-
-  /* Semantic color tokens at specific opacities for reuse in components */
-  --color-success-muted-bg: oklch(0.75 0.18 145 / 0.15);
   --color-warning-muted-bg: oklch(0.78 0.16 85 / 0.15);
+  --color-danger: oklch(0.62 0.22 25);
   --color-danger-muted-bg: oklch(0.62 0.22 25 / 0.15);
   --color-danger-muted-border: oklch(0.62 0.22 25 / 0.3);
   --color-danger-subtle-bg: oklch(0.62 0.22 25 / 0.1);
+  --color-info: oklch(0.65 0.15 250);
+
+  /* Background — Native Dark (Linear style) */
+  --color-background: #08090a; /* Marketing Black */
+  --color-background-elevated: #0f1011; /* Panel Dark */
+  --color-background-sunken: #010102; /* Deepest canvas */
+
+  /* Foreground — Greyscale steps */
+  --color-foreground: #f7f8f8; /* Primary Text */
+  --color-foreground-muted: #d0d6e0; /* Secondary Text */
+  --color-foreground-subtle: #8a8f98; /* Tertiary Text */
+  --color-foreground-quaternary: #62666d; /* Quaternary Text */
+
+  /* Surfaces — Luminance stacking */
+  --color-surface: #191a1b; /* Level 3 Surface */
+  --color-surface-elevated: #28282c; /* Secondary Surface */
+  --color-surface-floating: #28282c;
+  --color-surface-transparent: rgba(255, 255, 255, 0.02); /* Used for ghost buttons & standard cards */
+  --color-surface-transparent-hover: rgba(255, 255, 255, 0.05);
+
+  /* Borders — Semi-transparent white */
+  --color-border: rgba(255, 255, 255, 0.08); /* Standard */
+  --color-border-subtle: rgba(255, 255, 255, 0.05); /* Subtle */
+  --color-border-highlight: rgba(255, 255, 255, 0.12); /* Brighter for hover */
+
+  /* Interaction */
+  --color-ring: oklch(0.68 0.22 35);
+  --color-ring-offset: #08090a;
+  --color-primary-glow: oklch(0.68 0.22 35);
 
   /* ═══════════════════════════════════════════════════════════════════════════════
      TYPOGRAPHY — Distinctive & Characterful
      ═══════════════════════════════════════════════════════════════════════════════ */
 
-  --font-display: "Space Grotesk", "Plus Jakarta Sans", system-ui, sans-serif;
-  --font-heading: "Plus Jakarta Sans", system-ui, sans-serif;
+  /* The primary tracking adjustments are applied via CSS, but the font family is critical */
+  --font-display: "Inter", system-ui, sans-serif;
+  --font-heading: "Inter", system-ui, sans-serif;
   --font-sans: "Inter", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", "Fira Code", monospace;
+  --font-mono: "JetBrains Mono", "Berkeley Mono", ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 :root {
@@ -74,91 +67,57 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════════
-   LIGHT MODE — Clean & Airy
+   LIGHT MODE — Meticulous & Crisp
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 :root.light {
   color-scheme: light;
 
-  /* Primary — Coral accent maintained */
+  /* Primary — Coral/Orange warmth (Retained as per user request) */
   --color-primary: oklch(0.65 0.2 35);
   --color-primary-hover: oklch(0.58 0.22 35);
   --color-primary-foreground: oklch(0.98 0 0);
-  --color-primary-muted: oklch(0.65 0.2 35 / 0.12);
+  --color-primary-muted: rgba(226, 109, 54, 0.1);
+  --color-primary-end: oklch(0.72 0.24 45);
 
-  /* Semantic — adjusted for light */
-  --color-success: oklch(0.65 0.2 145);
+  /* Semantic - matched intensity for light */
+  --color-success: #1b8a36;
+  --color-success-muted-bg: rgba(39, 166, 68, 0.1);
   --color-warning: oklch(0.7 0.18 85);
+  --color-warning-muted-bg: oklch(0.7 0.18 85 / 0.1);
   --color-danger: oklch(0.55 0.2 25);
+  --color-danger-muted-bg: oklch(0.55 0.2 25 / 0.1);
+  --color-danger-muted-border: oklch(0.55 0.2 25 / 0.2);
+  --color-danger-subtle-bg: oklch(0.55 0.2 25 / 0.05);
   --color-info: oklch(0.55 0.15 250);
 
-  /* Background — Warm light tones */
-  --color-background: oklch(0.97 0.005 80);
-  --color-background-elevated: oklch(1 0 0);
-  --color-background-sunken: oklch(0.94 0.008 80);
+  /* Background — Native Light */
+  --color-background: #ffffff; /* Absolute White */
+  --color-background-elevated: #f9f9f9; /* Subtle App Panel */
+  --color-background-sunken: #f4f4f5; /* Recessed container */
 
-  /* Foreground — Dark text */
-  --color-foreground: oklch(0.2 0.01 80);
-  --color-foreground-muted: oklch(0.5 0.015 80);
-  --color-foreground-subtle: oklch(0.65 0.01 80);
+  /* Foreground — Deep Greys */
+  --color-foreground: #111822; /* Primary Text */
+  --color-foreground-muted: #5e636e; /* Secondary Text */
+  --color-foreground-subtle: #8a8f98; /* Tertiary Text */
+  --color-foreground-quaternary: #a1a6b0; /* Quaternary Text */
 
-  /* Surfaces — Clean white cards */
-  --color-surface: oklch(1 0 0);
-  --color-surface-elevated: oklch(0.98 0.005 80);
-  --color-surface-floating: oklch(0.95 0.008 80);
-  --color-surface-transparent: oklch(1 0 0 / 0.9);
+  /* Surfaces — Clean & Layered */
+  --color-surface: #ffffff; 
+  --color-surface-elevated: #ffffff; 
+  --color-surface-floating: #ffffff;
+  --color-surface-transparent: rgba(0, 0, 0, 0.02); /* Slight structure for standard cards */
+  --color-surface-transparent-hover: rgba(0, 0, 0, 0.04);
 
-  /* Borders — Subtle on light */
-  --color-border: oklch(0.88 0.01 80);
-  --color-border-subtle: oklch(0.94 0.008 80);
-  --color-border-highlight: oklch(0.8 0.015 80);
+  /* Borders — Soft architecture */
+  --color-border: rgba(0, 0, 0, 0.08); /* Standard */
+  --color-border-subtle: rgba(0, 0, 0, 0.05); /* Subtle */
+  --color-border-highlight: rgba(0, 0, 0, 0.15); /* Brighter for hover */
 
   /* Interaction */
   --color-ring: oklch(0.65 0.2 35);
-  --color-ring-offset: oklch(0.97 0.005 80);
-  /* Secondary gradient stop */
-  --color-primary-end: oklch(0.72 0.24 45);
-  /* Primary at full chroma for use in gradients */
-  --color-primary-glow: oklch(0.68 0.22 35);
-}
-
-/* Override glass effect in light mode for better visibility */
-:root.light .sidebar,
-:root.light .app-header {
-  background: oklch(1 0 0 / 0.85);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-}
-
-:root.light .widget-card,
-:root.light .store-card,
-:root.light .login-card,
-:root.light .dialog-panel {
-  box-shadow:
-    0 4px 6px oklch(0.5 0.01 80 / 0.05),
-    0 10px 20px oklch(0.5 0.01 80 / 0.08),
-    0 0 0 1px var(--color-border);
-}
-
-:root.light .widget-card:hover,
-:root.light .store-card:hover {
-  box-shadow:
-    0 8px 16px oklch(0.5 0.01 80 / 0.1),
-    0 20px 40px oklch(0.5 0.01 80 / 0.12),
-    0 0 0 1px var(--color-border-highlight);
-}
-
-:root.light .login-container {
-  background:
-    radial-gradient(ellipse at 20% 20%, oklch(0.65 0.2 35 / 0.06) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 80%, oklch(0.55 0.15 250 / 0.04) 0%, transparent 50%),
-    var(--color-background);
-}
-
-:root.light .sidebar-brand-icon,
-:root.light .login-brand-icon,
-:root.light .btn-primary {
-  box-shadow: 0 4px 14px oklch(0.65 0.2 35 / 0.2);
+  --color-ring-offset: #ffffff;
+  --color-primary-glow: oklch(0.65 0.2 35);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════════
@@ -185,6 +144,8 @@ body {
   background: var(--color-background);
   color: var(--color-foreground);
   font-family: var(--font-sans);
+  /* The design system demands these specific features globally */
+  font-feature-settings: "cv01", "ss03";
 }
 
 /* Safe-area insets — scoped to mobile widths only to avoid global padding on desktop */
@@ -200,16 +161,13 @@ body {
    UTILITY CLASSES — Reusable primitives
    ═══════════════════════════════════════════════════════════════════════════════ */
 
+/* Replaced heavy glassmorphism with subtle surface opacity stacking */
 .glass {
   background: var(--color-surface-transparent);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
 }
 
 .glass-strong {
-  background: oklch(0.15 0.012 40 / 0.95);
-  backdrop-filter: blur(40px) saturate(200%);
-  -webkit-backdrop-filter: blur(40px) saturate(200%);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .text-gradient {
@@ -220,17 +178,18 @@ body {
 }
 
 .glow-sm {
-  box-shadow: 0 0 20px oklch(from var(--color-primary) l c h / 0.2);
+  /* Suppressed extreme glows, replacing with multi-layer shadow as per spec */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .glow-md {
-  box-shadow: 0 0 40px oklch(from var(--color-primary) l c h / 0.3);
+  box-shadow: rgba(0,0,0,0) 0px 8px 2px, rgba(0,0,0,0.01) 0px 5px 2px, rgba(0,0,0,0.04) 0px 3px 2px, rgba(0,0,0,0.07) 0px 1px 1px, rgba(0,0,0,0.08) 0px 0px 1px;
 }
 
 /* Focus visible */
 :focus-visible {
-  outline: 2px solid var(--color-ring);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-background), 0 0 0 4px var(--color-ring);
 }
 
 /* Selection */

@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import logging
 from collections import OrderedDict
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass, field
@@ -17,13 +16,14 @@ from fastapi.encoders import jsonable_encoder
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import BaseTool
 from langgraph.prebuilt import create_react_agent
+from loguru import logger
 
 from core.config import settings
-from core.db import get_checkpointer, get_store
+from core.db import get_store
 from core.models import User
 from core.registry import PLUGIN_REGISTRY
 from core.utils.sanitizer import sanitize_user_content_async
-from core.utils.timezone import get_user_local_time
+from core.utils.timezone import get_user_timezone_context
 from core.workspace.service import list_installed_app_ids
 from shared.agent_context import clear_agent_context, set_thread_context, set_user_context
 from shared.enums import ChatEventType
@@ -38,16 +38,9 @@ from .tools import (
     _build_uninstall_app_tool,
 )
 
-logger = logging.getLogger(__name__)
-
-# Limit how many historical messages to load from DB per thread.
-# Prevents OOM and context window overflow for long-running threads.
-MAX_HISTORY_MESSAGES = 50
-
 # Cap on the number of compiled LangGraph instances retained per RootAgent.
 # Uses LRU eviction — least recently used graph is dropped when the cap is hit.
 MAX_CACHED_GRAPHS = 32
-
 
 def _normalize_tool_output(output: Any) -> Any:
     """Normalize tool output to JSON-serializable format."""
@@ -296,6 +289,7 @@ class EventStreamHandler:
         """Handle tool execution start."""
         if tool_name not in self.visible_tool_names:
             return None
+        logger.info("TOOL_START  run_id={}  tool={}", run_id, tool_name)
         if tool_name.startswith("ask_"):
             self.active_delegations.add(run_id)
 
@@ -313,6 +307,7 @@ class EventStreamHandler:
             return None
 
         self.active_delegations.discard(run_id)
+        logger.info("TOOL_END  run_id={}  tool={}", run_id, tool_name)
         return StreamEvent(
             type=ChatEventType.TOOL_RESULT,
             tool_call_id=run_id,
@@ -325,6 +320,8 @@ class EventStreamHandler:
             return None
 
         self.active_delegations.discard(run_id)
+        err = data.get("error", "Tool execution failed")
+        logger.error("TOOL_ERROR  run_id={}  tool={}  error={}", run_id, tool_name, err)
         return StreamEvent(
             type=ChatEventType.TOOL_RESULT,
             tool_call_id=run_id,
@@ -344,8 +341,8 @@ class RootAgent:
     Top-level LangGraph orchestrator.
 
     Wraps each registered AppAgent as a tool (ask_{app_id}) so the LLM
-    can decide which app to delegate to. Conversation history is loaded from
-    and saved to MongoDB (ConversationMessage) on every request.
+    can decide which app to delegate to. The root graph itself is stateless
+    across requests; callers provide the canonical thread history.
     """
 
     def __init__(self) -> None:
@@ -396,6 +393,12 @@ class RootAgent:
 
         tools = [t for app_id, t in self._all_ask_tools.items() if app_id in installed_app_ids]
         tools.extend(self._base_tools or self._build_base_tools())
+        logger.debug(
+            "RootAgent._get_user_tools  user_id={}  installed={}  total_tools={}",
+            user_id,
+            sorted(installed_app_ids),
+            len(tools),
+        )
         return tools
 
     def _get_graph(self, tools: list[BaseTool]) -> Any:
@@ -410,13 +413,15 @@ class RootAgent:
         if cache_key in self._graphs:
             # Move to end (most-recently-used)
             self._graphs.move_to_end(cache_key)
+            logger.debug("RootAgent._get_graph  cache=HIT  tools_count={}", len(tools))
             return self._graphs[cache_key]
+
+        logger.debug("RootAgent._get_graph  cache=MISS  tools_count={}  graphs_in_cache={}", len(tools), len(self._graphs))
 
         graph = create_react_agent(
             model=get_llm(),
             tools=tools,
             prompt=self._system_prompt or None,
-            checkpointer=get_checkpointer(),
             store=get_store(),
         )
         self._graphs[cache_key] = graph
@@ -436,8 +441,8 @@ class RootAgent:
         """
         Stream data-stream events for the frontend chat UI.
 
-        History is automatically managed by LangGraph's checkpointer.
-        Incoming messages are dynamically appended to the state before execution.
+        The root graph does not resume hidden state from LangGraph checkpoints.
+        Callers pass the canonical message history for the active thread.
         """
         if thread_id:
             # Enforce user isolation in thread IDs to block horizontal access
@@ -448,6 +453,7 @@ class RootAgent:
         else:
             thread = f"user:{user_id}"
 
+        logger.info("RootAgent.astream START  user_id={}  thread={}  incoming_msgs={}", user_id, thread, len(messages))
         set_user_context(user_id)
         set_thread_context(thread)
 
@@ -465,6 +471,7 @@ class RootAgent:
                 yield event_dict
 
             yield {"type": ChatEventType.DONE}
+            logger.info("RootAgent.astream END  user_id={}  thread={}", user_id, thread)
         finally:
             clear_agent_context()
 
@@ -474,12 +481,20 @@ class RootAgent:
         messages: list[dict[str, Any]],
         thread: str,
     ) -> list[BaseMessage]:
-        """Build LangChain message list from frontend messages and history."""
+        """Build LangChain message list from canonical thread history."""
         langchain_messages: list[BaseMessage] = []
+
+        logger.debug(
+            "RootAgent._build_message_list  user_id={}  thread={}  incoming_msgs={}  msg_types={}",
+            user_id,
+            thread,
+            len(messages),
+            [m.get("role") for m in messages],
+        )
 
         # Add user context as first system message (for date/time awareness)
         user = await User.find_one(User.id == PydanticObjectId(user_id))
-        current_date, current_time = get_user_local_time(user) if user else ("", "")
+        current_date, current_time = get_user_timezone_context(user).get_date_time_tuple() if user else ("", "")
         if current_date:
             langchain_messages.append(
                 SystemMessage(
@@ -498,7 +513,7 @@ class RootAgent:
             SystemMessage(content=build_available_apps_context(installed_app_ids))
         )
 
-        # Parse frontend messages (history is automatically loaded by the checkpointer)
+        # Parse the canonical thread history supplied by the caller.
         parser = MessageParser()
         for msg in messages:
             parsed = await parser.parse(msg)
@@ -508,11 +523,17 @@ class RootAgent:
         # Log any sanitization warnings
         if parser.warnings:
             logger.warning(
-                "Input sanitization warnings for user %s: %s",
+                "Input sanitization warnings for user {}: {}",
                 user_id,
                 ", ".join(parser.warnings),
             )
 
+        logger.debug(
+            "RootAgent._build_message_list  user_id={}  final_msg_count={}  msg_types={}",
+            user_id,
+            len(langchain_messages),
+            [type(m).__name__ for m in langchain_messages],
+        )
         return langchain_messages
 
     async def _run_graph_stream(
@@ -523,7 +544,11 @@ class RootAgent:
         event_handler: EventStreamHandler,
         langchain_messages: list[BaseMessage],
     ) -> AsyncGenerator[dict[str, Any], None]:
-        """Run graph and yield stream events."""
+        """Run graph and yield stream events.
+
+        Invalid tool-call history is surfaced directly instead of being retried
+        against hidden checkpoint state.
+        """
         config = {
             "configurable": {
                 "thread_id": thread,
@@ -546,21 +571,36 @@ class RootAgent:
                     timeout=settings.llm_stream_idle_timeout_seconds,
                 )
             except StopAsyncIteration:
-                return
+                logger.info("RootAgent._run_graph_stream END  thread={}  reason=StopAsyncIteration", thread)
+                return  # normal end of stream
+            except ValueError as exc:
+                if "tool_calls" in str(exc) and "ToolMessage" in str(exc):
+                    logger.error("INVALID_CHAT_HISTORY  thread={}  exc={}", thread, exc)
+                    raise RuntimeError(
+                        "Incoming chat history is malformed: a tool call is missing its matching tool result."
+                    ) from exc
+                raise
             except TimeoutError as exc:
                 logger.error(
-                    "LLM stream idle timeout after %.1fs for thread %s",
-                    settings.llm_stream_idle_timeout_seconds,
+                    "LLM_TIMEOUT  thread={}  timeout_s={}",
                     thread,
+                    settings.llm_stream_idle_timeout_seconds,
                 )
                 raise RuntimeError(
-                    "The language model timed out while streaming a response."
+                    "The language model timed out. Please try again."
                 ) from exc
 
+            event_type = event.get("event", "")
             stream_event = event_handler.handle(event)
             if stream_event:
+                logger.debug(
+                    "STREAM_EVENT  thread={}  type={}  event={}  tool={}",
+                    thread,
+                    stream_event.type,
+                    event_type,
+                    stream_event.tool_name,
+                )
                 yield stream_event.to_dict()
-
 
 # Singleton
 root_agent = RootAgent()

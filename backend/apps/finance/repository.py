@@ -11,7 +11,7 @@ from pymongo.asynchronous.client_session import AsyncClientSession
 from apps.finance.enums import TransactionType
 from apps.finance.models import Category, Transaction, Wallet
 from core.db import get_db
-from shared.normalization import normalize_name_key
+from core.utils.timezone import normalize_name_key
 
 
 @asynccontextmanager

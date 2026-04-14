@@ -22,12 +22,9 @@ export default function MonthViewWidget({ widget }: DashboardWidgetRendererProps
     []
   );
 
-  // Get "today" in user's timezone for highlighting
+  // Get "today" in user's timezone for highlighting (string comparison — no Date object)
   const [todayDateStr] = getNow();
-  const todayDate = new Date(todayDateStr);
-  const today = todayDate.getDate();
-  const todayMonth = todayDate.getMonth();
-  const todayYear = todayDate.getFullYear();
+  const [todayYear, todayMonth, todayDay] = todayDateStr.split("-").map(Number);
 
   const month = data?.month != null ? data.month - 1 : todayMonth; // API returns 1-indexed
   const year = data?.year ?? todayYear;
@@ -143,7 +140,7 @@ export default function MonthViewWidget({ widget }: DashboardWidgetRendererProps
               const daySummary = dayMap.get(day);
               const eventCount = daySummary?.event_count ?? 0;
               const eventTitles = daySummary?.event_titles ?? [];
-              const isDayToday = isCurrentMonth && day === today;
+              const isDayToday = isCurrentMonth && day === todayDay;
 
               return (
                 <div

@@ -16,4 +16,6 @@ const WIDGET_COMPONENTS = {
   "todo.today": TodayWidget,
 } as const satisfies Record<string, ComponentType<DashboardWidgetRendererProps>>;
 
-export default createDashboardWidgetRenderer(WIDGET_COMPONENTS);
+const TodoDashboardWidget = createDashboardWidgetRenderer(WIDGET_COMPONENTS);
+
+export default TodoDashboardWidget;

@@ -13,6 +13,7 @@ from langchain_core.tools import tool
 
 from apps.calendar.enums import EventType, RecurrenceFrequency
 from apps.calendar.service import calendar_service
+from core.utils.timezone import ensure_aware_utc
 from shared.agent_context import get_user_context
 from shared.tool_results import safe_tool_call
 
@@ -80,8 +81,8 @@ async def calendar_schedule_event(
     """
     async def operation() -> dict:
         user_id = get_user_context()
-        start_dt = datetime.fromisoformat(start)
-        end_dt = datetime.fromisoformat(end)
+        start_dt = ensure_aware_utc(datetime.fromisoformat(start))
+        end_dt = ensure_aware_utc(datetime.fromisoformat(end))
 
         # Check for conflicts first
         conflicts = await calendar_service.check_conflicts(
@@ -166,8 +167,8 @@ async def calendar_reschedule_event(
     """
     async def operation() -> dict:
         user_id = get_user_context()
-        new_start_dt = datetime.fromisoformat(new_start)
-        new_end_dt = datetime.fromisoformat(new_end)
+        new_start_dt = ensure_aware_utc(datetime.fromisoformat(new_start))
+        new_end_dt = ensure_aware_utc(datetime.fromisoformat(new_end))
 
         # Check for conflicts at new time (excluding this event)
         conflicts = await calendar_service.check_conflicts(
@@ -355,8 +356,8 @@ async def calendar_find_events(
             return await calendar_service.search_events(user_id, query, limit)
 
         # Otherwise do time-based listing
-        start_dt = datetime.fromisoformat(start) if start else None
-        end_dt = datetime.fromisoformat(end) if end else None
+        start_dt = ensure_aware_utc(datetime.fromisoformat(start)) if start else None
+        end_dt = ensure_aware_utc(datetime.fromisoformat(end)) if end else None
         return await calendar_service.list_events(
             user_id, start_dt, end_dt, calendar_id, limit
         )
@@ -438,7 +439,7 @@ async def calendar_make_recurring(
     """
     async def operation() -> dict:
         user_id = get_user_context()
-        end_dt = datetime.fromisoformat(end_date) if end_date else None
+        end_dt = ensure_aware_utc(datetime.fromisoformat(end_date)) if end_date else None
         return await calendar_service.create_recurring_rule(
             user_id=user_id,
             event_template_id=event_id,
@@ -530,7 +531,7 @@ async def calendar_block_task_time(
     """
     async def operation() -> dict:
         user_id = get_user_context()
-        start_dt = datetime.fromisoformat(start)
+        start_dt = ensure_aware_utc(datetime.fromisoformat(start))
         return await calendar_service.schedule_task(
             user_id=user_id,
             task_id=task_id,

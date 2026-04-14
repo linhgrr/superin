@@ -1,177 +1,138 @@
-import { HOURS, HOUR_HEIGHT, DAY_NAMES, isSameDayInTimezone } from "../utils/dateHelpers";
-import { calculateEventStyle } from "../utils/eventHelpers";
+import { useMemo } from "react";
+import { HOURS, HOUR_HEIGHT, DAY_NAMES } from "../utils/dateHelpers";
+import { computeOverlappingEvents, computeEventPosition, formatEventTime, getColorStyleForEvent, splitEventsByType } from "../utils/eventHelpers";
+import { isSameDayAs } from "@/shared/utils/datetime";
 import type { CalendarRead, EventRead } from "../api";
 import { useTimezone } from "@/shared/hooks/useTimezone";
+import "./WeekView.css";
 
 interface WeekViewProps {
-  weekDates: Date[];
+  weekDates: Date[];       // Local midnight Date objects (Mon–Sun)
   calendars: CalendarRead[];
   events: EventRead[];
   onCellClick: (date: Date, hour: number) => void;
+  onEventClick: (event: EventRead) => void;
 }
 
-export function WeekView({ weekDates, calendars, events, onCellClick }: WeekViewProps) {
-  const { formatTime, timezone } = useTimezone();
+export function WeekView({ weekDates, calendars: _calendars, events, onCellClick, onEventClick }: WeekViewProps) {
+  const { timezone } = useTimezone();
   const today = new Date();
 
-  const getEventsForDay = (date: Date) => {
-    return events.filter((e) => isSameDayInTimezone(new Date(e.start_datetime), date, timezone));
-  };
+  // Memoize per-day filtering — uses isSameDayAs which takes explicit timezone
+  const dayEventsMap = useMemo(() => {
+    const map = new Map<string, EventRead[]>();
+    for (const date of weekDates) {
+      map.set(
+        date.toDateString(),
+        events.filter((e) => isSameDayAs(e.start_datetime, date, timezone)),
+      );
+    }
+    return map;
+  }, [weekDates, events, timezone]);
+
+  // Memoize positioned events per day — avoids O(n²) recomputation on each render
+  const positionedEventsMap = useMemo(() => {
+    const map = new Map<string, ReturnType<typeof computeOverlappingEvents>>();
+    for (const date of weekDates) {
+      const dayEvents = dayEventsMap.get(date.toDateString()) ?? [];
+      map.set(date.toDateString(), computeOverlappingEvents(dayEvents, timezone));
+    }
+    return map;
+  }, [dayEventsMap, timezone, weekDates]);
+
 
   return (
-    <div
-      style={{
-        flex: 1,
-        overflow: "auto",
-        background: "var(--color-surface)",
-        borderRadius: "12px",
-        border: "1px solid var(--color-border)",
-      }}
-    >
+    <div className="week-view">
       {/* Day headers */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "60px repeat(7, 1fr)",
-          borderBottom: "1px solid var(--color-border)",
-          position: "sticky",
-          top: 0,
-          background: "var(--color-surface-elevated)",
-          zIndex: 10,
-        }}
-      >
-        <div /> {/* Empty corner */}
+      <div className="week-view__headers">
+        <div />
         {weekDates.map((date, i) => {
-          const isToday = isSameDayInTimezone(date, today, timezone);
+          const isToday = isSameDayAs(date, today, timezone);
           return (
-            <div
-              key={i}
-              style={{
-                padding: "0.75rem 0.5rem",
-                textAlign: "center",
-                borderLeft: "1px solid var(--color-border)",
-                background: isToday ? "var(--color-primary-muted)" : undefined,
-              }}
-            >
-              <div
-                style={{
-                  fontSize: "0.75rem",
-                  color: isToday ? "var(--color-primary)" : "var(--color-foreground-muted)",
-                  fontWeight: 600,
-                }}
-              >
-                {DAY_NAMES[i]}
-              </div>
-              <div
-                style={{
-                  fontSize: "1.25rem",
-                  fontWeight: 700,
-                  color: isToday ? "white" : "var(--color-foreground)",
-                  marginTop: "0.25rem",
-                  width: "36px",
-                  height: "36px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  borderRadius: "50%",
-                  background: isToday ? "var(--color-primary)" : "transparent",
-                  margin: "0.25rem auto 0",
-                }}
-              >
-                {date.getDate()}
-              </div>
+            <div key={i} className={`week-view__day-header${isToday ? " week-view__day-header--today" : ""}`}>
+              <div className="week-view__day-name">{DAY_NAMES[i]}</div>
+              <div className="week-view__day-number">{date.getDate()}</div>
+            </div>
+          );
+        })}
+      </div>
+      
+      {/* All-day row */}
+      <div className="week-view__all-day-row">
+        <div className="week-view__all-day-label">All day</div>
+        {weekDates.map((date, i) => {
+          const dayEvents = dayEventsMap.get(date.toDateString()) ?? [];
+          const { allDay } = splitEventsByType(dayEvents);
+          return (
+            <div key={i} className="week-view__all-day-cell">
+              {allDay.map(event => (
+                <div 
+                  key={event.id} 
+                  className="week-view__all-day-chip"
+                  style={getColorStyleForEvent(event.id)}
+                  onClick={() => onEventClick(event)}
+                >
+                  {event.title}
+                </div>
+              ))}
             </div>
           );
         })}
       </div>
 
       {/* Time grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "60px repeat(7, 1fr)" }}>
-        {/* Time labels column */}
-        <div>
+      <div className="week-view__grid">
+        {/* Time labels */}
+        <div className="week-view__time-col">
           {HOURS.map((hour) => (
-            <div
-              key={hour}
-              style={{
-                height: `${HOUR_HEIGHT}px`,
-                borderBottom: "1px solid var(--color-border)",
-                display: "flex",
-                alignItems: "flex-start",
-                justifyContent: "center",
-                paddingTop: "4px",
-                fontSize: "0.75rem",
-                color: "var(--color-foreground-muted)",
-              }}
-            >
-              {hour}:00
-            </div>
+            <div key={hour} className="week-view__time-label">{hour}:00</div>
           ))}
         </div>
 
         {/* Day columns */}
         {weekDates.map((date, dayIndex) => {
-          const dayEvents = getEventsForDay(date);
-          const isToday = isSameDayInTimezone(date, today, timezone);
+          const positioned = positionedEventsMap.get(date.toDateString()) ?? [];
+          const isToday = isSameDayAs(date, today, timezone);
 
           return (
             <div
               key={dayIndex}
-              style={{
-                borderLeft: "1px solid var(--color-border)",
-                position: "relative",
-                background: isToday ? "var(--color-primary-muted)" : undefined,
-              }}
+              className={`week-view__day-col${isToday ? " week-view__day-col--today" : ""}`}
             >
               {/* Hour cells */}
               {HOURS.map((hour) => (
                 <div
                   key={hour}
+                  className="week-view__hour-cell"
                   onClick={() => onCellClick(date, hour)}
-                  style={{
-                    height: `${HOUR_HEIGHT}px`,
-                    borderBottom: "1px solid var(--color-border)",
-                    cursor: "pointer",
-                    transition: "background 0.15s",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "var(--color-surface-elevated)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "transparent";
-                  }}
                 />
               ))}
 
               {/* Events overlay */}
-              {dayEvents.map((event) => {
-                const calendar = calendars.find((c) => c.id === event.calendar_id);
-                const style = calculateEventStyle(event, HOUR_HEIGHT);
+              {positioned.map(({ event, topMinutes, heightMinutes, leftFrac, widthFrac, zIndex }) => {
+                const pos = computeEventPosition(leftFrac, widthFrac, topMinutes, heightMinutes, HOUR_HEIGHT);
 
                 return (
                   <div
                     key={event.id}
+                    className="week-view__event"
                     style={{
-                      position: "absolute",
-                      left: "2px",
-                      right: "2px",
-                      ...style,
-                      background: calendar?.color || "var(--color-primary)",
-                      borderRadius: "4px",
-                      padding: "4px 6px",
-                      fontSize: "0.75rem",
-                      color: "white",
-                      overflow: "hidden",
-                      cursor: "pointer",
-                      boxShadow: "0 1px 2px rgba(0,0,0,0.2)",
-                      zIndex: 5,
+                      ...pos,
+                      ...getColorStyleForEvent(event.id),
+                      zIndex,
                     }}
-                    title={`${event.title}\n${formatTime(event.start_datetime)} - ${formatTime(event.end_datetime)}`}
+                    title={`${event.title}\n${formatEventTime(event.start_datetime, timezone)} - ${formatEventTime(event.end_datetime, timezone)}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEventClick(event);
+                    }}
                   >
-                    <div style={{ fontWeight: 600, whiteSpace: "nowrap" }}>{event.title}</div>
-                    <div style={{ fontSize: "0.625rem", opacity: 0.9 }}>
-                      {formatTime(event.start_datetime, { hour: "2-digit", minute: "2-digit" })}
-                      {event.location && ` 📍 ${event.location}`}
-                    </div>
+                    <div className="week-view__event-title">{event.title}</div>
+                    {widthFrac > 0.2 && (
+                      <div className="week-view__event-time">
+                        {formatEventTime(event.start_datetime, timezone)}
+                      </div>
+                    )}
                   </div>
                 );
               })}

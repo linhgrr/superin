@@ -1,12 +1,15 @@
 import type { CalendarRead, EventRead } from "../api";
 import { useTimezone } from "@/shared/hooks/useTimezone";
+import { getColorStyleForEvent } from "../utils/eventHelpers";
+import "./ListView.css";
 
 interface ListViewProps {
   calendars: CalendarRead[];
   eventsByDate: Record<string, { label: string; events: EventRead[] }>;
+  onEventClick: (event: EventRead) => void;
 }
 
-export function ListView({ calendars, eventsByDate }: ListViewProps) {
+export function ListView({ calendars, eventsByDate, onEventClick }: ListViewProps) {
   const { formatTime } = useTimezone();
   const sortedDateKeys = Object.keys(eventsByDate).sort();
 
@@ -57,25 +60,19 @@ export function ListView({ calendars, eventsByDate }: ListViewProps) {
                     return (
                       <div
                         key={event.id}
+                        className="event-card"
                         style={{
                           padding: "1rem",
                           background: "var(--color-surface-elevated)",
                           borderRadius: "12px",
-                          borderLeft: `4px solid ${calendar?.color || "var(--color-primary)"}`,
+                          borderLeft: "4px solid var(--event-bg, hsl(var(--event-hue), 70%, 50%))",
                           display: "flex",
                           flexDirection: "column",
                           gap: "0.25rem",
-                          transition: "transform 0.15s, box-shadow 0.15s",
                           cursor: "pointer",
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.transform = "translateX(4px)";
-                          e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.1)";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.transform = "translateX(0)";
-                          e.currentTarget.style.boxShadow = "none";
-                        }}
+                          ...getColorStyleForEvent(event.id),
+                        } as React.CSSProperties}
+                        onClick={() => onEventClick(event)}
                       >
                         <div
                           style={{
@@ -84,36 +81,26 @@ export function ListView({ calendars, eventsByDate }: ListViewProps) {
                             alignItems: "flex-start",
                           }}
                         >
-                          <span style={{ fontWeight: 600, fontSize: "0.9375rem" }}>
+                          <span className="event-card__title">
                             {event.title}
                           </span>
                           {event.type === "time_blocked_task" && (
-                            <span
-                              style={{
-                                fontSize: "0.75rem",
-                                padding: "0.125rem 0.5rem",
-                                background: "var(--color-primary-muted)",
-                                color: "var(--color-primary)",
-                                borderRadius: "4px",
-                              }}
-                            >
+                            <span className="event-card__badge">
                               Task
                             </span>
                           )}
                         </div>
-                        <div
-                          style={{
-                            fontSize: "0.8125rem",
-                            color: "var(--color-foreground-muted)",
-                            display: "flex",
-                            gap: "1rem",
-                            alignItems: "center",
-                          }}
-                        >
-                          <span style={{ fontWeight: 500 }}>
-                            {formatTime(event.start_datetime)}
-                            {" - "}
-                            {formatTime(event.end_datetime)}
+                        <div className="event-card__meta">
+                          <span className="event-card__meta-label">
+                            {event.is_all_day ? (
+                              "All day"
+                            ) : (
+                              <>
+                                {formatTime(event.start_datetime)}
+                                {" - "}
+                                {formatTime(event.end_datetime)}
+                              </>
+                            )}
                           </span>
                           {calendar && (
                             <span
@@ -138,13 +125,7 @@ export function ListView({ calendars, eventsByDate }: ListViewProps) {
                           {event.location && <span>📍 {event.location}</span>}
                         </div>
                         {event.description && (
-                          <div
-                            style={{
-                              fontSize: "0.8125rem",
-                              color: "var(--color-foreground-subtle)",
-                              marginTop: "0.25rem",
-                            }}
-                          >
+                          <div className="event-card__description">
                             {event.description}
                           </div>
                         )}

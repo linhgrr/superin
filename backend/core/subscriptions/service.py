@@ -17,6 +17,7 @@ from pymongo.errors import DuplicateKeyError
 
 from core.config import settings
 from core.models import User
+from core.utils.timezone import ensure_aware_utc
 from shared.enums import PaymentProvider, SubscriptionStatus, SubscriptionTier
 from shared.schemas import SubscriptionRead
 
@@ -30,6 +31,27 @@ STRIPE_EVENT_SUBSCRIPTION_UPDATED = "customer.subscription.updated"
 STRIPE_EVENT_INVOICE_PAYMENT_FAILED = "invoice.payment_failed"
 DEFAULT_STRIPE_WEBHOOK_TOLERANCE_SECONDS = 300
 PAYOS_SUCCESS_CODE = "00"
+
+_http_client: httpx.AsyncClient | None = None
+
+
+async def get_payment_http_client() -> httpx.AsyncClient:
+    """Return the shared outbound HTTP client used by payment integrations."""
+    global _http_client
+    if _http_client is None:
+        _http_client = httpx.AsyncClient(
+            timeout=httpx.Timeout(30.0),
+            limits=httpx.Limits(max_keepalive_connections=20, max_connections=100),
+        )
+    return _http_client
+
+
+async def close_payment_http_client() -> None:
+    """Close the shared outbound HTTP client during app shutdown."""
+    global _http_client
+    if _http_client is not None:
+        await _http_client.aclose()
+        _http_client = None
 
 
 def _require_payos_setting(value: str | int | None, env_name: str) -> str | int:
@@ -428,21 +450,21 @@ async def _create_stripe_checkout(user_id: str, request: CheckoutRequest) -> Che
         "metadata[provider]": PaymentProvider.STRIPE.value,
     }
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        response = await client.post(
-            f"{STRIPE_API_BASE}/checkout/sessions",
-            content=urlencode(form),
-            headers={
-                "Authorization": f"Bearer {settings.stripe_secret_key}",
-                "Content-Type": "application/x-www-form-urlencoded",
-            },
+    client = await get_payment_http_client()
+    response = await client.post(
+        f"{STRIPE_API_BASE}/checkout/sessions",
+        content=urlencode(form),
+        headers={
+            "Authorization": f"Bearer {settings.stripe_secret_key}",
+            "Content-Type": "application/x-www-form-urlencoded",
+        },
+    )
+    if response.status_code >= 400:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Stripe checkout creation failed: {response.text}",
         )
-        if response.status_code >= 400:
-            raise HTTPException(
-                status_code=502,
-                detail=f"Stripe checkout creation failed: {response.text}",
-            )
-        payload = response.json()
+    payload = response.json()
 
     checkout_url = payload.get("url")
     session_id = payload.get("id")
@@ -513,23 +535,23 @@ async def _create_payos_checkout(user_id: str, request: CheckoutRequest) -> Chec
 
     payload["signature"] = _create_payos_signature_for_payment_request(payload, checksum_key)
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        response = await client.post(
-            f"{base_url.rstrip('/')}/v2/payment-requests",
-            json=payload,
-            headers={
-                "x-client-id": client_id,
-                "x-api-key": api_key,
-                "Content-Type": "application/json",
-            },
+    client = await get_payment_http_client()
+    response = await client.post(
+        f"{base_url.rstrip('/')}/v2/payment-requests",
+        json=payload,
+        headers={
+            "x-client-id": client_id,
+            "x-api-key": api_key,
+            "Content-Type": "application/json",
+        },
+    )
+    if response.status_code >= 400:
+        raise HTTPException(
+            status_code=502,
+            detail=f"PayOS checkout creation failed: {response.text}",
         )
-        if response.status_code >= 400:
-            raise HTTPException(
-                status_code=502,
-                detail=f"PayOS checkout creation failed: {response.text}",
-            )
 
-        body = response.json()
+    body = response.json()
 
     code = str(body.get("code", ""))
     desc = str(body.get("desc", ""))
@@ -690,8 +712,8 @@ def _create_payos_signature_from_object(data: dict[str, Any], checksum_key: str)
 
 def _create_payos_signature_for_payment_request(data: dict[str, Any], checksum_key: str) -> str:
     """Create a signature specifically for the create-payment-link request.
-    
-    According to PayOS docs, only amount, cancelUrl, description, orderCode, 
+
+    According to PayOS docs, only amount, cancelUrl, description, orderCode,
     and returnUrl must be included in the signature string for checkout creation.
     """
     amount = data.get("amount", "")
@@ -699,7 +721,7 @@ def _create_payos_signature_for_payment_request(data: dict[str, Any], checksum_k
     description = data.get("description", "")
     order_code = data.get("orderCode", "")
     return_url = data.get("returnUrl", "")
-    
+
     data_str = f"amount={amount}&cancelUrl={cancel_url}&description={description}&orderCode={order_code}&returnUrl={return_url}"
     return hmac.new(
         checksum_key.encode("utf-8"),
@@ -769,11 +791,11 @@ async def _cancel_stripe_subscription(provider_subscription_id: str) -> None:
     if not settings.stripe_secret_key:
         raise HTTPException(status_code=501, detail="Stripe is not configured.")
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        response = await client.delete(
-            f"{STRIPE_API_BASE}/subscriptions/{provider_subscription_id}",
-            headers={"Authorization": f"Bearer {settings.stripe_secret_key}"},
-        )
+    client = await get_payment_http_client()
+    response = await client.delete(
+        f"{STRIPE_API_BASE}/subscriptions/{provider_subscription_id}",
+        headers={"Authorization": f"Bearer {settings.stripe_secret_key}"},
+    )
 
     if response.status_code >= 400:
         raise HTTPException(
@@ -782,7 +804,7 @@ async def _cancel_stripe_subscription(provider_subscription_id: str) -> None:
         )
 
 
-from core.utils.timezone import ensure_aware_utc
+
 
 def _is_payos_subscription_expired(sub: Subscription, *, now: datetime | None = None) -> bool:
     if sub.provider != PaymentProvider.PAYOS:
@@ -791,10 +813,10 @@ def _is_payos_subscription_expired(sub: Subscription, *, now: datetime | None = 
         return False
     if sub.expires_at is None:
         return False
-        
+
     expires = ensure_aware_utc(sub.expires_at)
     reference_time = ensure_aware_utc(now or datetime.now(UTC))
-        
+
     return expires <= reference_time
 
 

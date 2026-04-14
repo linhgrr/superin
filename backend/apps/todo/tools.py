@@ -7,6 +7,7 @@ from langchain_core.tools import tool
 from apps.todo.enums import RecurrenceFrequency, TaskPriority, TaskStatus
 from apps.todo.service import task_service
 from core.models import User
+from core.utils.timezone import ensure_aware_utc
 from shared.agent_context import get_user_context
 from shared.tool_results import safe_tool_call
 
@@ -48,7 +49,7 @@ async def todo_add_task(
     """
     async def operation() -> dict:
         user_id = get_user_context()
-        dt = datetime.fromisoformat(due_date) if due_date else None
+        dt = ensure_aware_utc(datetime.fromisoformat(due_date)) if due_date else None
         dt_time = datetime.strptime(due_time, "%H:%M") if due_time else None
         return await task_service.create_task(
             user_id, title, description, dt, dt_time, priority, tags, reminder_minutes
@@ -196,7 +197,7 @@ async def todo_update_task(
     """
     async def operation() -> dict:
         user_id = get_user_context()
-        dt = datetime.fromisoformat(due_date) if due_date else None
+        dt = ensure_aware_utc(datetime.fromisoformat(due_date)) if due_date else None
         dt_time = datetime.strptime(due_time, "%H:%M") if due_time else None
         return await task_service.update_task(
             task_id, user_id, title, description, dt, dt_time, priority, status, tags, reminder_minutes

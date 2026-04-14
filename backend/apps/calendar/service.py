@@ -1,5 +1,8 @@
 """Calendar plugin business logic."""
 
+from __future__ import annotations
+
+import logging
 from datetime import datetime, timedelta
 
 from pymongo.errors import DuplicateKeyError
@@ -7,14 +10,17 @@ from pymongo.errors import DuplicateKeyError
 from apps.calendar.enums import EventType, RecurrenceFrequency
 from apps.calendar.models import Calendar, Event, RecurringRule
 from apps.calendar.repository import (
+    DEFAULT_CALENDAR_COLOR,
     CalendarRepository,
     EventRepository,
     RecurringRuleRepository,
     calendar_transaction,
 )
+from core.models import User
+from core.utils.timezone import get_user_timezone_context
 
-# Default colors for calendars
-DEFAULT_CALENDAR_COLOR = "oklch(0.70 0.18 250)"  # Blue-ish
+logger = logging.getLogger(__name__)
+
 WORK_CALENDAR_COLOR = "oklch(0.65 0.21 145)"  # Green-ish
 
 
@@ -68,8 +74,18 @@ class CalendarService:
         color: str | None = None,
         reminders: list[int] | None = None,
     ) -> dict:
-        """Create event with conflict check."""
-        if end_datetime <= start_datetime:
+        """Create event with conflict check.
+
+        All incoming datetimes are normalized to UTC-naive via ensure_aware_utc
+        before storage. This handles both aware datetimes (any tz) and naive
+        datetimes (assumed to be UTC) uniformly.
+        """
+        from core.utils.timezone import ensure_aware_utc, ensure_naive_utc
+
+        start_utc = ensure_naive_utc(ensure_aware_utc(start_datetime))
+        end_utc = ensure_naive_utc(ensure_aware_utc(end_datetime))
+
+        if end_utc <= start_utc:
             raise ValueError("End time must be after start time")
 
         # Verify calendar exists
@@ -77,9 +93,12 @@ class CalendarService:
         if not calendar:
             raise ValueError("Calendar not found")
 
+        user = await User.get(user_id)
+        timezone_name = get_user_timezone_context(user).tz_name
+
         event = await self.events.create(
-            user_id, title, start_datetime, end_datetime, calendar_id,
-            description, location, is_all_day, type_, task_id, color, reminders
+            user_id, title, start_utc, end_utc, calendar_id,
+            description, location, is_all_day, timezone_name, type_, task_id, color, reminders
         )
         return _event_to_dict(event)
 
@@ -87,20 +106,51 @@ class CalendarService:
         self,
         event_id: str,
         user_id: str,
-        **kwargs,
+        title: str | None = None,
+        start_datetime: datetime | None = None,
+        end_datetime: datetime | None = None,
+        calendar_id: str | None = None,
+        description: str | None = None,
+        location: str | None = None,
+        color: str | None = None,
+        reminders: list[int] | None = None,
+        is_all_day: bool | None = None,
     ) -> dict:
-        """Update event with validation."""
+        """Update event with validation.
+
+        Only fields set to non-None values are updated (patch semantics).
+        Incoming datetime values are normalized to UTC-naive before storage.
+        """
+        from core.utils.timezone import ensure_aware_utc, ensure_naive_utc
+
         event = await self.events.find_by_id(event_id, user_id)
         if not event:
             raise ValueError("Event not found")
 
-        # Validate time if updating
-        new_start = kwargs.get("start_datetime", event.start_datetime)
-        new_end = kwargs.get("end_datetime", event.end_datetime)
+        # Normalize datetimes if provided
+        new_start = start_datetime if start_datetime else event.start_datetime
+        new_end = end_datetime if end_datetime else event.end_datetime
+
+        if isinstance(new_start, datetime):
+            new_start = ensure_naive_utc(ensure_aware_utc(new_start))
+        if isinstance(new_end, datetime):
+            new_end = ensure_naive_utc(ensure_aware_utc(new_end))
+
         if new_end <= new_start:
             raise ValueError("End time must be after start time")
 
-        updated = await self.events.update(event, **kwargs)
+        updated = await self.events.update(
+            event,
+            title=title,
+            start_datetime=start_datetime,
+            end_datetime=end_datetime,
+            calendar_id=calendar_id,
+            description=description,
+            location=location,
+            color=color,
+            reminders=reminders,
+            is_all_day=is_all_day,
+        )
         return _event_to_dict(updated)
 
     async def delete_event(self, event_id: str, user_id: str) -> dict:
@@ -110,7 +160,7 @@ class CalendarService:
             raise ValueError("Event not found")
 
         await self.events.delete(event)
-        return {"success": True, "id": event_id}
+        return {"success": True, "id": event_id, "message": "Event deleted successfully"}
 
     async def check_conflicts(
         self,
@@ -160,15 +210,18 @@ class CalendarService:
         self,
         calendar_id: str,
         user_id: str,
-        **kwargs,
+        name: str | None = None,
+        color: str | None = None,
+        is_visible: bool | None = None,
+        is_default: bool | None = None,
     ) -> dict:
-        """Update calendar."""
+        """Update calendar — only fields set to non-None are updated."""
         async with calendar_transaction() as session:
             calendar = await self.calendars.find_by_id(calendar_id, user_id, session=session)
             if not calendar:
                 raise ValueError("Calendar not found")
 
-            if kwargs.get("is_default"):
+            if is_default:
                 await self.calendars.unset_default_for_user(
                     user_id,
                     exclude_calendar_id=calendar_id,
@@ -179,11 +232,14 @@ class CalendarService:
                 updated = await self.calendars.update(
                     calendar,
                     session=session,
-                    **kwargs,
+                    name=name,
+                    color=color,
+                    is_visible=is_visible,
+                    is_default=is_default,
                 )
             except DuplicateKeyError as exc:
                 raise ValueError(
-                    _calendar_name_exists_message(kwargs.get("name") or calendar.name)
+                    _calendar_name_exists_message(name or calendar.name)
                 ) from exc
         return _calendar_to_dict(updated)
 
@@ -193,6 +249,10 @@ class CalendarService:
             calendar = await self.calendars.find_by_id(calendar_id, user_id, session=session)
             if not calendar:
                 raise ValueError("Calendar not found")
+
+            count = await self.calendars.count_by_user(user_id, session=session)
+            if count == 1:
+                raise ValueError("Cannot delete the only calendar — at least one calendar must remain")
 
             replacement = None
             if calendar.is_default:
@@ -212,7 +272,7 @@ class CalendarService:
                     is_default=True,
                     session=session,
                 )
-        return {"success": True, "id": calendar_id}
+        return {"success": True, "id": calendar_id, "message": "Calendar deleted successfully"}
 
     # ─── Recurring Rules ────────────────────────────────────────────────────────
 
@@ -232,13 +292,15 @@ class CalendarService:
         if not template:
             raise ValueError("Event template not found")
 
-        # Mark event as recurring
-        await self.events.update(template, is_recurring=True)
+        async with calendar_transaction() as session:
+            # Mark event as recurring
+            await self.events.update(template, is_recurring=True, session=session)
 
-        rule = await self.recurring.create(
-            user_id, event_template_id, frequency, interval,
-            days_of_week, end_date, max_occurrences
-        )
+            rule = await self.recurring.create(
+                user_id, event_template_id, frequency, interval,
+                days_of_week, end_date, max_occurrences,
+                session=session,
+            )
         return _recurring_rule_to_dict(rule)
 
     async def list_recurring_rules(self, user_id: str) -> list[dict]:
@@ -265,7 +327,11 @@ class CalendarService:
         duration_minutes: int,
         calendar_id: str | None = None,
     ) -> dict:
-        """Create time-blocked event from Todo task."""
+        """Create time-blocked event from Todo task.
+
+        The start_datetime may come from various callers (agents, tools, etc.)
+        with unknown timezone. Normalize it to UTC-naive via ensure_aware_utc first.
+        """
         # Local import to avoid circular dependency
         from apps.todo.repository import TaskRepository
 
@@ -281,16 +347,23 @@ class CalendarService:
                 raise ValueError("No default calendar found. Create a calendar first.")
             calendar_id = str(default.id)
 
-        # Calculate end time
-        end_datetime = start_datetime + timedelta(minutes=duration_minutes)
+        user = await User.get(user_id)
+        timezone_name = get_user_timezone_context(user).tz_name
+
+        # Normalize to UTC-naive before storage (defense-in-depth; model validator also does this)
+        from core.utils.timezone import ensure_aware_utc, ensure_naive_utc
+
+        start_utc = ensure_naive_utc(ensure_aware_utc(start_datetime))
+        end_utc = start_utc + timedelta(minutes=duration_minutes)
 
         # Create event with task reference and actual task title
         event = await self.events.create(
             user_id=user_id,
             title=task.title,
-            start_datetime=start_datetime,
-            end_datetime=end_datetime,
+            start_datetime=start_utc,
+            end_datetime=end_utc,
             calendar_id=calendar_id,
+            timezone=timezone_name,
             type_="time_blocked_task",
             task_id=task_id,
         )
@@ -318,20 +391,18 @@ class CalendarService:
                         session=session,
                     )
 
-            if not await self.calendars.find_by_name(user_id, "Work", session=session):
-                try:
-                    await self.calendars.create(
-                        user_id,
-                        "Work",
-                        WORK_CALENDAR_COLOR,
-                        False,
-                        session=session,
-                    )
-                except DuplicateKeyError:
-                    pass
+            try:
+                await self.calendars.create(
+                    user_id,
+                    "Work",
+                    WORK_CALENDAR_COLOR,
+                    False,
+                    session=session,
+                )
+            except DuplicateKeyError:
+                logger.warning("on_install: Work calendar already exists for user %s", user_id)
 
-            default_calendar = await self.calendars.find_default(user_id, session=session)
-            if not default_calendar and personal:
+            if personal and not personal.is_default:
                 await self.calendars.update(personal, is_default=True, session=session)
 
     async def on_uninstall(self, user_id: str) -> None:
@@ -355,13 +426,13 @@ def _calendar_name_exists_message(name: str) -> str:
 
 
 def _event_to_dict(e: Event) -> dict:
-    return {
+    d = {
         "id": str(e.id),
         "title": e.title,
         "description": e.description,
         "location": e.location,
-        "start_datetime": e.start_datetime.isoformat(),
-        "end_datetime": e.end_datetime.isoformat(),
+        "start_datetime": e.start_datetime.isoformat() + "Z",
+        "end_datetime": e.end_datetime.isoformat() + "Z",
         "is_all_day": e.is_all_day,
         "timezone": e.timezone,
         "calendar_id": str(e.calendar_id),
@@ -374,10 +445,15 @@ def _event_to_dict(e: Event) -> dict:
         "created_at": e.created_at.isoformat(),
         "updated_at": e.updated_at.isoformat(),
     }
+    # Fail-fast if dict shape drifts from CalendarEventRead schema
+    from apps.calendar.schemas import CalendarEventRead
+    CalendarEventRead.model_validate(d)
+    return d
 
 
 def _calendar_to_dict(c: Calendar) -> dict:
-    return {
+    from apps.calendar.schemas import CalendarCalendarRead
+    d = {
         "id": str(c.id),
         "name": c.name,
         "color": c.color,
@@ -385,10 +461,13 @@ def _calendar_to_dict(c: Calendar) -> dict:
         "is_default": c.is_default,
         "created_at": c.created_at.isoformat(),
     }
+    CalendarCalendarRead.model_validate(d)
+    return d
 
 
 def _recurring_rule_to_dict(r: RecurringRule) -> dict:
-    return {
+    from apps.calendar.schemas import CalendarRecurringRuleRead
+    d = {
         "id": str(r.id),
         "event_template_id": str(r.event_template_id),
         "frequency": r.frequency,
@@ -400,6 +479,8 @@ def _recurring_rule_to_dict(r: RecurringRule) -> dict:
         "is_active": r.is_active,
         "created_at": r.created_at.isoformat(),
     }
+    CalendarRecurringRuleRead.model_validate(d)
+    return d
 
 
 # Singleton

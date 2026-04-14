@@ -216,7 +216,7 @@ cd frontend && npm run build
 
 ### ⚠️ ABSOLUTE RULES - Never Violate
 
-1. **Platform agnostic to Apps** — Platform code (`src/lib/`, `src/components/`, `src/hooks/`, `backend/core/`, `backend/shared/`) tuyệt đối không được import từ app nào. **Chiều ngược lại (app → platform) là hợp lệ:** apps được phép import từ `shared/utils/timezone.ts`, `useTimezone`, `core.utils.timezone`, `User`, `utc_now()`, v.v.
+1. **Platform agnostic to Apps** — Platform code (`src/lib/`, `src/components/`, `src/hooks/`, `backend/core/`, `backend/shared/`) tuyệt đối không được import từ app nào. **Chiều ngược lại (app → platform) là hợp lệ:** apps được phép import từ `shared/utils/datetime.ts`, `useTimezone`, `core.utils.timezone`, `User`, `utc_now()`, v.v.
 2. **App containment** — Mỗi app chứa tất cả code của mình trong `src/apps/{app_id}/`
 3. **Apps có thể import từ nhau** — Cross-app integration được phép (vd: calendar import từ todo)
 4. **`src/shared/` là cầu nối hợp lệ** — `shared/utils/` và `shared/hooks/` dành cho pure utilities (timezone, formatters). Apps được phép import từ đây. Không bao giờ để app-specific logic ở `shared/`.
@@ -229,13 +229,139 @@ cd frontend && npm run build
 
 ### Datetime Conventions
 
-**Backend lưu UTC, hiển thị theo user timezone.** Mọi tính toán date/time phải đi qua timezone context — không dùng `datetime.now()` trực tiếp (nếu cần lấy UTC global, hãy dùng `core.models.utc_now()`).
+#### Architecture Overview
 
-- **Backend (User Time):** Dùng `get_user_timezone_context(user)` từ `core/utils/timezone.py`. Luôn dùng `ctx.now_utc()` hoặc `ctx.now_local()`. Dùng `ctx.today_range()`, `ctx.month_range()` cho date-range queries (due date, "income this month").
-- **Backend (Database/MongoDB):** Beanie/Motor mặc định thỉnh thoảng biến Datetime mất timezone (thành Naive). Rất dễ bị crash `TypeError: can't compare offset-naive and offset-aware datetimes`.
-  - Luôn sử dụng `ensure_aware_utc(dt)` (từ `core.utils.timezone`) để gắn lại múi giờ UTC nếu nghi ngờ dt lấy từ MongoDB lên bị mất múi giờ.
-  - Khi cần query MongoDB thủ công bằng range filter, dùng `ensure_naive_utc(dt)` để gỡ tzinfo gởi xuống DB để compare chính xác.
-- **Frontend:** Dùng `shared/utils/timezone.ts` để convert UTC → local khi hiển thị. Không tính toán timezone ở FE — chỉ convert để hiển thị, logic nghiệp vụ luôn ở BE.
+```
+FE  ←→  UTC ISO strings  ←→  BE  ←→  MongoDB (naive UTC)
+
+FE display: UTC → user local (Intl.DateTimeFormat + user timezone)
+BE storage: always UTC (aware → naive for Mongo)
+```
+
+**Rule #1 — BE stores UTC, FE stores/transmits UTC ISO strings.** No local-time datetimes cross the API boundary.
+
+**Rule #2 — User timezone is display-only, never storage.** BE does not store events in user's local time; it always converts to/from UTC.
+
+---
+
+#### Backend (`backend/core/utils/timezone.py`)
+
+**Source of truth for all BE datetime operations.**
+
+```python
+from core.utils.timezone import (
+    utc_now,              # datetime.now(UTC) — aware UTC now
+    ensure_aware_utc,      # naive → aware UTC; aware → convert to UTC
+    ensure_naive_utc,     # aware UTC → naive UTC (for MongoDB queries)
+    get_user_timezone_context,  # ctx.now_utc(), ctx.now_local(), ctx.today_range()
+)
+```
+
+| Situation | What to use |
+|---|---|
+| Get current time | `utc_now()` — NOT `datetime.now()` |
+| Convert any datetime to UTC-naive for DB | `ensure_naive_utc(ensure_aware_utc(dt))` |
+| Convert UTC to user local for display | `ctx.utc_to_local(utc_dt)` |
+| Convert user local to UTC for storage | `ctx.local_to_utc(local_dt)` |
+| Query "today in user's tz" | `ctx.today_range()` → `DayRange(start_utc, end_utc)` |
+| Query "this month in user's tz" | `ctx.month_range()` |
+| Get today's date in user's tz | `ctx.now_local()` then strip time |
+
+**⚠️ NEVER do this in BE:**
+- `datetime.now()` directly (use `utc_now()`)
+- `astimezone()` without an argument (converts to system local TZ, not user TZ)
+- Store user-local datetimes without converting to UTC first
+
+**⚠️ MongoDB / Beanie:** All stored `start_datetime`/`end_datetime` fields are naive UTC. Beanie can silently strip timezone from datetimes. Always run incoming datetimes through `ensure_naive_utc(ensure_aware_utc(dt))` before storing or querying.
+
+**⚠️ Model-level enforcement:** `Event.start_datetime` and `Event.end_datetime` have a Pydantic `model_validator` that auto-normalizes any input (aware, naive, or ISO string) to UTC-naive. Service layer also normalizes defensively — this is defense-in-depth.
+
+#### Tool / LLM Input Normalization
+
+> **Rule: Every datetime input from LLM MUST be normalized via `ensure_aware_utc()` BEFORE passing to service.**
+
+LLM agents can send datetime strings without explicit UTC offset (e.g. `"2025-04-01"` instead of `"2025-04-01T00:00:00Z"`). The tool layer must normalize all inputs:
+
+```python
+# ❌ WRONG — datetime.fromisoformat() returns naive, assumes UTC but doesn't normalize
+dt = datetime.fromisoformat(due_date)
+
+# ✅ CORRECT — always normalize before passing to service
+dt = ensure_aware_utc(datetime.fromisoformat(due_date))
+```
+
+Affected files: `apps/*/tools.py` — always wrap `datetime.fromisoformat()` calls with `ensure_aware_utc()`.
+
+---
+
+#### Frontend (`frontend/src/shared/utils/datetime.ts`)
+
+**Single source of truth for all FE datetime operations.**
+
+```typescript
+import {
+  getUserTimezone,           // Read active timezone (localStorage → browser → UTC)
+  setUserTimezone,            // Persist user preference
+  buildUtcIsoString,         // Date(y,m,d,h,min) → .toISOString() (correct UTC)
+  buildUtcIsoStringFromDate, // datePicker + hour/min → UTC ISO for API
+  formatTime,                // UTC string → "HH:MM" in user tz
+  formatDate,                // UTC string → "13 Apr 2026" in user tz
+  formatDateTime,            // UTC string → "13 Apr 2026, 09:00" in user tz
+  getHourMinute,             // UTC string → {hour, min} in user tz (REPLACES .getHours())
+  isToday,                   // UTC string → boolean (user tz)
+  isPast,                    // UTC string → boolean (user tz)
+  isSameDayAs,               // UTC string + Date → boolean (user tz, REPLACES .getDate())
+  getDayRange,               // Date → {start, end} UTC ISO strings (user tz)
+  getTodayRange,             // → today's range in UTC ISO strings
+  getWeekBoundaries,         // Date → {weekDatesLocal[], weekDatesUtcIso[]}
+  isSameDayInTimezone,       // Date + Date → boolean (user tz)
+  getWeekDates,              // Date → Date[7] Mon–Sun local midnight
+} from '@/shared/utils/datetime'
+```
+
+**⚠️ NEVER in FE:**
+- `.getHours()` / `.getMinutes()` / `.getDate()` / `.getDay()` directly on a Date — these use **browser system timezone**, not the user's timezone
+- `.setHours()` — mutates in system local time (caused the Calendar 9h→2h bug)
+- `new Date(isoString).getHours()` — parses ISO correctly but then uses system local to extract hours
+- `isSameDayInTimezone` with undefined timezone — always pass `timezone` explicitly
+- Direct `Intl.DateTimeFormat` without `{ timeZone }` — implicit browser system tz
+
+**✅ ALWAYS in FE:**
+- Use `Intl.DateTimeFormat(..., { timeZone: userTz })` for any display or comparison
+- Use `new Date(year, month, day, h, min, s, ms)` to construct dates from picker values (interprets args as local time)
+- Use `buildUtcIsoStringFromDate(date, hour, min)` to create UTC ISO from picker values
+- Always pass `timezone` explicitly — no hidden fallback in domain utilities
+
+**React Components:** Use `useTimezone()` hook (reactive — auto-updates when user changes timezone):
+```typescript
+const { timezone, formatTime, isToday, getWeekBoundaries, getHourMinute } = useTimezone();
+```
+
+**Non-React code:** Import directly from `@/shared/utils/datetime`.
+
+---
+
+#### Frontend vs Backend: Data Flow
+
+```
+User picks: 2026-04-13, time 09:00 (in Asia/Ho_Chi_Minh, UTC+7)
+
+FE (picker → API):
+  buildUtcIsoStringFromDate(datePickerDate, 9, 0)
+  → "2026-04-13T02:00:00Z"   ← correct! 9am UTC+7 = 2am UTC
+
+BE (API → DB):
+  ensure_aware_utc(datetime) → datetime in UTC
+  ensure_naive_utc(...) → naive UTC for MongoDB
+  → stored as 2026-04-13 02:00:00 (naive, UTC)
+
+BE → FE (API response):
+  "start_datetime": "2026-04-13T02:00:00Z"
+
+FE (display):
+  formatTime("2026-04-13T02:00:00Z", "Asia/Ho_Chi_Minh")
+  → "09:00"   ← correct!
+```
 
 ### Backend `shared/` Conventions
 
@@ -322,6 +448,12 @@ cd frontend && npm run build
 - Mọi BE schema public phải có tên globally unique theo mẫu `{App}{Entity}{Suffix}`.
 - Public tool names phải được pin explicit bằng `@tool("...")`; Python function name chỉ là implementation detail.
 - Root agent chỉ được expose tool của app đã cài; nếu bước resolve installed-app thất bại thì phải fail-closed.
+- **`routes.py` datetime range → BE service:** Luôn convert user-local datetime sang UTC (`.astimezone(UTC)`) TRƯỚC khi truyền vào service layer. Không bao giờ truyền aware-local datetime trực tiếp.
+- **Tạo event từ picker (FE → BE):** Luôn dùng `new Date(year, month, day, h, min)` constructor (interpret as local) rồi `.toISOString()`. KHÔNG dùng `.setHours()` trên Date object.
+- **Hour extraction từ UTC string:** Luôn dùng `getHourMinute(utc, tz)` hoặc `Intl.DateTimeFormat(..., { timeZone: tz })`. KHÔNG dùng `.getHours()` trực tiếp — nó dùng browser system timezone.
+- **Event model storage:** `Event.start_datetime`/`end_datetime` luôn là naive UTC. Mọi incoming datetime (aware any tz, naive, ISO string) phải đi qua `ensure_naive_utc(ensure_aware_utc(dt))` ở service layer và model validator.
+- **`to_naive_datetime()` assumptions:** Chỉ gọi `to_naive_datetime()` / `ensure_naive_utc()` trên datetimes mà đã biết là UTC (aware hoặc naive-labeled-UTC). Không dùng trên local-time naive datetimes.
+- **Week range query:** Luôn dùng `getWeekBoundaries(date, tz)` từ `@/shared/utils/datetime` — trả cả `weekDatesLocal[]` (grid columns) và `weekDatesUtcIso[]` (API query).
 
 ### Chat/Agent
 
@@ -383,6 +515,7 @@ cd frontend && npm run build
 - [ ] Mọi plugin route có `response_model` + request/response schema đầy đủ chưa (không để OpenAPI `unknown`)?
 - [ ] FE type import đã đi qua `@/types/generated` facade chưa (không import trực tiếp `@/types/generated/api`)?
 - [ ] `git commit --no-verify` chỉ dùng khi lint-staged/ESLint config bị lỗi — KHÔNG dùng để skip tất cả hooks
+- [ ] Datetime review: new datetime code dùng đúng util (`@/shared/utils/datetime`, `core/utils/timezone.py`) — không tự tính offset, không dùng `.getHours()` trực tiếp, không dùng `.setHours()`
 - [ ] **Sau khi deploy thành công:** commit và push lên **cả 3 repo** (root, backend, frontend) nếu có thay đổi tương ứng
 
 ---
@@ -423,6 +556,13 @@ lint-staged runs tasks with `shell: false` by default, so `cd frontend &&` chain
   (files) => `sh -c 'cd frontend && npx tsc --noEmit'`,
 ],
 ```
+
+### Event hiển thị sai giờ (VD: chọn 9h → hiện 2h)
+
+- FE dùng `.getHours()` trực tiếp → browser system timezone thay vì user timezone → fix: dùng `getHourMinute(utcString, tz)` hoặc `Intl.DateTimeFormat(..., { timeZone: tz })`
+- `CalendarScreen.handleCreateEvent` dùng `.setHours()` → shift ngược timezone → fix: dùng `buildUtcIsoStringFromDate(date, hour, min)`
+- BE `routes.py` dùng `.astimezone()` không argument → convert sang system local thay vì UTC → fix: dùng `.astimezone(UTC)`
+- Xem section "Datetime Conventions" chi tiết.
 
 ### Icons không hiển thị
 - Check `manifest.icon` trong backend là tên Lucide icon hợp lệ (vd: "Wallet", "Calendar")

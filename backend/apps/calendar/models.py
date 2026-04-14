@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
-
-from core.utils.timezone import utc_now
+from datetime import datetime
 
 from beanie import Document, PydanticObjectId
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from pymongo import IndexModel
 
 from apps.calendar.enums import AttendeeStatus, EventType, RecurrenceFrequency
+from core.utils.timezone import ensure_aware_utc, ensure_naive_utc, utc_now
 
 
 class Attendee(BaseModel):
@@ -28,11 +27,29 @@ class Event(Document):
     description: str | None = None
     location: str | None = None
 
-    # Time fields
+    # Time fields — ALWAYS stored as UTC-naive datetimes.
+    # Validation normalizes both aware (any tz) and naive inputs to UTC-naive
+    # before storage so MongoDB comparisons are always UTC-consistent.
     start_datetime: datetime
     end_datetime: datetime
     is_all_day: bool = False
-    timezone: str = "UTC"
+    timezone: str = "UTC"  # Informational: user's timezone at event creation time
+
+    # ── Normalize to UTC-naive on init / update ──────────────────────────────
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_datetimes_to_utc(cls, values: dict | object) -> dict | object:
+        if isinstance(values, dict):
+            for field in ("start_datetime", "end_datetime"):
+                raw = values.get(field)
+                if raw is None:
+                    continue
+                if isinstance(raw, datetime):
+                    values[field] = ensure_naive_utc(ensure_aware_utc(raw))
+                elif isinstance(raw, str):
+                    aware = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+                    values[field] = ensure_naive_utc(ensure_aware_utc(aware))
+        return values
 
     # Classification
     calendar_id: PydanticObjectId

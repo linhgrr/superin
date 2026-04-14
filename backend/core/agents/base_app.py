@@ -4,20 +4,20 @@ from __future__ import annotations
 
 import asyncio
 import json
-import logging
 from typing import Any, Literal
 
 from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
 from langchain_core.tools import BaseTool
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import create_react_agent
+from loguru import logger
 
 from core.config import settings
 from core.constants import AGENT_RECURSION_LIMIT, MAX_TOOL_CALLS_PER_DELEGATION
+from core.models import User
+from core.utils.timezone import get_user_timezone_context
 from shared.agent_context import get_user_context, set_thread_context, set_user_context
 from shared.llm import get_llm
-
-logger = logging.getLogger(__name__)
 
 # Type definitions for consistent status/error codes
 DelegationStatus = Literal["success", "no_action", "failed", "partial", "awaiting_confirmation"]
@@ -78,7 +78,7 @@ class BaseAppAgent:
         H1 DESIGN NOTE: Child agents intentionally have NO checkpointer or store.
         - They are stateless per-delegation: each `delegate()` call passes a fresh
           single-message input, so there is no multi-turn state to persist.
-        - The root agent's checkpointer (MongoDB) handles all cross-turn persistence.
+        - Canonical cross-turn persistence is handled by the root chat layer.
         - This graph is a SINGLETON shared across all users (no user data stored here).
 
         WARNING: If you add a checkpointer here in the future, you MUST also add
@@ -105,6 +105,8 @@ class BaseAppAgent:
         if not user_id:
             raise RuntimeError(f"{self.app_id} agent invoked without user context")
 
+        logger.info("BaseAppAgent.delegate START  app={}  user={}  thread={}  question={}", self.app_id, user_id, thread_id, question[:80])
+
         parent_thread_id = thread_id
         # M7: Child thread_id is scoped under the parent thread (which is already user-scoped
         # via 'user:{user_id}:...' prefix enforced by RootAgent.astream). This provides an
@@ -113,21 +115,32 @@ class BaseAppAgent:
         set_user_context(user_id)
         set_thread_context(child_thread_id)
 
+        # Inject current date/time so child agent knows "today" in user's timezone
+        user_obj = await User.find_one(User.id == user_id) if user_id else None
+        tz_ctx = get_user_timezone_context(user_obj)
+        date_str, time_str = tz_ctx.get_date_time_tuple()
+        prefixed_question = (
+            f"Current date: {date_str}, current time: {time_str}.\n\n{question}"
+        )
+
+        final_status = "failed"
+
         try:
             result = await asyncio.wait_for(
                 self.graph.ainvoke(
-                    {"messages": [{"role": "user", "content": question}]},
+                    {"messages": [{"role": "user", "content": prefixed_question}]},
                     config={
                         "recursion_limit": AGENT_RECURSION_LIMIT,
                     },
                 ),
                 timeout=settings.llm_request_timeout_seconds,
             )
+            final_status = str(result.get("status", "success"))
             messages = result.get("messages", [])
             return self._build_delegate_result(question, messages)
         except TimeoutError:
             logger.error(
-                "%s child agent timed out after %.1fs",
+                "{} child agent timed out after {}s",
                 self.app_id,
                 settings.llm_request_timeout_seconds,
             )
@@ -158,6 +171,7 @@ class BaseAppAgent:
         finally:
             set_user_context(user_id)
             set_thread_context(parent_thread_id)
+            logger.info("BaseAppAgent.delegate END  app={}  user={}  status={}", self.app_id, user_id, final_status)
 
     def _build_delegate_result(
         self,
@@ -207,7 +221,7 @@ class BaseAppAgent:
             # Early check: stop processing if already exceeded limit
             if tool_call_count > MAX_TOOL_CALLS_PER_DELEGATION:
                 logger.warning(
-                    "%s agent exceeded max tool calls (%d > %d)",
+                    "{} agent exceeded max tool calls ({} > {})",
                     self.app_id,
                     tool_call_count,
                     MAX_TOOL_CALLS_PER_DELEGATION,

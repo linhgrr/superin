@@ -53,7 +53,7 @@ export default function DaySummaryWidget({ widget }: DashboardWidgetRendererProp
                   width: "32px",
                   height: "32px",
                   borderRadius: "8px",
-                  background: "var(--color-success-muted, oklch(0.72 0.19 145 / 0.15))",
+                  background: "var(--color-success-muted-bg)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",

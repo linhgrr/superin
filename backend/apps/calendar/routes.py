@@ -1,7 +1,10 @@
 """Calendar plugin FastAPI routes."""
 
-from calendar import month_name, monthrange
-from datetime import UTC, datetime, timedelta
+from __future__ import annotations
+
+import calendar
+from calendar import month_name
+from datetime import datetime, timedelta
 
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -58,11 +61,9 @@ def _get_widget_manifest(widget_id: str) -> WidgetManifestSchema:
     raise HTTPException(status_code=404, detail=f"Widget '{widget_id}' not found")
 
 
-def _add_month_offset(now_local: datetime, month_offset: int) -> tuple[int, int]:
-    month_index = (now_local.year * 12 + (now_local.month - 1)) + month_offset
-    year = month_index // 12
-    month = month_index % 12 + 1
-    return year, month
+def _weekday_offset(year: int, month: int) -> int:
+    """Weekday of day 1 of the given month (Mon=0)."""
+    return calendar.monthrange(year, month)[0]
 
 
 async def _resolve_widget_options(
@@ -95,27 +96,15 @@ async def get_month_view_widget_data(
 
     ctx = get_user_timezone_context(user)
     now_local = ctx.now_local()
-    year, month = _add_month_offset(now_local, month_offset)
-    start_local = now_local.replace(
-        year=year,
-        month=month,
-        day=1,
-        hour=0,
-        minute=0,
-        second=0,
-        microsecond=0,
-    )
-    days_in_month = monthrange(year, month)[1]
-    if month == 12:
-        next_month_start = start_local.replace(year=year + 1, month=1)
-    else:
-        next_month_start = start_local.replace(month=month + 1)
-    end_local = next_month_start - timedelta(microseconds=1)
+    month_index = now_local.year * 12 + (now_local.month - 1) + month_offset
+    year = month_index // 12
+    month = month_index % 12 + 1
+    start_utc, end_utc = ctx.month_range(month_offset)
 
     events = await calendar_service.list_events(
         user_id,
-        start_local.astimezone().astimezone(start_local.tzinfo),
-        end_local.astimezone().astimezone(end_local.tzinfo),
+        start_utc,
+        end_utc,
         config.default_calendar,
         200,
     )
@@ -128,12 +117,12 @@ async def get_month_view_widget_data(
         day_map.setdefault(event_day, []).append(event)
 
     calendars = await calendar_service.list_calendars(user_id)
-    first_day = datetime(year, month, 1).weekday()
+    days_in_month = calendar.monthrange(year, month)[1]
     return MonthViewWidgetData(
         month=month,
         year=year,
         month_label=f"{month_name[month]} {year}",
-        start_offset=first_day,
+        start_offset=_weekday_offset(year, month),
         days_in_month=days_in_month,
         days=[
             CalendarMonthDaySummary(
@@ -151,7 +140,12 @@ async def get_upcoming_widget_data(
     user_id: str,
     config: UpcomingWidgetConfig,
 ) -> UpcomingWidgetData:
-    start = datetime.now(UTC)
+    user = await User.get(user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    ctx = get_user_timezone_context(user)
+    start = ctx.now_utc()
     end = start + timedelta(days=30)
     items = await calendar_service.list_events(
         user_id,
@@ -300,26 +294,21 @@ async def update_event(
     request: CalendarUpdateEventRequest,
     user_id: str = Depends(get_current_user),
 ):
-    """Update event."""
+    """Update event — only fields set in the request are updated."""
     try:
-        kwargs = {}
-        if request.title is not None:
-            kwargs["title"] = request.title
-        if request.start_datetime is not None:
-            kwargs["start_datetime"] = request.start_datetime
-        if request.end_datetime is not None:
-            kwargs["end_datetime"] = request.end_datetime
-        if request.calendar_id is not None:
-            kwargs["calendar_id"] = request.calendar_id
-        if request.description is not None:
-            kwargs["description"] = request.description
-        if request.location is not None:
-            kwargs["location"] = request.location
-        if request.color is not None:
-            kwargs["color"] = request.color
-        if request.reminders is not None:
-            kwargs["reminders"] = request.reminders
-        return await calendar_service.update_event(event_id, user_id, **kwargs)
+        return await calendar_service.update_event(
+            event_id,
+            user_id,
+            title=request.title,
+            start_datetime=request.start_datetime,
+            end_datetime=request.end_datetime,
+            calendar_id=request.calendar_id,
+            description=request.description,
+            location=request.location,
+            color=request.color,
+            reminders=request.reminders,
+            is_all_day=request.is_all_day,
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -372,18 +361,16 @@ async def update_calendar(
     request: CalendarUpdateCalendarRequest,
     user_id: str = Depends(get_current_user),
 ):
-    """Update calendar."""
+    """Update calendar — only fields set in the request are updated."""
     try:
-        kwargs = {}
-        if request.name is not None:
-            kwargs["name"] = request.name
-        if request.color is not None:
-            kwargs["color"] = request.color
-        if request.is_visible is not None:
-            kwargs["is_visible"] = request.is_visible
-        if request.is_default is not None:
-            kwargs["is_default"] = request.is_default
-        return await calendar_service.update_calendar(calendar_id, user_id, **kwargs)
+        return await calendar_service.update_calendar(
+            calendar_id,
+            user_id,
+            name=request.name,
+            color=request.color,
+            is_visible=request.is_visible,
+            is_default=request.is_default,
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

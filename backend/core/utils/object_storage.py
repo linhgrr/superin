@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import socket
+from functools import lru_cache
 from urllib.parse import quote, urlparse
 
 import boto3
@@ -43,18 +44,31 @@ def _is_endpoint_resolvable(endpoint: str) -> bool:
 
 
 def get_upload_endpoint() -> str:
-    internal_endpoint = normalize_endpoint(
-        settings.object_storage_endpoint_internal,
-        default_scheme="http",
-    )
-    external_endpoint = normalize_endpoint(
-        settings.object_storage_endpoint_external,
-        default_scheme="https",
+    return _get_upload_endpoint_cached(
+        hf_space=settings.hf_space,
+        kubernetes=is_running_in_kubernetes(),
+        internal_endpoint=normalize_endpoint(
+            settings.object_storage_endpoint_internal,
+            default_scheme="http",
+        ),
+        external_endpoint=normalize_endpoint(
+            settings.object_storage_endpoint_external,
+            default_scheme="https",
+        ),
     )
 
-    if settings.hf_space:
+
+@lru_cache(maxsize=16)
+def _get_upload_endpoint_cached(
+    *,
+    hf_space: bool,
+    kubernetes: bool,
+    internal_endpoint: str | None,
+    external_endpoint: str | None,
+) -> str:
+    if hf_space:
         ordered_candidates = [external_endpoint, internal_endpoint]
-    elif is_running_in_kubernetes():
+    elif kubernetes:
         ordered_candidates = [internal_endpoint, external_endpoint]
     else:
         ordered_candidates = [external_endpoint, internal_endpoint]
@@ -70,16 +84,22 @@ def get_upload_endpoint() -> str:
         if _is_endpoint_resolvable(endpoint):
             return endpoint
 
-    # If DNS checks fail for all options, still return the preferred candidate
-    # so callers get a concrete endpoint error instead of config masking.
     return candidates[0]
 
 
 def get_public_base_url() -> str:
-    return normalize_endpoint(
-        settings.object_storage_endpoint_external,
-        default_scheme="https",
-    ) or get_upload_endpoint()
+    return _get_public_base_url_cached(
+        external_endpoint=normalize_endpoint(
+            settings.object_storage_endpoint_external,
+            default_scheme="https",
+        ),
+        upload_endpoint=get_upload_endpoint(),
+    )
+
+
+@lru_cache(maxsize=16)
+def _get_public_base_url_cached(*, external_endpoint: str | None, upload_endpoint: str) -> str:
+    return external_endpoint or upload_endpoint
 
 
 def build_public_object_url(*, bucket: str, object_key: str) -> str:
@@ -105,10 +125,6 @@ def get_s3_client():
         aws_secret_access_key=settings.object_storage_secret_key,
         addressing_style=settings.object_storage_addressing_style,
     )
-
-
-from functools import lru_cache  # noqa: E402  (import after constants to avoid circular)
-
 
 @lru_cache(maxsize=1)
 def _get_s3_client_cached(

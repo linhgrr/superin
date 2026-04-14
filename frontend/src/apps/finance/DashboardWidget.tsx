@@ -18,4 +18,6 @@ const WIDGET_COMPONENTS = {
   "finance.recent-transactions": RecentTransactionsWidget,
 } as const satisfies Record<string, ComponentType<DashboardWidgetRendererProps>>;
 
-export default createDashboardWidgetRenderer(WIDGET_COMPONENTS);
+const FinanceDashboardWidget = createDashboardWidgetRenderer(WIDGET_COMPONENTS);
+
+export default FinanceDashboardWidget;

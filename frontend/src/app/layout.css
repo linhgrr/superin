@@ -9,10 +9,8 @@
   width: 100%;
   flex-shrink: 0;
   flex-direction: row;
-  background: var(--color-surface);
+  background: var(--color-background-elevated);
   border-top: 1px solid var(--color-border);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
   padding-bottom: env(safe-area-inset-bottom, 0px);
   /* Tab bar height — sync with AppShell padding via CSS var */
   --tab-bar-height: calc(56px + env(safe-area-inset-bottom, 0px));
@@ -199,12 +197,10 @@
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 .sidebar {
-  background: var(--color-surface-transparent);
+  background: var(--color-background-elevated);
   border-right: 1px solid var(--color-border);
   overflow-y: auto;
   overflow-x: hidden;
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
   position: relative;
   z-index: 100;
   padding-top: env(safe-area-inset-top, 0px);
@@ -221,8 +217,8 @@
 .sidebar-brand-icon {
   width: 36px;
   height: 36px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-end) 100%);
+  border-radius: 8px;
+  background: var(--color-primary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -230,7 +226,6 @@
   color: var(--color-primary-foreground);
   font-size: 1rem;
   font-family: var(--font-display);
-  box-shadow: 0 4px 14px oklch(from var(--color-primary) l c h / 0.3);
 }
 
 .sidebar-brand-text {
@@ -263,7 +258,7 @@
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, var(--color-primary-muted) 0%, transparent 100%);
+  background: var(--color-surface-transparent);
   opacity: 0;
   transition: opacity 0.2s ease;
 }
@@ -318,9 +313,7 @@
   align-items: center;
   padding: 0 1.5rem;
   gap: 1rem;
-  background: var(--color-surface-transparent);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  background: var(--color-background-elevated);
   flex-shrink: 0;
   position: relative;
   z-index: 100;

@@ -4,17 +4,16 @@ These are always loaded regardless of which plugins are installed.
 Plugin-specific models live in backend/apps/{app_id}/models.py.
 """
 
-from datetime import UTC, datetime
+from datetime import datetime
+from typing import Any, Literal
 
 from beanie import Document, PydanticObjectId
 from pydantic import Field
 from pymongo import IndexModel
 
+from core.utils.timezone import utc_now
 from shared.enums import InstallationStatus, UserRole
 
-from typing import Any
-
-from core.utils.timezone import utc_now
 
 class User(Document):
     """Platform user account."""
@@ -134,3 +133,37 @@ class AppCategory(Document):
             IndexModel([("name", 1)], name="app_categories_name_unique", unique=True),
         ]
 
+
+class ConversationMessage(Document):
+    """Canonical persisted chat history for a user thread.
+
+    Only user-visible text messages are stored here. Internal tool calls/results
+    are execution details and are intentionally not persisted across turns.
+    """
+
+    user_id: PydanticObjectId
+    thread_id: str
+    role: Literal["user", "assistant"]
+    content: str
+    client_message_id: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime = Field(default_factory=utc_now)
+
+    class Settings:
+        name = "conversation_messages"
+        indexes = [
+            IndexModel(
+                [("user_id", 1), ("thread_id", 1), ("created_at", 1)],
+                name="conversation_messages_user_thread_created_at",
+            ),
+            IndexModel(
+                [("thread_id", 1), ("created_at", 1)],
+                name="conversation_messages_thread_created_at",
+            ),
+            IndexModel(
+                [("user_id", 1), ("thread_id", 1), ("client_message_id", 1)],
+                name="conversation_messages_user_thread_client_message_id_unique",
+                unique=True,
+                partialFilterExpression={"client_message_id": {"$type": "string"}},
+            ),
+        ]

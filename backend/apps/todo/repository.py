@@ -1,11 +1,12 @@
 """Todo plugin data access layer."""
 
-from datetime import UTC, datetime
+from datetime import datetime
 
 from beanie import PydanticObjectId
 
 from apps.todo.enums import RecurrenceFrequency, TaskPriority, TaskStatus
 from apps.todo.models import RecurringRule, SubTask, Task
+from core.utils.timezone import utc_now
 
 
 class TaskRepository:
@@ -124,7 +125,7 @@ class TaskRepository:
         if status is not None:
             task.status = status  # type: ignore[assignment]
             if status == "completed":
-                task.completed_at = datetime.now(UTC)
+                task.completed_at = utc_now()
             else:
                 task.completed_at = None
         if tags is not None:
@@ -202,7 +203,7 @@ class SubTaskRepository:
     async def complete(self, subtask: SubTask) -> SubTask:
         """Mark subtask as completed."""
         subtask.completed = True
-        subtask.completed_at = datetime.now(UTC)
+        subtask.completed_at = utc_now()
         await subtask.save()
         return subtask
 
@@ -277,7 +278,7 @@ class RecurringRuleRepository:
     async def update_occurrence(self, rule: RecurringRule) -> RecurringRule:
         """Increment occurrence count and update last generated date."""
         rule.occurrence_count += 1
-        rule.last_generated_date = datetime.now(UTC)
+        rule.last_generated_date = utc_now()
         await rule.save()
         return rule
 

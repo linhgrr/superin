@@ -17,18 +17,20 @@
     <!-- Windows tile -->
     <meta name="msapplication-TileColor" content="#b05c32" />
 
-    <!-- Sync theme before React renders — prevents FOUC -->
     <script>
       (function() {
         try {
-          var stored = localStorage.getItem("superin:user-settings");
-          if (!stored) return;
-          var settings = JSON.parse(stored);
-          var root = document.documentElement;
-          var isDark = settings.theme === "dark" ||
-            (settings.theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-          root.classList.add(isDark ? "dark" : "light");
-        } catch(e) {}
+          var raw = localStorage.getItem("superin_settings");
+          var parsed = raw ? JSON.parse(raw) : {};
+          var theme = parsed.theme;
+          if (theme === "dark" || (theme !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches)) {
+            document.documentElement.classList.add("dark");
+          } else {
+            document.documentElement.classList.add("light");
+          }
+        } catch(e) {
+          document.documentElement.classList.add("dark");
+        }
       })();
     </script>
 
@@ -40,7 +42,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
     />
   </head>
   <body>

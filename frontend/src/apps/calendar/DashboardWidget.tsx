@@ -18,4 +18,6 @@ const WIDGET_COMPONENTS = {
   "calendar.day-summary": DaySummaryWidget,
 } as const satisfies Record<string, ComponentType<DashboardWidgetRendererProps>>;
 
-export default createDashboardWidgetRenderer(WIDGET_COMPONENTS);
+const CalendarDashboardWidget = createDashboardWidgetRenderer(WIDGET_COMPONENTS);
+
+export default CalendarDashboardWidget;

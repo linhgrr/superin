@@ -35,7 +35,6 @@ function AppIcon({ entry }: { entry: AppRuntimeEntry }) {
         fontWeight: 700,
         flexShrink: 0,
         color: "white",
-        boxShadow: "0 2px 8px oklch(0 0 0 / 0.25)",
         fontFamily: "var(--font-display)",
       }}
     >

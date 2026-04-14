@@ -95,6 +95,13 @@ INDEX_REQUIREMENTS: tuple[IndexRequirement, ...] = (
         unique=False,
     ),
     IndexRequirement(
+        collection="conversation_messages",
+        index_name="conversation_messages_user_thread_client_message_id_unique",
+        key=(("user_id", 1), ("thread_id", 1), ("client_message_id", 1)),
+        unique=True,
+        partial_filter_expression={"client_message_id": {"$type": "string"}},
+    ),
+    IndexRequirement(
         collection="subscriptions",
         index_name="subscriptions_user_id_unique",
         key=(("user_id", 1),),

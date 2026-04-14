@@ -2,108 +2,171 @@
  * CalendarScreen — calendar with week/list view and event management.
  */
 
-import { useState, useEffect, useMemo, useCallback } from "react";
-import {
-  getCalendars,
-  getEvents,
-  createEvent,
-  type CalendarRead,
-  type CreateEventRequest,
-  type EventRead,
-} from "../api";
+import { useState, useMemo, useCallback } from "react";
+import { useCalendars, useEvents, createEvent as swrCreateEvent, updateEvent as swrUpdateEvent, deleteEvent as swrDeleteEvent } from "../hooks/useCalendarSwr";
 import { WeekView } from "../components/WeekView";
 import { ListView } from "../components/ListView";
 import { CreateEventModal } from "../components/CreateEventModal";
-import { getWeekDatesInTimezone } from "../utils/dateHelpers";
 import { filterEventsByCalendar, groupEventsByDate } from "../utils/eventHelpers";
+import { buildUtcIsoStringFromDate } from "@/shared/utils/datetime";
 import { useTimezone } from "@/shared/hooks/useTimezone";
+import { useToast } from "@/components/providers/ToastProvider";
+import { ConfirmationModal } from "@/shared/components/ConfirmationModal";
 import { CalendarHeader } from "./CalendarHeader";
+import type { CreateEventRequest, EventRead } from "../api";
+import type { EventFormData } from "../components/CreateEventModal";
 
 type ViewMode = "list" | "week";
 const CALENDAR_EVENT_TYPE: CreateEventRequest["type"] = "event";
 
 export default function CalendarScreen() {
-  const { timezone } = useTimezone();
-  const [calendars, setCalendars] = useState<CalendarRead[]>([]);
-  const [events, setEvents] = useState<EventRead[]>([]);
+  const { timezone, getWeekBoundaries } = useTimezone();
+  const toast = useToast();
   const [viewMode, setViewMode] = useState<ViewMode>("week");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedCalendar, setSelectedCalendar] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newEventDate, setNewEventDate] = useState<Date | null>(null);
+  const [selectedEventForUpdate, setSelectedEventForUpdate] = useState<EventRead | null>(null);
+  const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
+  const [eventToDeleteId, setEventToDeleteId] = useState<string | null>(null);
 
-  // Derived state
-  const weekDates = useMemo(() => getWeekDatesInTimezone(currentDate, timezone), [currentDate, timezone]);
+  // getWeekBoundaries gives both:
+  //   - weekDatesLocal: Date[7] at local midnight (for grid columns)
+  //   - weekDatesUtcIso: string[7] UTC ISO strings (for API query)
+  const weekInfo = useMemo(
+    () => getWeekBoundaries(currentDate),
+    [getWeekBoundaries, currentDate],
+  );
+
+  // SWR data — query with UTC ISO range
+  const { data: calendars = [], isLoading: calendarsLoading } = useCalendars();
+  const { data: events = [], isLoading: eventsLoading } = useEvents(
+    weekInfo.weekDatesUtcIso[0],
+    weekInfo.weekDatesUtcIso[6],
+    selectedCalendar ?? undefined,
+    200,
+  );
+  const isLoading = calendarsLoading || eventsLoading;
+
   const filteredEvents = useMemo(
     () => filterEventsByCalendar({ events, selectedCalendar }),
-    [events, selectedCalendar]
+    [events, selectedCalendar],
   );
-  const eventsByDate = useMemo(() => groupEventsByDate(filteredEvents, { timezone }), [filteredEvents, timezone]);
+  const eventsByDate = useMemo(
+    () => groupEventsByDate(filteredEvents, timezone),
+    [filteredEvents, timezone],
+  );
 
-  // Load data
-  const loadData = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      const start = weekDates[0].toISOString();
-      const end = weekDates[6].toISOString();
+  // Navigation — useCallback to avoid re-renders
+  const goToPreviousWeek = useCallback(() => {
+    setCurrentDate((prev) => {
+      const d = new Date(prev);
+      d.setDate(d.getDate() - 7);
+      return d;
+    });
+  }, []);
 
-      const [cals, evts] = await Promise.all([
-        getCalendars(),
-        getEvents({ start, end, calendar_id: selectedCalendar || undefined, limit: 200 }),
-      ]);
-      setCalendars(cals);
-      setEvents(evts);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [weekDates, selectedCalendar]);
+  const goToNextWeek = useCallback(() => {
+    setCurrentDate((prev) => {
+      const d = new Date(prev);
+      d.setDate(d.getDate() + 7);
+      return d;
+    });
+  }, []);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  const goToToday = useCallback(() => setCurrentDate(new Date()), []);
 
-  // Navigation
-  const goToPreviousWeek = () => {
-    const d = new Date(currentDate);
-    d.setDate(d.getDate() - 7);
-    setCurrentDate(d);
-  };
-
-  const goToNextWeek = () => {
-    const d = new Date(currentDate);
-    d.setDate(d.getDate() + 7);
-    setCurrentDate(d);
-  };
-
-  const goToToday = () => setCurrentDate(new Date());
-
-  const handleCellClick = (date: Date) => {
-    setNewEventDate(date);
+  const handleCellClick = useCallback((date: Date, hour: number) => {
+    const newDate = new Date(date);
+    newDate.setHours(hour, 0, 0, 0);
+    setNewEventDate(newDate);
     setShowCreateModal(true);
-  };
+  }, []);
 
-  const handleCreateEvent = async (title: string, startMinutes: number, endMinutes: number) => {
-    if (!newEventDate || calendars.length === 0) return;
-    const defaultCalendar = calendars.find((c) => c.is_default) || calendars[0];
-    const start = new Date(newEventDate);
-    start.setHours(Math.floor(startMinutes / 60), startMinutes % 60, 0, 0);
-    const end = new Date(start);
-    end.setHours(Math.floor(endMinutes / 60), endMinutes % 60, 0, 0);
+  // ── Event creation ────────────────────────────────────────────────────────
+  // buildUtcIsoStringFromDate: uses Date(year,month,day,h,m,s,ms) constructor
+  // → JS interprets all args as LOCAL time → .toISOString() produces correct UTC
+  const handleCreateEvent = useCallback(
+    async (formData: EventFormData) => {
+      if (!newEventDate || calendars.length === 0) return;
+      
+      const start_hour = Math.floor(formData.startMinutes / 60);
+      const start_min = formData.startMinutes % 60;
+      const end_hour = Math.floor(formData.endMinutes / 60);
+      const end_min = formData.endMinutes % 60;
 
+      try {
+        await swrCreateEvent({
+          title: formData.title,
+          start_datetime: buildUtcIsoStringFromDate(newEventDate, start_hour, start_min),
+          end_datetime: buildUtcIsoStringFromDate(newEventDate, end_hour, end_min),
+          calendar_id: formData.calendar_id,
+          is_all_day: formData.is_all_day,
+          description: formData.description || null,
+          location: formData.location || null,
+          type: CALENDAR_EVENT_TYPE,
+        });
+        setShowCreateModal(false);
+      } catch (err) {
+        console.error("Failed to create event:", err);
+      }
+    },
+    [newEventDate, calendars],
+  );
+
+  const handleUpdateEvent = useCallback(
+    async (eventId: string, formData: EventFormData) => {
+      if (!selectedEventForUpdate) return;
+      // We need the original date for the event to keep it on the same day but different time
+      const date = new Date(selectedEventForUpdate.start_datetime);
+      const start_hour = Math.floor(formData.startMinutes / 60);
+      const start_min = formData.startMinutes % 60;
+      const end_hour = Math.floor(formData.endMinutes / 60);
+      const end_min = formData.endMinutes % 60;
+
+      try {
+        await swrUpdateEvent(eventId, {
+          title: formData.title,
+          start_datetime: buildUtcIsoStringFromDate(date, start_hour, start_min),
+          end_datetime: buildUtcIsoStringFromDate(date, end_hour, end_min),
+          calendar_id: formData.calendar_id,
+          is_all_day: formData.is_all_day,
+          description: formData.description || null,
+          location: formData.location || null,
+        });
+        setSelectedEventForUpdate(null);
+      } catch (err) {
+        console.error("Failed to update event:", err);
+      }
+    },
+    [selectedEventForUpdate],
+  );
+
+  const handleDeleteEvent = useCallback(
+    async (eventId: string) => {
+      setEventToDeleteId(eventId);
+      setIsConfirmDeleteOpen(true);
+    },
+    [],
+  );
+
+  const confirmDelete = useCallback(async () => {
+    if (!eventToDeleteId) return;
     try {
-      await createEvent({
-        title,
-        start_datetime: start.toISOString(),
-        end_datetime: end.toISOString(),
-        calendar_id: defaultCalendar.id,
-        is_all_day: false,
-        type: CALENDAR_EVENT_TYPE,
-      });
-      await loadData();
+      await swrDeleteEvent(eventToDeleteId);
+      toast.success("Event deleted successfully");
+      
+      // Close all modals and reset state
+      setIsConfirmDeleteOpen(false);
+      setEventToDeleteId(null);
+      setSelectedEventForUpdate(null);
       setShowCreateModal(false);
     } catch (err) {
-      console.error("Failed to create event:", err);
+      console.error("Failed to delete event:", err);
+      toast.error("Failed to delete event");
     }
-  };
+  }, [eventToDeleteId, toast]);
 
   if (isLoading) {
     return (
@@ -116,7 +179,7 @@ export default function CalendarScreen() {
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
       <CalendarHeader
-        weekDates={weekDates}
+        weekDates={weekInfo.weekDatesLocal}
         calendars={calendars}
         selectedCalendar={selectedCalendar}
         viewMode={viewMode}
@@ -127,12 +190,51 @@ export default function CalendarScreen() {
         onChangeView={setViewMode}
       />
       {viewMode === "week" ? (
-        <WeekView weekDates={weekDates} calendars={calendars} events={filteredEvents} onCellClick={handleCellClick} />
+        <WeekView
+          weekDates={weekInfo.weekDatesLocal}
+          calendars={calendars}
+          events={filteredEvents}
+          onCellClick={handleCellClick}
+          onEventClick={setSelectedEventForUpdate}
+        />
       ) : (
-        <ListView calendars={calendars} eventsByDate={eventsByDate} />
+        <ListView 
+          calendars={calendars} 
+          eventsByDate={eventsByDate} 
+          onEventClick={setSelectedEventForUpdate}
+        />
       )}
-      {showCreateModal && newEventDate && (
-        <CreateEventModal date={newEventDate} onClose={() => setShowCreateModal(false)} onCreate={handleCreateEvent} />
+      {showCreateModal && newEventDate && !selectedEventForUpdate && (
+        <CreateEventModal
+          date={newEventDate}
+          calendars={calendars}
+          onClose={() => setShowCreateModal(false)}
+          onCreate={handleCreateEvent}
+        />
+      )}
+      {selectedEventForUpdate && (
+        <CreateEventModal
+          date={new Date(selectedEventForUpdate.start_datetime)}
+          calendars={calendars}
+          initialEvent={selectedEventForUpdate}
+          onClose={() => setSelectedEventForUpdate(null)}
+          onUpdate={handleUpdateEvent}
+          onDelete={handleDeleteEvent}
+        />
+      )}
+
+      {isConfirmDeleteOpen && (
+        <ConfirmationModal
+          title="Delete Event"
+          message="Are you sure you want to delete this event? This action cannot be undone."
+          confirmLabel="Delete"
+          variant="danger"
+          onConfirm={confirmDelete}
+          onCancel={() => {
+            setIsConfirmDeleteOpen(false);
+            setEventToDeleteId(null);
+          }}
+        />
       )}
     </div>
   );

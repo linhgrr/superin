@@ -1,8 +1,14 @@
-// Date helper utilities for calendar components
+/**
+ * Calendar-specific pure value helpers — NO timezone logic here.
+ *
+ * All timezone-aware operations live in:  @/shared/utils/datetime
+ * Import from there directly. This file only contains:
+ *   - Grid constants  (TIME_OPTIONS, HOURS, DAY_NAMES, HOUR_HEIGHT)
+ *   - Time math       (formatTimeOfDay, formatMinutesToString, parseTimeString, formatDuration)
+ */
 
-export const formatTime = (hours: number, minutes: number): string => {
-  return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
-};
+export const formatTimeOfDay = (hours: number, minutes: number): string =>
+  `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
 
 export const formatDuration = (startMinutes: number, endMinutes: number): string => {
   const diff = endMinutes - startMinutes;
@@ -13,51 +19,36 @@ export const formatDuration = (startMinutes: number, endMinutes: number): string
   return `${hours} hr ${mins} min`;
 };
 
-/**
- * Check if two dates are the same day in the specified timezone.
- */
-export const isSameDayInTimezone = (d1: Date, d2: Date, timezone?: string): boolean => {
-  const d1Str = d1.toLocaleDateString("en-US", { timeZone: timezone });
-  const d2Str = d2.toLocaleDateString("en-US", { timeZone: timezone });
-  return d1Str === d2Str;
+/** Parse "HH:MM" → total minutes from midnight, or null if invalid. */
+export const parseTimeString = (value: string): number | null => {
+  const match = value.match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return null;
+  const hours = parseInt(match[1], 10);
+  const mins = parseInt(match[2], 10);
+  if (hours < 0 || hours > 23 || mins < 0 || mins > 59) return null;
+  return hours * 60 + mins;
 };
 
-/**
- * Get week dates (Monday-Sunday) relative to the given date in the specified timezone.
- * Returns dates in that timezone's local midnight.
- */
-export const getWeekDatesInTimezone = (date: Date, timezone?: string): Date[] => {
-  // Get the date components in the target timezone
-  const targetDateStr = date.toLocaleDateString("en-US", {
-    timeZone: timezone,
-    year: "numeric",
-    month: "numeric",
-    day: "numeric",
-  });
-  const [month, day, year] = targetDateStr.split("/").map(Number);
-
-  // Find the Monday of this week
-  const targetDate = new Date(year, month - 1, day);
-  const dayOfWeek = targetDate.getDay();
-  const diff = targetDate.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
-  const monday = new Date(targetDate.setDate(diff));
-
-  const weekDates = [];
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(monday);
-    d.setDate(monday.getDate() + i);
-    weekDates.push(d);
-  }
-  return weekDates;
+/** Format total minutes from midnight → "HH:MM". */
+export const formatMinutesToString = (totalMinutes: number): string => {
+  const hours = Math.floor(totalMinutes / 60) % 24;
+  const mins = totalMinutes % 60;
+  return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
 };
 
-// Generate 30-min interval options (00:00 - 23:30)
+// ─── Calendar grid constants ───────────────────────────────────────────────────
+
+/** 30-minute interval options for time pickers: [{value: 0, label: "00:00"}, ...] */
 export const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
   const hours = Math.floor(i / 2);
   const minutes = (i % 2) * 30;
-  return { value: i * 30, label: formatTime(hours, minutes) };
+  return { value: i * 30, label: formatTimeOfDay(hours, minutes) };
 });
 
-export const HOURS = Array.from({ length: 24 }, (_, i) => i); // 0-23 hours
-export const HOUR_HEIGHT = 60; // pixels per hour
-export const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+export const HOURS = Array.from({ length: 24 }, (_, i) => i);
+export const HOUR_HEIGHT = 60; // px per hour row
+export const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+// ─── No timezone logic below ──────────────────────────────────────────────────
+// For timezone-aware comparisons and week ranges, use:
+//   import { isSameDayInTimezone, getWeekDates } from '@/shared/utils/datetime'
