@@ -1,7 +1,10 @@
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
+
 import { DynamicIcon } from "@/lib/icon-resolver";
+
 import type { MonthlyTrendResponse } from "../api";
 import { getMonthlyTrend } from "../api";
+import FinancePanelState from "./FinancePanelState";
 
 interface MonthlyTrendChartProps {
   months?: number;
@@ -12,43 +15,56 @@ export default function MonthlyTrendChart({ months = 6 }: MonthlyTrendChartProps
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const result = await getMonthlyTrend({ months });
-        setData(result);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load data");
-      } finally {
-        setLoading(false);
-      }
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await getMonthlyTrend({ months });
+      setData(result);
+    } catch (err) {
+      setData(null);
+      setError(err instanceof Error ? err.message : "Unable to load trend data");
+    } finally {
+      setLoading(false);
     }
-    fetchData();
   }, [months]);
+
+  useEffect(() => {
+    void loadData();
+  }, [loadData]);
 
   if (loading) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "2rem" }}>
-        <DynamicIcon name="Loader2" size={24} style={{ animation: "spin 1s linear infinite", color: "var(--color-foreground-muted)" }} />
-      </div>
+      <FinancePanelState
+        variant="loading"
+        title="Loading trend data"
+        description="Fetching recent income and expense performance."
+      />
+    );
+  }
+
+  if (error) {
+    return (
+      <FinancePanelState
+        variant="error"
+        title="Could not load monthly trend"
+        description={error}
+        onRetry={() => {
+          void loadData();
+        }}
+      />
     );
   }
 
   const monthData = data?.trend ?? [];
 
-  if (error || !data || monthData.length === 0) {
+  if (!data || monthData.length === 0) {
     return (
-      <div style={{ padding: "1.5rem", textAlign: "center", color: "var(--color-foreground-muted)" }}>
-        {error || "No trend data available"}
-      </div>
-    );
-  }
-
-  if (monthData.length === 0) {
-    return (
-      <div style={{ padding: "1.5rem", textAlign: "center", color: "var(--color-foreground-muted)" }}>
-        No trend data available
-      </div>
+      <FinancePanelState
+        variant="empty"
+        title="No trend data yet"
+        description="Add some transactions to start seeing monthly income and expense trends."
+      />
     );
   }
 

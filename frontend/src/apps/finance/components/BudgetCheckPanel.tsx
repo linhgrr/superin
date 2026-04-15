@@ -1,6 +1,8 @@
+import { DynamicIcon } from "@/lib/icon-resolver";
+
 import type { BudgetCategoryStatus, CheckBudgetResponse } from "../api";
 import { useBudgetCheck } from "../hooks/useFinanceSwr";
-import { DynamicIcon } from "@/lib/icon-resolver";
+import FinancePanelState from "./FinancePanelState";
 
 interface BudgetCheckPanelProps {
   categoryId?: string;
@@ -11,18 +13,22 @@ export default function BudgetCheckPanel({ categoryId }: BudgetCheckPanelProps) 
 
   if (isLoading) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "2rem" }}>
-        <DynamicIcon name="Loader2" size={24} style={{ animation: "spin 1s linear infinite", color: "var(--color-foreground-muted)" }} />
-      </div>
+      <FinancePanelState
+        variant="loading"
+        title="Loading budget status"
+        description="Checking how your spending compares to configured budgets."
+      />
     );
   }
 
   if (error || !budgetData) {
     const message = error instanceof Error ? error.message : "Failed to load budget data";
     return (
-      <div style={{ padding: "1rem", color: "var(--color-danger)", fontSize: "0.875rem" }}>
-        {message}
-      </div>
+      <FinancePanelState
+        variant="error"
+        title="Could not load budget overview"
+        description={message}
+      />
     );
   }
 
@@ -38,9 +44,11 @@ export default function BudgetCheckPanel({ categoryId }: BudgetCheckPanelProps) 
 
   if (categories.length === 0) {
     return (
-      <div style={{ padding: "1.5rem", textAlign: "center", color: "var(--color-foreground-muted)" }}>
-        No budget set. Create categories with budgets to track your spending.
-      </div>
+      <FinancePanelState
+        variant="empty"
+        title="No budget tracking yet"
+        description="Add category budgets to start tracking how much you have left to spend."
+      />
     );
   }
 
@@ -112,7 +120,7 @@ export default function BudgetCheckPanel({ categoryId }: BudgetCheckPanelProps) 
               }}
             >
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem" }}>
-                    <span style={{ fontWeight: 500 }}>{category.category_name}</span>
+                <span style={{ fontWeight: 500 }}>{category.category_name}</span>
                 <div style={{ textAlign: "right" }}>
                   <span
                     style={{
@@ -162,8 +170,8 @@ export default function BudgetCheckPanel({ categoryId }: BudgetCheckPanelProps) 
                       color: "var(--color-danger)",
                       fontWeight: 500,
                     }}
-                    >
-                      <DynamicIcon name="AlertCircle" size={12} />
+                  >
+                    <DynamicIcon name="AlertCircle" size={12} />
                     Over budget by {Math.abs(category.remaining ?? 0).toLocaleString()}
                   </span>
                 )}

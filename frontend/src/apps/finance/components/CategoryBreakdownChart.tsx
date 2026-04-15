@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
-import { DynamicIcon } from "@/lib/icon-resolver";
+import { useCallback, useEffect, useState } from "react";
+
 import type { CategoryBreakdownResponse } from "../api";
 import { getCategoryBreakdown } from "../api";
+import FinancePanelState from "./FinancePanelState";
 
 interface CategoryBreakdownChartProps {
   month?: number;
@@ -13,48 +14,60 @@ export default function CategoryBreakdownChart({ month, year }: CategoryBreakdow
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const result = await getCategoryBreakdown({ month, year });
-        setData(result);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load data");
-      } finally {
-        setLoading(false);
-      }
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await getCategoryBreakdown({ month, year });
+      setData(result);
+    } catch (err) {
+      setData(null);
+      setError(err instanceof Error ? err.message : "Unable to load category spending data");
+    } finally {
+      setLoading(false);
     }
-    fetchData();
   }, [month, year]);
+
+  useEffect(() => {
+    void loadData();
+  }, [loadData]);
 
   if (loading) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "2rem" }}>
-        <DynamicIcon name="Loader2" size={24} style={{ animation: "spin 1s linear infinite", color: "var(--color-foreground-muted)" }} />
-      </div>
+      <FinancePanelState
+        variant="loading"
+        title="Loading category breakdown"
+        description="Calculating which categories drive your spending."
+      />
+    );
+  }
+
+  if (error) {
+    return (
+      <FinancePanelState
+        variant="error"
+        title="Could not load category breakdown"
+        description={error}
+        onRetry={() => {
+          void loadData();
+        }}
+      />
     );
   }
 
   const categories = data?.breakdown ?? [];
 
-  if (error || !data || categories.length === 0) {
+  if (!data || categories.length === 0) {
     return (
-      <div style={{ padding: "1.5rem", textAlign: "center", color: "var(--color-foreground-muted)" }}>
-        {error || "No spending data available"}
-      </div>
+      <FinancePanelState
+        variant="empty"
+        title="No spending breakdown yet"
+        description="Add expense transactions to see how your spending is distributed across categories."
+      />
     );
   }
 
   const total = data.total_spending;
-
-  if (categories.length === 0) {
-    return (
-      <div style={{ padding: "1.5rem", textAlign: "center", color: "var(--color-foreground-muted)" }}>
-        No spending data available
-      </div>
-    );
-  }
-
   const maxAmount = Math.max(...categories.map((c) => c.amount ?? 0), 1);
 
   return (

@@ -1,5 +1,6 @@
 import type { DashboardWidgetRendererProps } from "../types";
 
+import WidgetState from "@/components/feedback/WidgetState";
 import { formatCurrency } from "../lib/formatCurrency";
 import { getWidgetData, type RecentTransactionsWidgetData } from "../api";
 import { DynamicIcon } from "@/lib/icon-resolver";
@@ -9,19 +10,44 @@ import { useTimezone } from "@/shared/hooks/useTimezone";
 const RECENT_TRANSACTION_RENDER_LIMIT = 3;
 
 export default function RecentTransactionsWidget({ widget }: DashboardWidgetRendererProps) {
-  const { data, isLoading } = useWidgetData<RecentTransactionsWidgetData>(
+  const { data, error, isLoading, mutate } = useWidgetData<RecentTransactionsWidgetData>(
     "finance",
     widget.id,
     () => getWidgetData(widget.id) as Promise<RecentTransactionsWidgetData>
   );
   const { formatDate } = useTimezone();
 
+  if (isLoading) {
+    return (
+      <WidgetState
+        variant="loading"
+        title="Loading transactions"
+        description="Fetching your most recent activity."
+      />
+    );
+  }
+
+  if (error) {
+    return (
+      <WidgetState
+        variant="error"
+        title="Could not load transactions"
+        description={error instanceof Error ? error.message : "Please try again."}
+        onRetry={() => {
+          void mutate();
+        }}
+      />
+    );
+  }
+
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", justifyContent: "center", gap: "0.5rem" }}>
-      {isLoading ? (
-        <div style={{ color: "var(--color-foreground-muted)", fontSize: "0.875rem" }}>Loading…</div>
-      ) : (data?.items?.length ?? 0) === 0 ? (
-        <div style={{ color: "var(--color-foreground-muted)", fontSize: "0.875rem" }}>No recent transactions</div>
+      {(data?.items?.length ?? 0) === 0 ? (
+        <WidgetState
+          variant="empty"
+          title="No recent transactions"
+          description="Your latest transactions will appear here once you start recording activity."
+        />
       ) : (
         data.items.slice(0, RECENT_TRANSACTION_RENDER_LIMIT).map((item) => {
           const isIncome = item.type === "income";
