@@ -1,5 +1,7 @@
 """Beanie MongoDB initialization and connection management."""
 
+from typing import Any
+
 from langgraph.store.mongodb import MongoDBStore
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo import MongoClient
@@ -89,3 +91,14 @@ def get_store() -> MongoDBStore:
     if _store is None:
         raise RuntimeError("Store not initialized. Call init_db() first.")
     return _store
+
+
+def get_document_collection(document_model: Any) -> Any:
+    """Return the underlying collection for a Beanie document model."""
+    if hasattr(document_model, "get_motor_collection"):
+        return document_model.get_motor_collection()
+    if hasattr(document_model, "get_pymongo_collection"):
+        return document_model.get_pymongo_collection()
+    raise AttributeError(
+        f"{getattr(document_model, '__name__', document_model)!r} has no collection accessor"
+    )

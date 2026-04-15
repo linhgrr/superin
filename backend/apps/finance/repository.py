@@ -10,7 +10,7 @@ from pymongo.asynchronous.client_session import AsyncClientSession
 
 from apps.finance.enums import TransactionType
 from apps.finance.models import Category, Transaction, Wallet
-from core.db import get_db
+from core.db import get_db, get_document_collection
 from core.utils.timezone import normalize_name_key
 
 
@@ -117,7 +117,7 @@ class WalletRepository:
         if min_balance is not None:
             query["balance"] = {"$gte": min_balance}
 
-        updated = await Wallet.get_pymongo_collection().find_one_and_update(
+        updated = await get_document_collection(Wallet).find_one_and_update(
             query,
             [
                 {

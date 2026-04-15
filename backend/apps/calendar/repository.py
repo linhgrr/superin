@@ -12,7 +12,7 @@ from pymongo.asynchronous.client_session import AsyncClientSession
 
 from apps.calendar.enums import EventType, RecurrenceFrequency
 from apps.calendar.models import Calendar, Event, RecurringRule
-from core.db import get_db
+from core.db import get_db, get_document_collection
 from core.utils.timezone import ensure_naive_utc, normalize_name_key, utc_now
 
 logger = logging.getLogger(__name__)
@@ -329,7 +329,7 @@ class CalendarRepository:
         }
         if exclude_calendar_id is not None:
             query["_id"] = {"$ne": PydanticObjectId(exclude_calendar_id)}
-        await Calendar.get_pymongo_collection().update_many(
+        await get_document_collection(Calendar).update_many(
             query,
             {"$set": {"is_default": False}},
             session=session,
@@ -401,7 +401,7 @@ class RecurringRuleRepository:
     ) -> RecurringRule:
         """Increment occurrence count and update last generated date atomically."""
         now = utc_now()
-        await RecurringRule.get_pymongo_collection().update_one(
+        await get_document_collection(RecurringRule).update_one(
             {"_id": rule.id},
             {
                 "$inc": {"occurrence_count": 1},

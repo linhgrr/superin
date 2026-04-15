@@ -86,8 +86,6 @@ async def test_update_multiple_preferences_upserts_missing_rows(monkeypatch) -> 
         "app_id": "finance",
         "widget_id": "finance.total-balance",
         "sort_order": 0,
-        "grid_x": 0,
-        "grid_y": 0,
         "size_w": None,
         "size_h": None,
     }
