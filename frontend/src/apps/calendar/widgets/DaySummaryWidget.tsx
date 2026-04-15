@@ -1,23 +1,44 @@
 import type { DashboardWidgetRendererProps } from "../types";
+import WidgetState from "@/components/feedback/WidgetState";
 import { getWidgetData, type DaySummaryWidgetData } from "../api";
 import { DynamicIcon } from "@/lib/icon-resolver";
 import { useWidgetData } from "@/lib/widget-data";
 import { useTimezone } from "@/shared/hooks/useTimezone";
 
 export default function DaySummaryWidget({ widget }: DashboardWidgetRendererProps) {
-  const { data, isLoading } = useWidgetData<DaySummaryWidgetData>(
+  const { data, error, isLoading, mutate } = useWidgetData<DaySummaryWidgetData>(
     "calendar",
     widget.id,
     () => getWidgetData(widget.id) as Promise<DaySummaryWidgetData>
   );
   const { formatTime } = useTimezone();
 
+  if (isLoading) {
+    return (
+      <WidgetState
+        variant="loading"
+        title="Loading day summary"
+        description="Checking today's event count and what's coming next."
+      />
+    );
+  }
+
+  if (error) {
+    return (
+      <WidgetState
+        variant="error"
+        title="Could not load day summary"
+        description={error instanceof Error ? error.message : "Please try again."}
+        onRetry={() => {
+          void mutate();
+        }}
+      />
+    );
+  }
+
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-      {isLoading ? (
-        <div style={{ color: "var(--color-foreground-muted)", fontSize: "0.875rem" }}>Loading…</div>
-      ) : (
-        <div style={{ display: "flex", gap: "1rem" }}>
+      <div style={{ display: "flex", gap: "1rem" }}>
           {/* Today count */}
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
             <div
@@ -103,8 +124,7 @@ export default function DaySummaryWidget({ widget }: DashboardWidgetRendererProp
               </div>
             </div>
           )}
-        </div>
-      )}
+      </div>
     </div>
   );
 }

@@ -1,12 +1,12 @@
 import type { DashboardWidgetRendererProps } from "../types";
+import WidgetState from "@/components/feedback/WidgetState";
 import { getWidgetData, type UpcomingWidgetData, type EventRead } from "../api";
-import { DynamicIcon } from "@/lib/icon-resolver";
 import { useWidgetData } from "@/lib/widget-data";
 import { useTimezone } from "@/shared/hooks/useTimezone";
 import { utcToLocalDate } from "@/shared/utils/datetime";
 
 export default function UpcomingWidget({ widget }: DashboardWidgetRendererProps) {
-  const { data, isLoading } = useWidgetData<UpcomingWidgetData>(
+  const { data, error, isLoading, mutate } = useWidgetData<UpcomingWidgetData>(
     "calendar",
     widget.id,
     () => getWidgetData(widget.id) as Promise<UpcomingWidgetData>
@@ -14,6 +14,29 @@ export default function UpcomingWidget({ widget }: DashboardWidgetRendererProps)
   const { formatDate, formatTime, isToday, getNow } = useTimezone();
 
   const events = data?.items ?? [];
+
+  if (isLoading) {
+    return (
+      <WidgetState
+        variant="loading"
+        title="Loading upcoming events"
+        description="Fetching the next items on your calendar."
+      />
+    );
+  }
+
+  if (error) {
+    return (
+      <WidgetState
+        variant="error"
+        title="Could not load upcoming events"
+        description={error instanceof Error ? error.message : "Please try again."}
+        onRetry={() => {
+          void mutate();
+        }}
+      />
+    );
+  }
 
   const formatEventDate = (dateStr: string) => {
     if (isToday(dateStr)) return "Today";
@@ -34,29 +57,12 @@ export default function UpcomingWidget({ widget }: DashboardWidgetRendererProps)
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-      {isLoading ? (
-        <div style={{ color: "var(--color-foreground-muted)", fontSize: "0.875rem" }}>Loading…</div>
-      ) : events.length === 0 ? (
-        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-          <div
-            style={{
-              width: "40px",
-              height: "40px",
-              borderRadius: "10px",
-              background: "var(--color-surface)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "var(--color-foreground-muted)",
-              flexShrink: 0,
-            }}
-          >
-            <DynamicIcon name="Calendar" size={20} />
-          </div>
-          <div style={{ fontSize: "0.875rem", color: "var(--color-foreground-muted)" }}>
-            No upcoming events
-          </div>
-        </div>
+      {events.length === 0 ? (
+        <WidgetState
+          variant="empty"
+          title="No upcoming events"
+          description="Upcoming calendar items will show up here when they are scheduled."
+        />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
           {events.map((event: EventRead) => (

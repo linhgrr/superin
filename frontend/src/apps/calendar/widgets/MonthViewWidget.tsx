@@ -1,5 +1,7 @@
 import type { DashboardWidgetRendererProps } from "../types";
 import { useCallback, useState } from "react";
+
+import WidgetState from "@/components/feedback/WidgetState";
 import { getWidgetData, type MonthViewWidgetData } from "../api";
 import { useWidgetData } from "@/lib/widget-data";
 import { useTimezone } from "@/shared/hooks/useTimezone";
@@ -9,7 +11,7 @@ export default function MonthViewWidget({ widget }: DashboardWidgetRendererProps
   const [monthOffset, setMonthOffset] = useState(0);
   const { getNow } = useTimezone();
 
-  const { data, isLoading } = useWidgetData<MonthViewWidgetData>(
+  const { data, error, isLoading, mutate } = useWidgetData<MonthViewWidgetData>(
     "calendar",
     widget.id,
     () => getWidgetData(widget.id, { month_offset: monthOffset }) as Promise<MonthViewWidgetData>
@@ -87,10 +89,27 @@ export default function MonthViewWidget({ widget }: DashboardWidgetRendererProps
         </button>
       </div>
 
-      {showLoading && !data ? (
-        <div style={{ color: "var(--color-foreground-muted)", fontSize: "0.875rem", textAlign: "center", padding: "1rem" }}>
-          Loading…
-        </div>
+      {error ? (
+        <WidgetState
+          variant="error"
+          title="Could not load month view"
+          description={error instanceof Error ? error.message : "Please try again."}
+          onRetry={() => {
+            void mutate();
+          }}
+        />
+      ) : showLoading && !data ? (
+        <WidgetState
+          variant="loading"
+          title="Loading calendar month"
+          description="Fetching event density for this month."
+        />
+      ) : daysInMonth === 0 ? (
+        <WidgetState
+          variant="empty"
+          title="No calendar days available"
+          description="Month data is not available right now."
+        />
       ) : (
         <>
           {/* Day headers */}
@@ -201,4 +220,3 @@ export default function MonthViewWidget({ widget }: DashboardWidgetRendererProps
     </div>
   );
 }
-

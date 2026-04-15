@@ -8,6 +8,7 @@ import useSWR from "swr";
 import { swrConfig, mutateByPrefix } from "@/lib/swr";
 import {
   checkConflicts as apiCheckConflicts,
+  createCalendar as apiCreateCalendar,
   createEvent as apiCreateEvent,
   createRecurringRule as apiCreateRecurringRule,
   deleteEvent as apiDeleteEvent,
@@ -18,6 +19,7 @@ import {
   stopRecurringRule as apiStopRecurringRule,
   updateEvent as apiUpdateEvent,
   type CalendarRead,
+  type CreateCalendarRequest,
   type CreateEventRequest,
   type CreateRecurringRuleRequest,
   type EventRead,
@@ -72,6 +74,12 @@ export function useConflicts(start: string, end: string, excludeEventId?: string
 export async function createEvent(request: CreateEventRequest): Promise<EventRead> {
   const result = await apiCreateEvent(request);
   mutateByPrefix("calendar/events");
+  return result;
+}
+
+export async function createCalendar(request: CreateCalendarRequest): Promise<CalendarRead> {
+  const result = await apiCreateCalendar(request);
+  mutateByPrefix("calendar/calendars");
   return result;
 }
 

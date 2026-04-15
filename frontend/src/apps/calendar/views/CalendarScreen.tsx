@@ -3,32 +3,49 @@
  */
 
 import { useState, useMemo, useCallback } from "react";
-import { useCalendars, useEvents, createEvent as swrCreateEvent, updateEvent as swrUpdateEvent, deleteEvent as swrDeleteEvent } from "../hooks/useCalendarSwr";
-import { WeekView } from "../components/WeekView";
-import { ListView } from "../components/ListView";
-import { CreateEventModal } from "../components/CreateEventModal";
-import { filterEventsByCalendar, groupEventsByDate } from "../utils/eventHelpers";
-import { buildUtcIsoStringFromDate } from "@/shared/utils/datetime";
-import { useTimezone } from "@/shared/hooks/useTimezone";
+
 import { useToast } from "@/components/providers/ToastProvider";
+import { useAsyncTask } from "@/hooks/useAsyncTask";
 import { useDisclosure } from "@/hooks/useDisclosure";
 import { ConfirmationModal } from "@/shared/components/ConfirmationModal";
-import { CalendarHeader } from "./CalendarHeader";
+import { useTimezone } from "@/shared/hooks/useTimezone";
+import { buildUtcIsoStringFromDate } from "@/shared/utils/datetime";
+
+import { CreateCalendarModal } from "../components/CreateCalendarModal";
+import { CreateEventModal } from "../components/CreateEventModal";
+import { ListView } from "../components/ListView";
+import { WeekView } from "../components/WeekView";
 import type { CreateEventRequest, EventRead } from "../api";
+import { filterEventsByCalendar, groupEventsByDate } from "../utils/eventHelpers";
+import {
+  createCalendar as swrCreateCalendar,
+  createEvent as swrCreateEvent,
+  deleteEvent as swrDeleteEvent,
+  updateEvent as swrUpdateEvent,
+  useCalendars,
+  useEvents,
+} from "../hooks/useCalendarSwr";
+import { CalendarHeader } from "./CalendarHeader";
 import type { EventFormData } from "../components/CreateEventModal";
 
-type ViewMode = "list" | "week";
+export type ViewMode = "list" | "week";
 const CALENDAR_EVENT_TYPE: CreateEventRequest["type"] = "event";
 
 export default function CalendarScreen() {
   const { timezone, getWeekBoundaries } = useTimezone();
   const toast = useToast();
+  const { run: runCreateCalendar } = useAsyncTask();
   const [viewMode, setViewMode] = useState<ViewMode>("week");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedCalendar, setSelectedCalendar] = useState<string | null>(null);
   const [newEventDate, setNewEventDate] = useState<Date | null>(null);
   const [selectedEventForUpdate, setSelectedEventForUpdate] = useState<EventRead | null>(null);
   const [eventToDeleteId, setEventToDeleteId] = useState<string | null>(null);
+  const {
+    close: closeCreateCalendarDisclosure,
+    isOpen: isCreateCalendarModalOpen,
+    open: openCreateCalendarModal,
+  } = useDisclosure();
   const { close: closeCreateEventDisclosure, isOpen: isCreateEventModalOpen, open: openCreateEventModal } = useDisclosure();
   const { close: closeDeleteConfirmDisclosure, isOpen: isDeleteConfirmModalOpen, open: openDeleteConfirmModal } = useDisclosure();
 
@@ -94,6 +111,17 @@ export default function CalendarScreen() {
     closeDeleteConfirmDisclosure();
     setEventToDeleteId(null);
   }, [closeDeleteConfirmDisclosure]);
+
+  const handleCreateCalendar = useCallback(
+    async (formData: { color: string; name: string }) => {
+      const calendar = await runCreateCalendar(() => swrCreateCalendar(formData));
+      setSelectedCalendar(calendar.id);
+      closeCreateCalendarDisclosure();
+      toast.success("Calendar created successfully");
+      return calendar;
+    },
+    [closeCreateCalendarDisclosure, runCreateCalendar, toast]
+  );
 
   // ── Event creation ────────────────────────────────────────────────────────
   // buildUtcIsoStringFromDate: uses Date(year,month,day,h,m,s,ms) constructor
@@ -207,6 +235,7 @@ export default function CalendarScreen() {
         onToday={goToToday}
         onSelectCalendar={setSelectedCalendar}
         onChangeView={setViewMode}
+        onCreateCalendar={openCreateCalendarModal}
       />
       {viewMode === "week" ? (
         <WeekView
@@ -223,6 +252,12 @@ export default function CalendarScreen() {
           onEventClick={setSelectedEventForUpdate}
         />
       )}
+      {isCreateCalendarModalOpen ? (
+        <CreateCalendarModal
+          onClose={closeCreateCalendarDisclosure}
+          onCreate={handleCreateCalendar}
+        />
+      ) : null}
       {isCreateEventModalOpen && newEventDate && !selectedEventForUpdate && (
         <CreateEventModal
           date={newEventDate}

@@ -2,9 +2,9 @@
  * CalendarHeader — navigation, calendar filter, and view toggle.
  */
 
-import type { CalendarRead } from "../../api";
-import type { ViewMode } from "./CalendarScreen";
 import { useTimezone } from "@/shared/hooks/useTimezone";
+
+import type { CalendarRead } from "../api";
 
 const NAV_BUTTON_STYLE = {
   padding: "0.375rem 0.75rem",
@@ -14,6 +14,8 @@ const NAV_BUTTON_STYLE = {
   cursor: "pointer",
   fontSize: "0.875rem",
 } as const;
+
+type ViewMode = "list" | "week";
 
 interface CalendarHeaderProps {
   weekDates: Date[];
@@ -25,6 +27,7 @@ interface CalendarHeaderProps {
   onToday: () => void;
   onSelectCalendar: (id: string | null) => void;
   onChangeView: (mode: ViewMode) => void;
+  onCreateCalendar: () => void;
 }
 
 export function CalendarHeader({
@@ -37,6 +40,7 @@ export function CalendarHeader({
   onToday,
   onSelectCalendar,
   onChangeView,
+  onCreateCalendar,
 }: CalendarHeaderProps) {
   const { formatDate } = useTimezone();
 
@@ -108,47 +112,57 @@ export function CalendarHeader({
       </div>
 
       {/* Right: View toggle */}
-      <div
-        style={{
-          display: "flex",
-          background: "var(--color-surface)",
-          borderRadius: "8px",
-          padding: "0.25rem",
-          border: "1px solid var(--color-border)",
-        }}
-      >
+      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
         <button
-          onClick={() => onChangeView("week")}
+          type="button"
+          className="btn btn-primary"
+          onClick={onCreateCalendar}
+          style={{ whiteSpace: "nowrap" }}
+        >
+          New calendar
+        </button>
+        <div
           style={{
-            padding: "0.375rem 0.75rem",
-            border: "none",
-            background: viewMode === "week" ? "var(--color-surface-elevated)" : "transparent",
-            color: viewMode === "week" ? "var(--color-foreground)" : "var(--color-foreground-muted)",
-            fontWeight: viewMode === "week" ? 600 : 400,
-            fontSize: "0.75rem",
-            cursor: "pointer",
-            borderRadius: "6px",
-            boxShadow: viewMode === "week" ? "0 1px 2px rgba(0,0,0,0.1)" : "none",
+            display: "flex",
+            background: "var(--color-surface)",
+            borderRadius: "8px",
+            padding: "0.25rem",
+            border: "1px solid var(--color-border)",
           }}
         >
-          Week
-        </button>
-        <button
-          onClick={() => onChangeView("list")}
-          style={{
-            padding: "0.375rem 0.75rem",
-            border: "none",
-            background: viewMode === "list" ? "var(--color-surface-elevated)" : "transparent",
-            color: viewMode === "list" ? "var(--color-foreground)" : "var(--color-foreground-muted)",
-            fontWeight: viewMode === "list" ? 600 : 400,
-            fontSize: "0.75rem",
-            cursor: "pointer",
-            borderRadius: "6px",
-            boxShadow: viewMode === "list" ? "0 1px 2px rgba(0,0,0,0.1)" : "none",
-          }}
-        >
-          List
-        </button>
+          <button
+            onClick={() => onChangeView("week")}
+            style={{
+              padding: "0.375rem 0.75rem",
+              border: "none",
+              background: viewMode === "week" ? "var(--color-surface-elevated)" : "transparent",
+              color: viewMode === "week" ? "var(--color-foreground)" : "var(--color-foreground-muted)",
+              fontWeight: viewMode === "week" ? 600 : 400,
+              fontSize: "0.75rem",
+              cursor: "pointer",
+              borderRadius: "6px",
+              boxShadow: viewMode === "week" ? "0 1px 2px rgba(0,0,0,0.1)" : "none",
+            }}
+          >
+            Week
+          </button>
+          <button
+            onClick={() => onChangeView("list")}
+            style={{
+              padding: "0.375rem 0.75rem",
+              border: "none",
+              background: viewMode === "list" ? "var(--color-surface-elevated)" : "transparent",
+              color: viewMode === "list" ? "var(--color-foreground)" : "var(--color-foreground-muted)",
+              fontWeight: viewMode === "list" ? 600 : 400,
+              fontSize: "0.75rem",
+              cursor: "pointer",
+              borderRadius: "6px",
+              boxShadow: viewMode === "list" ? "0 1px 2px rgba(0,0,0,0.1)" : "none",
+            }}
+          >
+            List
+          </button>
+        </div>
       </div>
     </div>
   );
