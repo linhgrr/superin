@@ -19,7 +19,8 @@ from apps.calendar.routes.widgets import (
 router = APIRouter()
 router.include_router(widgets.router, prefix="/widgets", tags=["widgets"])
 router.include_router(events.router, prefix="/events", tags=["events"])
-router.include_router(calendars.router, tags=["calendars"])
+router.include_router(calendars.calendar_router, prefix="/calendars", tags=["calendars"])
+router.include_router(calendars.router, tags=["calendar-misc"])
 router.include_router(preferences.router, prefix="/preferences", tags=["preferences"])
 
 __all__ = [

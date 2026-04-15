@@ -19,18 +19,19 @@ from apps.calendar.service import calendar_service
 from core.auth.dependencies import get_current_user
 
 router = APIRouter()
+calendar_router = APIRouter()
 
 
 # ─── Calendars ────────────────────────────────────────────────────────────────
 
 
-@router.get("/", response_model=list[CalendarCalendarRead])
+@calendar_router.get("/", response_model=list[CalendarCalendarRead])
 async def list_calendars(user_id: str = Depends(get_current_user)):
     """List all calendars."""
     return await calendar_service.list_calendars(user_id)
 
 
-@router.post("/", response_model=CalendarCalendarRead)
+@calendar_router.post("/", response_model=CalendarCalendarRead)
 async def create_calendar(
     request: CalendarCreateCalendarRequest,
     user_id: str = Depends(get_current_user),
@@ -42,7 +43,7 @@ async def create_calendar(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.patch("/{calendar_id}", response_model=CalendarCalendarRead)
+@calendar_router.patch("/{calendar_id}", response_model=CalendarCalendarRead)
 async def update_calendar(
     calendar_id: str,
     request: CalendarUpdateCalendarRequest,
@@ -62,7 +63,7 @@ async def update_calendar(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.delete("/{calendar_id}")
+@calendar_router.delete("/{calendar_id}")
 async def delete_calendar(calendar_id: str, user_id: str = Depends(get_current_user)):
     """Delete calendar and all its events."""
     try:
