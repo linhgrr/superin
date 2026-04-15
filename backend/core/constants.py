@@ -58,7 +58,10 @@ CATALOG_UNINSTALL = f"{API_CATALOG}/uninstall/{{app_id}}"
 # Chat endpoints
 CHAT_STREAM = f"{API_CHAT}/stream"
 CHAT_HISTORY = f"{API_CHAT}/history"
+CHAT_THREADS = f"{API_CHAT}/threads"
 CHAT_STREAM_FRIENDLY_ERROR_TEXT = "Rin-chan is having a little trouble right now. Please try again."
+THREAD_PREVIEW_MAX_LENGTH = 100
+CHAT_THREADS_PAGE_SIZE = 50
 
 
 # ─── App API Helper ─────────────────────────────────────────────────────────────

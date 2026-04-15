@@ -62,7 +62,7 @@ export function WeekView({ weekDates, calendars: _calendars, events, onCellClick
         <div className="week-view__all-day-label">All day</div>
         {weekDates.map((date, i) => {
           const dayEvents = dayEventsMap.get(date.toDateString()) ?? [];
-          const { allDay } = splitEventsByType(dayEvents);
+          const { allDay } = splitEventsByType(dayEvents, timezone);
           return (
             <div key={i} className="week-view__all-day-cell">
               {allDay.map(event => (

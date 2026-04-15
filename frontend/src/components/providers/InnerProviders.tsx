@@ -17,8 +17,11 @@ const CHAT_STREAM_API = `${API_BASE_URL}${API_PATHS.CHAT_STREAM}`;
 
 const ChatRuntimeProvider = memo(function ChatRuntimeProvider({
   children,
+  threadId,
 }: {
   children: ReactNode;
+  /** Client-generated thread identity. Must be stable across page reloads. */
+  threadId: string;
 }) {
   useRenderLoopDebug("ChatRuntimeProvider");
 
@@ -45,8 +48,12 @@ const ChatRuntimeProvider = memo(function ChatRuntimeProvider({
       credentials: "include" as const,
       headers: getHeaders,
       onError: handleError,
+      // Enable so backend can deduplicate by message id on retries
+      sendExtraMessageFields: true,
+      // Inject threadId into every request body — backend requires it
+      body: { threadId },
     }),
-    [getHeaders, handleError]
+    [getHeaders, handleError, threadId]
   );
 
   const runtime = useDataStreamRuntime(runtimeOptions);

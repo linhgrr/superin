@@ -1,68 +1,46 @@
 """
-RootAgent implementation.
+RootAgent — top-level LangGraph orchestrator.
+
+Wraps each registered AppAgent as a tool (ask_{app_id}) so the LLM
+can decide which app to delegate to. The root graph is stateless across
+requests; callers provide the canonical thread history.
+
+The class delegates heavy responsibilities to co-located collaborators:
+  - GraphCache   — LRU-bounded compiled graph cache
+  - ToolScoper   — per-user tool scoping with fail-closed error handling
+  - EventStreamHandler — LangGraph stream → frontend event conversion
+  - MessageParser — frontend message → LangChain message parsing
 """
 
 from __future__ import annotations
 
 import asyncio
 import json
-from collections import OrderedDict
 from collections.abc import AsyncGenerator
-from dataclasses import dataclass, field
 from typing import Any
 
 from beanie import PydanticObjectId
-from fastapi.encoders import jsonable_encoder
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
-from langchain_core.tools import BaseTool
-from langgraph.prebuilt import create_react_agent
 from loguru import logger
 
-from core.config import settings
-from core.db import get_store
 from core.models import User
 from core.registry import PLUGIN_REGISTRY
-from core.utils.sanitizer import sanitize_user_content_async
 from core.utils.timezone import get_user_timezone_context
-from core.workspace.service import list_installed_app_ids
-from shared.agent_context import clear_agent_context, set_thread_context, set_user_context
+from core.workspace.service import list_installed_app_ids as _list_installed_app_ids
 from shared.enums import ChatEventType
-from shared.llm import get_llm
 
+from .graph_cache import GraphCache
 from .prompts import build_available_apps_context, build_system_prompt
-from .tools import (
+from .root_tools import (
     _build_ask_tool,
     _build_install_app_tool,
-    _build_memory_tools,
     _build_platform_info_tool,
     _build_uninstall_app_tool,
 )
+from .streaming_handler import EventStreamHandler
+from .tool_scoping import ToolScoper
 
-# Cap on the number of compiled LangGraph instances retained per RootAgent.
-# Uses LRU eviction — least recently used graph is dropped when the cap is hit.
-MAX_CACHED_GRAPHS = 32
-
-def _normalize_tool_output(output: Any) -> Any:
-    """Normalize tool output to JSON-serializable format."""
-    if isinstance(output, ToolMessage):
-        content = output.content
-        if isinstance(content, str):
-            try:
-                return json.loads(content)
-            except Exception:
-                return content
-        return jsonable_encoder(content)
-
-    if hasattr(output, "content"):
-        content = getattr(output, "content")
-        if isinstance(content, str):
-            try:
-                return json.loads(content)
-            except Exception:
-                return content
-        return jsonable_encoder(content)
-
-    return jsonable_encoder(output)
+# ─── Free functions ────────────────────────────────────────────────────────────
 
 
 def _extract_args(args_str: Any) -> dict:
@@ -77,23 +55,220 @@ def _extract_args(args_str: Any) -> dict:
     return {}
 
 
-@dataclass
+# ─── Data classes ──────────────────────────────────────────────────────────────
+
+
 class ParsedMessage:
     """Result of parsing a frontend message into LangChain format."""
 
-    langchain_message: BaseMessage | None = None
-    user_content: str = ""
-    warnings: list[str] = field(default_factory=list)
+    __slots__ = ("langchain_message", "user_content", "warnings")
+
+    def __init__(
+        self,
+        langchain_message: BaseMessage | None = None,
+        user_content: str = "",
+        warnings: list[str] | None = None,
+    ) -> None:
+        self.langchain_message = langchain_message
+        self.user_content = user_content
+        self.warnings = warnings or []
+
+
+# ─── RootAgent ────────────────────────────────────────────────────────────────
+
+
+class RootAgent:
+    """
+    Top-level LangGraph orchestrator.
+
+    Wraps each registered AppAgent as a tool (ask_{app_id}) so the LLM
+    can decide which app to delegate to. The root graph itself is stateless
+    across requests; callers provide the canonical thread history.
+    """
+
+    def __init__(self) -> None:
+        self._system_prompt = ""
+        self._all_ask_tools: dict[str, Any] = {}
+        self._base_tools: list[Any] = []
+        self._graph_cache = GraphCache()
+        self._tool_scopers: dict[str, ToolScoper] = {}
+        self.refresh()
+
+    # ── refresh ──────────────────────────────────────────────────────────────────
+
+    def refresh(self) -> None:
+        """Rebuild system prompt, ask_X tools, and invalidate the graph cache."""
+        self._system_prompt = build_system_prompt()
+        self._all_ask_tools = {
+            app_id: _build_ask_tool(
+                app_id,
+                plugin["agent"],
+                agent_description=plugin["manifest"].agent_description,
+            )
+            for app_id, plugin in PLUGIN_REGISTRY.items()
+        }
+        self._base_tools = _build_base_tools()
+        self._graph_cache.invalidate()
+        self._tool_scopers.clear()  # tool scopings are user-specific, not globally shared
+
+    # ── public streaming API ────────────────────────────────────────────────────
+
+    async def astream(
+        self,
+        user_id: str,
+        messages: list[dict[str, Any]],
+        thread_id: str | None = None,
+    ) -> AsyncGenerator[dict[str, Any], None]:
+        """
+        Stream data-stream events for the frontend chat UI.
+
+        The root graph does not resume hidden state from LangGraph checkpoints.
+        Callers pass the canonical message history for the active thread.
+        """
+        thread = _resolve_thread(user_id, thread_id)
+
+        from shared.agent_context import clear_agent_context, set_thread_context, set_user_context
+
+        set_user_context(user_id)
+        set_thread_context(thread)
+
+        tools = await self._get_user_tools(user_id)
+        graph = self._graph_cache.get_or_create(self._system_prompt, tools)
+        event_handler = EventStreamHandler(tools)
+
+        try:
+            langchain_messages = await self._build_message_list(user_id, messages, thread)
+
+            async for event_dict in self._run_graph_stream(
+                graph,
+                thread,
+                user_id,
+                event_handler,
+                langchain_messages,
+            ):
+                yield event_dict
+
+            yield {"type": ChatEventType.DONE}
+        finally:
+            clear_agent_context()
+
+    # ── internal helpers ─────────────────────────────────────────────────────────
+
+    async def _get_user_tools(self, user_id: str) -> list[Any]:
+        """Delegate tool scoping to ToolScoper (lazily created per user)."""
+        if user_id not in self._tool_scopers:
+            self._tool_scopers[user_id] = ToolScoper(self)
+        return await self._tool_scopers[user_id].get_user_tools(user_id)
+
+    async def _build_message_list(
+        self,
+        user_id: str,
+        messages: list[dict[str, Any]],
+        thread: str,
+    ) -> list[BaseMessage]:
+        """Build LangChain message list from canonical thread history."""
+        langchain_messages: list[BaseMessage] = []
+
+        # Add date/time context as first system message
+        user = await User.find_one(User.id == PydanticObjectId(user_id))
+        if user:
+            tz_ctx = get_user_timezone_context(user)
+            current_date, current_time = tz_ctx.get_date_time_tuple()
+            langchain_messages.append(
+                SystemMessage(content=f"Current date: {current_date}, current time: {current_time}.")
+            )
+
+        # Add installed-app catalog context
+        installed_app_ids = await _load_installed_app_ids(user_id)
+        langchain_messages.append(
+            SystemMessage(content=build_available_apps_context(installed_app_ids))
+        )
+
+        # Parse the canonical thread history supplied by the caller
+        parser = MessageParser()
+        for msg in messages:
+            parsed = await parser.parse(msg)
+            if parsed.langchain_message:
+                langchain_messages.append(parsed.langchain_message)
+
+        if parser.warnings:
+            logger.warning(
+                "Input sanitization warnings for user %s: %s",
+                user_id,
+                ", ".join(parser.warnings),
+            )
+
+        return langchain_messages
+
+    async def _run_graph_stream(
+        self,
+        graph: Any,
+        thread: str,
+        user_id: str,
+        event_handler: EventStreamHandler,
+        langchain_messages: list[BaseMessage],
+    ) -> AsyncGenerator[dict[str, Any], None]:
+        """Run graph and yield stream events.
+
+        Invalid tool-call history is surfaced directly instead of being retried
+        against hidden checkpoint state.
+        """
+        from core.config import settings
+
+        config = {
+            "configurable": {
+                "thread_id": thread,
+                "user_id": user_id,
+            },
+            "recursion_limit": 50,
+        }
+
+        event_stream = graph.astream_events(
+            {"messages": langchain_messages},
+            config=config,
+            version="v2",
+        )
+        event_iterator = event_stream.__aiter__()
+
+        while True:
+            try:
+                event = await asyncio.wait_for(
+                    anext(event_iterator),
+                    timeout=settings.llm_stream_idle_timeout_seconds,
+                )
+            except StopAsyncIteration:
+                return
+            except ValueError as exc:
+                if "tool_calls" in str(exc) and "ToolMessage" in str(exc):
+                    logger.error("INVALID_CHAT_HISTORY  thread=%s  exc=%s", thread, exc)
+                    raise RuntimeError(
+                        "Incoming chat history is malformed: a tool call is missing "
+                        "its matching tool result."
+                    ) from exc
+                raise
+            except TimeoutError:
+                logger.error(
+                    "LLM_TIMEOUT  thread=%s  timeout_s=%d",
+                    thread,
+                    settings.llm_stream_idle_timeout_seconds,
+                )
+                raise RuntimeError("The language model timed out. Please try again.")
+
+            stream_event = event_handler.handle(event)
+            if stream_event:
+                yield stream_event.to_dict()
+
+
+# ─── MessageParser ─────────────────────────────────────────────────────────────
 
 
 class MessageParser:
     """Parse frontend messages into LangChain message format with sanitization."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.warnings: list[str] = []
 
     async def parse(self, msg: dict[str, Any]) -> ParsedMessage:
-        """Parse a single frontend message into LangChain format."""
         role = msg.get("role", "user")
         content = msg.get("content", "")
         msg_id = msg.get("id")
@@ -108,13 +283,13 @@ class MessageParser:
             return ParsedMessage()
 
     async def _parse_user_message(self, content: Any, msg_id: str | None) -> ParsedMessage:
-        """Parse user message with sanitization."""
+        from core.utils.sanitizer import sanitize_user_content_async
+
         if isinstance(content, list):
             text_parts = []
             for p in content:
                 if isinstance(p, dict) and p.get("type") == "text":
-                    text = p.get("text", "")
-                    sanitized, _ = await sanitize_user_content_async(text)
+                    sanitized, _ = await sanitize_user_content_async(p.get("text", ""))
                     text_parts.append(sanitized)
             content_str = " ".join(text_parts)
         else:
@@ -130,7 +305,6 @@ class MessageParser:
     def _parse_assistant_message(
         self, content: Any, msg_id: str | None, tool_calls: list[dict]
     ) -> ParsedMessage:
-        """Parse assistant message with tool calls."""
         content_str = (
             " ".join(
                 p.get("text", "")
@@ -141,10 +315,8 @@ class MessageParser:
             else str(content)
         )
 
-        # Parse tool calls from message parts or explicit tool_calls field
         lc_tool_calls = self._extract_tool_calls(tool_calls)
 
-        # Also check content array for tool-call parts
         if isinstance(content, list):
             for p in content:
                 if isinstance(p, dict) and p.get("type") in ("tool-call", "tool_call"):
@@ -167,10 +339,9 @@ class MessageParser:
         )
 
     def _extract_tool_calls(self, tool_calls: list[dict]) -> list[dict]:
-        """Extract LangChain format tool calls from frontend format."""
         lc_tool_calls = []
         for tc in tool_calls:
-            fn = tc.get("function", tc)  # Support both formats
+            fn = tc.get("function", tc)
             args_str = fn.get("arguments") or tc.get("args") or tc.get("input") or {}
             args = _extract_args(args_str)
 
@@ -185,7 +356,6 @@ class MessageParser:
         return lc_tool_calls
 
     def _parse_tool_message(self, content: Any, msg_id: str | None) -> ParsedMessage:
-        """Parse tool result message."""
         if isinstance(content, list):
             for p in content:
                 if isinstance(p, dict) and p.get("type") in ("tool-result", "tool_result"):
@@ -222,385 +392,55 @@ class MessageParser:
         )
 
 
-@dataclass
-class StreamEvent:
-    """Stream event for frontend consumption."""
-
-    type: str
-    content: str | None = None
-    tool_name: str | None = None
-    tool_call_id: str | None = None
-    args: dict | None = None
-    result: Any = None
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert to dict for JSON serialization."""
-        data: dict[str, Any] = {"type": self.type}
-        if self.content is not None:
-            data["content"] = self.content
-        if self.tool_name is not None:
-            data["toolName"] = self.tool_name
-        if self.tool_call_id is not None:
-            data["toolCallId"] = self.tool_call_id
-        if self.args is not None:
-            data["args"] = self.args
-        if self.result is not None:
-            data["result"] = self.result
-        return data
+# ─── Helpers ───────────────────────────────────────────────────────────────────
 
 
-class EventStreamHandler:
-    """Handle LangGraph stream events and convert to frontend format."""
-
-    def __init__(self, tools: list[BaseTool]):
-        self.visible_tool_names = {t.name for t in tools}
-        self.active_delegations: set[str] = set()
-        self.assistant_buffer = ""
-
-    def handle(self, event: dict[str, Any]) -> StreamEvent | None:
-        """Process a single LangGraph event and return stream event if applicable."""
-        event_type = event.get("event", "")
-        data = event.get("data", {})
-        run_id = event.get("run_id", "")
-        tool_name = event.get("name", "unknown")
-
-        if event_type == "on_chat_model_stream":
-            return self._handle_chat_stream(run_id, data)
-        elif event_type == "on_tool_start":
-            return self._handle_tool_start(run_id, tool_name, data)
-        elif event_type == "on_tool_end":
-            return self._handle_tool_end(run_id, tool_name, data)
-        elif event_type == "on_tool_error":
-            return self._handle_tool_error(run_id, tool_name, data)
-        return None
-
-    def _handle_chat_stream(self, run_id: str, data: dict) -> StreamEvent | None:
-        """Handle chat model streaming chunks."""
-        if self.active_delegations:
-            return None
-        chunk = data.get("chunk")
-        content = getattr(chunk, "content", "") or ""
-        if content:
-            self.assistant_buffer += str(content)
-            return StreamEvent(type=ChatEventType.TOKEN, content=str(content))
-        return None
-
-    def _handle_tool_start(self, run_id: str, tool_name: str, data: dict) -> StreamEvent | None:
-        """Handle tool execution start."""
-        if tool_name not in self.visible_tool_names:
-            return None
-        logger.info("TOOL_START  run_id={}  tool={}", run_id, tool_name)
-        if tool_name.startswith("ask_"):
-            self.active_delegations.add(run_id)
-
-        inp = data.get("input", {})
-        return StreamEvent(
-            type=ChatEventType.TOOL_CALL,
-            tool_name=tool_name,
-            tool_call_id=run_id,
-            args=jsonable_encoder(inp) if isinstance(inp, dict) else {},
-        )
-
-    def _handle_tool_end(self, run_id: str, tool_name: str, data: dict) -> StreamEvent | None:
-        """Handle tool execution completion."""
-        if tool_name not in self.visible_tool_names:
-            return None
-
-        self.active_delegations.discard(run_id)
-        logger.info("TOOL_END  run_id={}  tool={}", run_id, tool_name)
-        return StreamEvent(
-            type=ChatEventType.TOOL_RESULT,
-            tool_call_id=run_id,
-            result=_normalize_tool_output(data.get("output", {})),
-        )
-
-    def _handle_tool_error(self, run_id: str, tool_name: str, data: dict) -> StreamEvent | None:
-        """Handle tool execution error."""
-        if tool_name not in self.visible_tool_names:
-            return None
-
-        self.active_delegations.discard(run_id)
-        err = data.get("error", "Tool execution failed")
-        logger.error("TOOL_ERROR  run_id={}  tool={}  error={}", run_id, tool_name, err)
-        return StreamEvent(
-            type=ChatEventType.TOOL_RESULT,
-            tool_call_id=run_id,
-            result={
-                "ok": False,
-                "error": {
-                    "message": str(data.get("error", "Tool execution failed")),
-                    "code": "tool_error",
-                    "retryable": True,
-                },
-            },
-        )
+def _resolve_thread(user_id: str, thread_id: str | None) -> str:
+    """Resolve and validate thread ID, enforcing user isolation."""
+    if thread_id:
+        if thread_id.startswith(f"user:{user_id}"):
+            return thread_id
+        return f"user:{user_id}:{thread_id}"
+    return f"user:{user_id}"
 
 
-class RootAgent:
-    """
-    Top-level LangGraph orchestrator.
-
-    Wraps each registered AppAgent as a tool (ask_{app_id}) so the LLM
-    can decide which app to delegate to. The root graph itself is stateless
-    across requests; callers provide the canonical thread history.
-    """
-
-    def __init__(self) -> None:
-        self._system_prompt = ""
-        self._all_ask_tools: dict[str, BaseTool] = {}
-        # _base_tools is built in refresh() which is always called during lifespan startup.
-        # L1: Do NOT call _build_base_tools() here — refresh() will do it.
-        self._base_tools: list[BaseTool] = []
-        # LRU-bounded graph cache keyed by sorted tool names.
-        self._graphs: OrderedDict[tuple[str, ...], Any] = OrderedDict()
-
-    def refresh(self) -> None:
-        """Rebuild system prompt, ask_X tools, and cached graph. Called after plugin discovery."""
-        self._system_prompt = build_system_prompt()
-        self._all_ask_tools = {
-            app_id: _build_ask_tool(
-                app_id,
-                plugin["agent"],
-                agent_description=plugin["manifest"].agent_description,
-            )
-            for app_id, plugin in PLUGIN_REGISTRY.items()
-        }
-        self._base_tools = self._build_base_tools()
-        self._graphs.clear()  # force rebuild on next request
-
-    @classmethod
-    def _build_base_tools(cls) -> list[BaseTool]:
-        return [
-            _build_platform_info_tool(),
-            _build_install_app_tool(),
-            _build_uninstall_app_tool(),
-            *_build_memory_tools(),
-        ]
-
-    async def _get_user_tools(self, user_id: str) -> list[BaseTool]:
-        """Get tools available to the user based on installed apps."""
-        try:
-            installed_app_ids = set(await list_installed_app_ids(user_id))
-        except Exception:
-            # Fail closed: if installed-app scoping cannot be resolved, never
-            # expose ask_* tools outside the verified installation set.
-            logger.warning(
-                "Failed to load installed apps for tool scoping, "
-                "falling back to platform info only",
-                exc_info=True,
-            )
-            return self._base_tools or self._build_base_tools()
-
-        tools = [t for app_id, t in self._all_ask_tools.items() if app_id in installed_app_ids]
-        tools.extend(self._base_tools or self._build_base_tools())
-        logger.debug(
-            "RootAgent._get_user_tools  user_id={}  installed={}  total_tools={}",
+async def _load_installed_app_ids(user_id: str) -> set[str]:
+    """Load installed app IDs, failing gracefully on DB/network errors."""
+    try:
+        return set(await list_installed_app_ids(user_id))
+    except (ConnectionError, TimeoutError):
+        logger.warning(
+            "RootAgent: DB unavailable while loading installed apps for user_id=%s, "
+            "defaulting to empty set",
             user_id,
-            sorted(installed_app_ids),
-            len(tools),
+            exc_info=True,
         )
-        return tools
-
-    def _get_graph(self, tools: list[BaseTool]) -> Any:
-        """Get or create LangGraph for given tools (LRU cache, max MAX_CACHED_GRAPHS).
-
-        H2: Uses SHA256 (not MD5) for FIPS-compliant environments.
-        """
-        import hashlib
-        sys_hash = hashlib.sha256((self._system_prompt or "").encode()).hexdigest()
-        cache_key = (sys_hash, tuple(sorted(t.name for t in tools)))
-
-        if cache_key in self._graphs:
-            # Move to end (most-recently-used)
-            self._graphs.move_to_end(cache_key)
-            logger.debug("RootAgent._get_graph  cache=HIT  tools_count={}", len(tools))
-            return self._graphs[cache_key]
-
-        logger.debug("RootAgent._get_graph  cache=MISS  tools_count={}  graphs_in_cache={}", len(tools), len(self._graphs))
-
-        graph = create_react_agent(
-            model=get_llm(),
-            tools=tools,
-            prompt=self._system_prompt or None,
-            store=get_store(),
-        )
-        self._graphs[cache_key] = graph
-
-        # Evict oldest (least-recently-used) entry if over limit
-        if len(self._graphs) > MAX_CACHED_GRAPHS:
-            self._graphs.popitem(last=False)
-
-        return graph
-
-    async def astream(
-        self,
-        user_id: str,
-        messages: list[dict[str, Any]],
-        thread_id: str | None = None,
-    ) -> AsyncGenerator[dict[str, Any], None]:
-        """
-        Stream data-stream events for the frontend chat UI.
-
-        The root graph does not resume hidden state from LangGraph checkpoints.
-        Callers pass the canonical message history for the active thread.
-        """
-        if thread_id:
-            # Enforce user isolation in thread IDs to block horizontal access
-            if not thread_id.startswith(f"user:{user_id}"):
-                thread = f"user:{user_id}:{thread_id}"
-            else:
-                thread = thread_id
-        else:
-            thread = f"user:{user_id}"
-
-        logger.info("RootAgent.astream START  user_id={}  thread={}  incoming_msgs={}", user_id, thread, len(messages))
-        set_user_context(user_id)
-        set_thread_context(thread)
-
-        tools = await self._get_user_tools(user_id)
-        graph = self._get_graph(tools)
-        event_handler = EventStreamHandler(tools)
-
-        try:
-            langchain_messages = await self._build_message_list(user_id, messages, thread)
-
-            # Run graph and yield stream events
-            async for event_dict in self._run_graph_stream(
-                graph, thread, user_id, event_handler, langchain_messages
-            ):
-                yield event_dict
-
-            yield {"type": ChatEventType.DONE}
-            logger.info("RootAgent.astream END  user_id={}  thread={}", user_id, thread)
-        finally:
-            clear_agent_context()
-
-    async def _build_message_list(
-        self,
-        user_id: str,
-        messages: list[dict[str, Any]],
-        thread: str,
-    ) -> list[BaseMessage]:
-        """Build LangChain message list from canonical thread history."""
-        langchain_messages: list[BaseMessage] = []
-
-        logger.debug(
-            "RootAgent._build_message_list  user_id={}  thread={}  incoming_msgs={}  msg_types={}",
+        return set()
+    except Exception:
+        # Programming error — also degrade gracefully
+        logger.error(
+            "RootAgent: unexpected error loading installed apps for user_id=%s, "
+            "defaulting to empty set",
             user_id,
-            thread,
-            len(messages),
-            [m.get("role") for m in messages],
+            exc_info=True,
         )
+        return set()
 
-        # Add user context as first system message (for date/time awareness)
-        user = await User.find_one(User.id == PydanticObjectId(user_id))
-        current_date, current_time = get_user_timezone_context(user).get_date_time_tuple() if user else ("", "")
-        if current_date:
-            langchain_messages.append(
-                SystemMessage(
-                    content=f"Current date: {current_date}, current time: {current_time}."
-                )
-            )
-        try:
-            installed_app_ids = set(await list_installed_app_ids(user_id))
-        except Exception:
-            installed_app_ids = set()
-            logger.warning(
-                "Failed to build user-specific app catalog context, defaulting to not-installed markers",
-                exc_info=True,
-            )
-        langchain_messages.append(
-            SystemMessage(content=build_available_apps_context(installed_app_ids))
-        )
 
-        # Parse the canonical thread history supplied by the caller.
-        parser = MessageParser()
-        for msg in messages:
-            parsed = await parser.parse(msg)
-            if parsed.langchain_message:
-                langchain_messages.append(parsed.langchain_message)
+# ─── Module-level base tools builder (used by refresh()) ──────────────────────
 
-        # Log any sanitization warnings
-        if parser.warnings:
-            logger.warning(
-                "Input sanitization warnings for user {}: {}",
-                user_id,
-                ", ".join(parser.warnings),
-            )
 
-        logger.debug(
-            "RootAgent._build_message_list  user_id={}  final_msg_count={}  msg_types={}",
-            user_id,
-            len(langchain_messages),
-            [type(m).__name__ for m in langchain_messages],
-        )
-        return langchain_messages
+def _build_base_tools() -> list[Any]:
+    return [
+        _build_platform_info_tool(),
+        _build_install_app_tool(),
+        _build_uninstall_app_tool(),
+    ]
 
-    async def _run_graph_stream(
-        self,
-        graph: Any,
-        thread: str,
-        user_id: str,
-        event_handler: EventStreamHandler,
-        langchain_messages: list[BaseMessage],
-    ) -> AsyncGenerator[dict[str, Any], None]:
-        """Run graph and yield stream events.
 
-        Invalid tool-call history is surfaced directly instead of being retried
-        against hidden checkpoint state.
-        """
-        config = {
-            "configurable": {
-                "thread_id": thread,
-                "user_id": user_id,
-            },
-            "recursion_limit": 50,
-        }
+# ─── Singleton ─────────────────────────────────────────────────────────────────
 
-        event_stream = graph.astream_events(
-            {"messages": langchain_messages},
-            config=config,
-            version="v2",
-        )
-        event_iterator = event_stream.__aiter__()
-
-        while True:
-            try:
-                event = await asyncio.wait_for(
-                    anext(event_iterator),
-                    timeout=settings.llm_stream_idle_timeout_seconds,
-                )
-            except StopAsyncIteration:
-                logger.info("RootAgent._run_graph_stream END  thread={}  reason=StopAsyncIteration", thread)
-                return  # normal end of stream
-            except ValueError as exc:
-                if "tool_calls" in str(exc) and "ToolMessage" in str(exc):
-                    logger.error("INVALID_CHAT_HISTORY  thread={}  exc={}", thread, exc)
-                    raise RuntimeError(
-                        "Incoming chat history is malformed: a tool call is missing its matching tool result."
-                    ) from exc
-                raise
-            except TimeoutError as exc:
-                logger.error(
-                    "LLM_TIMEOUT  thread={}  timeout_s={}",
-                    thread,
-                    settings.llm_stream_idle_timeout_seconds,
-                )
-                raise RuntimeError(
-                    "The language model timed out. Please try again."
-                ) from exc
-
-            event_type = event.get("event", "")
-            stream_event = event_handler.handle(event)
-            if stream_event:
-                logger.debug(
-                    "STREAM_EVENT  thread={}  type={}  event={}  tool={}",
-                    thread,
-                    stream_event.type,
-                    event_type,
-                    stream_event.tool_name,
-                )
-                yield stream_event.to_dict()
-
-# Singleton
 root_agent = RootAgent()
+
+# Compatibility alias for monkeypatch-based tests and legacy imports.
+list_installed_app_ids = _list_installed_app_ids

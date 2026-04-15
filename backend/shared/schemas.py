@@ -180,6 +180,8 @@ class PreferenceUpdate(BaseModel):
     size_w: int | None = Field(default=None, ge=2, le=12)
     size_h: int | None = Field(default=None, ge=1, le=6)
 
+    model_config = {"extra": "forbid"}
+
 
 class WidgetDataConfigSchema(BaseModel):
     """Persisted per-widget data config."""

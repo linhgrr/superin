@@ -113,9 +113,11 @@ export default function CalendarScreen() {
         });
         toast.success("Event created successfully");
         setShowCreateModal(false);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Failed to create event:", err);
-        const errorMessage = err?.message || err?.detail || "Failed to create event";
+        const errorMessage = (err as { message?: string; detail?: string })?.message
+          || (err as { detail?: string })?.detail
+          || "Failed to create event";
         toast.error(errorMessage);
       }
     },

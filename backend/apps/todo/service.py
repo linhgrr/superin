@@ -63,6 +63,20 @@ class TaskService:
         task = await self.repo.find_by_id(task_id, user_id)
         return _task_to_dict(task) if task else None
 
+    async def get_tasks(self, ids: list[str], user_id: str) -> list[Task]:
+        """Fetch multiple tasks by their IDs, scoped to a user."""
+        if not ids:
+            return []
+        from beanie import PydanticObjectId
+
+        tasks = await Task.find(
+            {
+                "_id": {"$in": [PydanticObjectId(tid) for tid in ids]},
+                "user_id": PydanticObjectId(user_id),
+            }
+        ).to_list()
+        return tasks
+
     async def get_task_with_subtasks(self, task_id: str, user_id: str) -> dict | None:
         """Get task with its subtasks."""
         task = await self.repo.find_by_id(task_id, user_id)

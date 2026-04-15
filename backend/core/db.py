@@ -35,6 +35,7 @@ async def init_db() -> None:
     from core.models import (
         AppCategory,
         ConversationMessage,
+ ThreadMeta,
         TokenBlacklist,
         User,
         UserAppInstallation,
@@ -57,6 +58,7 @@ async def init_db() -> None:
             WidgetDataConfig,
             TokenBlacklist,
             ConversationMessage,
+ ThreadMeta,
             Subscription,
             SubscriptionWebhookEvent,
             *get_plugin_models(),

@@ -34,6 +34,7 @@ langgraph-prebuilt==0.1.8
 langgraph-checkpoint-mongodb<0.3.0
 langgraph-store-mongodb
 langchain-openai==0.3.0
+langsmith[claude-agent-sdk]==0.4.52
 openai==1.58.1
 tiktoken==0.8.0
 

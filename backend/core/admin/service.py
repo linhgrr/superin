@@ -7,9 +7,9 @@ from beanie.operators import In
 from fastapi import HTTPException
 
 from core.models import User, UserAppInstallation
-from core.utils.timezone import utc_now
 from core.registry import PLUGIN_REGISTRY, get_plugin
 from core.subscriptions.model import Subscription
+from core.utils.timezone import utc_now
 from shared.enums import (
     InstallationStatus,
     SubscriptionStatus,

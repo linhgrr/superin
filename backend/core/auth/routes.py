@@ -17,6 +17,7 @@ from fastapi import (
 
 from core.auth.avatar_storage import upload_avatar
 from core.auth.dependencies import (
+    JWTError,
     create_access_token,
     create_refresh_token,
     decode_token,
@@ -33,19 +34,24 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+def _build_user_public(user: User) -> UserPublic:
+    """Construct a UserPublic from a User document."""
+    return UserPublic(
+        id=str(user.id),
+        email=user.email,
+        name=user.name,
+        avatar_url=user.avatar_url,
+        role=user.role,
+        settings=user.settings or {},
+    )
+
+
 def _token_response(user: User) -> TokenResponse:
     return TokenResponse(
         access_token=create_access_token({"sub": str(user.id)}),
         refresh_token=create_refresh_token({"sub": str(user.id)}),
         token_type="bearer",
-        user=UserPublic(
-            id=str(user.id),
-            email=user.email,
-            name=user.name,
-            avatar_url=user.avatar_url,
-            role=user.role,
-            settings=user.settings or {},
-        ),
+        user=_build_user_public(user),
     )
 
 
@@ -133,7 +139,7 @@ async def refresh_tokens(
 
     try:
         payload = decode_token(refresh_token)
-    except Exception:
+    except JWTError:
         raise HTTPException(status_code=401, detail="Invalid refresh token")
 
     if payload.get("type") != "refresh":
@@ -173,7 +179,7 @@ async def logout(
             blacklist_entry = _blacklist_token(payload)
             if blacklist_entry:
                 await blacklist_entry.insert()
-        except Exception:
+        except JWTError:
             logger.debug(
                 "Token invalid or expired during logout blacklist",
                 exc_info=True,
@@ -187,14 +193,7 @@ async def get_me(user_id: str = Depends(get_current_user)) -> UserPublic:
     user = await User.get(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    return UserPublic(
-        id=str(user.id),
-        email=user.email,
-        name=user.name,
-        avatar_url=user.avatar_url,
-        role=user.role,
-        settings=user.settings or {},
-    )
+    return _build_user_public(user)
 
 
 @router.patch("/me/settings")

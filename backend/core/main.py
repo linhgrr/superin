@@ -1,6 +1,7 @@
 """FastAPI application entry point with lifespan management."""
 
 import asyncio
+import importlib.util
 import logging
 import os
 from concurrent.futures import ThreadPoolExecutor
@@ -40,6 +41,20 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s — %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+
+def _log_langsmith_startup_state() -> None:
+    """Emit a startup snapshot for LangSmith wiring without logging secrets."""
+    logger.info(
+        "LangSmith startup: tracing=%s langchain_tracing_v2=%s api_key_present=%s project=%s endpoint=%s langsmith_pkg=%s claude_agent_sdk_pkg=%s",
+        os.getenv("LANGSMITH_TRACING"),
+        os.getenv("LANGCHAIN_TRACING_V2"),
+        bool(os.getenv("LANGSMITH_API_KEY")),
+        os.getenv("LANGSMITH_PROJECT") or "",
+        os.getenv("LANGSMITH_ENDPOINT") or "",
+        bool(importlib.util.find_spec("langsmith")),
+        bool(importlib.util.find_spec("claude_agent_sdk")),
+    )
 
 
 def _validate_subscription_expiry_cron_config() -> ZoneInfo:
@@ -104,6 +119,8 @@ async def _run_subscription_expiry_cron(stop_event: asyncio.Event) -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Server lifecycle: startup → serve → shutdown."""
+    _log_langsmith_startup_state()
+
     # 0. Bound the shared executor used by libraries that still offload sync work.
     # Avoid the previous fixed 100-thread pool while keeping enough capacity for
     # MongoDBStore and explicit asyncio.to_thread() call sites.
@@ -131,7 +148,7 @@ async def lifespan(app: FastAPI):
             set_redis_client(_redis)
             tiered_limiter.set_redis(_redis)
             logger.info("✓ Redis rate limiting enabled (%s)", settings.redis_url)
-        except Exception:
+        except (ConnectionError, OSError, TimeoutError):
             logger.warning(
                 "⚠️  Redis connection failed — rate limiting falls back to in-memory (not safe for multi-worker)",
                 exc_info=True,

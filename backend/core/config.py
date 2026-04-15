@@ -14,9 +14,28 @@ Production: set env vars directly in your deployment platform.
 
 from pathlib import Path
 
+from dotenv import load_dotenv
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from shared.enums import PaymentProvider
+
+_BACKEND_DIR = Path(__file__).parent.parent
+
+
+def _prime_process_env() -> None:
+    """Load backend env files into os.environ for third-party SDKs.
+
+    BaseSettings can read from env files without mutating process environment.
+    Libraries like LangSmith read directly from os.environ, so we prime those
+    variables here while preserving documented precedence:
+    system env > .env.local > .env.
+    """
+    for env_path in (_BACKEND_DIR / ".env", _BACKEND_DIR / ".env.local"):
+        if env_path.exists():
+            load_dotenv(env_path, override=False)
+
+
+_prime_process_env()
 
 
 class Settings(BaseSettings):
@@ -24,8 +43,8 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(
         env_file=(
-            Path(__file__).parent.parent / ".env.local",
-            Path(__file__).parent.parent / ".env",
+            _BACKEND_DIR / ".env.local",
+            _BACKEND_DIR / ".env",
         ),
         env_file_encoding="utf-8",
         extra="ignore",

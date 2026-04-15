@@ -8,7 +8,6 @@ from beanie import PydanticObjectId
 from beanie.operators import In
 from pymongo import ReturnDocument, UpdateOne
 
-from core.db import get_db
 from core.models import WidgetPreference
 from shared.schemas import PreferenceUpdate
 
@@ -68,7 +67,7 @@ def _build_update_document(
     set_on_insert = {
         key: value
         for key, value in insert_defaults.items()
-        if key not in set_payload
+        if key not in set_payload or key in {"grid_x", "grid_y"}
     }
 
     update_document: dict[str, dict] = {"$setOnInsert": set_on_insert}
@@ -84,7 +83,7 @@ async def update_widget_preference(
 ) -> WidgetPreference | None:
     """Update or create a single widget preference for a user."""
     user_object_id = PydanticObjectId(user_id)
-    collection = get_db()["widget_preferences"]
+    collection = WidgetPreference.get_pymongo_collection()
     updated = await collection.find_one_and_update(
         {
             "user_id": user_object_id,
@@ -120,7 +119,7 @@ async def update_multiple_preferences(
         latest_by_widget_id[update.widget_id] = update
 
     user_object_id = PydanticObjectId(user_id)
-    collection = get_db()["widget_preferences"]
+    collection = WidgetPreference.get_pymongo_collection()
     operations = [
         UpdateOne(
             {

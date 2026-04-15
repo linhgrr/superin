@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from beanie import PydanticObjectId
 
-from core.models import ConversationMessage
+from core.constants import CHAT_THREADS_PAGE_SIZE, THREAD_PREVIEW_MAX_LENGTH
+from core.models import ConversationMessage, ThreadMeta
+from core.utils.timezone import utc_now
 
 
 def normalize_thread_id(user_id: str, thread_id: str | None) -> str:
@@ -16,7 +18,9 @@ def normalize_thread_id(user_id: str, thread_id: str | None) -> str:
     return f"user:{user_id}"
 
 
-async def list_thread_messages(user_id: str, thread_id: str, *, limit: int = 200) -> list[ConversationMessage]:
+async def list_thread_messages(
+    user_id: str, thread_id: str, *, limit: int = 200
+) -> list[ConversationMessage]:
     """Return canonical persisted messages for a thread in chronological order."""
     return await ConversationMessage.find(
         ConversationMessage.user_id == PydanticObjectId(user_id),
@@ -57,3 +61,45 @@ async def append_thread_message(
     )
     await message.insert()
     return message
+
+
+async def upsert_thread_meta(
+    user_id: str,
+    canonical_thread_id: str,
+    *,
+    title: str | None = None,
+    preview: str | None = None,
+    increment_count: int = 0,
+) -> ThreadMeta:
+    """Create or update ThreadMeta. Call only after messages are confirmed persisted."""
+    existing = await ThreadMeta.find_one(
+        ThreadMeta.user_id == PydanticObjectId(user_id),
+        ThreadMeta.thread_id == canonical_thread_id,
+    )
+    if existing:
+        update_fields: dict[str, object] = {"updated_at": utc_now()}
+        if title is not None:
+            update_fields["title"] = title
+        if preview is not None:
+            update_fields["preview"] = preview[:THREAD_PREVIEW_MAX_LENGTH]
+        if increment_count:
+            update_fields["message_count"] = existing.message_count + increment_count
+        await existing.set(update_fields)
+        return existing
+    else:
+        meta = ThreadMeta(
+            user_id=PydanticObjectId(user_id),
+            thread_id=canonical_thread_id,
+            title=title or "New conversation",
+            preview=preview[:THREAD_PREVIEW_MAX_LENGTH] if preview else "",
+            message_count=0,
+        )
+        await meta.insert()
+        return meta
+
+
+async def list_user_threads(user_id: str, limit: int = CHAT_THREADS_PAGE_SIZE) -> list[ThreadMeta]:
+    """Return thread metadata list for a user, most-recently-updated first."""
+    return await ThreadMeta.find(
+        ThreadMeta.user_id == PydanticObjectId(user_id),
+    ).sort("-updated_at").limit(limit).to_list()

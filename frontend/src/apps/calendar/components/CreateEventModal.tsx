@@ -212,7 +212,6 @@ export function CreateEventModal({ date, calendars, onClose, onCreate, onUpdate,
     }
   };
 
-  const durationText = formatDuration(startMinutes, endMinutes);
   const isValid = Boolean(title.trim() && calendarId && endMinutes > startMinutes);
 
   return (

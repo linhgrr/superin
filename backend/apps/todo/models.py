@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, time
-
-from core.utils.timezone import utc_now
+from datetime import datetime, time
 
 from beanie import Document, PydanticObjectId
 from pydantic import Field
 
 from apps.todo.enums import RecurrenceFrequency, TaskPriority, TaskStatus
+from core.utils.timezone import utc_now
 
 
 class Task(Document):

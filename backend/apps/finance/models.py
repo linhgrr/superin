@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
-
-from core.utils.timezone import utc_now
+from datetime import datetime
 
 from beanie import Document, PydanticObjectId
 from pydantic import Field
 from pymongo import IndexModel
 
 from apps.finance.enums import TransactionType
+from core.utils.timezone import utc_now
 
 
 class Wallet(Document):

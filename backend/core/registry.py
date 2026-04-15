@@ -136,3 +136,21 @@ def get_plugin(app_id: str) -> PluginEntry | None:
 def list_plugins() -> list[AppManifestSchema]:
     """Return all plugin manifests as a list."""
     return [entry["manifest"] for entry in PLUGIN_REGISTRY.values()]
+
+
+def get_task_finder(user_id: str) -> "TaskFinder | None":
+    """Look up a task by ID using the registered todo plugin's TaskFinder.
+
+    Returns None if the todo plugin is not installed — calendar degrades gracefully.
+    """
+    todo_entry = PLUGIN_REGISTRY.get("todo")
+    if todo_entry is None:
+        return None
+    agent = todo_entry["agent"]
+    if hasattr(agent, "get_task_finder"):
+        return agent.get_task_finder()  # type: ignore[return-value]
+    return None
+
+
+if TYPE_CHECKING:
+    from shared.interfaces import TaskFinder

@@ -134,12 +134,8 @@ export function computeOverlappingEvents(
 ): PositionedEvent[] {
   if (!events.length) return [];
 
-  // 1. Separate all-day events from timed events
-  const timedEvents = events.filter(e => !e.is_all_day);
-  if (!timedEvents.length) return [];
-
-  // 2. Extract start/end minutes in the USER'S timezone
-  const withMinutes = timedEvents.map((e) => {
+  // Extract start/end minutes in the USER'S timezone (not browser local!)
+  const withMinutes = events.map((e) => {
     const startResult = getHourMinute(e.start_datetime, timezone);
     const endResult = getHourMinute(e.end_datetime, timezone);
     const start = startResult ? startResult.hour * 60 + startResult.minute : 0;
@@ -169,8 +165,8 @@ export function computeOverlappingEvents(
 
     cls.forEach((item, index) => {
       const col = itemCols[index];
-      // Thụt vào 12% cho mỗi level overlapping
-      const indentFrac = 0.12;
+      // Thụt vào 15% cho mỗi level overlapping
+      const indentFrac = 0.15;
       const leftFrac = col * indentFrac;
       // Dành 8% bên phải để click tạo mới. Vậy right luôn bằng 92%.
       // Card sẽ hẹp dần, đảm bảo độ rộng tối thiểu là 20% nếu overlap quá dày
@@ -232,6 +228,35 @@ export function computeEventPosition(
 }
 
 /**
+ * Split events into all-day vs timed based on whether they span midnight
+ * in the user's timezone.
+ *
+ * All-day events are those whose end_datetime is the same calendar day as
+ * their start_datetime in the user's timezone (i.e. they don't cross midnight).
+ */
+export function splitEventsByType(events: EventRead[], timezone: string): {
+  allDay: EventRead[];
+  timed: EventRead[];
+} {
+  const allDay: EventRead[] = [];
+  const timed: EventRead[] = [];
+
+  for (const event of events) {
+    const start = new Date(event.start_datetime);
+    const end = new Date(event.end_datetime);
+    const startDay = new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).format(start);
+    const endDay = new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).format(end);
+    if (startDay === endDay) {
+      allDay.push(event);
+    } else {
+      timed.push(event);
+    }
+  }
+
+  return { allDay, timed };
+}
+
+/**
  * Format UTC ISO datetime to time string (HH:MM) in the user's timezone.
  *
  * @param utcString - UTC ISO string
@@ -244,13 +269,4 @@ export function formatEventTime(utcString: string, timezone: string): string {
     minute: "2-digit",
     timeZone: timezone,
   }).format(date);
-}
-/**
- * Split events into all-day and timed events.
- */
-export function splitEventsByType(events: EventRead[]) {
-  return {
-    allDay: events.filter(e => e.is_all_day),
-    timed: events.filter(e => !e.is_all_day),
-  };
 }

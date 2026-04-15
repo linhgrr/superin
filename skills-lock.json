@@ -54,7 +54,7 @@
     "zustand": {
       "source": "lobehub/lobe-chat",
       "sourceType": "github",
-      "computedHash": "ef9a6e8dea1837804918bc6533e52b6e05b4589dbe9c26af692111413328a13c"
+      "computedHash": "57e393ad366e48d80a23950ef1393d4ec131abf81fca7def35adac602f820931"
     }
   }
 }

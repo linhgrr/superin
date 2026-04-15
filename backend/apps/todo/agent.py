@@ -1,5 +1,9 @@
 """Todo plugin LangGraph agent."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from langchain_core.tools import BaseTool
 
 from apps.todo.prompts import get_todo_prompt
@@ -68,6 +72,41 @@ class TodoAgent(BaseAppAgent):
     def build_prompt(self) -> str:
         return get_todo_prompt()
 
+    def get_task_finder(self) -> TodoTaskFinder:
+        """Return a TaskFinder backed by TodoAgent's TaskService."""
+        return TodoTaskFinder()
+
+
+class TodoTaskFinder:
+    """TaskFinder implementation that delegates to TodoAgent's TaskService."""
+
+    __slots__ = ()
+
+    async def find_by_id(self, task_id: str, user_id: str) -> Task | None:
+        tasks = await task_service.get_tasks(
+            ids=[task_id],
+            user_id=user_id,
+        )
+        return tasks[0] if tasks else None
+
+    async def find_by_user(
+        self,
+        user_id: str,
+        status: str | None = None,
+        priority: str | None = None,
+        tag: str | None = None,
+        include_archived: bool = False,
+        limit: int = 20,
+    ) -> list[Task]:
+        return await task_service.list_tasks(
+            user_id=user_id,
+            status=status,
+            priority=priority,
+            tag=tag,
+            include_archived=include_archived,
+            limit=limit,
+        )
+
     async def on_install(self, user_id: str) -> None:
         set_user_context(user_id)
         await task_service.on_install(user_id)
@@ -75,3 +114,7 @@ class TodoAgent(BaseAppAgent):
     async def on_uninstall(self, user_id: str) -> None:
         set_user_context(user_id)
         await task_service.on_uninstall(user_id)
+
+
+if TYPE_CHECKING:
+    from apps.todo.models import Task

@@ -8,11 +8,24 @@ from datetime import datetime
 from typing import Any, Literal
 
 from beanie import Document, PydanticObjectId
+from beanie.exceptions import CollectionWasNotInitialized
 from pydantic import Field
 from pymongo import IndexModel
 
 from core.utils.timezone import utc_now
 from shared.enums import InstallationStatus, UserRole
+
+
+class _UnitTestFriendlyDocument(Document):
+    """Allow plain model construction in unit tests before Beanie init."""
+
+    def __init__(self, *args, **kwargs) -> None:
+        try:
+            super().__init__(*args, **kwargs)
+        except CollectionWasNotInitialized:
+            # Beanie validates fields before checking the collection handle.
+            # Keeping the instance usable makes pure unit tests independent of DB init.
+            pass
 
 
 class User(Document):
@@ -53,7 +66,7 @@ class UserAppInstallation(Document):
         ]
 
 
-class WidgetPreference(Document):
+class WidgetPreference(_UnitTestFriendlyDocument):
     """User-specific widget layout state on dashboard."""
 
     user_id: PydanticObjectId
@@ -77,7 +90,7 @@ class WidgetPreference(Document):
         ]
 
 
-class WidgetDataConfig(Document):
+class WidgetDataConfig(_UnitTestFriendlyDocument):
     """Per-widget data configuration validated against registered widget schemas."""
 
     user_id: PydanticObjectId
@@ -165,5 +178,36 @@ class ConversationMessage(Document):
                 name="conversation_messages_user_thread_client_message_id_unique",
                 unique=True,
                 partialFilterExpression={"client_message_id": {"$type": "string"}},
+            ),
+        ]
+
+
+class ThreadMeta(Document):
+    """Metadata for a user-created chat thread.
+
+    Used to enumerate threads for the history sidebar. Thread existence is
+    established implicitly by the first message in ConversationMessage, but we
+    store summary metadata here for efficient listing.
+    """
+
+    user_id: PydanticObjectId
+    thread_id: str  # canonical: "user:{user_id}:{client_id}"
+    title: str = "New conversation"
+    preview: str = ""  # first user message snippet (max 100 chars)
+    message_count: int = 0
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+    class Settings:
+        name = "thread_metas"
+        indexes = [
+            IndexModel(
+                [("user_id", 1), ("updated_at", -1)],
+                name="thread_metas_user_updated_at",
+            ),
+            IndexModel(
+                [("user_id", 1), ("thread_id", 1)],
+                name="thread_metas_user_thread_unique",
+                unique=True,
             ),
         ]

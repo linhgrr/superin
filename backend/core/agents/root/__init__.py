@@ -21,7 +21,7 @@ Message persistence:
 
 from .agent import RootAgent, root_agent
 from .prompts import build_system_prompt
-from .tools import _build_ask_tool, _build_memory_tools
+from .root_tools import _build_ask_tool, _build_memory_tools
 
 __all__ = [
     "RootAgent",

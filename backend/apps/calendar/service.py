@@ -142,8 +142,8 @@ class CalendarService:
         updated = await self.events.update(
             event,
             title=title,
-            start_datetime=start_datetime,
-            end_datetime=end_datetime,
+            start_datetime=new_start,
+            end_datetime=new_end,
             calendar_id=calendar_id,
             description=description,
             location=location,
@@ -253,10 +253,6 @@ class CalendarService:
             if not calendar:
                 raise ValueError("Calendar not found")
 
-            count = await self.calendars.count_by_user(user_id, session=session)
-            if count == 1:
-                raise ValueError("Cannot delete the only calendar — at least one calendar must remain")
-
             replacement = None
             if calendar.is_default:
                 replacement = await self.calendars.find_first_other(
@@ -264,6 +260,12 @@ class CalendarService:
                     calendar_id,
                     session=session,
                 )
+                if replacement is None:
+                    raise ValueError("Cannot delete the only calendar — at least one calendar must remain")
+            else:
+                count = await self.calendars.count_by_user(user_id, session=session)
+                if count == 1:
+                    raise ValueError("Cannot delete the only calendar — at least one calendar must remain")
 
             await self.events.delete_by_calendar(calendar_id, session=session)
             await self.calendars.delete(calendar, session=session)
@@ -275,7 +277,7 @@ class CalendarService:
                     is_default=True,
                     session=session,
                 )
-        return {"success": True, "id": calendar_id, "message": "Calendar deleted successfully"}
+        return {"success": True, "id": calendar_id}
 
     # ─── Recurring Rules ────────────────────────────────────────────────────────
 
@@ -335,11 +337,13 @@ class CalendarService:
         The start_datetime may come from various callers (agents, tools, etc.)
         with unknown timezone. Normalize it to UTC-naive via ensure_aware_utc first.
         """
-        # Local import to avoid circular dependency
-        from apps.todo.repository import TaskRepository
+        from core.registry import get_task_finder
 
-        task_repo = TaskRepository()
-        task = await task_repo.find_by_id(task_id, user_id)
+        task_finder = get_task_finder(user_id)
+        if task_finder is None:
+            raise ValueError("Todo plugin is not installed")
+
+        task = await task_finder.find_by_id(task_id, user_id)
         if not task:
             raise ValueError(f"Task '{task_id}' not found")
 

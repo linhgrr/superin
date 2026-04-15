@@ -9,9 +9,10 @@ Provides:
 from __future__ import annotations
 
 import asyncio
-from loguru import logger
 from collections.abc import Awaitable, Callable
 from typing import Any, TypeVar
+
+from loguru import logger
 
 from core.models import User
 from core.utils.sanitizer import sanitize_db_content_for_llm
@@ -45,7 +46,11 @@ async def _tool_success_async(data: T, localize: bool = True) -> dict[str, Any]:
         if user_id:
             try:
                 user = await User.get(user_id)
+            except (AttributeError, TypeError):
+                # Unexpected: user_id is None or User model is broken — not a DB failure
+                user = None
             except Exception:
+                # Genuine DB/network errors — degrade gracefully to unlocalized output
                 user = None
             formatter = get_user_timezone_context(user).format_datetime
             localized_data = convert_utc_strings_to_local(data, formatter)

@@ -13,7 +13,9 @@ from core.chat.service import (
     append_thread_message,
     get_message_by_client_id,
     list_thread_messages,
+    list_user_threads,
     normalize_thread_id,
+    upsert_thread_meta,
 )
 from core.constants import (
     CHAT_STREAM_FRIENDLY_ERROR_TEXT,
@@ -22,7 +24,7 @@ from core.constants import (
     RATE_LIMIT_CHAT_FREE,
     RATE_LIMIT_CHAT_PAID,
 )
-from core.models import User
+from core.models import ConversationMessage, User
 from core.subscriptions.service import get_effective_tier
 from core.utils.limiter import tiered_limiter
 from shared.enums import ChatEventType, SubscriptionTier, UserRole
@@ -32,8 +34,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # Maximum request body size for chat stream.
-# The backend only uses the latest user message from the request body, but the
-# current frontend transport still posts the in-memory thread state.
 _CHAT_BODY_MAX_BYTES = 1 * 1024 * 1024  # 1 MB
 
 
@@ -47,6 +47,16 @@ def _encode_done() -> bytes:
 
 def _is_error(result: object) -> bool:
     return isinstance(result, dict) and result.get("ok") is False
+
+
+def _message_to_api(item: ConversationMessage) -> dict[str, object]:
+    """Serialize a ConversationMessage for the REST API."""
+    return {
+        "id": str(item.client_message_id or item.id),
+        "role": item.role,
+        "content": item.content,
+        "createdAt": item.created_at.isoformat(),
+    }
 
 
 def _extract_text_content(content: object) -> str:
@@ -77,17 +87,53 @@ def _extract_latest_user_message(messages: list[object]) -> tuple[str, str | Non
     )
 
 
+@router.get("/threads")
+async def list_threads(user_id: str = Depends(get_current_user)):
+    """
+    GET /api/chat/threads
+    Returns list of thread metadata for the current user (most-recently-updated first).
+    """
+    threads = await list_user_threads(user_id)
+    return {
+        "threads": [
+            {
+                "threadId": t.thread_id,
+                "title": t.title,
+                "preview": t.preview,
+                "messageCount": t.message_count,
+                "createdAt": t.created_at.isoformat(),
+                "updatedAt": t.updated_at.isoformat(),
+            }
+            for t in threads
+        ],
+    }
+
+
+@router.get("/history")
+async def chat_history(thread_id: str, user_id: str = Depends(get_current_user)):
+    """
+    GET /api/chat/history?thread_id=<canonical_or_client_thread_id>
+    Returns persisted messages for a thread in chronological order.
+    """
+    canonical = normalize_thread_id(user_id, thread_id)
+    history = await list_thread_messages(user_id, canonical)
+    return {
+        "threadId": canonical,
+        "messages": [_message_to_api(item) for item in history],
+    }
+
+
 @router.post("/stream")
 async def chat_stream(request: Request, user_id: str = Depends(get_current_user)):
     """
     POST /api/chat/stream
     Body: {
+        "threadId": str       # REQUIRED — client-generated UUID (immutable identity)
+        "threadTitle": str    # optional — override auto-generated title from first msg
         "messages": GenericMessage[],
-        "tools": ToolDefinition[]   # optional
     }
     Returns: SSE (assistant-ui UI message stream protocol)
     """
-    # H3: Enforce request body size limit before deserializing
     content_length = request.headers.get("content-length")
     if content_length and int(content_length) > _CHAT_BODY_MAX_BYTES:
         raise HTTPException(
@@ -112,12 +158,20 @@ async def chat_stream(request: Request, user_id: str = Depends(get_current_user)
     if not isinstance(body, dict):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Body must be a JSON object.")
 
+    # threadId is REQUIRED — strict contract
+    raw_thread_id = body.get("threadId")
+    if not raw_thread_id or not isinstance(raw_thread_id, str) or not raw_thread_id.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="'threadId' is required and must be a non-empty string.",
+        )
+
     messages = body.get("messages", [])
     if not isinstance(messages, list):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="'messages' must be an array.")
 
-    thread_id = body.get("threadId") or body.get("thread_id")
-    canonical_thread_id = normalize_thread_id(user_id, str(thread_id) if thread_id is not None else None)
+    canonical_thread_id = normalize_thread_id(user_id, raw_thread_id.strip())
+    thread_title = body.get("threadTitle")
     latest_user_text, latest_user_message_id = _extract_latest_user_message(messages)
     assistant_message_id_raw = body.get("unstable_assistantMessageId")
     assistant_message_id = (
@@ -126,12 +180,11 @@ async def chat_stream(request: Request, user_id: str = Depends(get_current_user)
         else None
     )
 
-    # Fix4: Admin users get unlimited chat (bypass all rate limits)
+    # Admin users bypass all rate limits
     user = await User.get(user_id)
     is_admin = user is not None and user.role == UserRole.ADMIN
 
     if is_admin:
-        # Admins always use paid-tier routing (unlimited daily, high per-minute)
         limits: list[tuple[int, int]] = [(RATE_LIMIT_CHAT_PAID, 60), (RATE_LIMIT_CHAT_DAILY_PAID, 86400)]
         tier = SubscriptionTier.PAID
     else:
@@ -141,8 +194,7 @@ async def chat_stream(request: Request, user_id: str = Depends(get_current_user)
         else:
             limits = [(RATE_LIMIT_CHAT_FREE, 60), (RATE_LIMIT_CHAT_DAILY_FREE, 86400)]
 
-    # Fix3: Check rate limit BEFORE opening the SSE stream.
-    # Prevents UI flicker where frontend sees `start` then immediately `error`.
+    # Check rate limit BEFORE opening SSE stream
     if not is_admin:
         is_allowed, limit_error_message = await tiered_limiter.check(user_id, limits)
         if not is_allowed:
@@ -173,6 +225,13 @@ async def chat_stream(request: Request, user_id: str = Depends(get_current_user)
                 content=latest_user_text,
                 client_message_id=latest_user_message_id,
             )
+            # Create thread meta only when first user message is confirmed persisted
+            await upsert_thread_meta(
+                user_id,
+                canonical_thread_id,
+                title=thread_title,
+                preview=latest_user_text,
+            )
 
         history = await list_thread_messages(user_id, canonical_thread_id)
         canonical_messages = [
@@ -185,9 +244,6 @@ async def chat_stream(request: Request, user_id: str = Depends(get_current_user)
         ]
 
         yield _encode_chunk({"type": "start", "messageId": message_id})
-
-        # Rate limit already checked above (Fix3 — no longer duplicated here for non-admin)
-        # For admin users, skip the rate limit entirely.
 
         try:
             async for event in root_agent.astream(
@@ -245,6 +301,13 @@ async def chat_stream(request: Request, user_id: str = Depends(get_current_user)
                             role="assistant",
                             content=final_assistant_text,
                             client_message_id=message_id,
+                        )
+                        # Update thread meta after assistant reply: bump counter + refresh preview
+                        await upsert_thread_meta(
+                            user_id,
+                            canonical_thread_id,
+                            preview=final_assistant_text,
+                            increment_count=1,
                         )
                     yield _encode_chunk({
                         "type": "finish",

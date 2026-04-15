@@ -1,6 +1,10 @@
 /**
- * ChatThread — Refined chat experience with @assistant-ui/react.
- * Simplified implementation using proper assistant-ui primitives.
+ * ChatThread — Full chat experience with thread history.
+ *
+ * Message management strategy:
+ *   - SWR owns persisted server state (thread history + thread list)
+ *   - Zustand owns local chat UI state (active thread + history sidebar)
+ *   - assistant-ui runtime is hydrated from server history via reset()
  */
 
 import {
@@ -9,25 +13,29 @@ import {
   MessagePrimitive,
   MessagePartPrimitive,
   ThreadPrimitive,
+  useAssistantRuntime,
   useMessage,
   useMessagePartText,
 } from "@assistant-ui/react";
 import { DynamicIcon } from "@/lib/icon-resolver";
+import React from "react";
+import type { ThreadMessageLike } from "@assistant-ui/react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-/**
- * TextPart — Plain text renderer with streaming support
- */
+import ChatHeader from "@/components/chat/ChatHeader";
+import ThreadHistorySidebar from "@/components/chat/ThreadHistorySidebar";
+import { useChatHistory } from "@/hooks/useChatHistory";
+import { useChatUiStore } from "@/stores/useChatUiStore";
+
+/* ─── Primitive components ─────────────────────────────────────────── */
+
 function TextPart() {
   const { text } = useMessagePartText();
   const textContent = typeof text === "string" ? text : String(text ?? "");
   return <div className="chat-text">{textContent}</div>;
 }
 
-/**
- * ThinkingDots — Animated waiting indicator while agent is processing
- */
 function ThinkingDots() {
   return (
     <span className="chat-thinking-dots" aria-label="Thinking…">
@@ -38,16 +46,11 @@ function ThinkingDots() {
   );
 }
 
-/**
- * AssistantText — Markdown text renderer with streaming support
- */
 function AssistantText() {
   const { text } = useMessagePartText();
   const textContent = typeof text === "string" ? text : String(text ?? "");
 
-  if (!textContent) {
-    return <ThinkingDots />;
-  }
+  if (!textContent) return <ThinkingDots />;
 
   return (
     <div className="chat-markdown">
@@ -59,9 +62,6 @@ function AssistantText() {
   );
 }
 
-/**
- * ToolCallBadge — Compact tool execution indicator
- */
 function ToolCallBadge({ toolName, argsText }: { toolName: string; argsText?: string }) {
   return (
     <div className="tool-call-badge">
@@ -77,31 +77,18 @@ function ToolCallBadge({ toolName, argsText }: { toolName: string; argsText?: st
   );
 }
 
-/**
- * UserMessage — Message bubble for user role
- */
 function UserMessage() {
   return (
     <MessagePrimitive.Root className="flex justify-end mb-2">
       <div className="message-bubble message-bubble-user">
-        <MessagePrimitive.Parts
-          components={{
-            Text: TextPart,
-          }}
-        />
+        <MessagePrimitive.Parts components={{ Text: TextPart }} />
       </div>
     </MessagePrimitive.Root>
   );
 }
 
-/**
- * AssistantMessageContent — Inner content with thinking indicator logic
- * Uses useMessage to detect in-progress state when no text has arrived yet.
- */
 function AssistantMessageContent() {
   const message = useMessage();
-  // Determine if we should show the thinking dots:
-  // Message is still streaming (in_progress) AND has no text part with content yet
   const hasTextContent = message.content.some(
     (part) => part.type === "text" && typeof part.text === "string" && part.text.length > 0
   );
@@ -128,9 +115,6 @@ function AssistantMessageContent() {
   );
 }
 
-/**
- * AssistantMessage — Message bubble for assistant role with tool calls
- */
 function AssistantMessage() {
   return (
     <div className="animate-fade-in-scale">
@@ -139,8 +123,6 @@ function AssistantMessage() {
           <AssistantMessageContent />
         </div>
       </MessagePrimitive.Root>
-
-      {/* Error display — only render when this message has an actual error */}
       <MessagePrimitive.Error>
         <ErrorPrimitive.Root className="chat-error-message">
           <ErrorPrimitive.Message />
@@ -150,14 +132,12 @@ function AssistantMessage() {
   );
 }
 
-/**
- * ChatComposer — Message input using assistant-ui primitives
- * Layout: input + send button side by side (full width)
- */
 function ChatComposer() {
   return (
     <div className="chat-input-container" style={{ width: "100%" }}>
-      <ComposerPrimitive.Root style={{ display: "flex", alignItems: "flex-end", gap: "0.5rem", width: "100%" }}>
+      <ComposerPrimitive.Root
+        style={{ display: "flex", alignItems: "flex-end", gap: "0.5rem", width: "100%" }}
+      >
         <ComposerPrimitive.Input
           placeholder="Ask Rin-chan anything... (Enter to send, Shift+Enter for new line)"
           maxRows={5}
@@ -165,12 +145,7 @@ function ChatComposer() {
           style={{ flex: 1, minWidth: 0 }}
         />
         <ComposerPrimitive.Send asChild>
-          <button
-            type="submit"
-            aria-label="Send message"
-            className="chat-send-btn"
-            style={{ flexShrink: 0 }}
-          >
+          <button type="submit" aria-label="Send message" className="chat-send-btn" style={{ flexShrink: 0 }}>
             <DynamicIcon name="Send" size={16} />
           </button>
         </ComposerPrimitive.Send>
@@ -179,43 +154,92 @@ function ChatComposer() {
   );
 }
 
-/**
- * ChatThread — Main chat interface
- */
-export default function ChatThread() {
-  return (
-    <ThreadPrimitive.Root className="chat-container">
-      {/* Header */}
-      <div className="chat-header">
-        <div>
-          <div className="chat-header-title">
-            <span className="flex items-center gap-2">
-              <DynamicIcon name="Sparkles" size={16} className="text-primary" />
-              Superin AI
-            </span>
-          </div>
-          <div className="chat-header-subtitle">Powered by Linhdz</div>
-        </div>
+/* ─── ChatThread ───────────────────────────────────────────────────── */
+
+interface ChatThreadProps {
+  threadId: string;
+}
+
+export default function ChatThread({ threadId }: ChatThreadProps) {
+  const { messages, loading, error } = useChatHistory(threadId);
+  const runtime = useAssistantRuntime({ optional: true });
+  const showHistory = useChatUiStore((state) => state.showHistory);
+  const createNewThread = useChatUiStore((state) => state.createNewThread);
+  const toggleHistory = useChatUiStore((state) => state.toggleHistory);
+  const closeHistory = useChatUiStore((state) => state.closeHistory);
+  const switchThread = useChatUiStore((state) => state.switchThread);
+
+  // Track the last threadId + messages hash we've already loaded so we never
+  // reset the same restored history twice on development re-renders.
+  const lastLoadedKey = React.useRef<string>("");
+
+  // Reset runtime + hydrate history messages whenever threadId changes.
+  // Loading state gates the UI so old messages never flash.
+  React.useEffect(() => {
+    if (loading) return;
+    if (!runtime) return;
+
+    const loadKey = `${threadId}:${messages.length}:${messages.at(-1)?.id ?? ""}`;
+    if (lastLoadedKey.current === loadKey) return; // Already loaded for this thread
+    lastLoadedKey.current = loadKey;
+
+    // Rebuild the runtime from the fetched history in a single pass.
+    // Using append() per message on the external-store runtime can produce
+    // branch/edit semantics instead of a linear restore, so hydrate via reset().
+    const initialMessages: ThreadMessageLike[] = messages.map((msg) => ({
+      role: msg.role,
+      content: [{ type: "text" as const, text: msg.content }],
+    }));
+
+    runtime.thread.reset(initialMessages);
+  }, [loading, messages, runtime, threadId]);
+
+  // Show blank while loading — old messages are hidden until new history loads
+  if (loading) {
+    return (
+      <div className="flex flex-col h-full relative">
+        <ChatHeader onNewChat={createNewThread} onOpenHistory={toggleHistory} />
+        <div className="flex-1" />
       </div>
+    );
+  }
 
-      {/* Messages */}
-      <ThreadPrimitive.Viewport
-        autoScroll={true}
-        turnAnchor="bottom"
-        className="chat-messages"
-      >
-        <ThreadPrimitive.Messages>
-          {({ message }) => {
-            if (message.role === "user") {
-              return <UserMessage key={message.id} />;
-            }
-            return <AssistantMessage key={message.id} />;
-          }}
-        </ThreadPrimitive.Messages>
-      </ThreadPrimitive.Viewport>
+  return (
+    <div className="flex flex-col h-full relative">
+      <ChatHeader onNewChat={createNewThread} onOpenHistory={toggleHistory} />
 
-      {/* Input */}
-      <ChatComposer />
-    </ThreadPrimitive.Root>
+      {showHistory && (
+        <ThreadHistorySidebar
+          onClose={closeHistory}
+          onSelectThread={switchThread}
+        />
+      )}
+
+      {error ? (
+        <div className="flex-1 flex items-center justify-center text-sm text-muted">
+          Failed to load this conversation.
+        </div>
+      ) : (
+        <>
+
+          {/* ThreadPrimitive.Root — messages come from runtime.thread.reset(initialMessages) above */}
+          <ThreadPrimitive.Root className="chat-container">
+            <ThreadPrimitive.Viewport
+              autoScroll={true}
+              turnAnchor="bottom"
+              className="chat-messages"
+            >
+              <ThreadPrimitive.Messages>
+                {({ message }) => {
+                  if (message.role === "user") return <UserMessage key={message.id} />;
+                  return <AssistantMessage key={message.id} />;
+                }}
+              </ThreadPrimitive.Messages>
+            </ThreadPrimitive.Viewport>
+            <ChatComposer />
+          </ThreadPrimitive.Root>
+        </>
+      )}
+    </div>
   );
 }

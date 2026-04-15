@@ -155,8 +155,9 @@ class BaseAppAgent:
                 "question": question,
                 "tool_results": [],
             }
-        except Exception:
-            logger.exception("%s child agent failed", self.app_id)
+        except (AttributeError, TypeError, ValueError) as exc:
+            # Programming / domain errors — surface to caller with a clear message
+            logger.error("%s child agent encountered an error: %s", self.app_id, exc)
             return {
                 "app": self.app_id,
                 "status": "failed",

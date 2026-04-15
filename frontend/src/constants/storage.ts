@@ -16,4 +16,7 @@ export const STORAGE_KEYS = {
   ONBOARDING_STATE: "superin_onboarding",
   WORKSPACE_SNAPSHOT: "superin_workspace_snapshot",
   STORE_CATALOG_SNAPSHOT: "superin_store_catalog_snapshot",
+
+  // Chat
+  CHAT_ACTIVE_THREAD_ID: "superin_chat_thread_id",
 } as const;
