@@ -9,8 +9,11 @@
 
 import { useMemo } from "react";
 
-
-import { useWorkspace } from "@/hooks/useWorkspace";
+import {
+  useInstalledApps,
+  useWidgetPreferences,
+  useWorkspaceStore,
+} from "@/stores/platform/workspaceStore";
 import { getSizeConfig } from "./layout-engine";
 import { ROW_HEIGHT } from "./useWidgetPreferences";
 import DashboardGrid from "./DashboardGrid";
@@ -43,12 +46,10 @@ function DashboardSkeleton() {
 }
 
 export default function DashboardPage() {
-  const {
-    applyPreferenceUpdates,
-    installedApps,
-    isWorkspaceLoading,
-    widgetPreferences,
-  } = useWorkspace();
+  const applyPreferenceUpdates = useWorkspaceStore((state) => state.applyPreferenceUpdates);
+  const installedApps = useInstalledApps();
+  const isWorkspaceLoading = useWorkspaceStore((state) => state.isWorkspaceLoading);
+  const widgetPreferences = useWidgetPreferences();
 
   // Hooks MUST be called before any conditional returns
   const allWidgets = useMemo(

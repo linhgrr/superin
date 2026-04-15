@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { DynamicIcon } from "@/lib/icon-resolver";
+import { useAsyncTask } from "@/hooks/useAsyncTask";
+import { useDisclosure } from "@/hooks/useDisclosure";
 import { createWallet, getWallets, type WalletRead } from "../../api";
 import type { CreateWalletRequest } from "../../api";
 import Modal from "../../components/Modal";
@@ -9,23 +11,22 @@ import { formatCurrency } from "../../lib/formatCurrency";
 
 export default function WalletsTab() {
   const [wallets, setWallets] = useState<WalletRead[]>([]);
-  const [showModal, setShowModal] = useState(false);
   const [editingWallet, setEditingWallet] = useState<WalletRead | null>(null);
-  const [loading, setLoading] = useState(true);
+  const createWalletModal = useDisclosure();
+  const { isPending: loading, run } = useAsyncTask(true);
 
-  function load() {
-    setLoading(true);
-    getWallets()
-      .then(setWallets)
-      .catch((error: unknown) => {
-        console.error("Failed to load wallets", error);
-      })
-      .finally(() => setLoading(false));
-  }
+  const load = useCallback(async () => {
+    try {
+      const nextWallets = await run(() => getWallets());
+      setWallets(nextWallets);
+    } catch (error: unknown) {
+      console.error("Failed to load wallets", error);
+    }
+  }, [run]);
 
   useEffect(() => {
-    load();
-  }, []);
+    void load();
+  }, [load]);
 
   const total = wallets.reduce((sum, wallet) => sum + wallet.balance, 0);
 
@@ -36,7 +37,7 @@ export default function WalletsTab() {
           <p className="section-label">Total Balance</p>
           <div className="stat-value">{formatCurrency(total)}</div>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+        <button className="btn btn-primary" onClick={createWalletModal.open}>
           + New Wallet
         </button>
       </div>
@@ -92,8 +93,8 @@ export default function WalletsTab() {
         </div>
       )}
 
-      {showModal && (
-        <Modal title="New Wallet" onClose={() => setShowModal(false)}>
+      {createWalletModal.isOpen && (
+        <Modal title="New Wallet" onClose={createWalletModal.close}>
           <SimpleForm
             fields={[
               { label: "Wallet Name", key: "name", placeholder: "e.g. Main Account" },
@@ -106,8 +107,8 @@ export default function WalletsTab() {
                 currency: values.currency || "USD",
               };
               await createWallet(request);
-              setShowModal(false);
-              load();
+              createWalletModal.close();
+              void load();
             }}
           />
         </Modal>

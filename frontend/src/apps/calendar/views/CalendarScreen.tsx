@@ -11,6 +11,7 @@ import { filterEventsByCalendar, groupEventsByDate } from "../utils/eventHelpers
 import { buildUtcIsoStringFromDate } from "@/shared/utils/datetime";
 import { useTimezone } from "@/shared/hooks/useTimezone";
 import { useToast } from "@/components/providers/ToastProvider";
+import { useDisclosure } from "@/hooks/useDisclosure";
 import { ConfirmationModal } from "@/shared/components/ConfirmationModal";
 import { CalendarHeader } from "./CalendarHeader";
 import type { CreateEventRequest, EventRead } from "../api";
@@ -25,11 +26,11 @@ export default function CalendarScreen() {
   const [viewMode, setViewMode] = useState<ViewMode>("week");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedCalendar, setSelectedCalendar] = useState<string | null>(null);
-  const [showCreateModal, setShowCreateModal] = useState(false);
   const [newEventDate, setNewEventDate] = useState<Date | null>(null);
   const [selectedEventForUpdate, setSelectedEventForUpdate] = useState<EventRead | null>(null);
-  const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
   const [eventToDeleteId, setEventToDeleteId] = useState<string | null>(null);
+  const { close: closeCreateEventDisclosure, isOpen: isCreateEventModalOpen, open: openCreateEventModal } = useDisclosure();
+  const { close: closeDeleteConfirmDisclosure, isOpen: isDeleteConfirmModalOpen, open: openDeleteConfirmModal } = useDisclosure();
 
   // getWeekBoundaries gives both:
   //   - weekDatesLocal: Date[7] at local midnight (for grid columns)
@@ -81,8 +82,18 @@ export default function CalendarScreen() {
     const newDate = new Date(date);
     newDate.setHours(hour, 0, 0, 0);
     setNewEventDate(newDate);
-    setShowCreateModal(true);
-  }, []);
+    openCreateEventModal();
+  }, [openCreateEventModal]);
+
+  const closeCreateEventModal = useCallback(() => {
+    closeCreateEventDisclosure();
+    setNewEventDate(null);
+  }, [closeCreateEventDisclosure]);
+
+  const closeDeleteConfirmModal = useCallback(() => {
+    closeDeleteConfirmDisclosure();
+    setEventToDeleteId(null);
+  }, [closeDeleteConfirmDisclosure]);
 
   // ── Event creation ────────────────────────────────────────────────────────
   // buildUtcIsoStringFromDate: uses Date(year,month,day,h,m,s,ms) constructor
@@ -112,7 +123,7 @@ export default function CalendarScreen() {
           type: CALENDAR_EVENT_TYPE,
         });
         toast.success("Event created successfully");
-        setShowCreateModal(false);
+        closeCreateEventModal();
       } catch (err: unknown) {
         console.error("Failed to create event:", err);
         const errorMessage = (err as { message?: string; detail?: string })?.message
@@ -121,7 +132,7 @@ export default function CalendarScreen() {
         toast.error(errorMessage);
       }
     },
-    [newEventDate, calendars, toast],
+    [calendars, closeCreateEventModal, newEventDate, toast],
   );
 
   const handleUpdateEvent = useCallback(
@@ -155,9 +166,9 @@ export default function CalendarScreen() {
   const handleDeleteEvent = useCallback(
     async (eventId: string) => {
       setEventToDeleteId(eventId);
-      setIsConfirmDeleteOpen(true);
+      openDeleteConfirmModal();
     },
-    [],
+    [openDeleteConfirmModal],
   );
 
   const confirmDelete = useCallback(async () => {
@@ -167,15 +178,14 @@ export default function CalendarScreen() {
       toast.success("Event deleted successfully");
       
       // Close all modals and reset state
-      setIsConfirmDeleteOpen(false);
-      setEventToDeleteId(null);
+      closeDeleteConfirmModal();
       setSelectedEventForUpdate(null);
-      setShowCreateModal(false);
+      closeCreateEventModal();
     } catch (err) {
       console.error("Failed to delete event:", err);
       toast.error("Failed to delete event");
     }
-  }, [eventToDeleteId, toast]);
+  }, [closeCreateEventModal, closeDeleteConfirmModal, eventToDeleteId, toast]);
 
   if (isLoading) {
     return (
@@ -213,11 +223,11 @@ export default function CalendarScreen() {
           onEventClick={setSelectedEventForUpdate}
         />
       )}
-      {showCreateModal && newEventDate && !selectedEventForUpdate && (
+      {isCreateEventModalOpen && newEventDate && !selectedEventForUpdate && (
         <CreateEventModal
           date={newEventDate}
           calendars={calendars}
-          onClose={() => setShowCreateModal(false)}
+          onClose={closeCreateEventModal}
           onCreate={handleCreateEvent}
         />
       )}
@@ -232,17 +242,14 @@ export default function CalendarScreen() {
         />
       )}
 
-      {isConfirmDeleteOpen && (
+      {isDeleteConfirmModalOpen && (
         <ConfirmationModal
           title="Delete Event"
           message="Are you sure you want to delete this event? This action cannot be undone."
           confirmLabel="Delete"
           variant="danger"
           onConfirm={confirmDelete}
-          onCancel={() => {
-            setIsConfirmDeleteOpen(false);
-            setEventToDeleteId(null);
-          }}
+          onCancel={closeDeleteConfirmModal}
         />
       )}
     </div>

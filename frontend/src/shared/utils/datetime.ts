@@ -272,6 +272,47 @@ export function buildUtcIsoStringFromDate(date: Date, hour: number, minute: numb
   );
 }
 
+/**
+ * Convert a UTC ISO datetime into a YYYY-MM-DD string for an HTML date input.
+ *
+ * Uses local date parts to preserve the calendar day the user selected locally.
+ */
+export function toDateInputValue(value: DateInput): string {
+  const date = utcToLocalDate(value);
+  if (!date) return '';
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Convert a YYYY-MM-DD date input value into a UTC ISO string at local midnight.
+ */
+export function dateInputValueToUtcIso(value: string): string | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+
+  if (
+    !Number.isInteger(year) ||
+    !Number.isInteger(month) ||
+    !Number.isInteger(day) ||
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    day > 31
+  ) {
+    return null;
+  }
+
+  return buildUtcIsoString(year, month - 1, day, 0, 0, 0);
+}
+
 // ─── Date-part extraction (in user's timezone) ──────────────────────────────────
 
 /**

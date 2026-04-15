@@ -8,7 +8,6 @@
  * AppPageSpy avoids Vitest's lazy-module-cache issue where the real AppPage
  * import is cached before mocks are fully configured.
  */
-import { createContext } from "react";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter, useNavigate } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -19,22 +18,21 @@ vi.mock("@/lib/lazy-registry", () => ({
   getAppMetadata: vi.fn(),
 }));
 
-vi.mock("@/constants", () => ({
-  ROUTES: { DASHBOARD: "/dashboard", STORE: "/store", APP_DETAIL: (id: string) => `/apps/${id}` },
-}));
+vi.mock("@/constants", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/constants")>();
 
-// WorkspaceContext mock — passthrough Provider (useWorkspace uses useContext)
-vi.mock("../components/providers/workspace-context", () => {
-  const ctx = createContext(null);
-  return { WorkspaceContext: ctx };
+  return {
+    ...actual,
+    ROUTES: {
+      ...actual.ROUTES,
+      DASHBOARD: "/dashboard",
+      STORE: "/store",
+      APP_DETAIL: (id: string) => `/apps/${id}`,
+    },
+  };
 });
-
-// useWorkspace mock
-vi.mock("../hooks/useWorkspace");
-
-import { useWorkspace } from "../hooks/useWorkspace";
 import { getAppMetadata } from "@/lib/lazy-registry";
-import { WorkspaceContext } from "../components/providers/workspace-context";
+import type { WorkspaceStoreSlice } from "@/stores/platform/workspaceStore";
 
 // ─── Import exported components from AppPage ───────────────────────────────────
 
@@ -47,7 +45,7 @@ function AppPageSpy({
   workspaceValue,
 }: {
   appId: string;
-  workspaceValue: ReturnType<typeof useWorkspace>;
+  workspaceValue: WorkspaceStoreSlice;
 }) {
   const navigate = useNavigate();
   const appMetadata = appId ? (getAppMetadata(appId) as { name?: string } | undefined) : undefined;
@@ -81,7 +79,6 @@ const defaultWorkspaceValue = {
   installedApps: [] as unknown[],
   widgetPreferences: [] as unknown[],
   isWorkspaceRefreshing: false,
-  isReady: true,
   refreshWorkspace: vi.fn(),
   setAppInstalled: vi.fn(),
   applyPreferenceUpdates: vi.fn(),
@@ -91,11 +88,9 @@ const defaultWorkspaceValue = {
 function renderAppPageSpy(appId: string, workspaceOverride: Partial<typeof defaultWorkspaceValue> = {}) {
   const wsValue = { ...defaultWorkspaceValue, ...workspaceOverride };
   return render(
-    <WorkspaceContext.Provider value={wsValue}>
-      <MemoryRouter initialEntries={[`/apps/${appId}`]}>
-        <AppPageSpy appId={appId} workspaceValue={wsValue} />
-      </MemoryRouter>
-    </WorkspaceContext.Provider>
+    <MemoryRouter initialEntries={[`/apps/${appId}`]}>
+      <AppPageSpy appId={appId} workspaceValue={wsValue} />
+    </MemoryRouter>
   );
 }
 

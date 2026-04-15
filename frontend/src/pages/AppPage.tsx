@@ -7,13 +7,14 @@
  */
 
 import { memo, useEffect, useState, type ComponentType } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { useNavigate, useParams } from "react-router-dom";
 import Construction from "lucide-react/dist/esm/icons/construction";
 import Download from "lucide-react/dist/esm/icons/download";
 import Loader2 from "lucide-react/dist/esm/icons/loader-2";
 import { getAppMetadata, getLoadedAppView, loadAppViewComponent } from "@/lib/lazy-registry";
-import { useWorkspace } from "@/hooks/useWorkspace";
 import { ROUTES } from "@/constants";
+import { useWorkspaceStore } from "@/stores/platform/workspaceStore";
 
 const SKELETON_DELAY_MS = 120;
 
@@ -145,7 +146,12 @@ export const AppNotInstalled = memo(function AppNotInstalled({
 
 export default function AppPage() {
   const { appId } = useParams<{ appId: string }>();
-  const { installedAppIds, isWorkspaceLoading } = useWorkspace();
+  const { installedAppIds, isWorkspaceLoading } = useWorkspaceStore(
+    useShallow((state) => ({
+      installedAppIds: state.installedAppIds,
+      isWorkspaceLoading: state.isWorkspaceLoading,
+    }))
+  );
   const [loadedComponent, setLoadedComponent] = useState<ComponentType | null>(null);
   const [hasLoadError, setHasLoadError] = useState(false);
   const [showSkeleton, setShowSkeleton] = useState(false);

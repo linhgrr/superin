@@ -1,9 +1,12 @@
-import { useState, useRef, useEffect } from "react";
-import { TIME_OPTIONS, formatDuration, parseTimeString, formatMinutesToString } from "../utils/dateHelpers";
+import { useEffect, useRef, useState } from "react";
+
+import { useClickOutside } from "@/hooks/useClickOutside";
 import { useTimezone } from "@/shared/hooks/useTimezone";
-import "./CreateEventModal.css";
+import { TIME_OPTIONS, formatDuration, formatMinutesToString, parseTimeString } from "../utils/dateHelpers";
 
 import type { CalendarRead, EventRead } from "../api";
+
+import "./CreateEventModal.css";
 
 export interface EventFormData {
   title: string;
@@ -46,16 +49,13 @@ function TimeInput({ label, value, onChange, earliest }: TimeInputProps) {
     setTextValue(formatMinutesToString(value));
   }, [value]);
 
-  // Close dropdown on outside click
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    };
-    if (open) document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
+  useClickOutside(
+    containerRef,
+    () => {
+      setOpen(false);
+    },
+    open
+  );
 
   const applyValue = (mins: number) => {
     const effective = earliest !== undefined ? Math.max(mins, earliest) : mins;

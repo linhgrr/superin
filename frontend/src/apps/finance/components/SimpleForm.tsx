@@ -1,11 +1,19 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 
+import { useAsyncTask } from "@/hooks/useAsyncTask";
+
 export interface SimpleFormField {
   label: string;
   key: string;
   type?: string;
+  initialValue?: string;
+  options?: Array<{
+    label: string;
+    value: string;
+  }>;
   placeholder?: string;
+  required?: boolean;
 }
 
 interface SimpleFormProps {
@@ -19,20 +27,25 @@ export default function SimpleForm({
   submitLabel,
   onSubmit,
 }: SimpleFormProps) {
-  const [values, setValues] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(false);
+  const [values, setValues] = useState<Record<string, string>>(
+    () =>
+      Object.fromEntries(
+        fields.map((field) => [field.key, field.initialValue ?? ""])
+      )
+  );
   const [error, setError] = useState<string | null>(null);
+  const { isPending: loading, run } = useAsyncTask();
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setLoading(true);
     setError(null);
     try {
-      await onSubmit(values);
+      const normalizedValues = Object.fromEntries(
+        Object.entries(values).map(([key, value]) => [key, value.trim()])
+      );
+      await run(() => onSubmit(normalizedValues));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed");
-    } finally {
-      setLoading(false);
     }
   }
 
@@ -51,15 +64,31 @@ export default function SimpleForm({
           >
             {field.label}
           </label>
-          <input
-            type={field.type ?? "text"}
-            placeholder={field.placeholder}
-            value={values[field.key] ?? ""}
-            onChange={(event) =>
-              setValues((current) => ({ ...current, [field.key]: event.target.value }))
-            }
-            required
-          />
+          {field.options ? (
+            <select
+              value={values[field.key] ?? ""}
+              onChange={(event) =>
+                setValues((current) => ({ ...current, [field.key]: event.target.value }))
+              }
+              required={field.required ?? true}
+            >
+              {field.options.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              type={field.type ?? "text"}
+              placeholder={field.placeholder}
+              value={values[field.key] ?? ""}
+              onChange={(event) =>
+                setValues((current) => ({ ...current, [field.key]: event.target.value }))
+              }
+              required={field.required ?? true}
+            />
+          )}
         </div>
       ))}
       {error && (

@@ -9,6 +9,7 @@
 "use client";
 
 import { ReactNode } from "react";
+import { ThemeEffects } from "./platform/ThemeEffects";
 import { OnboardingProvider } from "./onboarding/OnboardingProvider";
 import { ToastProvider } from "./ToastProvider";
 
@@ -16,6 +17,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
   return (
     <OnboardingProvider>
       <ToastProvider>
+        <ThemeEffects />
         {children}
       </ToastProvider>
     </OnboardingProvider>

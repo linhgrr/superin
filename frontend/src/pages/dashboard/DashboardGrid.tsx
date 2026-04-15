@@ -6,11 +6,12 @@
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 
-import { useCallback, useState } from "react";
+import { useCallback } from "react";
 import { Responsive } from "react-grid-layout";
 
 import { DynamicIcon } from "@/lib/icon-resolver";
 import AddWidgetDialog from "@/components/dashboard/AddWidgetDialog";
+import { platformUiSelectors, usePlatformUiStore } from "@/stores/platform/platformUiStore";
 import {
   useWidgetPreferences,
   GRID_COLS,
@@ -139,9 +140,11 @@ function AddWidgetButton({
   busyWidgetId,
   onToggleWidget,
 }: AddWidgetButtonProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const open = useCallback(() => setIsOpen(true), []);
-  const close = useCallback(() => setIsOpen(false), []);
+  const isOpen = usePlatformUiStore(platformUiSelectors.isAddWidgetDialogOpen);
+  const openDialog = usePlatformUiStore(platformUiSelectors.openAddWidgetDialog);
+  const closeDialog = usePlatformUiStore(platformUiSelectors.closeAddWidgetDialog);
+  const open = useCallback(() => openDialog(), [openDialog]);
+  const close = useCallback(() => closeDialog(), [closeDialog]);
 
   return (
     <>

@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useAsyncTask } from "@/hooks/useAsyncTask";
+import { useDisclosure } from "@/hooks/useDisclosure";
 import {
   completeSubtask,
   createRecurringRule,
@@ -36,25 +38,26 @@ type TaskListItem = TaskRead & {
 
 export default function TasksPanel() {
   const [tasks, setTasks] = useState<TaskListItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
   const [filter, setFilter] = useState<TaskFilter>("all");
   const [selectedTask, setSelectedTask] = useState<TaskListItem | null>(null);
   const [subtasks, setSubtasks] = useState<SubTaskRead[]>([]);
-  const [subtasksLoading, setSubtasksLoading] = useState(false);
-  const [showRecurringForm, setShowRecurringForm] = useState(false);
+  const newTaskForm = useDisclosure();
+  const recurringRuleForm = useDisclosure();
+  const { isPending: loading, run: runTasksRequest } = useAsyncTask(true);
+  const { isPending: subtasksLoading, run: runSubtasksRequest } = useAsyncTask();
 
-  function load() {
-    setLoading(true);
-    getTasks()
-      .then(setTasks)
-      .catch((error: unknown) => {
-        console.error("Failed to load tasks", error);
-      })
-      .finally(() => setLoading(false));
-  }
+  const load = useCallback(async () => {
+    try {
+      const nextTasks = await runTasksRequest(() => getTasks());
+      setTasks(nextTasks);
+    } catch (error: unknown) {
+      console.error("Failed to load tasks", error);
+    }
+  }, [runTasksRequest]);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   async function handleToggle(id: string) {
     try {
@@ -77,25 +80,24 @@ export default function TasksPanel() {
   async function handleCreate(data: CreateTaskRequest) {
     const created = await createTask(data);
     setTasks((current) => [created, ...current]);
-    setShowForm(false);
+    newTaskForm.close();
   }
 
   async function handleSelectTask(task: TaskListItem) {
     if (selectedTask?.id === task.id) {
       setSelectedTask(null);
       setSubtasks([]);
+      recurringRuleForm.close();
       return;
     }
     setSelectedTask(task);
-    setSubtasksLoading(true);
+    recurringRuleForm.close();
     try {
-      const data = await getSubtasks(task.id);
+      const data = await runSubtasksRequest(() => getSubtasks(task.id));
       setSubtasks(data);
     } catch {
       console.error("Failed to load subtasks", task.id);
       setSubtasks([]);
-    } finally {
-      setSubtasksLoading(false);
     }
   }
 
@@ -162,7 +164,7 @@ export default function TasksPanel() {
           : t
       )
     );
-    setShowRecurringForm(false);
+    recurringRuleForm.close();
   }
 
   const pendingCount = tasks.filter((t) => t.status === "pending").length;
@@ -184,12 +186,12 @@ export default function TasksPanel() {
     <>
       <TaskFilters filter={filter} counts={counts} onFilter={setFilter} />
 
-      {showForm ? (
-        <NewTaskForm onSubmit={handleCreate} onCancel={() => setShowForm(false)} />
+      {newTaskForm.isOpen ? (
+        <NewTaskForm onSubmit={handleCreate} onCancel={newTaskForm.close} />
       ) : (
         <button
           className="btn btn-primary"
-          onClick={() => setShowForm(true)}
+          onClick={newTaskForm.open}
           style={{ marginBottom: "1.25rem" }}
         >
           + New Task
@@ -278,10 +280,10 @@ export default function TasksPanel() {
                   <span style={{ fontSize: "0.875rem", color: "var(--color-success)" }}>Active</span>
                 )}
               </div>
-              {showRecurringForm ? (
+              {recurringRuleForm.isOpen ? (
                 <RecurringRuleForm
                   onSubmit={handleCreateRecurring}
-                  onCancel={() => setShowRecurringForm(false)}
+                  onCancel={recurringRuleForm.close}
                 />
               ) : selectedTask.recurring_rule?.is_active ? (
                 <p style={{ color: "var(--color-foreground-muted)", fontSize: "0.875rem" }}>
@@ -290,7 +292,7 @@ export default function TasksPanel() {
               ) : (
                 <button
                   className="btn btn-secondary"
-                  onClick={() => setShowRecurringForm(true)}
+                  onClick={recurringRuleForm.open}
                   style={{ width: "100%" }}
                 >
                   Set up recurring

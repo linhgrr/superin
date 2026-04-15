@@ -7,16 +7,19 @@
  *   └── AppCard / AppListItem  (rendered per catalog entry)
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { useShallow } from "zustand/react/shallow";
+
 import type { AppCatalogEntry, AppCategoryRead } from "@/types/generated";
 import { getCatalog, getCategories, installApp, uninstallApp } from "@/api/catalog";
 import { DynamicIcon } from "@/lib/icon-resolver";
 import { useToast } from "@/components/providers/ToastProvider";
-import { useWorkspace } from "@/hooks/useWorkspace";
 import { ROUTES, STORAGE_KEYS } from "@/constants";
 import AppCard from "@/components/store/AppCard";
 import AppListItem from "@/components/store/AppListItem";
 import StoreFilters from "@/components/store/StoreFilters";
+import { useWorkspaceStore } from "@/stores/platform/workspaceStore";
 
 interface PersistedCatalogSnapshot {
   catalog: AppCatalogEntry[];
@@ -25,6 +28,10 @@ interface PersistedCatalogSnapshot {
 }
 
 const STORE_CATALOG_CACHE_VERSION = 1;
+const DEFAULT_STORE_CATEGORY = "all";
+const DEFAULT_STORE_VIEW_MODE = "grid";
+
+type StoreViewMode = "grid" | "list";
 
 function readCatalogSnapshot(): AppCatalogEntry[] {
   try {
@@ -53,16 +60,24 @@ function formatCategoryLabel(category: string): string {
   return category.charAt(0).toUpperCase() + category.slice(1).toLowerCase();
 }
 
+function normalizeStoreViewMode(value: string | null): StoreViewMode {
+  return value === "list" ? "list" : DEFAULT_STORE_VIEW_MODE;
+}
+
 export default function StorePage() {
-  const { installedAppIds, refreshWorkspace, setAppInstalled } = useWorkspace();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { installedAppIds, refreshWorkspace, setAppInstalled } = useWorkspaceStore(
+    useShallow((state) => ({
+      installedAppIds: state.installedAppIds,
+      refreshWorkspace: state.refreshWorkspace,
+      setAppInstalled: state.setAppInstalled,
+    }))
+  );
   const toast = useToast();
 
   const [catalog, setCatalog] = useState<AppCatalogEntry[]>(readCatalogSnapshot);
   const [isCatalogLoading, setIsCatalogLoading] = useState(() => readCatalogSnapshot().length === 0);
   const [installing, setInstalling] = useState<Set<string>>(new Set());
-  const [filter, setFilter] = useState("all");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [categories, setCategories] = useState<AppCategoryRead[]>([]);
 
   // Fetch catalog + categories in parallel
@@ -107,8 +122,53 @@ export default function StorePage() {
   const availableCategories = useMemo(() => {
     const catIds = new Set(mergedCatalog.map((a) => a.category.toLowerCase()));
     const merged = new Set([...categories.map((c) => c.name.toLowerCase()), ...catIds]);
-    return ["all", ...Array.from(merged).sort()];
+    return [DEFAULT_STORE_CATEGORY, ...Array.from(merged).sort()];
   }, [categories, mergedCatalog]);
+
+  const rawSearchQuery = searchParams.get("q") ?? "";
+  const rawFilter = searchParams.get("category") ?? DEFAULT_STORE_CATEGORY;
+  const searchQuery = rawSearchQuery.trim();
+  const filter = availableCategories.some((category) => category === rawFilter.toLowerCase())
+    ? rawFilter
+    : DEFAULT_STORE_CATEGORY;
+  const viewMode = normalizeStoreViewMode(searchParams.get("view"));
+
+  const updateStoreSearchParams = useCallback(
+    (updates: { category?: string; q?: string; view?: StoreViewMode }) => {
+      setSearchParams((currentParams) => {
+        const nextParams = new URLSearchParams(currentParams);
+
+        if (updates.category !== undefined) {
+          const nextCategory = updates.category.trim().toLowerCase();
+          if (!nextCategory || nextCategory === DEFAULT_STORE_CATEGORY) {
+            nextParams.delete("category");
+          } else {
+            nextParams.set("category", nextCategory);
+          }
+        }
+
+        if (updates.q !== undefined) {
+          const nextQuery = updates.q.trim();
+          if (!nextQuery) {
+            nextParams.delete("q");
+          } else {
+            nextParams.set("q", nextQuery);
+          }
+        }
+
+        if (updates.view !== undefined) {
+          if (updates.view === DEFAULT_STORE_VIEW_MODE) {
+            nextParams.delete("view");
+          } else {
+            nextParams.set("view", updates.view);
+          }
+        }
+
+        return nextParams;
+      }, { replace: true });
+    },
+    [setSearchParams]
+  );
 
   const filtered = useMemo(() => {
     return mergedCatalog.filter((app) => {
@@ -203,12 +263,12 @@ export default function StorePage() {
   return (
     <div style={{ animation: "fadeIn 0.4s ease" }}>
       <StoreFilters
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
+        searchQuery={rawSearchQuery}
+        onSearchChange={(query) => updateStoreSearchParams({ q: query })}
         filter={filter}
-        onFilterChange={setFilter}
+        onFilterChange={(category) => updateStoreSearchParams({ category })}
         viewMode={viewMode}
-        onViewModeChange={setViewMode}
+        onViewModeChange={(mode) => updateStoreSearchParams({ view: mode })}
         availableCategories={availableCategories}
         getCategory={getCategory}
       />

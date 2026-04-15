@@ -4,7 +4,8 @@
 
 import RefreshCw from "lucide-react/dist/esm/icons/refresh-cw";
 import Shield from "lucide-react/dist/esm/icons/shield";
-import { useState } from "react";
+import { useCallback, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import useSWR from "swr";
 
 import {
@@ -27,13 +28,51 @@ import { SubscriptionsTab } from "./SubscriptionsTab";
 import { UsersTab } from "./UsersTab";
 
 type AdminTab = "users" | "subscriptions" | "apps";
+const DEFAULT_ADMIN_TAB: AdminTab = "users";
+
+function normalizeAdminTab(value: string | null): AdminTab {
+  if (value === "subscriptions" || value === "apps") {
+    return value;
+  }
+
+  return DEFAULT_ADMIN_TAB;
+}
 
 export default function AdminPage() {
-  const [tab, setTab] = useState<AdminTab>("users");
-  const [search, setSearch] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const { user, isAdmin } = useAuth();
   const toast = useToast();
+  const tab = normalizeAdminTab(searchParams.get("tab"));
+  const search = searchParams.get("q") ?? "";
+
+  const updateAdminSearchParams = useCallback(
+    (updates: { q?: string; tab?: AdminTab }) => {
+      setSearchParams((currentParams) => {
+        const nextParams = new URLSearchParams(currentParams);
+
+        if (updates.tab !== undefined) {
+          if (updates.tab === DEFAULT_ADMIN_TAB) {
+            nextParams.delete("tab");
+          } else {
+            nextParams.set("tab", updates.tab);
+          }
+        }
+
+        if (updates.q !== undefined) {
+          const nextQuery = updates.q.trim();
+          if (!nextQuery) {
+            nextParams.delete("q");
+          } else {
+            nextParams.set("q", nextQuery);
+          }
+        }
+
+        return nextParams;
+      }, { replace: true });
+    },
+    [setSearchParams]
+  );
 
   const statsSwr = useSWR("admin:stats", getAdminStats);
   const usersSwr = useSWR(["admin:users", search], () => getAdminUsers({ search }));
@@ -130,7 +169,12 @@ export default function AdminPage() {
 
       <AdminStats stats={statsSwr.data} />
 
-      <AdminTabs tab={tab} onTabChange={setTab} search={search} onSearchChange={setSearch} />
+      <AdminTabs
+        tab={tab}
+        onTabChange={(nextTab) => updateAdminSearchParams({ tab: nextTab })}
+        search={search}
+        onSearchChange={(nextSearch) => updateAdminSearchParams({ q: nextSearch })}
+      />
 
       {tab === "users" && (
         <UsersTab

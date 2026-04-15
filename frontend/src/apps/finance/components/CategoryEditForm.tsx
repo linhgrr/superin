@@ -1,6 +1,9 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
+
 import { DynamicIcon } from "@/lib/icon-resolver";
+import { useAsyncTask } from "@/hooks/useAsyncTask";
+
 import type { CategoryRead } from "../api";
 import { updateCategory, deleteCategory } from "../api";
 
@@ -16,39 +19,41 @@ export default function CategoryEditForm({ category, onSave, onCancel, onDelete 
   const [icon, setIcon] = useState(category.icon);
   const [color, setColor] = useState(category.color);
   const [budget, setBudget] = useState(String(category.budget || ""));
-  const [loading, setLoading] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { isPending: loading, run } = useAsyncTask();
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     if (!name.trim()) return;
+    if (budget && (!Number.isFinite(Number(budget)) || Number(budget) < 0)) {
+      setError("Budget must be 0 or greater");
+      return;
+    }
 
-    setLoading(true);
     setError(null);
     try {
-      const updated = await updateCategory(category.id, {
-        name: name.trim(),
-        icon: icon.trim() || "Tag",
-        color: color.trim() || "var(--color-primary)",
-        ...(budget ? { budget: Number(budget) } : {}),
-      });
+      const updated = await run(() =>
+        updateCategory(category.id, {
+          name: name.trim(),
+          icon: icon.trim() || "Tag",
+          color: color.trim() || "var(--color-primary)",
+          ...(budget ? { budget: Number(budget) } : {}),
+        })
+      );
       onSave(updated);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update category");
-    } finally {
-      setLoading(false);
     }
   }
 
   async function handleDelete() {
-    setLoading(true);
+    setError(null);
     try {
-      await deleteCategory(category.id);
+      await run(() => deleteCategory(category.id));
       onDelete?.(category.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete category");
-      setLoading(false);
     }
   }
 

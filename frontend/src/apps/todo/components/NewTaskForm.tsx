@@ -1,5 +1,9 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
+
+import { useAsyncTask } from "@/hooks/useAsyncTask";
+import { dateInputValueToUtcIso, toDateInputValue } from "@/shared/utils/datetime";
+
 import type { CreateTaskRequest } from "../api";
 
 interface NewTaskFormProps {
@@ -12,16 +16,26 @@ export default function NewTaskForm({ onSubmit, onCancel }: NewTaskFormProps) {
     title: "",
     priority: "medium",
   });
-  const [loading, setLoading] = useState(false);
+  const [dueDateInput, setDueDateInput] = useState("");
+  const { isPending: loading, run } = useAsyncTask();
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!form.title.trim()) return;
-    setLoading(true);
+    const dueDate = dueDateInput ? dateInputValueToUtcIso(dueDateInput) : null;
+    if (dueDateInput && !dueDate) {
+      return;
+    }
     try {
-      await onSubmit(form);
-    } finally {
-      setLoading(false);
+      await run(() =>
+        onSubmit({
+          ...form,
+          title: form.title.trim(),
+          due_date: dueDate,
+        })
+      );
+    } catch {
+      // The parent form handles user-visible errors.
     }
   }
 
@@ -62,13 +76,8 @@ export default function NewTaskForm({ onSubmit, onCancel }: NewTaskFormProps) {
         </select>
         <input
           type="date"
-          value={form.due_date ? new Date(form.due_date).toISOString().slice(0, 10) : ""}
-          onChange={(event) =>
-            setForm((current) => ({
-              ...current,
-              due_date: event.target.value ? new Date(event.target.value).toISOString() : null,
-            }))
-          }
+          value={dueDateInput || toDateInputValue(form.due_date)}
+          onChange={(event) => setDueDateInput(event.target.value)}
         />
       </div>
       <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>

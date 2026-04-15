@@ -12,8 +12,8 @@ import { NavLink } from "react-router-dom";
 import { DynamicIcon } from "@/lib/icon-resolver";
 import { ROUTES } from "@/constants";
 import { useAuth } from "@/hooks/useAuth";
-import { useWorkspace } from "@/hooks/useWorkspace";
 import { prefetchHandlers } from "@/lib/prefetch";
+import { useInstalledApps } from "@/stores/platform/workspaceStore";
 import type { AppRuntimeEntry } from "@/types/generated";
 
 import { generateGradient } from "@/components/store/generateGradient";
@@ -48,7 +48,7 @@ function AppIcon({ entry }: { entry: AppRuntimeEntry }) {
 }
 
 function Sidebar() {
-  const { installedApps } = useWorkspace();
+  const installedApps = useInstalledApps();
   const { isAdmin } = useAuth();
 
   return (

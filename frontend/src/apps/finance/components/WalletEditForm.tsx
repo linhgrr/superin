@@ -1,5 +1,8 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
+
+import { useAsyncTask } from "@/hooks/useAsyncTask";
+
 import type { WalletRead } from "../api";
 import { updateWallet } from "../api";
 
@@ -11,22 +14,19 @@ interface WalletEditFormProps {
 
 export default function WalletEditForm({ wallet, onSave, onCancel }: WalletEditFormProps) {
   const [name, setName] = useState(wallet.name);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { isPending: loading, run } = useAsyncTask();
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     if (!name.trim()) return;
 
-    setLoading(true);
     setError(null);
     try {
-      const updated = await updateWallet(wallet.id, { name: name.trim() });
+      const updated = await run(() => updateWallet(wallet.id, { name: name.trim() }));
       onSave(updated);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update wallet");
-    } finally {
-      setLoading(false);
     }
   }
 

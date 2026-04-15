@@ -9,9 +9,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { ROUTES } from "@/constants";
 import { DynamicIcon } from "@/lib/icon-resolver";
-import { useWorkspace } from "@/hooks/useWorkspace";
 import { useAuth } from "@/hooks/useAuth";
+import { platformUiSelectors, usePlatformUiStore } from "@/stores/platform/platformUiStore";
+import { settingsSelectors, useSettingsStore } from "@/stores/platform/settingsStore";
+import type { SettingsTabId } from "@/stores/platform/settingsStore";
+import { useInstalledApps } from "@/stores/platform/workspaceStore";
 import {
   buildStaticCommands,
   buildInstalledAppCommands,
@@ -19,58 +23,52 @@ import {
   type CommandCategory,
   type CommandItem,
 } from "./command-definitions";
-import { STORAGE_KEYS } from "@/constants";
 
 import { CommandList } from "./CommandList";
 
 export type { CommandItem };
 
-const MAX_RECENT = 5;
-
 function CommandPalette({ onClose }: { onClose: () => void }) {
   const navigate = useNavigate();
-  const { installedApps } = useWorkspace();
+  const installedApps = useInstalledApps();
   const { logout } = useAuth();
+  const openAddWidgetDialog = usePlatformUiStore(platformUiSelectors.openAddWidgetDialog);
+  const recentCommandIds = usePlatformUiStore(platformUiSelectors.recentCommandIds);
+  const trackRecentCommand = usePlatformUiStore(platformUiSelectors.trackRecentCommand);
+  const toggleTheme = useSettingsStore(settingsSelectors.toggleTheme);
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [recentCommands, setRecentCommands] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.RECENT_COMMANDS);
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
   const inputRef = useRef<HTMLInputElement>(null);
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
-  // Stable event dispatch
-  const dispatchCustom = useCallback((event: CustomEvent) => {
-    window.dispatchEvent(event);
-  }, []);
-
   const openAddWidget = useCallback(() => {
-    dispatchCustom(new CustomEvent("superin:open-add-widget"));
-  }, [dispatchCustom]);
+    openAddWidgetDialog();
+  }, [openAddWidgetDialog]);
 
-  const openSettings = useCallback((tab: string) => {
-    dispatchCustom(new CustomEvent("superin:open-settings", { detail: tab }));
-  }, [dispatchCustom]);
+  const navigateSettings = useCallback((tab?: SettingsTabId) => {
+    navigate(ROUTES.SETTINGS_TAB(tab));
+  }, [navigate]);
 
   // Build commands
   const commands = useMemo<CommandItem[]>(() => {
-    const staticCmds = buildStaticCommands(navigate, logout, openAddWidget, openSettings);
+    const staticCmds = buildStaticCommands(
+      navigate,
+      logout,
+      openAddWidget,
+      navigateSettings,
+      toggleTheme
+    );
     const appCmds = buildInstalledAppCommands(installedApps, navigate);
     return [...staticCmds, ...appCmds];
-  }, [installedApps, navigate, logout, openAddWidget, openSettings]);
+  }, [installedApps, navigate, logout, openAddWidget, navigateSettings, toggleTheme]);
 
   // Filter by query
   const filteredCommands = useMemo(() => {
     if (!query.trim()) {
-      const recent = recentCommands
+      const recent = recentCommandIds
         .map((id) => commands.find((c) => c.id === id))
         .filter(Boolean) as CommandItem[];
-      const others = commands.filter((c) => !recentCommands.includes(c.id));
+      const others = commands.filter((c) => !recentCommandIds.includes(c.id));
       return [...recent, ...others];
     }
     const lowerQuery = query.toLowerCase();
@@ -78,7 +76,7 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
       const searchText = [cmd.title, cmd.subtitle, ...cmd.keywords].join(" ").toLowerCase();
       return searchText.includes(lowerQuery);
     });
-  }, [commands, query, recentCommands]);
+  }, [commands, query, recentCommandIds]);
 
   // Group by category
   const groupedDisplay = useMemo(() => {
@@ -112,38 +110,13 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
     inputRef.current?.focus();
   }, []);
 
-  // Track recent commands — debounced to batch writes on rapid interactions
-  const pendingRecent = useRef<string[] | null>(null);
-  const trackRecent = useCallback(
-    (id: string) => {
-      const next = [id, ...recentCommands.filter((c) => c !== id)].slice(0, MAX_RECENT);
-      setRecentCommands(next);
-      pendingRecent.current = next;
-    },
-    [recentCommands]
-  );
-
-  // Flush pending recent commands to localStorage (debounced)
-  useEffect(() => {
-    if (pendingRecent.current === null) return;
-    const toWrite = pendingRecent.current;
-    const timer = setTimeout(() => {
-      try {
-        localStorage.setItem(STORAGE_KEYS.RECENT_COMMANDS, JSON.stringify(toWrite));
-      } catch {
-        // Non-critical
-      }
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [recentCommands]);
-
   const executeCommand = useCallback(
     (cmd: CommandItem) => {
-      trackRecent(cmd.id);
+      trackRecentCommand(cmd.id);
       cmd.action();
       onClose();
     },
-    [onClose, trackRecent]
+    [onClose, trackRecentCommand]
   );
 
   // Scroll selected into view

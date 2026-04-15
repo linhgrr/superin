@@ -2,12 +2,15 @@
  * Header — top navigation with user menu and tour trigger.
  */
 
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
+
+import { ROUTES } from "@/constants";
 import { useOnboarding } from "@/components/providers/onboarding/OnboardingProvider";
 import { DynamicIcon } from "@/lib/icon-resolver";
-import { useState, useEffect, useRef, useCallback } from "react";
-import { ROUTES } from "@/constants";
+import { useAuth } from "@/hooks/useAuth";
+import { useClickOutside } from "@/hooks/useClickOutside";
+import { platformUiSelectors, usePlatformUiStore } from "@/stores/platform/platformUiStore";
 
 interface HeaderProps {
   title?: string;
@@ -20,16 +23,11 @@ function TourMenu() {
   const { startTour, resetTours, isCompleted } = useOnboarding();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setIsOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+  const closeMenu = useCallback(() => {
+    setIsOpen(false);
   }, []);
+
+  useClickOutside(dropdownRef, closeMenu, isOpen);
 
   const tours = [
     { id: "welcome" as const, label: "Welcome Tour", icon: <DynamicIcon name="HelpCircle" size={14} /> },
@@ -77,7 +75,10 @@ function TourMenu() {
             <button
               key={tour.id}
               className="btn"
-              onClick={() => { startTour(tour.id); setIsOpen(false); }}
+              onClick={() => {
+                startTour(tour.id);
+                closeMenu();
+              }}
               style={{
                 width: "100%",
                 justifyContent: "flex-start",
@@ -101,7 +102,10 @@ function TourMenu() {
           <div style={{ borderTop: "1px solid var(--color-border)", margin: "0.5rem 0" }} />
           <button
             className="btn"
-            onClick={() => { resetTours(); setIsOpen(false); }}
+            onClick={() => {
+              resetTours();
+              closeMenu();
+            }}
             style={{
               width: "100%",
               justifyContent: "flex-start",
@@ -123,23 +127,19 @@ function TourMenu() {
 export default function Header({ title, showTourTrigger = true }: HeaderProps) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const openCommandPalette = usePlatformUiStore(platformUiSelectors.openCommandPalette);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
-        setShowUserMenu(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+  const closeUserMenu = useCallback(() => {
+    setShowUserMenu(false);
   }, []);
+
+  useClickOutside(userMenuRef, closeUserMenu, showUserMenu);
 
   const handleLogout = useCallback(async () => {
     await logout();
-    navigate("/login");
+    navigate(ROUTES.LOGIN);
   }, [logout, navigate]);
 
   const userInitials = user?.name
@@ -186,7 +186,7 @@ export default function Header({ title, showTourTrigger = true }: HeaderProps) {
         {/* Command Palette trigger */}
         <button
           className="btn btn-ghost btn-icon"
-          onClick={() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }))}
+          onClick={openCommandPalette}
           title="Command Palette (Cmd+K)"
         >
           <DynamicIcon name="Command" size={16} />
@@ -257,7 +257,10 @@ export default function Header({ title, showTourTrigger = true }: HeaderProps) {
                 </div>
                 <button
                   className="btn"
-                  onClick={() => { navigate("/settings"); setShowUserMenu(false); }}
+                  onClick={() => {
+                    navigate(ROUTES.SETTINGS);
+                    closeUserMenu();
+                  }}
                   style={{
                     width: "100%",
                     justifyContent: "flex-start",
@@ -277,7 +280,10 @@ export default function Header({ title, showTourTrigger = true }: HeaderProps) {
                 </button>
                 <button
                   className="btn"
-                  onClick={() => { navigate(ROUTES.BILLING); setShowUserMenu(false); }}
+                  onClick={() => {
+                    navigate(ROUTES.BILLING);
+                    closeUserMenu();
+                  }}
                   style={{
                     width: "100%",
                     justifyContent: "flex-start",

@@ -1,6 +1,9 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
+
 import { DynamicIcon } from "@/lib/icon-resolver";
+import { useAsyncTask } from "@/hooks/useAsyncTask";
+
 import type { CreateRecurringRuleRequest, RecurringFrequency } from "../api";
 
 interface RecurringRuleFormProps {
@@ -24,11 +27,10 @@ export default function RecurringRuleForm({ onSubmit, onCancel }: RecurringRuleF
   const [daysOfWeek, setDaysOfWeek] = useState<number[]>([]);
   const [endDate, setEndDate] = useState("");
   const [maxOccurrences, setMaxOccurrences] = useState("");
-  const [loading, setLoading] = useState(false);
+  const { isPending: loading, run } = useAsyncTask();
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    setLoading(true);
     try {
       const data: CreateRecurringRuleRequest = {
         frequency,
@@ -37,9 +39,9 @@ export default function RecurringRuleForm({ onSubmit, onCancel }: RecurringRuleF
         end_date: endDate || undefined,
         max_occurrences: maxOccurrences ? Number(maxOccurrences) : undefined,
       };
-      await onSubmit(data);
-    } finally {
-      setLoading(false);
+      await run(() => onSubmit(data));
+    } catch {
+      // The parent form handles user-visible errors.
     }
   }
 

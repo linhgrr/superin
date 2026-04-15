@@ -3,8 +3,8 @@
  */
 
 import type { AppRuntimeEntry } from "@/types/generated";
-import { applyTheme, persistTheme } from "@/lib/theme";
 import { DynamicIcon } from "@/lib/icon-resolver";
+import type { SettingsTabId } from "@/stores/platform/settingsStore";
 
 export type CommandCategory = "apps" | "actions" | "settings" | "help";
 
@@ -39,8 +39,9 @@ export function buildStaticCommands(
   navigate: NavigateFn,
   logout: LogoutFn,
   onOpenAddWidget: () => void,
-  onOpenSettings: (tab: string) => void
-): Omit<CommandItem, "id">[] {
+  onNavigateSettings: (tab?: SettingsTabId) => void,
+  onToggleTheme: () => void
+): CommandItem[] {
   return [
     // ── Apps ──────────────────────────────────────────────────────────────────
     {
@@ -84,15 +85,7 @@ export function buildStaticCommands(
       icon: <DynamicIcon name="Moon" size={18} />,
       shortcut: "T T",
       category: "actions",
-      action: () => {
-        const isDark = document.documentElement.classList.contains("dark");
-        const newTheme = isDark ? "light" : "dark";
-
-        applyTheme(newTheme);
-        persistTheme(newTheme);
-
-        window.dispatchEvent(new CustomEvent("superin:theme-changed", { detail: newTheme }));
-      },
+      action: onToggleTheme,
       keywords: ["theme", "dark", "light", "mode", "toggle", "appearance"],
     },
     // ── Settings ───────────────────────────────────────────────────────────────
@@ -102,7 +95,7 @@ export function buildStaticCommands(
       subtitle: "Manage your preferences and account",
       icon: <DynamicIcon name="Settings" size={18} />,
       category: "settings",
-      action: () => navigate("/settings"),
+      action: () => onNavigateSettings(),
       keywords: ["settings", "preferences", "options", "configuration"],
     },
     {
@@ -111,10 +104,7 @@ export function buildStaticCommands(
       subtitle: "Change appearance preferences",
       icon: <DynamicIcon name="Sun" size={18} />,
       category: "settings",
-      action: () => {
-        navigate("/settings");
-        onOpenSettings("appearance");
-      },
+      action: () => onNavigateSettings("appearance"),
       keywords: ["settings", "theme", "appearance", "display", "preferences"],
     },
     {
@@ -123,10 +113,7 @@ export function buildStaticCommands(
       subtitle: "Manage your account details",
       icon: <DynamicIcon name="User" size={18} />,
       category: "settings",
-      action: () => {
-        navigate("/settings");
-        onOpenSettings("profile");
-      },
+      action: () => onNavigateSettings("profile"),
       keywords: ["settings", "profile", "account", "personal"],
     },
     {
@@ -146,10 +133,7 @@ export function buildStaticCommands(
       icon: <DynamicIcon name="Command" size={18} />,
       shortcut: "?",
       category: "help",
-      action: () => {
-        navigate("/settings");
-        onOpenSettings("keyboard");
-      },
+      action: () => onNavigateSettings("keyboard"),
       keywords: ["help", "shortcuts", "keyboard", "hotkeys", "commands"],
     },
   ];

@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { DynamicIcon } from "@/lib/icon-resolver";
+import { useAsyncTask } from "@/hooks/useAsyncTask";
+import { useDisclosure } from "@/hooks/useDisclosure";
 import { createCategory, getCategories, type CategoryRead } from "../../api";
 import type { CreateCategoryRequest } from "../../api";
 import Modal from "../../components/Modal";
@@ -8,28 +10,27 @@ import CategoryEditForm from "../../components/CategoryEditForm";
 
 export default function CategoriesTab() {
   const [categories, setCategories] = useState<CategoryRead[]>([]);
-  const [showModal, setShowModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState<CategoryRead | null>(null);
-  const [loading, setLoading] = useState(true);
+  const createCategoryModal = useDisclosure();
+  const { isPending: loading, run } = useAsyncTask(true);
 
-  function load() {
-    setLoading(true);
-    getCategories()
-      .then(setCategories)
-      .catch((error: unknown) => {
-        console.error("Failed to load categories", error);
-      })
-      .finally(() => setLoading(false));
-  }
+  const load = useCallback(async () => {
+    try {
+      const nextCategories = await run(() => getCategories());
+      setCategories(nextCategories);
+    } catch (error: unknown) {
+      console.error("Failed to load categories", error);
+    }
+  }, [run]);
 
   useEffect(() => {
-    load();
-  }, []);
+    void load();
+  }, [load]);
 
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1rem" }}>
-        <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+        <button className="btn btn-primary" onClick={createCategoryModal.open}>
           + New Category
         </button>
       </div>
@@ -89,8 +90,8 @@ export default function CategoriesTab() {
         </div>
       )}
 
-      {showModal && (
-        <Modal title="New Category" onClose={() => setShowModal(false)}>
+      {createCategoryModal.isOpen && (
+        <Modal title="New Category" onClose={createCategoryModal.close}>
           <SimpleForm
             fields={[
               { label: "Name", key: "name", placeholder: "e.g. Food" },
@@ -100,15 +101,20 @@ export default function CategoriesTab() {
             ]}
             submitLabel="Create Category"
             onSubmit={async (values) => {
+              const budget = Number.parseFloat(values.budget);
+              if (!Number.isFinite(budget) || budget < 0) {
+                throw new Error("Budget must be 0 or greater");
+              }
+
               const request: CreateCategoryRequest = {
                 name: values.name,
                 icon: values.icon || "Tag",
                 color: values.color || "oklch(0.65 0.21 280)",
-                budget: parseFloat(values.budget) || 0,
+                budget,
               };
               await createCategory(request);
-              setShowModal(false);
-              load();
+              createCategoryModal.close();
+              void load();
             }}
           />
         </Modal>

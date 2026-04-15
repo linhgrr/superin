@@ -1,5 +1,5 @@
 /**
- * Shared preference merge utilities — used by both WorkspaceProvider
+ * Shared preference merge utilities — used by the workspace store
  * and useWidgetPreferences. Keeps the merge semantics in one place.
  */
 

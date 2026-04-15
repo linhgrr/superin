@@ -1,5 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { DynamicIcon } from "@/lib/icon-resolver";
+import { useAsyncTask } from "@/hooks/useAsyncTask";
+import { useDisclosure } from "@/hooks/useDisclosure";
+import { dateInputValueToUtcIso, toDateInputValue } from "@/shared/utils/datetime";
 import { createTransaction, getTransactions, type TransactionRead, getWallets, getCategories, type WalletRead, type CategoryRead } from "../../api";
 import type { CreateTransactionRequest } from "../../api";
 import Modal from "../../components/Modal";
@@ -17,46 +20,42 @@ function isTransactionType(value: string): value is CreateTransactionRequest["ty
 export default function TransactionsTab() {
   const { formatDate } = useTimezone();
   const [transactions, setTransactions] = useState<TransactionRead[]>([]);
-  const [showModal, setShowModal] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<TransactionRead | null>(null);
   const [wallets, setWallets] = useState<WalletRead[]>([]);
   const [categories, setCategories] = useState<CategoryRead[]>([]);
-  const [loading, setLoading] = useState(true);
+  const createTransactionModal = useDisclosure();
+  const { isPending: loading, run } = useAsyncTask(true);
 
-  function load() {
-    setLoading(true);
-    getTransactions({ limit: 50 })
-      .then(setTransactions)
-      .catch((error: unknown) => {
-        console.error("Failed to load transactions", error);
-      })
-      .finally(() => setLoading(false));
-  }
-
-  function loadWalletsAndCategories() {
-    getWallets()
-      .then(setWallets)
-      .catch((error: unknown) => {
-        console.error("Failed to load wallets", error);
-      });
-    getCategories()
-      .then(setCategories)
-      .catch((error: unknown) => {
-        console.error("Failed to load categories", error);
-      });
-  }
+  const load = useCallback(async () => {
+    try {
+      const [nextTransactions, nextWallets, nextCategories] = await run(() =>
+        Promise.all([
+          getTransactions({ limit: 50 }),
+          getWallets(),
+          getCategories(),
+        ])
+      );
+      setTransactions(nextTransactions);
+      setWallets(nextWallets);
+      setCategories(nextCategories);
+    } catch (error: unknown) {
+      console.error("Failed to load finance transaction data", error);
+    }
+  }, [run]);
 
   useEffect(() => {
-    load();
-    loadWalletsAndCategories();
-  }, []);
+    void load();
+  }, [load]);
 
-  const categoryNameById = new Map(categories.map((category) => [category.id, category.name] as const));
+  const categoryNameById = useMemo(
+    () => new Map(categories.map((category) => [category.id, category.name] as const)),
+    [categories]
+  );
 
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1rem" }}>
-        <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+        <button className="btn btn-primary" onClick={createTransactionModal.open}>
           + New Transaction
         </button>
       </div>
@@ -130,31 +129,70 @@ export default function TransactionsTab() {
         </div>
       )}
 
-      {showModal && (
-        <Modal title="New Transaction" onClose={() => setShowModal(false)}>
+      {createTransactionModal.isOpen && (
+        <Modal title="New Transaction" onClose={createTransactionModal.close}>
           <SimpleForm
             fields={[
-              { label: "Wallet ID", key: "wallet_id", placeholder: "Wallet ID" },
-              { label: "Category ID", key: "category_id", placeholder: "Category ID" },
-              { label: "Type", key: "type", placeholder: "income or expense" },
+              {
+                label: "Wallet",
+                key: "wallet_id",
+                initialValue: wallets[0]?.id ?? "",
+                options: wallets.map((wallet) => ({
+                  label: `${wallet.name} (${wallet.currency})`,
+                  value: wallet.id,
+                })),
+              },
+              {
+                label: "Category",
+                key: "category_id",
+                initialValue: categories[0]?.id ?? "",
+                options: categories.map((category) => ({
+                  label: category.name,
+                  value: category.id,
+                })),
+              },
+              {
+                label: "Type",
+                key: "type",
+                options: TRANSACTION_TYPE_VALUES.map((value) => ({
+                  label: value === "income" ? "Income" : "Expense",
+                  value,
+                })),
+                initialValue: "expense",
+              },
               { label: "Amount", key: "amount", type: "number", placeholder: "0.00" },
-              { label: "Date (ISO)", key: "date", placeholder: new Date().toISOString() },
-              { label: "Note (optional)", key: "note", placeholder: "Lunch at restaurant" },
+              {
+                label: "Date",
+                key: "date",
+                type: "date",
+                initialValue: toDateInputValue(new Date()),
+              },
+              { label: "Note", key: "note", placeholder: "Lunch at restaurant", required: false },
             ]}
             submitLabel="Add Transaction"
             onSubmit={async (values) => {
               const transactionType = isTransactionType(values.type) ? values.type : "expense";
+              const amount = Number.parseFloat(values.amount);
+              if (!Number.isFinite(amount) || amount <= 0) {
+                throw new Error("Amount must be greater than 0");
+              }
+
+              const date = dateInputValueToUtcIso(values.date);
+              if (!date) {
+                throw new Error("Please select a valid transaction date");
+              }
+
               const request: CreateTransactionRequest = {
                 wallet_id: values.wallet_id,
                 category_id: values.category_id,
                 type: transactionType,
-                amount: parseFloat(values.amount),
-                date: new Date(values.date).toISOString(),
+                amount,
+                date,
                 note: values.note || undefined,
               };
               await createTransaction(request);
-              setShowModal(false);
-              load();
+              createTransactionModal.close();
+              void load();
             }}
           />
         </Modal>

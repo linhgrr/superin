@@ -13,6 +13,8 @@ export const ROUTES = {
   BILLING_SUCCESS: "/billing/success",
   BILLING_CANCEL: "/billing/cancel",
   SETTINGS: "/settings",
+  SETTINGS_TAB: (tab?: string) =>
+    tab ? `/settings?tab=${encodeURIComponent(tab)}` : "/settings",
   ADMIN: "/admin",
   CHAT: "/chat",
   APP_DETAIL: (appId: string) => `/apps/${appId}`,

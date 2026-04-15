@@ -9,147 +9,76 @@
  *   └── KeyboardSection      (shortcuts reference)
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useCallback, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { DynamicIcon } from "@/lib/icon-resolver";
-import { STORAGE_KEYS } from "@/constants";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/components/providers/ToastProvider";
-import { updateUserSettings } from "@/api/auth";
-import { applyTheme } from "@/lib/theme";
-import {
-  DEFAULT_SETTINGS,
-  type SettingsState,
-  type Theme,
-} from "./settings-constants";
+import type { SettingsState } from "./settings-constants";
 import ProfileSection from "./ProfileSection";
 import AppearanceSection from "./AppearanceSection";
 import NotificationsSection from "./NotificationsSection";
 import KeyboardSection from "./KeyboardSection";
-
-type TabId = "profile" | "appearance" | "notifications" | "keyboard";
+import { settingsSelectors, useSettingsStore } from "@/stores/platform/settingsStore";
+import type { SettingsTabId } from "@/stores/platform/settingsStore";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const VALID_TABS: TabId[] = ["profile", "appearance", "notifications", "keyboard"];
-
-const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
+const TABS: { id: SettingsTabId; label: string; icon: React.ReactNode }[] = [
   { id: "profile", label: "Profile", icon: <DynamicIcon name="User" size={18} /> },
   { id: "appearance", label: "Appearance", icon: <DynamicIcon name="Palette" size={18} /> },
   { id: "notifications", label: "Notifications", icon: <DynamicIcon name="Bell" size={18} /> },
   { id: "keyboard", label: "Keyboard", icon: <DynamicIcon name="Keyboard" size={18} /> },
 ];
 
-const OPEN_SETTINGS_EVENT = "superin:open-settings";
-const THEME_CHANGED_EVENT = "superin:theme-changed";
+const DEFAULT_SETTINGS_TAB: SettingsTabId = "profile";
+
+function isSettingsTabId(value: string | null): value is SettingsTabId {
+  return TABS.some((tab) => tab.id === value);
+}
 
 // ─── Page ───────────────────────────────────────────────────────────────────
 
 export default function SettingsPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const toast = useToast();
-  const [activeTab, setActiveTab] = useState<TabId>("profile");
-  const [isSaving, setIsSaving] = useState(false);
-  const [settingsSnapshot, setSettingsSnapshot] = useState<SettingsState | null>(null);
-
-  // Load from localStorage
-  const [settings, setSettings] = useState<SettingsState>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.USER_SETTINGS);
-    return saved ? { ...DEFAULT_SETTINGS, ...JSON.parse(saved) } : DEFAULT_SETTINGS;
-  });
+  const isSaving = useSettingsStore(settingsSelectors.isSaving);
+  const saveSettings = useSettingsStore(settingsSelectors.saveSettings);
+  const settings = useSettingsStore(settingsSelectors.settings);
+  const syncTimezoneFromUser = useSettingsStore(settingsSelectors.syncTimezoneFromUser);
+  const activeTabParam = searchParams.get("tab");
+  const activeTab = isSettingsTabId(activeTabParam) ? activeTabParam : DEFAULT_SETTINGS_TAB;
 
   // Sync timezone from user settings when available
   useEffect(() => {
-    const timezone = user?.settings?.timezone;
-    if (typeof timezone === "string" && timezone.length > 0) {
-      setSettings((prev) => ({ ...prev, timezone }));
-    }
-  }, [user?.settings?.timezone]);
+    syncTimezoneFromUser(user?.settings?.timezone);
+  }, [syncTimezoneFromUser, user?.settings?.timezone]);
 
-  // Apply theme to <html>
-  useEffect(() => {
-    applyTheme(settings.theme);
-  }, [settings.theme]);
-
-  // Listen for custom event to open a specific tab
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const tab = (e as CustomEvent<string>).detail as TabId;
-      if (VALID_TABS.includes(tab)) {
-        setActiveTab(tab);
-      }
-    };
-    window.addEventListener(OPEN_SETTINGS_EVENT, handler);
-    return () => window.removeEventListener(OPEN_SETTINGS_EVENT, handler);
-  }, []);
-
-  // Listen for theme changes from other sources (Command Palette)
-  useEffect(() => {
-    const handler = (e: Event) => {
-      setSettings((prev) => ({ ...prev, theme: (e as CustomEvent<string>).detail as Theme }));
-    };
-    window.addEventListener(THEME_CHANGED_EVENT, handler);
-    return () => window.removeEventListener(THEME_CHANGED_EVENT, handler);
-  }, []);
-
-  // Cross-tab sync
-  useEffect(() => {
-    const handler = (e: StorageEvent) => {
-      if (e.key === STORAGE_KEYS.USER_SETTINGS && e.newValue) {
-        try {
-          setSettings((prev) => ({ ...prev, ...JSON.parse(e.newValue!) }));
-        } catch {
-          toast.error("Failed to sync settings", {
-            description: "Could not parse settings from another tab",
-          });
-        }
-      }
-    };
-    window.addEventListener("storage", handler);
-    return () => window.removeEventListener("storage", handler);
-  }, [toast]);
-
-  const pendingSettings = useRef<SettingsState | null>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Debounce localStorage write — fires 300ms after the last settings change
-  useEffect(() => {
-    if (!settingsSnapshot) return;
-    timerRef.current = setTimeout(() => {
-      try {
-        if (pendingSettings.current) {
-          localStorage.setItem(STORAGE_KEYS.USER_SETTINGS, JSON.stringify(pendingSettings.current));
-        }
-      } catch (error) {
-        console.error("Failed to persist settings to localStorage", error);
-      }
-    }, 300);
-    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
-  }, [settingsSnapshot]);
-
-  const saveSettings = useCallback(
-    async (newSettings: Partial<SettingsState>) => {
-      setIsSaving(true);
-      const updated = { ...settings, ...newSettings };
-      setSettings(updated);
-      pendingSettings.current = updated;
-      setSettingsSnapshot({ ...updated });
-
-      if (newSettings.timezone) {
-        try {
-          await updateUserSettings({ settings: { timezone: newSettings.timezone } });
-        } catch {
+  const handleSave = useCallback(
+    (updates: Partial<SettingsState>) => {
+      void saveSettings(updates).then(({ serverSyncFailed, timezoneSynced }) => {
+        if (updates.timezone && !timezoneSynced) {
           toast.error("Failed to sync timezone", {
             description: "Your timezone preference could not be saved to the server",
           });
+          return;
         }
-      }
 
-      setIsSaving(false);
-      toast.success("Settings saved", { description: "Your preferences have been updated" });
+        if (serverSyncFailed) {
+          toast.warning("Settings saved locally", {
+            description: "Some preferences could not be synced to the server",
+          });
+          return;
+        }
+
+        toast.success("Settings saved", {
+          description: "Your preferences have been updated",
+        });
+      });
     },
-    [settings, toast]
+    [saveSettings, toast]
   );
 
   const handleLogout = useCallback(async () => {
@@ -157,7 +86,24 @@ export default function SettingsPage() {
     navigate("/login");
   }, [logout, navigate]);
 
-  const isTabActive = (id: TabId) => activeTab === id;
+  const handleTabChange = useCallback(
+    (tab: SettingsTabId) => {
+      setSearchParams((currentParams) => {
+        const nextParams = new URLSearchParams(currentParams);
+
+        if (tab === DEFAULT_SETTINGS_TAB) {
+          nextParams.delete("tab");
+        } else {
+          nextParams.set("tab", tab);
+        }
+
+        return nextParams;
+      }, { replace: true });
+    },
+    [setSearchParams]
+  );
+
+  const isTabActive = (id: SettingsTabId) => activeTab === id;
 
   return (
     <div style={{ maxWidth: "720px", margin: "0 auto", animation: "fadeIn 0.3s ease" }}>
@@ -197,7 +143,7 @@ export default function SettingsPage() {
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => handleTabChange(tab.id)}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -224,13 +170,13 @@ export default function SettingsPage() {
 
       {/* Tab content */}
       {activeTab === "profile" && (
-        <ProfileSection settings={settings} onSave={saveSettings} onLogout={handleLogout} />
+        <ProfileSection settings={settings} onSave={handleSave} onLogout={handleLogout} />
       )}
       {activeTab === "appearance" && (
-        <AppearanceSection settings={settings} onSave={saveSettings} />
+        <AppearanceSection settings={settings} onSave={handleSave} />
       )}
       {activeTab === "notifications" && (
-        <NotificationsSection settings={settings} onSave={saveSettings} />
+        <NotificationsSection settings={settings} onSave={handleSave} />
       )}
       {activeTab === "keyboard" && <KeyboardSection />}
 

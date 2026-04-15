@@ -1,5 +1,9 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
+
+import { useAsyncTask } from "@/hooks/useAsyncTask";
+import { dateInputValueToUtcIso, toDateInputValue } from "@/shared/utils/datetime";
+
 import type { TransactionRead, WalletRead, CategoryRead } from "../api";
 import { updateTransaction } from "../api";
 
@@ -19,32 +23,41 @@ export default function TransactionEditForm({
   onCancel,
 }: TransactionEditFormProps) {
   const [amount, setAmount] = useState(String(transaction.amount));
-  const [date, setDate] = useState(transaction.date.slice(0, 10));
+  const [date, setDate] = useState(toDateInputValue(transaction.date));
   const [note, setNote] = useState(transaction.note || "");
   const [walletId, setWalletId] = useState(transaction.wallet_id);
   const [categoryId, setCategoryId] = useState(transaction.category_id);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { isPending: loading, run } = useAsyncTask();
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    if (!amount.trim() || Number(amount) <= 0) return;
+    const normalizedAmount = Number.parseFloat(amount);
+    if (!Number.isFinite(normalizedAmount) || normalizedAmount <= 0) {
+      setError("Amount must be greater than 0");
+      return;
+    }
 
-    setLoading(true);
+    const normalizedDate = dateInputValueToUtcIso(date);
+    if (!normalizedDate) {
+      setError("Please select a valid date");
+      return;
+    }
+
     setError(null);
     try {
-      const updated = await updateTransaction(transaction.id, {
-        amount: Number(amount),
-        date: new Date(date).toISOString(),
-        note: note.trim() || undefined,
-        wallet_id: walletId,
-        category_id: categoryId,
-      });
+      const updated = await run(() =>
+        updateTransaction(transaction.id, {
+          amount: normalizedAmount,
+          date: normalizedDate,
+          note: note.trim() || undefined,
+          wallet_id: walletId,
+          category_id: categoryId,
+        })
+      );
       onSave(updated);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update transaction");
-    } finally {
-      setLoading(false);
     }
   }
 
@@ -174,7 +187,7 @@ export default function TransactionEditForm({
         <button
           type="submit"
           className="btn btn-primary"
-          disabled={loading || !amount.trim() || Number(amount) <= 0}
+          disabled={loading}
         >
           {loading ? "Saving…" : "Save Changes"}
         </button>

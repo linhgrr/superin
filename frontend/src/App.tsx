@@ -9,13 +9,12 @@
  *   /apps/:appId → AppPage (protected)
  */
 
-import { lazy, Suspense, useCallback, useEffect, useState, type ComponentType, type LazyExoticComponent } from "react";
-import { BrowserRouter, Navigate, Route, Routes, useNavigate } from "react-router-dom";
+import { lazy, Suspense, type ComponentType, type LazyExoticComponent } from "react";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AppProviders } from "@/components/providers/AppProviders";
 import { DiscoveryInitializer } from "@/components/providers/DiscoveryInitializer";
-import { WorkspaceProvider } from "@/components/providers/WorkspaceProvider";
+import { ProtectedShellRuntime } from "@/components/providers/platform/ProtectedShellRuntime";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
-import { applyTheme, readStoredTheme } from "@/lib/theme";
 import AppShell from "@/pages/AppShell";
 
 const LoginPage = lazy(() => import("@/pages/LoginPage"));
@@ -27,37 +26,7 @@ const BillingCancelPage = lazy(() => import("@/pages/billing/BillingCancelPage")
 const AppPage = lazy(() => import("@/pages/AppPage"));
 const SettingsPage = lazy(() => import("@/pages/settings/SettingsPage"));
 const AdminPage = lazy(() => import("@/pages/admin/AdminPage"));
-const CommandPalette = lazy(async () => {
-  const module = await import("@/components/providers/command-palette/CommandPalette");
-  return { default: module.CommandPalette };
-});
 const ChatPage = lazy(() => import("@/pages/ChatPage"));
-
-// ─── Global Theme Loader ───────────────────────────────────────────────────────
-
-function ThemeLoader() {
-  useEffect(() => {
-    const syncTheme = () => applyTheme(readStoredTheme());
-    syncTheme();
-
-    const media = window.matchMedia("(prefers-color-scheme: dark)");
-    const onSystemThemeChange = () => {
-      if (readStoredTheme() === "system") {
-        syncTheme();
-      }
-    };
-
-    if (typeof media.addEventListener === "function") {
-      media.addEventListener("change", onSystemThemeChange);
-      return () => media.removeEventListener("change", onSystemThemeChange);
-    }
-
-    media.addListener(onSystemThemeChange);
-    return () => media.removeListener(onSystemThemeChange);
-  }, []);
-
-  return null;
-}
 
 function RouteFallback() {
   return (
@@ -72,19 +41,6 @@ function RouteFallback() {
     >
       Loading…
     </div>
-  );
-}
-
-function CommandPaletteFallback() {
-  return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 1000,
-        background: "oklch(0 0 0 / 0.35)",
-      }}
-    />
   );
 }
 
@@ -137,69 +93,11 @@ function PublicOnly({ children }: { children: React.ReactNode }) {
 function ShellLayout() {
   return (
     <Protected>
-      <WorkspaceProvider>
-        <DiscoveryInitializer>
-          <CommandPaletteWrapper>
-            <AppShell />
-          </CommandPaletteWrapper>
-        </DiscoveryInitializer>
-      </WorkspaceProvider>
+      <ProtectedShellRuntime />
+      <DiscoveryInitializer>
+        <AppShell />
+      </DiscoveryInitializer>
     </Protected>
-  );
-}
-
-// ─── Command Palette Wrapper ─────────────────────────────────────────────────
-
-function CommandPaletteWrapper({ children }: { children: React.ReactNode }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const navigate = useNavigate();
-
-  const handleClose = useCallback(() => setIsOpen(false), []);
-
-  useEffect(() => {
-    const handle = window.setTimeout(() => {
-      void import("@/components/providers/command-palette/CommandPalette");
-    }, 200);
-    return () => {
-      window.clearTimeout(handle);
-    };
-  }, []);
-
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Cmd/Ctrl + K for Command Palette
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault();
-        setIsOpen((prev) => !prev);
-      }
-      // ? for Keyboard Shortcuts (not in input)
-      if (e.key === "?" && !e.metaKey && !e.ctrlKey && !e.altKey) {
-        const target = e.target as HTMLElement;
-        if (target.tagName !== "INPUT" && target.tagName !== "TEXTAREA" && target.contentEditable !== "true") {
-          e.preventDefault();
-          navigate("/settings");
-          // Dispatch event to switch to keyboard tab
-          setTimeout(() => {
-            window.dispatchEvent(new CustomEvent("superin:open-settings", { detail: "keyboard" }));
-          }, 100);
-        }
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [navigate]);
-
-  return (
-    <>
-      {children}
-      {isOpen && (
-        <Suspense fallback={<CommandPaletteFallback />}>
-          <CommandPalette onClose={handleClose} />
-        </Suspense>
-      )}
-    </>
   );
 }
 
@@ -210,7 +108,6 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         <AppProviders>
-          <ThemeLoader />
           <Routes>
             {/* Public */}
             <Route

@@ -5,19 +5,21 @@
  * Hidden on /chat because that route already renders the chat UI.
  */
 
-import { lazy, Suspense, useState } from "react";
-import { DynamicIcon } from "@/lib/icon-resolver";
+import { lazy, Suspense } from "react";
 import { useLocation } from "react-router-dom";
-import { ROUTES } from "@/constants";
+
+import { DynamicIcon } from "@/lib/icon-resolver";
+import { isChatRoute } from "@/lib/routes";
+import { useDisclosure } from "@/hooks/useDisclosure";
 
 const ChatOverlay = lazy(() => import("./ChatOverlay"));
 
 export default function MobileChatFAB() {
   const location = useLocation();
-  const [isOpen, setIsOpen] = useState(false);
-  const isChatRoute = location.pathname === ROUTES.CHAT;
+  const chatOverlay = useDisclosure();
+  const hiddenOnRoute = isChatRoute(location.pathname);
 
-  if (isChatRoute) {
+  if (hiddenOnRoute) {
     return null;
   }
 
@@ -25,16 +27,16 @@ export default function MobileChatFAB() {
     <>
       <button
         className="mobile-chat-fab"
-        onClick={() => setIsOpen(true)}
+        onClick={chatOverlay.open}
         aria-label="Open chat"
         type="button"
       >
         <DynamicIcon name="MessageCircle" size={22} strokeWidth={2} />
       </button>
 
-      {isOpen && (
+      {chatOverlay.isOpen && (
         <Suspense fallback={null}>
-          <ChatOverlay onClose={() => setIsOpen(false)} />
+          <ChatOverlay onClose={chatOverlay.close} />
         </Suspense>
       )}
     </>
