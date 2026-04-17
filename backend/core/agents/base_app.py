@@ -8,12 +8,13 @@ from typing import Any, Literal
 
 from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
 from langchain_core.tools import BaseTool
+from langgraph.errors import GraphRecursionError
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import create_react_agent
 from loguru import logger
 
 from core.config import settings
-from core.constants import AGENT_RECURSION_LIMIT, MAX_TOOL_CALLS_PER_DELEGATION
+from core.constants import AGENT_RECURSION_LIMIT
 from core.models import User
 from core.utils.timezone import get_user_timezone_context
 from shared.agent_context import get_user_context, set_thread_context, set_user_context
@@ -27,25 +28,6 @@ ToolErrorCode = Literal[
     "internal_error",
     "too_many_tool_calls",
 ]
-
-
-def _content_to_text(content: Any) -> str:
-    if isinstance(content, str):
-        return content.strip()
-
-    if isinstance(content, list):
-        text_parts: list[str] = []
-        for part in content:
-            if isinstance(part, str):
-                text_parts.append(part)
-            elif isinstance(part, dict):
-                if part.get("type") == "text":
-                    text_parts.append(str(part.get("text", "")))
-                elif "text" in part:
-                    text_parts.append(str(part["text"]))
-        return "\n".join(part for part in text_parts if part).strip()
-
-    return str(content).strip()
 
 
 def _parse_tool_message_content(content: Any) -> Any:
@@ -100,11 +82,20 @@ class BaseAppAgent:
     def build_prompt(self) -> str:
         raise NotImplementedError
 
-    async def delegate(self, question: str, thread_id: str) -> dict[str, Any]:
-        user_id = get_user_context()
+
+    async def delegate(
+        self,
+        question: str,
+        thread_id: str,
+        user_id: str | None = None,
+        **_kwargs: Any,
+    ) -> dict[str, Any]:
+        # Support explicit user_id (from @entrypoint) or ContextVar (from old-style invoke)
+        # Accept **_kwargs for forward-compat (e.g. `config` passed by workers.py)
+        if user_id is None:
+            user_id = get_user_context()
         if not user_id:
             raise RuntimeError(f"{self.app_id} agent invoked without user context")
-
         logger.info("BaseAppAgent.delegate START  app={}  user={}  thread={}  question={}", self.app_id, user_id, thread_id, question[:80])
 
         parent_thread_id = thread_id
@@ -144,35 +135,45 @@ class BaseAppAgent:
                 self.app_id,
                 settings.llm_request_timeout_seconds,
             )
-            return {
-                "app": self.app_id,
-                "status": "failed",
-                "ok": False,
-                "message": (
-                    f"The {self.app_id} assistant timed out while waiting for the language model. "
-                    "Please try again."
-                ),
-                "question": question,
-                "tool_results": [],
-            }
+            return self._failed_result(
+                question,
+                f"The {self.app_id} assistant timed out while waiting for the language model. "
+                "Please try again.",
+            )
+        except GraphRecursionError:
+            logger.warning(
+                "%s child agent exceeded recursion limit (%d)",
+                self.app_id,
+                AGENT_RECURSION_LIMIT,
+            )
+            return self._failed_result(
+                question,
+                f"The {self.app_id} assistant needed too many steps to complete this request. "
+                "Please try a simpler query.",
+            )
         except (AttributeError, TypeError, ValueError) as exc:
             # Programming / domain errors — surface to caller with a clear message
             logger.error("%s child agent encountered an error: %s", self.app_id, exc)
-            return {
-                "app": self.app_id,
-                "status": "failed",
-                "ok": False,
-                "message": (
-                    f"The {self.app_id} assistant hit an internal error while handling that request. "
-                    "Please try again."
-                ),
-                "question": question,
-                "tool_results": [],
-            }
+            return self._failed_result(
+                question,
+                f"The {self.app_id} assistant hit an internal error while handling that request. "
+                "Please try again.",
+            )
         finally:
             set_user_context(user_id)
             set_thread_context(parent_thread_id)
             logger.info("BaseAppAgent.delegate END  app={}  user={}  status={}", self.app_id, user_id, final_status)
+
+    def _failed_result(self, question: str, message: str) -> dict[str, Any]:
+        """Build a standardized failure result dict."""
+        return {
+            "app": self.app_id,
+            "status": "failed",
+            "ok": False,
+            "message": message,
+            "question": question,
+            "tool_results": [],
+        }
 
     def _build_delegate_result(
         self,
@@ -196,51 +197,26 @@ class BaseAppAgent:
     def _extract_reply(self, messages: list[BaseMessage]) -> str:
         for message in reversed(messages):
             if isinstance(message, AIMessage):
-                text = _content_to_text(message.content)
+                text = message.text().strip()
                 if text:
                     return text
 
         if messages:
-            return _content_to_text(getattr(messages[-1], "content", ""))
+            return messages[-1].text().strip()
 
         return ""
 
     def _extract_tool_results(self, messages: list[BaseMessage]) -> list[dict[str, Any]]:
-        """Extract tool results with safety check for excessive tool calls.
+        """Extract tool results from messages.
 
-        Combines result extraction with tool call counting in single pass for efficiency.
+        Note: Manual tool call counting (MAX_TOOL_CALLS_PER_DELEGATION) has been
+        removed — recursion_limit + GraphRecursionError handling is sufficient.
         """
         results: list[dict[str, Any]] = []
-        tool_call_count = 0
 
         for message in messages:
             if not isinstance(message, ToolMessage):
                 continue
-
-            tool_call_count += 1
-
-            # Early check: stop processing if already exceeded limit
-            if tool_call_count > MAX_TOOL_CALLS_PER_DELEGATION:
-                logger.warning(
-                    "{} agent exceeded max tool calls ({} > {})",
-                    self.app_id,
-                    tool_call_count,
-                    MAX_TOOL_CALLS_PER_DELEGATION,
-                )
-                return [{
-                    "tool_name": "safety_check",
-                    "tool_call_id": "safety",
-                    "ok": False,
-                    "data": None,
-                    "error": {
-                        "message": (
-                            f"Too many tool calls ({tool_call_count}) for this request. "
-                            "Please try a simpler query."
-                        ),
-                        "code": "too_many_tool_calls",
-                        "retryable": True,
-                    },
-                }]
 
             payload = _parse_tool_message_content(message.content)
             if isinstance(payload, dict) and "ok" in payload:

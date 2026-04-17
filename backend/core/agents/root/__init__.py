@@ -1,32 +1,44 @@
 """
-RootAgent — top-level LangGraph orchestrator.
+RootAgent — top-level parallel orchestrator using LangGraph v2 @entrypoint.
 
 Plugin discovery is fully automatic:
   - PLUGIN_REGISTRY is scanned at startup
-  - Each installed AppAgent is wrapped as a tool: ask_{app_id}(question)
-  - The root runtime injects thread context when delegating to a child agent
-  - LLM decides which installed app agent to delegate to based on the user's request
+  - @task workers are registered for every plugin agent
+  - The root @entrypoint fans out to parallel @task workers
 
-Hierarchy:
-    RootAgent (create_react_agent, top-level)
-        └── Tool: ask_finance   ──→ FinanceAgent (child graph, app-scoped thread)
-        └── Tool: ask_todo      ──→ TodoAgent    (child graph, app-scoped thread)
+Architecture:
+    @entrypoint root_agent
+        ├── decide_target_apps(messages, installed_apps)  → list[app_id]
+        └── for app_id in target_apps:
+                future = task_fn(question=...) → submit to LangGraph executor
+            for app_id, future in futures:
+                result = await future  → collect results (parallel execution)
+                ↓
+            Results collected → merged → synthesized → returned
 
-Message persistence:
-  - `conversation_messages` stores canonical user/assistant thread history.
-  - LangGraph's `MongoDBStore` handles long-term persistent knowledge via memory tools
-    (save_memory, recall_memories, delete_memory).
-  - Each child AppAgent is a stateless LangGraph specialist invoked by the root agent.
+Streaming:
+  - Partial app results streamed via writer({type: "app_result", ...})
+  - Final answer tokens streamed via writer({type: "token", ...})
+  - Done signal via writer({type: "done", ...})
+
+Memory:
+  - Short-term: conversation history loaded from MongoDB per-request
+  - Long-term: store (MongoDBStore via get_store()) → user memories across sessions
 """
 
 from .agent import RootAgent, root_agent
-from .prompts import build_system_prompt
-from .root_tools import _build_ask_tool, _build_memory_tools
+from .graph import get_root_agent_graph, refresh_graph
+from .memory import delete_memory, recall_memories, recall_memories_for_context, save_memory
 
 __all__ = [
     "RootAgent",
     "root_agent",
-    "build_system_prompt",
-    "_build_ask_tool",
-    "_build_memory_tools",
+    "get_root_agent_graph",
+    "refresh_graph",
+    # Memory helpers
+    "save_memory",
+    "recall_memories",
+    "recall_memories_for_context",
+    "delete_memory",
 ]
+

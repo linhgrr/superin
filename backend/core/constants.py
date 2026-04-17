@@ -25,7 +25,6 @@ RATE_LIMIT_DEFAULT = 120  # per minute per user
 
 MAX_MESSAGE_LENGTH = 10000               # characters per message
 MAX_TOOL_CALL_ARGUMENTS_SIZE = 5000      # JSON characters per tool call
-MAX_TOOL_CALLS_PER_DELEGATION = 30       # per agent invocation
 AGENT_RECURSION_LIMIT = 25                # LangGraph recursion limit for child agents
 
 

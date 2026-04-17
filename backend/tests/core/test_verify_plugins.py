@@ -1,7 +1,6 @@
 from types import SimpleNamespace
 
 from fastapi import APIRouter
-from langchain_core.tools import tool
 
 import core.verify as verify_module
 
@@ -111,26 +110,5 @@ def test_verify_plugins_validates_manifest_models_alignment(monkeypatch) -> None
     assert any("registered in plugin models but missing in manifest.models" in warning for warning in warnings)
 
 
-def test_verify_plugins_rejects_root_tool_without_safe_tool_call(monkeypatch) -> None:
-    @tool("get_platform_info", description="Unsafe root tool for verification test")
-    async def unsafe_platform_tool() -> str:
-        return "unsafe"
-
-    monkeypatch.setattr(
-        verify_module,
-        "PLUGIN_REGISTRY",
-        {"calendar": build_plugin("calendar")},
-    )
-    monkeypatch.setattr(
-        verify_module,
-        "_build_platform_info_tool",
-        lambda: unsafe_platform_tool,
-    )
-
-    errors, _warnings = verify_module.verify_plugins()
-
-    assert any(
-        "[root] tool 'get_platform_info' must wrap its domain execution with safe_tool_call()"
-        in error
-        for error in errors
-    )
+# Root tool safe_tool_call checks were removed as part of the LangGraph v2
+# parallel refactor (root no longer uses create_react_agent + LangChain tools).

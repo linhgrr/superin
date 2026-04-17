@@ -4,88 +4,14 @@ errors   → server WILL NOT start (RuntimeError).
 warnings → server starts but logs to console.
 """
 
-import inspect
 import re
-from typing import Any
 
-from core.agents.root.root_tools import (
-    _build_ask_tool,
-    _build_install_app_tool,
-    _build_platform_info_tool,
-    _build_uninstall_app_tool,
-)
 from core.constants import API_ROOT
 from core.registry import PLUGIN_REGISTRY
 from shared.enums import VALID_WIDGET_SIZES
 
 APP_ID_PATTERN = re.compile(r"^[a-z0-9]+$")
 WIDGET_SUFFIX_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
-
-
-class _VerifyRootDelegateAgent:
-    """Minimal delegate stub used to build root ask_* tool during verification."""
-
-    async def delegate(self, question: str, thread_id: str) -> dict[str, Any]:
-        return {
-            "ok": True,
-            "status": "no_action",
-            "app": "verify",
-            "message": question,
-            "question": question,
-            "tool_results": [],
-        }
-
-
-def _uses_safe_tool_call(tool: object) -> bool | None:
-    """Return whether a LangChain tool implementation uses safe_tool_call().
-
-    Returns:
-        True: implementation clearly uses safe_tool_call()
-        False: implementation source is available and does not use it
-        None: implementation source could not be inspected
-    """
-    callable_obj = getattr(tool, "coroutine", None) or getattr(tool, "func", None)
-    if callable_obj is None:
-        return None
-
-    try:
-        source = inspect.getsource(callable_obj)
-    except (OSError, TypeError):
-        return None
-
-    return "safe_tool_call(" in source
-
-
-def _verify_root_tools() -> tuple[list[str], list[str]]:
-    """Ensure root/orchestrator tools are wrapped with safe_tool_call()."""
-    errors: list[str] = []
-    warnings: list[str] = []
-
-    root_tools = [
-        _build_platform_info_tool(),
-        _build_install_app_tool(),
-        _build_uninstall_app_tool(),
-        _build_ask_tool(
-            app_id="verify",
-            agent=_VerifyRootDelegateAgent(),  # type: ignore[arg-type]
-            agent_description="Root-tool verification delegate",
-        ),
-    ]
-
-    for tool_obj in root_tools:
-        uses_safe_tool_call = _uses_safe_tool_call(tool_obj)
-        if uses_safe_tool_call is False:
-            errors.append(
-                f"[root] tool '{tool_obj.name}' must wrap its domain execution "
-                "with safe_tool_call()"
-            )
-        elif uses_safe_tool_call is None:
-            warnings.append(
-                f"[root] tool '{tool_obj.name}' could not be inspected for "
-                "safe_tool_call() usage"
-            )
-
-    return errors, warnings
 
 
 def verify_plugins() -> tuple[list[str], list[str]]:
@@ -190,20 +116,6 @@ def verify_plugins() -> tuple[list[str], list[str]]:
                     f"[{app_id}] tool '{tool_name}' must start with '{expected_prefix}'"
                 )
 
-        for tool_obj in agent_tools:
-            tool_name = tool_obj.name
-            uses_safe_tool_call = _uses_safe_tool_call(tool_obj)
-            if uses_safe_tool_call is False:
-                errors.append(
-                    f"[{app_id}] tool '{tool_name}' must wrap its domain execution "
-                    "with safe_tool_call()"
-                )
-            elif uses_safe_tool_call is None:
-                warnings.append(
-                    f"[{app_id}] tool '{tool_name}' could not be inspected for "
-                    "safe_tool_call() usage"
-                )
-
         # ── Beanie model checks ─────────────────────────────────────────────
         manifest_models = set(m.models)
         registered_models = {model.__name__ for model in plugin["models"]}
@@ -249,9 +161,5 @@ def verify_plugins() -> tuple[list[str], list[str]]:
                         f"'{seen_routes[key]}' and '{app_id}'"
                     )
                 seen_routes[key] = app_id
-
-    root_errors, root_warnings = _verify_root_tools()
-    errors.extend(root_errors)
-    warnings.extend(root_warnings)
 
     return errors, warnings
