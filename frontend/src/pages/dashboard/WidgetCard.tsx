@@ -3,7 +3,7 @@
  * Adds a mouse-tracking gradient sheen effect and optional settings gear.
  */
 
-import { memo, useState } from "react";
+import { memo, useRef, useState } from "react";
 import type { WidgetManifestSchema } from "@/types/generated";
 import { DynamicIcon } from "@/lib/icon-resolver";
 import { getWidgetSettings } from "@/lib/widget-settings-registry";
@@ -23,9 +23,9 @@ const WidgetCard = memo(function WidgetCard({
   onConfigSave,
   children,
 }: WidgetCardProps) {
-  const [mousePos, setMousePos] = useState({ x: 50, y: 50 });
   const [showSettings, setShowSettings] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const rafRef = useRef<number | null>(null);
 
   const SettingsComponent = getWidgetSettings(widgetId);
   const hasSettings = !!SettingsComponent;
@@ -33,19 +33,23 @@ const WidgetCard = memo(function WidgetCard({
   return (
     <>
       <div
+        ref={cardRef}
         className="widget-card"
         onMouseMove={(e) => {
-          const rect = e.currentTarget.getBoundingClientRect();
-          setMousePos({
-            x: ((e.clientX - rect.left) / rect.width) * 100,
-            y: ((e.clientY - rect.top) / rect.height) * 100,
+          if (rafRef.current !== null) return;
+          const { clientX, clientY } = e;
+          rafRef.current = window.requestAnimationFrame(() => {
+            rafRef.current = null;
+            const element = cardRef.current;
+            if (!element) return;
+            const rect = element.getBoundingClientRect();
+            element.style.setProperty("--mouse-x", `${((clientX - rect.left) / rect.width) * 100}%`);
+            element.style.setProperty("--mouse-y", `${((clientY - rect.top) / rect.height) * 100}%`);
           });
         }}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
         style={{
-          "--mouse-x": `${mousePos.x}%`,
-          "--mouse-y": `${mousePos.y}%`,
+          "--mouse-x": "50%",
+          "--mouse-y": "50%",
           display: "flex",
           flexDirection: "column",
         } as React.CSSProperties}
@@ -75,13 +79,12 @@ const WidgetCard = memo(function WidgetCard({
                 padding: "0.25rem",
                 cursor: "pointer",
                 color: "var(--color-foreground-muted)",
-                opacity: isHovered ? 0.8 : 0,
-                transition: "opacity 0.15s",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 borderRadius: "4px",
               }}
+              className="widget-card-settings-button"
               aria-label={`${widget.name} settings`}
             >
               <DynamicIcon name="Settings" size={14} />

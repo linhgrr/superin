@@ -2,9 +2,12 @@ import { useEffect } from "react";
 import { useShallow } from "zustand/react/shallow";
 
 import { useRenderLoopDebug } from "@/lib/debug-render-loop";
+import { mutate as swrMutate } from "@/lib/swr";
+import { createWidgetDataKey } from "@/lib/widget-data";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/components/providers/ToastProvider";
 import {
+  useInitialWidgetData,
   useInstalledApps,
   useWidgetPreferences,
   useWorkspaceStore,
@@ -21,6 +24,7 @@ export function WorkspaceEffects() {
   const { user } = useAuth();
   const toast = useToast();
   const installedApps = useInstalledApps();
+  const initialWidgetDataById = useInitialWidgetData();
   const widgetPreferences = useWidgetPreferences();
   const {
     hydrateWorkspace,
@@ -46,6 +50,7 @@ export function WorkspaceEffects() {
     details: () => ({
       userId,
       installedApps: installedApps.length,
+      initialWidgetData: Object.keys(initialWidgetDataById).length,
       widgetPreferences: widgetPreferences.length,
       isWorkspaceLoading,
       isWorkspaceRefreshing,
@@ -79,9 +84,23 @@ export function WorkspaceEffects() {
   }, [toast, workspaceError]);
 
   useEffect(() => {
+    for (const app of installedApps) {
+      for (const widget of app.widgets ?? []) {
+        const initialData = initialWidgetDataById[widget.id];
+        if (initialData === undefined) continue;
+        void swrMutate(createWidgetDataKey(app.id, widget.id), initialData, {
+          populateCache: true,
+          revalidate: false,
+        });
+      }
+    }
+  }, [initialWidgetDataById, installedApps]);
+
+  useEffect(() => {
     if (!userId || isWorkspaceLoading) return;
 
     const workspaceSnapshot = {
+      initial_widget_data: initialWidgetDataById,
       installed_apps: installedApps,
       widget_preferences: widgetPreferences,
     };
@@ -102,7 +121,7 @@ export function WorkspaceEffects() {
       window.clearTimeout(timeoutId);
       cancelScheduled();
     };
-  }, [installedApps, isWorkspaceLoading, userId, widgetPreferences]);
+  }, [initialWidgetDataById, installedApps, isWorkspaceLoading, userId, widgetPreferences]);
 
   return null;
 }

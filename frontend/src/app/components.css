@@ -119,6 +119,16 @@ html.dark .theme-logo-dark { display: block; }
   letter-spacing: 0.02em;
 }
 
+.widget-card-settings-button {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.widget-card:hover .widget-card-settings-button,
+.widget-card:focus-within .widget-card-settings-button {
+  opacity: 0.8;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════════
    STAT DISPLAYS
    ═══════════════════════════════════════════════════════════════════════════════ */

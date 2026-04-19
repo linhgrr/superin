@@ -40,6 +40,7 @@ export type UpdateEventRequest = CalendarUpdateEventRequest;
 export type RecurringFrequency = RecurringRuleRead["frequency"];
 
 export type GetCalendarsResponse = CalendarRead[];
+export type DeleteCalendarResponse = unknown;
 export type CheckConflictsResponse = EventRead[];
 export type GetEventsResponse = EventRead[];
 export type SearchEventsResponse = EventRead[];
@@ -73,15 +74,15 @@ export interface GetWidgetDataParams {
 }
 
 export async function getCalendars(): Promise<GetCalendarsResponse> {
-  return appRequest<GetCalendarsResponse>("calendar", `/calendars`);
+  return appRequest<GetCalendarsResponse>("calendar", `/calendars/`);
 }
 
 export async function createCalendar(request: CreateCalendarRequest): Promise<CalendarRead> {
-  return appRequest<CalendarRead>("calendar", `/calendars`, { method: "POST", body: request });
+  return appRequest<CalendarRead>("calendar", `/calendars/`, { method: "POST", body: request });
 }
 
-export async function deleteCalendar(calendar_id: string): Promise<ActionResponse> {
-  return appRequest<ActionResponse>("calendar", `/calendars/${encodeURIComponent(String(calendar_id))}`, { method: "DELETE" });
+export async function deleteCalendar(calendar_id: string): Promise<DeleteCalendarResponse> {
+  return appRequest<DeleteCalendarResponse>("calendar", `/calendars/${encodeURIComponent(String(calendar_id))}`, { method: "DELETE" });
 }
 
 export async function updateCalendar(calendar_id: string, request: UpdateCalendarRequest): Promise<CalendarRead> {
@@ -100,7 +101,7 @@ export async function checkConflicts(params: CheckConflictsParams): Promise<Chec
     query.set("exclude_event_id", String(params.exclude_event_id));
   }
   const suffix = query.toString();
-  return appRequest<CheckConflictsResponse>("calendar", `/conflicts/check${suffix ? `?${suffix}` : ""}`);
+  return appRequest<CheckConflictsResponse>("calendar", `/conflicts${suffix ? `?${suffix}` : ""}`);
 }
 
 export async function getEvents(params: GetEventsParams = {}): Promise<GetEventsResponse> {
@@ -118,11 +119,11 @@ export async function getEvents(params: GetEventsParams = {}): Promise<GetEvents
     query.set("limit", String(params.limit));
   }
   const suffix = query.toString();
-  return appRequest<GetEventsResponse>("calendar", `/events${suffix ? `?${suffix}` : ""}`);
+  return appRequest<GetEventsResponse>("calendar", `/events/${suffix ? `?${suffix}` : ""}`);
 }
 
 export async function createEvent(request: CreateEventRequest): Promise<EventRead> {
-  return appRequest<EventRead>("calendar", `/events`, { method: "POST", body: request });
+  return appRequest<EventRead>("calendar", `/events/`, { method: "POST", body: request });
 }
 
 export async function searchEvents(params: SearchEventsParams): Promise<SearchEventsResponse> {
@@ -154,11 +155,11 @@ export async function createRecurringRule(event_id: string, request: CreateRecur
 }
 
 export async function getPreferences(): Promise<GetPreferencesResponse> {
-  return appRequest<GetPreferencesResponse>("calendar", `/preferences`);
+  return appRequest<GetPreferencesResponse>("calendar", `/preferences/`);
 }
 
 export async function updatePreferences(request: PreferenceUpdate[]): Promise<UpdatePreferencesResponse> {
-  return appRequest<UpdatePreferencesResponse>("calendar", `/preferences`, { method: "PUT", body: request });
+  return appRequest<UpdatePreferencesResponse>("calendar", `/preferences/`, { method: "PUT", body: request });
 }
 
 export async function getRecurringRules(): Promise<GetRecurringRulesResponse> {
@@ -174,7 +175,7 @@ export async function scheduleTask(task_id: string, request: ScheduleTaskRequest
 }
 
 export async function getWidgets(): Promise<GetWidgetsResponse> {
-  return appRequest<GetWidgetsResponse>("calendar", `/widgets`);
+  return appRequest<GetWidgetsResponse>("calendar", `/widgets/`);
 }
 
 export async function getWidgetData(widget_id: string, params: GetWidgetDataParams = {}): Promise<GetWidgetDataResponse> {

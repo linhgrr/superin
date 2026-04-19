@@ -15,6 +15,7 @@ export interface WorkspaceEntities {
 }
 
 export interface WorkspaceStateData {
+  initialWidgetDataById: Record<string, unknown>;
   installedAppIds: Set<string>;
   installedAppOrder: string[];
   installedAppsById: Record<string, AppRuntimeEntry>;
@@ -116,14 +117,17 @@ export function getWorkspaceErrorMessage(error: unknown): string {
 export function createWorkspaceEntitiesState(
   installedApps: AppRuntimeEntry[],
   widgetPreferences: WidgetPreferenceSchema[],
+  initialWidgetDataById: Record<string, unknown> = {},
 ) {
   return {
+    initialWidgetDataById,
     installedAppIds: toInstalledAppIds(installedApps),
     ...normalizeWorkspaceEntities(installedApps, widgetPreferences),
   };
 }
 
 export const initialWorkspaceState = {
+  initialWidgetDataById: {},
   installedAppIds: new Set<string>(),
   installedAppOrder: [],
   installedAppsById: {},
@@ -146,12 +150,19 @@ export function createEmptyWorkspaceState(
 }
 
 export function reducePreferenceUpdates(
-  state: Pick<WorkspaceStateData, "installedAppOrder" | "installedAppsById" | "widgetPreferencesById">,
+  state: Pick<
+    WorkspaceStateData,
+    "initialWidgetDataById" | "installedAppOrder" | "installedAppsById" | "widgetPreferencesById"
+  >,
   updates: PreferenceUpdate[],
 ) {
   const widgetPreferences = mergePreferenceUpdates(getWidgetPreferencesSnapshot(state), updates);
 
-  return createWorkspaceEntitiesState(getInstalledAppsSnapshot(state), widgetPreferences);
+  return createWorkspaceEntitiesState(
+    getInstalledAppsSnapshot(state),
+    widgetPreferences,
+    state.initialWidgetDataById,
+  );
 }
 
 export function createInstalledAppPreferences(
@@ -193,7 +204,12 @@ export function removeInstalledAppPreferences(
 export function reduceInstalledAppChange(
   state: Pick<
     WorkspaceStateData,
-    "installedAppIds" | "installedAppOrder" | "installedAppsById" | "widgetPreferencesById" | "userId"
+    | "initialWidgetDataById"
+    | "installedAppIds"
+    | "installedAppOrder"
+    | "installedAppsById"
+    | "widgetPreferencesById"
+    | "userId"
   >,
   app: AppCatalogEntry,
   isInstalled: boolean,
@@ -210,7 +226,11 @@ export function reduceInstalledAppChange(
     ? createInstalledAppPreferences(app, state.userId, widgetPreferences)
     : removeInstalledAppPreferences(app.id, widgetPreferences);
 
-  return createWorkspaceEntitiesState(nextInstalledApps, nextWidgetPreferences);
+  return createWorkspaceEntitiesState(
+    nextInstalledApps,
+    nextWidgetPreferences,
+    state.initialWidgetDataById,
+  );
 }
 
 export function createHydratedWorkspaceState(
@@ -231,6 +251,7 @@ export function createHydratedWorkspaceState(
     ...createWorkspaceEntitiesState(
       snapshot.installed_apps ?? [],
       snapshot.widget_preferences ?? [],
+      snapshot.initial_widget_data ?? {},
     ),
     isWorkspaceLoading: false,
     isWorkspaceRefreshing: false,
@@ -256,6 +277,7 @@ export function isActiveRefreshRequest(
 export function createResetWorkspaceState(sessionRevision: number) {
   clearActiveApps();
   return createEmptyWorkspaceState({
+    initialWidgetDataById: {},
     isWorkspaceLoading: false,
     sessionRevision,
   });

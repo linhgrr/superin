@@ -25,6 +25,7 @@ import {
 } from "./workspaceState";
 
 interface WorkspaceStoreState {
+  initialWidgetDataById: Record<string, unknown>;
   installedAppIds: Set<string>;
   installedAppOrder: string[];
   installedAppsById: Record<string, AppRuntimeEntry>;
@@ -57,7 +58,8 @@ export const useWorkspaceStore = create<WorkspaceStoreState>((set, get) => ({
     set({
       ...createWorkspaceEntitiesState(
         workspace.installed_apps ?? [],
-        workspace.widget_preferences ?? []
+        workspace.widget_preferences ?? [],
+        workspace.initial_widget_data ?? {},
       ),
       workspaceError: null,
     });
@@ -130,6 +132,7 @@ export const workspaceSelectors = {
 
 export type WorkspaceStoreSlice = Pick<
   WorkspaceStoreState,
+  | "initialWidgetDataById"
   | "installedAppIds"
   | "isWorkspaceLoading"
   | "isWorkspaceRefreshing"
@@ -163,4 +166,8 @@ export function useWidgetPreferences(): WidgetPreferenceSchema[] {
     () => getWidgetPreferencesSnapshot({ widgetPreferencesById }),
     [widgetPreferencesById]
   );
+}
+
+export function useInitialWidgetData() {
+  return useWorkspaceStore((state) => state.initialWidgetDataById);
 }

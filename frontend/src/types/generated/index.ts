@@ -78,6 +78,7 @@ export type SubscriptionRead = Schemas["SubscriptionRead"];
 export type SubscriptionStatus = Schemas["SubscriptionStatus"];
 export type SubscriptionTier = Schemas["SubscriptionTier"];
 export type TaskListWidgetData = Schemas["TaskListWidgetData"];
+export type ThreadUpdateRequest = Schemas["ThreadUpdateRequest"];
 export type TodayWidgetData = Schemas["TodayWidgetData"];
 export type TodoActionResponse = Schemas["TodoActionResponse"];
 export type TodoCreateRecurringRuleRequest = Schemas["TodoCreateRecurringRuleRequest"];

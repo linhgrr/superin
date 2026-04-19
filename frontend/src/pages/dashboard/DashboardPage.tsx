@@ -7,13 +7,14 @@
  *   └── DashboardGrid      (draggable widget grid + AddWidgetButton)
  */
 
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 
 import {
   useInstalledApps,
   useWidgetPreferences,
   useWorkspaceStore,
 } from "@/stores/platform/workspaceStore";
+import { loadDashboardWidgetComponent } from "@/lib/lazy-registry";
 import { getSizeConfig } from "./layout-engine";
 import { ROW_HEIGHT } from "./useWidgetPreferences";
 import DashboardGrid from "./DashboardGrid";
@@ -56,6 +57,23 @@ export default function DashboardPage() {
     () => installedApps.flatMap((app) => app.widgets ?? []),
     [installedApps]
   );
+
+  useEffect(() => {
+    if (isWorkspaceLoading || installedApps.length === 0) return;
+
+    const schedule =
+      window.requestIdleCallback ??
+      ((cb: IdleRequestCallback) => window.setTimeout(cb, 150));
+    const cancel = window.cancelIdleCallback ?? window.clearTimeout;
+
+    const handle = schedule(() => {
+      for (const app of installedApps) {
+        void loadDashboardWidgetComponent(app.id);
+      }
+    });
+
+    return () => cancel(handle);
+  }, [installedApps, isWorkspaceLoading]);
 
   if (isWorkspaceLoading) {
     return <DashboardSkeleton />;

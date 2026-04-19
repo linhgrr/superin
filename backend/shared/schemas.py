@@ -296,6 +296,7 @@ class WorkspaceBootstrap(BaseModel):
     installed_apps: list[AppRuntimeEntry] = Field(default_factory=list)
     widget_preferences: list[WidgetPreferenceSchema] = Field(default_factory=list)
     widget_data_configs: list[WidgetDataConfigSchema] = Field(default_factory=list)
+    initial_widget_data: dict[str, Any] = Field(default_factory=dict)
 
 
 # ─── Chat / Agent ──────────────────────────────────────────────────────────────

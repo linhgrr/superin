@@ -1,5 +1,6 @@
 """Workspace domain — installed app access helpers."""
 
+import asyncio
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
@@ -9,7 +10,8 @@ from fastapi import Depends, HTTPException, Request
 
 from core.auth.dependencies import get_current_user
 from core.models import User, UserAppInstallation, WidgetDataConfig, WidgetPreference
-from core.registry import get_plugin
+from core.registry import WIDGET_DATA_HANDLERS, get_plugin
+from core.widget_config import resolve_widget_config_from_serialized
 from shared.enums import InstallationStatus, SubscriptionTier, UserRole
 from shared.permissions import meets_minimum_tier
 from shared.preference_utils import preference_to_schema
@@ -107,12 +109,71 @@ async def build_workspace_bootstrap(user_id: str) -> WorkspaceBootstrap:
         )
         for doc in widget_data_configs
     ]
+    initial_widget_data = await build_initial_widget_data(
+        user_id,
+        installed_apps,
+        widget_preferences,
+        widget_data_config_schemas,
+    )
 
     return WorkspaceBootstrap(
         installed_apps=installed_apps,
         widget_preferences=widget_preferences,
         widget_data_configs=widget_data_config_schemas,
+        initial_widget_data=initial_widget_data,
     )
+
+
+def _is_widget_enabled(widget, preference: WidgetPreferenceSchema | None) -> bool:
+    return preference.enabled if preference is not None else not widget.requires_auth
+
+
+async def build_initial_widget_data(
+    user_id: str,
+    installed_apps: list[AppRuntimeEntry],
+    widget_preferences: list[WidgetPreferenceSchema],
+    widget_data_configs: list[WidgetDataConfigSchema],
+) -> dict[str, object]:
+    """Resolve first-paint widget payloads in parallel for enabled widgets."""
+    preference_by_widget_id = {
+        preference.widget_id: preference
+        for preference in widget_preferences
+    }
+    config_by_widget_id = {
+        config.widget_id: config.config
+        for config in widget_data_configs
+    }
+
+    async def load_widget_data(widget_id: str) -> tuple[str, object] | None:
+        handler = WIDGET_DATA_HANDLERS.get(widget_id)
+        if handler is None:
+            return None
+
+        config = resolve_widget_config_from_serialized(
+            widget_id,
+            config_by_widget_id.get(widget_id),
+        )
+        try:
+            return widget_id, await handler(user_id, config)
+        except Exception:
+            return None
+
+    tasks = [
+        load_widget_data(widget.id)
+        for app in installed_apps
+        for widget in app.widgets
+        if _is_widget_enabled(widget, preference_by_widget_id.get(widget.id))
+    ]
+    if not tasks:
+        return {}
+
+    results = await asyncio.gather(*tasks)
+    return {
+        widget_id: data
+        for item in results
+        if item is not None
+        for widget_id, data in [item]
+    }
 
 
 def require_installed_app(app_id: str) -> Callable:

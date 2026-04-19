@@ -281,6 +281,116 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/chat/threads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Threads
+         * @description GET /api/chat/threads
+         *     Returns list of thread metadata for the current user (most-recently-updated first).
+         */
+        get: operations["list_threads_api_chat_threads_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chat/threads/{thread_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Thread
+         * @description Return one thread metadata row for the authenticated user.
+         */
+        get: operations["get_thread_api_chat_threads__thread_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Thread
+         * @description Delete one thread and its LangGraph checkpoints.
+         */
+        delete: operations["delete_thread_api_chat_threads__thread_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Thread
+         * @description Rename one thread for the authenticated user.
+         */
+        patch: operations["update_thread_api_chat_threads__thread_id__patch"];
+        trace?: never;
+    };
+    "/api/chat/threads/{thread_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Archive Thread
+         * @description Archive one thread for the authenticated user.
+         */
+        post: operations["archive_thread_api_chat_threads__thread_id__archive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chat/threads/{thread_id}/unarchive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Unarchive Thread
+         * @description Restore one archived thread for the authenticated user.
+         */
+        post: operations["unarchive_thread_api_chat_threads__thread_id__unarchive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chat/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Chat History
+         * @description GET /api/chat/history?thread_id=<thread_id>
+         *     Returns messages for a thread from LangGraph checkpoint state.
+         */
+        get: operations["chat_history_api_chat_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/chat/stream": {
         parameters: {
             query?: never;
@@ -294,10 +404,11 @@ export interface paths {
          * Chat Stream
          * @description POST /api/chat/stream
          *     Body: {
+         *         "threadId": str       # REQUIRED — client-generated UUID (immutable identity)
+         *         "threadTitle": str    # optional — override auto-generated title from first msg
          *         "messages": GenericMessage[],
-         *         "tools": ToolDefinition[]   # optional
          *     }
-         *     Returns: SSE (assistant-ui UI message stream protocol)
+         *     Returns: SSE of LangGraph-compatible `{event, data}` chunks for `useLangGraphRuntime`.
          */
         post: operations["chat_stream_api_chat_stream_post"];
         delete?: never;
@@ -545,7 +656,7 @@ export interface paths {
         patch: operations["patch_admin_app_tier_api_admin_apps__app_id__tier_patch"];
         trace?: never;
     };
-    "/api/apps/calendar/widgets": {
+    "/api/apps/calendar/widgets/": {
         parameters: {
             query?: never;
             header?: never;
@@ -553,7 +664,7 @@ export interface paths {
             cookie?: never;
         };
         /** List Widgets */
-        get: operations["list_widgets_api_apps_calendar_widgets_get"];
+        get: operations["list_widgets_api_apps_calendar_widgets__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -613,7 +724,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/apps/calendar/events": {
+    "/api/apps/calendar/events/": {
         parameters: {
             query?: never;
             header?: never;
@@ -624,13 +735,13 @@ export interface paths {
          * List Events
          * @description List events with optional filters.
          */
-        get: operations["list_events_api_apps_calendar_events_get"];
+        get: operations["list_events_api_apps_calendar_events__get"];
         put?: never;
         /**
          * Create Event
          * @description Create new event.
          */
-        post: operations["create_event_api_apps_calendar_events_post"];
+        post: operations["create_event_api_apps_calendar_events__post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -680,32 +791,12 @@ export interface paths {
         head?: never;
         /**
          * Update Event
-         * @description Update event.
+         * @description Update event — only fields set in the request are updated.
          */
         patch: operations["update_event_api_apps_calendar_events__event_id__patch"];
         trace?: never;
     };
-    "/api/apps/calendar/conflicts/check": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Check Conflicts
-         * @description Check for conflicting events.
-         */
-        get: operations["check_conflicts_api_apps_calendar_conflicts_check_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/apps/calendar/calendars": {
+    "/api/apps/calendar/calendars/": {
         parameters: {
             query?: never;
             header?: never;
@@ -716,13 +807,13 @@ export interface paths {
          * List Calendars
          * @description List all calendars.
          */
-        get: operations["list_calendars_api_apps_calendar_calendars_get"];
+        get: operations["list_calendars_api_apps_calendar_calendars__get"];
         put?: never;
         /**
          * Create Calendar
          * @description Create new calendar.
          */
-        post: operations["create_calendar_api_apps_calendar_calendars_post"];
+        post: operations["create_calendar_api_apps_calendar_calendars__post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -748,9 +839,29 @@ export interface paths {
         head?: never;
         /**
          * Update Calendar
-         * @description Update calendar.
+         * @description Update calendar — only fields set in the request are updated.
          */
         patch: operations["update_calendar_api_apps_calendar_calendars__calendar_id__patch"];
+        trace?: never;
+    };
+    "/api/apps/calendar/conflicts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Check Conflicts
+         * @description Check for conflicting events.
+         */
+        get: operations["check_conflicts_api_apps_calendar_conflicts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/apps/calendar/events/{event_id}/recurring": {
@@ -833,7 +944,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/apps/calendar/preferences": {
+    "/api/apps/calendar/preferences/": {
         parameters: {
             query?: never;
             header?: never;
@@ -841,9 +952,9 @@ export interface paths {
             cookie?: never;
         };
         /** Get Preferences */
-        get: operations["get_preferences_api_apps_calendar_preferences_get"];
+        get: operations["get_preferences_api_apps_calendar_preferences__get"];
         /** Update Preferences */
-        put: operations["update_preferences_api_apps_calendar_preferences_put"];
+        put: operations["update_preferences_api_apps_calendar_preferences__put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -2583,6 +2694,11 @@ export interface components {
             /** Total */
             total: number;
         };
+        /** ThreadUpdateRequest */
+        ThreadUpdateRequest: {
+            /** Title */
+            title: string;
+        };
         /** TodayWidgetData */
         TodayWidgetData: {
             /** Due Today */
@@ -3039,6 +3155,8 @@ export interface components {
             widget_preferences?: components["schemas"]["WidgetPreferenceSchema"][];
             /** Widget Data Configs */
             widget_data_configs?: components["schemas"]["WidgetDataConfigSchema"][];
+            /** Initial Widget Data */
+            initial_widget_data?: Record<string, never>;
         };
     };
     responses: never;
@@ -3552,6 +3670,227 @@ export interface operations {
             };
         };
     };
+    list_threads_api_chat_threads_get: {
+        parameters: {
+            query?: {
+                include_archived?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_thread_api_chat_threads__thread_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                thread_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_thread_api_chat_threads__thread_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                thread_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_thread_api_chat_threads__thread_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                thread_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ThreadUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_thread_api_chat_threads__thread_id__archive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                thread_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unarchive_thread_api_chat_threads__thread_id__unarchive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                thread_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    chat_history_api_chat_history_get: {
+        parameters: {
+            query: {
+                thread_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     chat_stream_api_chat_stream_post: {
         parameters: {
             query?: never;
@@ -3928,7 +4267,7 @@ export interface operations {
             };
         };
     };
-    list_widgets_api_apps_calendar_widgets_get: {
+    list_widgets_api_apps_calendar_widgets__get: {
         parameters: {
             query?: never;
             header?: never;
@@ -4047,7 +4386,7 @@ export interface operations {
             };
         };
     };
-    list_events_api_apps_calendar_events_get: {
+    list_events_api_apps_calendar_events__get: {
         parameters: {
             query?: {
                 start?: string | null;
@@ -4081,7 +4420,7 @@ export interface operations {
             };
         };
     };
-    create_event_api_apps_calendar_events_post: {
+    create_event_api_apps_calendar_events__post: {
         parameters: {
             query?: never;
             header?: never;
@@ -4243,40 +4582,7 @@ export interface operations {
             };
         };
     };
-    check_conflicts_api_apps_calendar_conflicts_check_get: {
-        parameters: {
-            query: {
-                start: string;
-                end: string;
-                exclude_event_id?: string | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CalendarEventRead"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_calendars_api_apps_calendar_calendars_get: {
+    list_calendars_api_apps_calendar_calendars__get: {
         parameters: {
             query?: never;
             header?: never;
@@ -4296,7 +4602,7 @@ export interface operations {
             };
         };
     };
-    create_calendar_api_apps_calendar_calendars_post: {
+    create_calendar_api_apps_calendar_calendars__post: {
         parameters: {
             query?: never;
             header?: never;
@@ -4346,7 +4652,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CalendarActionResponse"];
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -4382,6 +4688,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CalendarCalendarRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_conflicts_api_apps_calendar_conflicts_get: {
+        parameters: {
+            query: {
+                start: string;
+                end: string;
+                exclude_event_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarEventRead"][];
                 };
             };
             /** @description Validation Error */
@@ -4516,7 +4855,7 @@ export interface operations {
             };
         };
     };
-    get_preferences_api_apps_calendar_preferences_get: {
+    get_preferences_api_apps_calendar_preferences__get: {
         parameters: {
             query?: never;
             header?: never;
@@ -4536,7 +4875,7 @@ export interface operations {
             };
         };
     };
-    update_preferences_api_apps_calendar_preferences_put: {
+    update_preferences_api_apps_calendar_preferences__put: {
         parameters: {
             query?: never;
             header?: never;
