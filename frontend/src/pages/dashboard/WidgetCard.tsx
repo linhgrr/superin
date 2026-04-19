@@ -3,7 +3,7 @@
  * Adds a mouse-tracking gradient sheen effect and optional settings gear.
  */
 
-import { memo, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import type { WidgetManifestSchema } from "@/types/generated";
 import { DynamicIcon } from "@/lib/icon-resolver";
 import { getWidgetSettings } from "@/lib/widget-settings-registry";
@@ -29,6 +29,14 @@ const WidgetCard = memo(function WidgetCard({
 
   const SettingsComponent = getWidgetSettings(widgetId);
   const hasSettings = !!SettingsComponent;
+
+  useEffect(() => {
+    return () => {
+      if (rafRef.current !== null) {
+        window.cancelAnimationFrame(rafRef.current);
+      }
+    };
+  }, []);
 
   return (
     <>

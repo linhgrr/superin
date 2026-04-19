@@ -8,6 +8,7 @@
  */
 
 import { useEffect, useMemo } from "react";
+import { Link } from "react-router-dom";
 
 import {
   useInstalledApps,
@@ -89,12 +90,12 @@ export default function DashboardPage() {
         <h3 className="empty-state-title">Welcome to Superin</h3>
         <p className="empty-state-description">
           Your dashboard is empty. Visit the{" "}
-          <a
-            href="/store"
+          <Link
+            to="/store"
             style={{ color: "var(--color-primary)", fontWeight: 600 }}
           >
             App Store
-          </a>{" "}
+          </Link>{" "}
           to install your first app.
         </p>
       </div>

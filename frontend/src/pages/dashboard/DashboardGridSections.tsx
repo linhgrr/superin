@@ -1,12 +1,11 @@
-import type { ReactNode } from "react";
+import { lazy, memo, Suspense, useEffect } from "react";
 
 import { Responsive } from "react-grid-layout";
 
 import LazyWidget from "@/components/LazyWidget";
-import AddWidgetDialog from "@/components/dashboard/AddWidgetDialog";
 import { DynamicIcon } from "@/lib/icon-resolver";
 import { platformUiSelectors, usePlatformUiStore } from "@/stores/platform/platformUiStore";
-import type { AppRuntimeEntry, PreferenceUpdate, WidgetPreferenceSchema } from "@/types/generated";
+import type { AppRuntimeEntry } from "@/types/generated";
 
 import { getSizeConfig } from "./layout-engine";
 import { GRID_BREAKPOINTS, GRID_COLS, ROW_HEIGHT } from "./useWidgetPreferences";
@@ -43,8 +42,19 @@ interface DashboardGridContentProps {
 
 const MOBILE_BREAKPOINT = 1024;
 const DEFAULT_AUTO_HEIGHT = "200px";
+const ADD_WIDGET_DIALOG_IDLE_DELAY_MS = 1_200;
 
-export function DashboardActionBar({
+const AddWidgetDialog = lazy(async () => import("@/components/dashboard/AddWidgetDialog"));
+
+function preloadAddWidgetDialog() {
+  void import("@/components/dashboard/AddWidgetDialog");
+}
+
+function AddWidgetDialogFallback() {
+  return <div className="dialog-backdrop" aria-hidden="true" />;
+}
+
+export const DashboardActionBar = memo(function DashboardActionBar({
   busyWidgetId,
   enabledWidgetIds,
   installedApps,
@@ -72,9 +82,9 @@ export function DashboardActionBar({
       />
     </div>
   );
-}
+});
 
-export function DashboardGridContent({
+export const DashboardGridContent = memo(function DashboardGridContent({
   containerWidth,
   onLayoutChange,
   onLayoutCommit,
@@ -119,7 +129,7 @@ export function DashboardGridContent({
       ))}
     </Responsive>
   );
-}
+});
 
 function AddWidgetButton({
   installedApps,
@@ -136,12 +146,23 @@ function AddWidgetButton({
   const openDialog = usePlatformUiStore(platformUiSelectors.openAddWidgetDialog);
   const closeDialog = usePlatformUiStore(platformUiSelectors.closeAddWidgetDialog);
 
+  useEffect(() => {
+    const schedule =
+      window.requestIdleCallback ??
+      ((cb: IdleRequestCallback) => window.setTimeout(cb, ADD_WIDGET_DIALOG_IDLE_DELAY_MS));
+    const cancel = window.cancelIdleCallback ?? window.clearTimeout;
+    const handle = schedule(() => preloadAddWidgetDialog());
+    return () => cancel(handle);
+  }, []);
+
   return (
     <>
       <button
         type="button"
         className="btn btn-secondary btn-sm"
         onClick={openDialog}
+        onMouseEnter={preloadAddWidgetDialog}
+        onFocus={preloadAddWidgetDialog}
         aria-label="Add widget"
         style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
       >
@@ -149,19 +170,21 @@ function AddWidgetButton({
         Add Widget
       </button>
       {isOpen ? (
-        <AddWidgetDialog
-          catalog={installedApps}
-          enabledWidgetIds={enabledWidgetIds}
-          busyWidgetId={busyWidgetId}
-          onToggleWidget={onToggleWidget}
-          onClose={closeDialog}
-        />
+        <Suspense fallback={<AddWidgetDialogFallback />}>
+          <AddWidgetDialog
+            catalog={installedApps}
+            enabledWidgetIds={enabledWidgetIds}
+            busyWidgetId={busyWidgetId}
+            onToggleWidget={onToggleWidget}
+            onClose={closeDialog}
+          />
+        </Suspense>
       ) : null}
     </>
   );
 }
 
-function MobileWidgetCard({ item }: { item: VisibleWidget }) {
+const MobileWidgetCard = memo(function MobileWidgetCard({ item }: { item: VisibleWidget }) {
   const config = getSizeConfig(item.widget.size);
   const minHeight = config.height === "auto" ? DEFAULT_AUTO_HEIGHT : config.height;
 
@@ -170,12 +193,12 @@ function MobileWidgetCard({ item }: { item: VisibleWidget }) {
       <DashboardWidgetCard item={item} />
     </div>
   );
-}
+});
 
-function DashboardWidgetCard({ item }: { item: VisibleWidget }) {
+const DashboardWidgetCard = memo(function DashboardWidgetCard({ item }: { item: VisibleWidget }) {
   return (
     <WidgetCard widget={item.widget} widgetId={item.widgetId}>
       <LazyWidget appId={item.appId} widgetId={item.widgetId} widget={item.widget} />
     </WidgetCard>
   );
-}
+});
