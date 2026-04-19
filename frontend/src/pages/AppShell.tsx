@@ -14,7 +14,7 @@ import MobileChatFAB from "@/components/chat/MobileChatFAB";
 import MobileTabBar from "@/components/navigation/MobileTabBar";
 import { getShellRouteTitle } from "@/lib/routes";
 import { useInstalledApps } from "@/stores/platform/workspaceStore";
-import Sidebar from "./Sidebar";
+import Sidebar from "./sidebar/Sidebar";
 import Header from "./Header";
 
 const ChatPanel = lazy(() => import("@/components/chat/ChatPanel"));

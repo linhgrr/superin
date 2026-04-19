@@ -13,6 +13,7 @@ export const STORAGE_KEYS = {
 
   // App state
   RECENT_COMMANDS: "superin_recent_commands",
+  PLATFORM_UI: "superin_platform_ui",
   ONBOARDING_STATE: "superin_onboarding",
   WORKSPACE_SNAPSHOT: "superin_workspace_snapshot",
   STORE_CATALOG_SNAPSHOT: "superin_store_catalog_snapshot",
