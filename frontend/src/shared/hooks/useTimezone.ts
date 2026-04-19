@@ -35,20 +35,23 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import {
-  formatTime as formatTimeUtil,
   formatDate as formatDateUtil,
   formatDateTime as formatDateTimeUtil,
-  isToday as isTodayUtil,
+  formatLongWeekdayDate as formatLongWeekdayDateUtil,
+  formatTime as formatTimeUtil,
+  formatWeekdayDate as formatWeekdayDateUtil,
+  formatWeekdayDateTime as formatWeekdayDateTimeUtil,
+  getDayRange as getDayRangeUtil,
+  getHourMinute as getHourMinuteUtil,
+  getLocalNow as getLocalNowUtil,
+  getTodayRange as getTodayRangeUtil,
+  getWeekBoundaries as getWeekBoundariesUtil,
+  getWeekDates as getWeekDatesUtil,
+  getUserTimezone,
   isPast as isPastUtil,
   isSameDayAs as isSameDayAsUtil,
   isSameDayInTimezone as isSameDayInTimezoneUtil,
-  getHourMinute as getHourMinuteUtil,
-  getWeekDates as getWeekDatesUtil,
-  getDayRange as getDayRangeUtil,
-  getTodayRange as getTodayRangeUtil,
-  getWeekBoundaries as getWeekBoundariesUtil,
-  getLocalNow as getLocalNowUtil,
-  getUserTimezone,
+  isToday as isTodayUtil,
   setUserTimezone,
   type DateInput,
 } from '@/shared/utils/datetime';
@@ -66,6 +69,12 @@ export interface UseTimezoneReturn {
   formatDate: (utcString: DateInput, options?: Intl.DateTimeFormatOptions) => string;
   /** Format UTC datetime as full datetime string */
   formatDateTime: (utcString: DateInput, options?: Intl.DateTimeFormatOptions) => string;
+  /** Format UTC datetime as compact weekday + date string */
+  formatWeekdayDate: (utcString: DateInput, options?: Intl.DateTimeFormatOptions) => string;
+  /** Format UTC datetime as compact weekday + datetime string */
+  formatWeekdayDateTime: (utcString: DateInput, options?: Intl.DateTimeFormatOptions) => string;
+  /** Format UTC datetime as long weekday + date string */
+  formatLongWeekdayDate: (utcString: DateInput, options?: Intl.DateTimeFormatOptions) => string;
 
   // ── Comparisons ────────────────────────────────────────────────────────────
   /** True if UTC datetime falls on today in user timezone */
@@ -90,12 +99,16 @@ export interface UseTimezoneReturn {
   getTodayRange: () => { start: string; end: string };
   /** UTC ISO string range for a specific day in user timezone */
   getDayRange: (date: Date) => { start: string; end: string };
+  /** Week date anchors (Mon-Sun) in user timezone */
+  getWeekDates: (date: Date) => Date[];
   /** Week boundaries (Mon-Sun) in user timezone */
   getWeekBoundaries: (date: Date) => {
     mondayLocal: Date;
     sundayLocal: Date;
     weekDatesLocal: Date[];
     weekDatesUtcIso: string[];
+    rangeStartUtcIso: string;
+    rangeEndUtcIso: string;
   };
 
   // ── Current time ───────────────────────────────────────────────────────────
@@ -141,6 +154,24 @@ export function useTimezone(): UseTimezoneReturn {
   const formatDateTime = useCallback(
     (utcString: DateInput, options?: Intl.DateTimeFormatOptions) =>
       formatDateTimeUtil(utcString, timezone, options),
+    [timezone],
+  );
+
+  const formatWeekdayDate = useCallback(
+    (utcString: DateInput, options?: Intl.DateTimeFormatOptions) =>
+      formatWeekdayDateUtil(utcString, timezone, options),
+    [timezone],
+  );
+
+  const formatWeekdayDateTime = useCallback(
+    (utcString: DateInput, options?: Intl.DateTimeFormatOptions) =>
+      formatWeekdayDateTimeUtil(utcString, timezone, options),
+    [timezone],
+  );
+
+  const formatLongWeekdayDate = useCallback(
+    (utcString: DateInput, options?: Intl.DateTimeFormatOptions) =>
+      formatLongWeekdayDateUtil(utcString, timezone, options),
     [timezone],
   );
 
@@ -200,6 +231,9 @@ export function useTimezone(): UseTimezoneReturn {
     formatTime,
     formatDate,
     formatDateTime,
+    formatWeekdayDate,
+    formatWeekdayDateTime,
+    formatLongWeekdayDate,
     isToday,
     isPast,
     isSameDayAs,

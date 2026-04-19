@@ -2,10 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { DynamicIcon } from "@/lib/icon-resolver";
 import { useAsyncTask } from "@/hooks/useAsyncTask";
 import { useDisclosure } from "@/hooks/useDisclosure";
+import { AppModal } from "@/shared/components/AppModal";
 import { dateInputValueToUtcIso, toDateInputValue } from "@/shared/utils/datetime";
 import { createTransaction, getTransactions, type TransactionRead, getWallets, getCategories, type WalletRead, type CategoryRead } from "../../api";
 import type { CreateTransactionRequest } from "../../api";
-import Modal from "../../components/Modal";
 import SimpleForm from "../../components/SimpleForm";
 import TransactionEditForm from "../../components/TransactionEditForm";
 import { formatCurrency } from "../../lib/formatCurrency";
@@ -18,7 +18,7 @@ function isTransactionType(value: string): value is CreateTransactionRequest["ty
 }
 
 export default function TransactionsTab() {
-  const { formatDate } = useTimezone();
+  const { formatWeekdayDate } = useTimezone();
   const [transactions, setTransactions] = useState<TransactionRead[]>([]);
   const [editingTransaction, setEditingTransaction] = useState<TransactionRead | null>(null);
   const [wallets, setWallets] = useState<WalletRead[]>([]);
@@ -84,7 +84,7 @@ export default function TransactionsTab() {
                   style={{ cursor: "pointer" }}
                 >
                   <td style={{ whiteSpace: "nowrap" }}>
-                    {formatDate(transaction.date, { month: "short", day: "numeric", year: "numeric" })}
+                    {formatWeekdayDate(transaction.date, { year: "numeric" })}
                   </td>
                   <td>
                     <span
@@ -130,7 +130,7 @@ export default function TransactionsTab() {
       )}
 
       {createTransactionModal.isOpen && (
-        <Modal title="New Transaction" onClose={createTransactionModal.close}>
+        <AppModal title="New Transaction" onClose={createTransactionModal.close}>
           <SimpleForm
             fields={[
               {
@@ -195,12 +195,12 @@ export default function TransactionsTab() {
               void load();
             }}
           />
-        </Modal>
+        </AppModal>
       )}
 
       {/* Edit Modal */}
       {editingTransaction && wallets.length > 0 && categories.length > 0 && (
-        <Modal title="Edit Transaction" onClose={() => setEditingTransaction(null)}>
+        <AppModal title="Edit Transaction" onClose={() => setEditingTransaction(null)}>
           <TransactionEditForm
             transaction={editingTransaction}
             wallets={wallets}
@@ -213,7 +213,7 @@ export default function TransactionsTab() {
             }}
             onCancel={() => setEditingTransaction(null)}
           />
-        </Modal>
+        </AppModal>
       )}
     </div>
   );

@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 
 import type { AdminSubscriptionRead } from "@/types/generated";
+import { useTimezone } from "@/shared/hooks/useTimezone";
 import { Pill } from "./Pill";
 import { Table } from "./AdminTable";
 
@@ -9,6 +10,7 @@ interface SubscriptionsTabProps {
 }
 
 export function SubscriptionsTab({ subscriptions }: SubscriptionsTabProps) {
+  const { formatWeekdayDateTime } = useTimezone();
   const rows = useMemo(
     () =>
       subscriptions.map((item: AdminSubscriptionRead) => [
@@ -18,9 +20,9 @@ export function SubscriptionsTab({ subscriptions }: SubscriptionsTabProps) {
         </div>,
         <Pill key={`sub-tier:${item.id}`}>{item.tier}</Pill>,
         <Pill key={`sub-status:${item.id}`}>{item.status}</Pill>,
-        <div key={`sub-exp:${item.id}`}>{item.expires_at ? new Date(item.expires_at).toLocaleString() : "-"}</div>,
+        <div key={`sub-exp:${item.id}`}>{item.expires_at ? formatWeekdayDateTime(item.expires_at) : "-"}</div>,
       ]),
-    [subscriptions],
+    [formatWeekdayDateTime, subscriptions],
   );
 
   return <Table columns={["User", "Tier", "Status", "Expires At"]} rows={rows} />;

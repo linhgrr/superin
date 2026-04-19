@@ -20,9 +20,8 @@
  *
  *   ALWAYS use Intl.DateTimeFormat(..., { timeZone }) for any display or comparison work
  *
- *   ALWAYS use new Date(year, month, day, h, m, s, ms) to construct dates
- *           → this constructor interprets ALL arguments as LOCAL time (not UTC)
- *           → then .toISOString() gives the correct UTC instant
+ *   ALWAYS convert local calendar components with an explicit IANA timezone
+ *           → buildUtcIsoString()/buildUtcIsoStringFromDate() do this safely
  *
  *   ALWAYS use .toISOString() when sending datetimes to the backend
  *
@@ -70,6 +69,18 @@ export const COMMON_TIMEZONES = {
 
 export const DEFAULT_TIMEZONE = 'UTC';
 
+interface TimeZoneDateParts {
+  year: number;
+  month: number;
+  day: number;
+}
+
+interface TimeZoneDateTimeParts extends TimeZoneDateParts {
+  hour: number;
+  minute: number;
+  second: number;
+}
+
 // ─── User timezone ─────────────────────────────────────────────────────────────
 
 /**
@@ -113,6 +124,158 @@ export function utcToLocalDate(value: DateInput): Date | null {
   if (!value) return null;
   const date = value instanceof Date ? value : new Date(value);
   return isNaN(date.getTime()) ? null : date;
+}
+
+function getDateTimePartsInTimezone(date: Date, timeZone: string): TimeZoneDateTimeParts {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date);
+
+  const mapped = {
+    year: 1970,
+    month: 1,
+    day: 1,
+    hour: 0,
+    minute: 0,
+    second: 0,
+  };
+
+  for (const part of parts) {
+    if (part.type === 'year') mapped.year = Number(part.value);
+    if (part.type === 'month') mapped.month = Number(part.value);
+    if (part.type === 'day') mapped.day = Number(part.value);
+    if (part.type === 'hour') mapped.hour = Number(part.value);
+    if (part.type === 'minute') mapped.minute = Number(part.value);
+    if (part.type === 'second') mapped.second = Number(part.value);
+  }
+
+  return mapped;
+}
+
+function getDatePartsInTimezone(date: Date, timeZone: string): TimeZoneDateParts {
+  const { year, month, day } = getDateTimePartsInTimezone(date, timeZone);
+  return { year, month, day };
+}
+
+function formatDateKey({ year, month, day }: TimeZoneDateParts): string {
+  return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function parseDateKey(value: string): TimeZoneDateParts | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
+    return null;
+  }
+  if (month < 1 || month > 12 || day < 1 || day > 31) {
+    return null;
+  }
+  return { year, month, day };
+}
+
+function addDaysToDateParts(parts: TimeZoneDateParts, days: number): TimeZoneDateParts {
+  const anchor = new Date(Date.UTC(parts.year, parts.month - 1, parts.day));
+  anchor.setUTCDate(anchor.getUTCDate() + days);
+  return {
+    year: anchor.getUTCFullYear(),
+    month: anchor.getUTCMonth() + 1,
+    day: anchor.getUTCDate(),
+  };
+}
+
+function parseTimeZoneOffsetMinutes(value: string): number {
+  if (value === 'GMT' || value === 'UTC') return 0;
+
+  const match = /^(?:GMT|UTC)([+-])(\d{1,2})(?::?(\d{2}))?$/.exec(value);
+  if (!match) {
+    throw new Error(`Unsupported timezone offset format: ${value}`);
+  }
+
+  const sign = match[1] === '-' ? -1 : 1;
+  const hours = Number(match[2]);
+  const minutes = Number(match[3] ?? '0');
+  return sign * (hours * 60 + minutes);
+}
+
+function getTimeZoneOffsetMinutes(date: Date, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    timeZoneName: 'shortOffset',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date);
+
+  const timeZoneName = parts.find((part) => part.type === 'timeZoneName')?.value;
+  if (!timeZoneName) {
+    throw new Error(`Unable to resolve timezone offset for ${timeZone}`);
+  }
+
+  return parseTimeZoneOffsetMinutes(timeZoneName);
+}
+
+function zonedDateTimeToUtcDate(
+  parts: TimeZoneDateTimeParts,
+  timeZone: string,
+  millisecond = 0,
+): Date {
+  let utcMillis = Date.UTC(
+    parts.year,
+    parts.month - 1,
+    parts.day,
+    parts.hour,
+    parts.minute,
+    parts.second,
+    millisecond,
+  );
+
+  for (let i = 0; i < 3; i++) {
+    const offsetMinutes = getTimeZoneOffsetMinutes(new Date(utcMillis), timeZone);
+    const nextUtcMillis = Date.UTC(
+      parts.year,
+      parts.month - 1,
+      parts.day,
+      parts.hour,
+      parts.minute,
+      parts.second,
+      millisecond,
+    ) - offsetMinutes * 60 * 1000;
+
+    if (nextUtcMillis === utcMillis) {
+      break;
+    }
+    utcMillis = nextUtcMillis;
+  }
+
+  return new Date(utcMillis);
+}
+
+export function getDateKey(value: DateInput, tz?: string): string {
+  const date = utcToLocalDate(value);
+  if (!date) return '';
+  const activeTz = tz ?? getUserTimezone();
+  return formatDateKey(getDatePartsInTimezone(date, activeTz));
+}
+
+export function shiftDateKey(value: string, days: number): string {
+  const parts = parseDateKey(value);
+  if (!parts) return '';
+  return formatDateKey(addDaysToDateParts(parts, days));
 }
 
 // ─── Formatters (user timezone) ────────────────────────────────────────────────
@@ -188,6 +351,63 @@ export function formatDateTime(
 }
 
 /**
+ * Format a UTC datetime as a compact weekday + date string in the user's timezone.
+ *
+ * Default output shape is locale-aware, typically like "Mon, Apr 13".
+ */
+export function formatWeekdayDate(
+  utcString: DateInput,
+  tz?: string,
+  opts?: Intl.DateTimeFormatOptions,
+): string {
+  return formatDate(utcString, tz, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    ...opts,
+  });
+}
+
+/**
+ * Format a UTC datetime as a compact weekday + datetime string in the user's timezone.
+ *
+ * Default output shape is locale-aware, typically like "Mon, Apr 13, 09:30".
+ */
+export function formatWeekdayDateTime(
+  utcString: DateInput,
+  tz?: string,
+  opts?: Intl.DateTimeFormatOptions,
+): string {
+  return formatDateTime(utcString, tz, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    ...opts,
+  });
+}
+
+/**
+ * Format a UTC datetime as a full weekday + long date string in the user's timezone.
+ *
+ * Default output shape is locale-aware, typically like "Monday, April 13, 2026".
+ */
+export function formatLongWeekdayDate(
+  utcString: DateInput,
+  tz?: string,
+  opts?: Intl.DateTimeFormatOptions,
+): string {
+  return formatDate(utcString, tz, {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+    ...opts,
+  });
+}
+
+/**
  * Get current date and time strings in the user's timezone.
  *
  * @param tz - IANA timezone (default: user's active timezone)
@@ -217,8 +437,8 @@ export function getLocalNow(tz?: string): { date: string; time: string } {
  * Build a UTC ISO string from year/month/day + hour/minute.
  *
  * This is the CORRECT way to create a UTC datetime from date/time picker values.
- * The Date constructor with explicit args interprets everything as LOCAL time,
- * and .toISOString() then produces the correct UTC offset.
+ * The conversion uses the user's configured IANA timezone, not the browser's
+ * system-local timezone.
  *
  * @param year   - Full year (e.g. 2026)
  * @param month  - Month index 0-11
@@ -239,9 +459,20 @@ export function buildUtcIsoString(
   hour: number,
   minute: number,
   second = 0,
+  tz?: string,
 ): string {
-  const localDate = new Date(year, month, date, hour, minute, second, 0);
-  return localDate.toISOString();
+  const activeTz = tz ?? getUserTimezone();
+  return zonedDateTimeToUtcDate(
+    {
+      year,
+      month: month + 1,
+      day: date,
+      hour,
+      minute,
+      second,
+    },
+    activeTz,
+  ).toISOString();
 }
 
 /**
@@ -256,61 +487,44 @@ export function buildUtcIsoString(
  *   buildUtcIsoStringFromDate(datePickerDate, 9, 0)
  *   → "2026-04-13T02:00:00Z"  (UTC+7 09:00 → stored as UTC)
  */
-export function buildUtcIsoStringFromDate(date: Date, hour: number, minute: number): string {
-  // Use LOCAL methods — weekDatesLocal from getWeekBoundaries() are at local midnight.
-  // buildUtcIsoString() constructs via new Date(year, month, date, h, m, s, ms) which
-  // interprets all arguments as LOCAL time, then .toISOString() converts to UTC.
-  // Using getUTC*() here would extract the WRONG date when local midnight falls on
-  // the previous day in UTC (e.g., April 17 00:00 UTC+7 = April 16 17:00 UTC).
+export function buildUtcIsoStringFromDate(
+  date: Date,
+  hour: number,
+  minute: number,
+  tz?: string,
+): string {
+  const activeTz = tz ?? getUserTimezone();
+  const parts = getDatePartsInTimezone(date, activeTz);
   return buildUtcIsoString(
-    date.getFullYear(),
-    date.getMonth(),
-    date.getDate(),
+    parts.year,
+    parts.month - 1,
+    parts.day,
     hour,
     minute,
     0,
+    activeTz,
   );
 }
 
 /**
  * Convert a UTC ISO datetime into a YYYY-MM-DD string for an HTML date input.
  *
- * Uses local date parts to preserve the calendar day the user selected locally.
+ * Uses user-timezone date parts to preserve the calendar day the user selected.
  */
 export function toDateInputValue(value: DateInput): string {
   const date = utcToLocalDate(value);
   if (!date) return '';
-
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  return getDateKey(date);
 }
 
 /**
- * Convert a YYYY-MM-DD date input value into a UTC ISO string at local midnight.
+ * Convert a YYYY-MM-DD date input value into a UTC ISO string at midnight in
+ * the active user timezone.
  */
 export function dateInputValueToUtcIso(value: string): string | null {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
-  if (!match) return null;
-
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  const day = Number(match[3]);
-
-  if (
-    !Number.isInteger(year) ||
-    !Number.isInteger(month) ||
-    !Number.isInteger(day) ||
-    month < 1 ||
-    month > 12 ||
-    day < 1 ||
-    day > 31
-  ) {
-    return null;
-  }
-
-  return buildUtcIsoString(year, month - 1, day, 0, 0, 0);
+  const parts = parseDateKey(value);
+  if (!parts) return null;
+  return buildUtcIsoString(parts.year, parts.month - 1, parts.day, 0, 0, 0);
 }
 
 // ─── Date-part extraction (in user's timezone) ──────────────────────────────────
@@ -377,41 +591,14 @@ export function isSameDayInTimezone(d1: Date, d2: Date, tz?: string): boolean {
  *
  * @param date - Any date within the desired week
  * @param tz   - IANA timezone (default: user's active timezone)
- * @returns Date[7] — Monday … Sunday, each at local midnight
+ * @returns Date[7] — Monday … Sunday, each representing midnight in the user tz
  *
  * @example
  *   getWeekDates(new Date(2026, 3, 13), "Asia/Ho_Chi_Minh")
  *   → [Date13, Date14, ..., Date19] in UTC+7 local time
  */
 export function getWeekDates(date: Date, tz?: string): Date[] {
-  const activeTz = tz ?? getUserTimezone();
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: activeTz,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  })
-    .formatToParts(date)
-    .reduce(
-      (acc, p) => {
-        if (p.type === 'year') acc.year = p.value;
-        if (p.type === 'month') acc.month = p.value;
-        if (p.type === 'day') acc.day = p.value;
-        return acc;
-      },
-      { year: '1970', month: '01', day: '01' } as Record<string, string>,
-    );
-  // Construct Date at local midnight — JS interprets "YYYY-MM-DDTHH:MM:SS" as LOCAL time
-  const targetDate = new Date(`${parts.year}-${parts.month}-${parts.day}T00:00:00`);
-  const dow = targetDate.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
-  const diffToMon = dow === 0 ? -6 : 1 - dow;
-  const monday = new Date(targetDate);
-  monday.setDate(targetDate.getDate() + diffToMon);
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(monday);
-    d.setDate(monday.getDate() + i);
-    return d;
-  });
+  return getWeekBoundaries(date, tz).weekDatesLocal;
 }
 
 // ─── Day comparison (in user's timezone) ─────────────────────────────────────
@@ -497,25 +684,9 @@ export function isSameDayAs(utcString: DateInput, date: Date, tz?: string): bool
  */
 export function getDayRange(date: Date, tz?: string): { start: string; end: string } {
   const activeTz = tz ?? getUserTimezone();
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: activeTz,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  })
-    .formatToParts(date)
-    .reduce(
-      (acc, p) => {
-        if (p.type === 'year') acc.year = p.value;
-        if (p.type === 'month') acc.month = p.value;
-        if (p.type === 'day') acc.day = p.value;
-        return acc;
-      },
-      { year: '1970', month: '01', day: '01' } as Record<string, string>,
-    );
-
-  const startLocal = new Date(`${parts.year}-${parts.month}-${parts.day}T00:00:00`);
-  const endLocal = new Date(`${parts.year}-${parts.month}-${parts.day}T23:59:59.999`);
+  const parts = getDatePartsInTimezone(date, activeTz);
+  const startLocal = zonedDateTimeToUtcDate({ ...parts, hour: 0, minute: 0, second: 0 }, activeTz, 0);
+  const endLocal = zonedDateTimeToUtcDate({ ...parts, hour: 23, minute: 59, second: 59 }, activeTz, 999);
 
   return {
     start: startLocal.toISOString(),
@@ -540,6 +711,7 @@ export function getTodayRange(tz?: string): { start: string; end: string } {
  *   - mondayLocal / sundayLocal: Date objects at midnight in user's tz
  *   - weekDatesLocal: Date[7] at local midnight (Mon–Sun)
  *   - weekDatesUtcIso: UTC ISO strings (for API queries)
+ *   - rangeStartUtcIso / rangeEndUtcIso: inclusive UTC query range for the full week
  *
  * @example
  *   getWeekBoundaries(new Date(2026, 3, 13), "Asia/Ho_Chi_Minh")
@@ -556,51 +728,49 @@ export function getWeekBoundaries(
   sundayLocal: Date;
   weekDatesLocal: Date[];
   weekDatesUtcIso: string[];
+  rangeStartUtcIso: string;
+  rangeEndUtcIso: string;
 } {
   const activeTz = tz ?? getUserTimezone();
-
-  // Step 1: get calendar day string of `date` in user tz
-  const parts = new Intl.DateTimeFormat('en-CA', {
+  const targetParts = getDatePartsInTimezone(date, activeTz);
+  const weekday = new Intl.DateTimeFormat('en-US', {
     timeZone: activeTz,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  })
-    .formatToParts(date)
-    .reduce(
-      (acc, p) => {
-        if (p.type === 'year') acc.year = p.value;
-        if (p.type === 'month') acc.month = p.value;
-        if (p.type === 'day') acc.day = p.value;
-        return acc;
-      },
-      { year: '1970', month: '01', day: '01' } as Record<string, string>,
-    );
+    weekday: 'short',
+  }).format(date);
+  const isoWeekday = {
+    Mon: 1,
+    Tue: 2,
+    Wed: 3,
+    Thu: 4,
+    Fri: 5,
+    Sat: 6,
+    Sun: 7,
+  }[weekday] ?? 1;
+  const mondayParts = addDaysToDateParts(targetParts, 1 - isoWeekday);
 
-  // Step 2: construct Date at local midnight — JS interprets "YYYY-MM-DDTHH:MM:SS" as LOCAL time
-  const dateLocal = new Date(`${parts.year}-${parts.month}-${parts.day}T00:00:00`);
-
-  // Step 3: find Monday of that week (ISO: Monday = day 1, Sunday = 0)
-  const dow = dateLocal.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
-  const diffToMon = dow === 0 ? -6 : 1 - dow;
-  const mondayLocal = new Date(dateLocal);
-  mondayLocal.setDate(dateLocal.getDate() + diffToMon);
-
-  // Step 4: build weekDates[7] (Mon–Sun)
   const weekDatesLocal: Date[] = [];
   const weekDatesUtcIso: string[] = [];
   for (let i = 0; i < 7; i++) {
-    const d = new Date(mondayLocal);
-    d.setDate(mondayLocal.getDate() + i);
-    weekDatesLocal.push(d);
-    weekDatesUtcIso.push(d.toISOString());
+    const currentParts = addDaysToDateParts(mondayParts, i);
+    const startOfDay = zonedDateTimeToUtcDate(
+      { ...currentParts, hour: 0, minute: 0, second: 0 },
+      activeTz,
+      0,
+    );
+    weekDatesLocal.push(startOfDay);
+    weekDatesUtcIso.push(startOfDay.toISOString());
   }
 
+  const rangeStartUtcIso = weekDatesUtcIso[0];
+  const rangeEndUtcIso = getDayRange(weekDatesLocal[6], activeTz).end;
+
   return {
-    mondayLocal,
+    mondayLocal: weekDatesLocal[0],
     sundayLocal: weekDatesLocal[6],
     weekDatesLocal,
     weekDatesUtcIso,
+    rangeStartUtcIso,
+    rangeEndUtcIso,
   };
 }
 

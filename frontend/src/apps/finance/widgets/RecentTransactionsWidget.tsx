@@ -15,7 +15,7 @@ export default function RecentTransactionsWidget({ widget }: DashboardWidgetRend
     widget.id,
     () => getWidgetData(widget.id) as Promise<RecentTransactionsWidgetData>
   );
-  const { formatDate } = useTimezone();
+  const { formatWeekdayDate } = useTimezone();
 
   if (isLoading) {
     return (
@@ -88,7 +88,7 @@ export default function RecentTransactionsWidget({ widget }: DashboardWidgetRend
                     {item.note || "Untitled transaction"}
                   </div>
                   <div style={{ fontSize: "0.6875rem", color: "var(--color-foreground-muted)" }}>
-                  {formatDate(item.date)}
+                    {formatWeekdayDate(item.date)}
                   </div>
                 </div>
               </div>

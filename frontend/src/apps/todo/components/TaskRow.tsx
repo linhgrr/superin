@@ -26,9 +26,9 @@ interface TaskRowProps {
 }
 
 export default function TaskRow({ task, onToggle, onDelete, onClick, selected }: TaskRowProps) {
-  const { formatDate } = useTimezone();
+  const { formatWeekdayDate, isPast } = useTimezone();
   const priorityStyle = PRIORITY_STYLE[task.priority] ?? PRIORITY_STYLE.low;
-  const overdue = task.due_date && new Date(task.due_date) < new Date() && task.status === "pending";
+  const overdue = Boolean(task.due_date) && isPast(task.due_date) && task.status === "pending";
   const hasSubtasks = (task.subtask_count ?? 0) > 0;
   const allSubtasksDone = hasSubtasks && task.subtask_completed === task.subtask_count;
 
@@ -103,7 +103,7 @@ export default function TaskRow({ task, onToggle, onDelete, onClick, selected }:
         </span>
       </td>
       <td style={{ fontSize: "0.8125rem", color: overdue ? "var(--color-danger)" : "var(--color-foreground-muted)" }}>
-        {task.due_date ? formatDate(task.due_date, { month: "short", day: "numeric" }) : "—"}
+        {task.due_date ? formatWeekdayDate(task.due_date) : "—"}
         {overdue && <DynamicIcon name="AlertTriangle" size={12} style={{ display: "inline", color: "var(--color-danger)", marginLeft: "0.25rem" }} />}
       </td>
       <td>
