@@ -35,7 +35,7 @@ Tool Layer Rule:
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, time, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from typing import TYPE_CHECKING, Any, NamedTuple
 from zoneinfo import ZoneInfo
 
@@ -242,11 +242,11 @@ class UserTimezoneContext:
 
         return start_local.astimezone(UTC), end_local.astimezone(UTC)
 
-    def day_range(self, local_date: datetime) -> DayRange:
+    def day_range(self, local_date: date | datetime) -> DayRange:
         """Get UTC range for a specific local calendar date.
 
         Args:
-            local_date: Any datetime; only its date component is used.
+            local_date: A local calendar date or datetime.
 
         Returns:
             DayRange for that date in UTC.

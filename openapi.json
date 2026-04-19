@@ -3805,7 +3805,7 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date-time"
+                  "format": "date"
                 },
                 {
                   "type": "null"
@@ -3822,7 +3822,7 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "format": "date-time"
+                  "format": "date"
                 },
                 {
                   "type": "null"
@@ -6467,7 +6467,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "format": "date-time"
+                "format": "date"
               },
               {
                 "type": "null"
@@ -6726,7 +6726,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "format": "date-time"
+                "format": "date"
               },
               {
                 "type": "null"
@@ -7487,10 +7487,10 @@
             "exclusiveMinimum": 0.0,
             "title": "Amount"
           },
-          "date": {
+          "occurred_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Date"
+            "title": "Occurred At"
           },
           "note": {
             "anyOf": [
@@ -7510,7 +7510,7 @@
           "category_id",
           "type",
           "amount",
-          "date"
+          "occurred_at"
         ],
         "title": "FinanceCreateTransactionRequest"
       },
@@ -7657,10 +7657,10 @@
             "type": "number",
             "title": "Amount"
           },
-          "date": {
+          "occurred_at": {
             "type": "string",
             "format": "date-time",
-            "title": "Date"
+            "title": "Occurred At"
           },
           "note": {
             "anyOf": [
@@ -7686,7 +7686,7 @@
           "category_id",
           "type",
           "amount",
-          "date",
+          "occurred_at",
           "created_at"
         ],
         "title": "FinanceTransactionRead"
@@ -7847,7 +7847,7 @@
             ],
             "title": "Amount"
           },
-          "date": {
+          "occurred_at": {
             "anyOf": [
               {
                 "type": "string",
@@ -7857,7 +7857,7 @@
                 "type": "null"
               }
             ],
-            "title": "Date"
+            "title": "Occurred At"
           },
           "note": {
             "anyOf": [
@@ -8392,7 +8392,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "format": "date-time"
+                "format": "date"
               },
               {
                 "type": "null"
@@ -8458,7 +8458,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "format": "date-time"
+                "format": "date"
               },
               {
                 "type": "null"
@@ -8557,7 +8557,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "format": "date-time"
+                "format": "date"
               },
               {
                 "type": "null"
@@ -8758,7 +8758,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "format": "date-time"
+                "format": "date"
               },
               {
                 "type": "null"
@@ -8893,7 +8893,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "format": "date-time"
+                "format": "date"
               },
               {
                 "type": "null"
@@ -9022,7 +9022,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "format": "date-time"
+                "format": "date"
               },
               {
                 "type": "null"

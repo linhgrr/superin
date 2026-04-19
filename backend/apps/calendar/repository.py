@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import date, datetime
 
 from beanie import PydanticObjectId
 from pymongo.asynchronous.client_session import AsyncClientSession
@@ -376,7 +376,7 @@ class RecurringRuleRepository:
         frequency: RecurrenceFrequency,
         interval: int = 1,
         days_of_week: list[int] | None = None,
-        end_date: datetime | None = None,
+        end_date: date | None = None,
         max_occurrences: int | None = None,
         *,
         session: AsyncClientSession | None = None,

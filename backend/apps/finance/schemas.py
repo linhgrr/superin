@@ -27,7 +27,7 @@ class FinanceCreateTransactionRequest(BaseModel):
     category_id: str
     type: TransactionType
     amount: float = Field(gt=0)
-    date: datetime
+    occurred_at: datetime
     note: str | None = None
 
 
@@ -53,7 +53,7 @@ class FinanceUpdateTransactionRequest(BaseModel):
     wallet_id: str | None = None
     category_id: str | None = None
     amount: float | None = Field(default=None, gt=0)
-    date: datetime | None = None
+    occurred_at: datetime | None = None
     note: str | None = None
 
 
@@ -80,7 +80,7 @@ class FinanceTransactionRead(BaseModel):
     category_id: str
     type: TransactionType
     amount: float
-    date: datetime
+    occurred_at: datetime
     note: str | None = None
     created_at: datetime
 

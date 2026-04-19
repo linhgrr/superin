@@ -1,27 +1,52 @@
-"""Reusable base class for tool-using child agents under the root graph."""
+"""Reusable base class for installed app child agents."""
 
 from __future__ import annotations
 
 import asyncio
 import json
-from datetime import UTC, datetime
 from typing import Any, Literal
-from zoneinfo import ZoneInfo
 
 from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
-from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import BaseTool
 from langgraph.errors import GraphRecursionError
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import create_react_agent
 from loguru import logger
+from shared.agent_context import get_user_context, set_thread_context, set_user_context
 
 from core.config import settings
 from core.constants import AGENT_RECURSION_LIMIT
+from core.models import User
+from core.utils.timezone import get_user_timezone_context
 from shared.llm import get_llm
 
 # Type definitions for consistent status/error codes
 DelegationStatus = Literal["success", "no_action", "failed", "partial", "awaiting_confirmation"]
+ToolErrorCode = Literal[
+    "domain_error",
+    "invalid_request",
+    "internal_error",
+    "too_many_tool_calls",
+]
+
+
+def _content_to_text(content: Any) -> str:
+    if isinstance(content, str):
+        return content.strip()
+
+    if isinstance(content, list):
+        text_parts: list[str] = []
+        for part in content:
+            if isinstance(part, str):
+                text_parts.append(part)
+            elif isinstance(part, dict):
+                if part.get("type") == "text":
+                    text_parts.append(str(part.get("text", "")))
+                elif "text" in part:
+                    text_parts.append(str(part["text"]))
+        return "\n".join(part for part in text_parts if part).strip()
+
+    return str(content).strip()
 
 
 def _parse_tool_message_content(content: Any) -> Any:
@@ -34,9 +59,12 @@ def _parse_tool_message_content(content: Any) -> Any:
 
 
 class BaseAppAgent:
-    """Shared implementation for child agents invoked by the root graph.
+    """Shared implementation for child app agents invoked by the root agent.
 
-    Covers both domain app agents and the platform agent.
+    Safety features:
+    - Recursion limit (configurable) prevents infinite loops
+    - Tool call tracking detects runaway execution
+    - All tool results are sanitized before returning to LLM
     """
 
     app_id: str
@@ -62,7 +90,7 @@ class BaseAppAgent:
             self._graph = create_react_agent(
                 model=get_llm(),
                 tools=self.tools(),
-                prompt=self._make_dynamic_prompt(),
+                prompt=self.build_prompt(),
                 name=f"{self.app_id}_agent",
             )
         return self._graph
@@ -73,96 +101,53 @@ class BaseAppAgent:
     def build_prompt(self) -> str:
         raise NotImplementedError
 
-    def _make_dynamic_prompt(self):
-        """Build dynamic child-agent prompt from RunnableConfig.
-
-        MUST return list[BaseMessage] (not str) so create_react_agent can prepend
-        the system prompt to the messages list. Returning a plain string causes
-        langchain to treat it as user content — the model echoes it back without
-        calling tools.
-        """
-
-        def prompt(
-            state: Any, config: RunnableConfig
-        ) -> list[BaseMessage]:
-            cfg = config.get("configurable") or {}
-            user_tz = cfg.get("user_tz", "UTC")
-            try:
-                now_local = datetime.now(UTC).astimezone(ZoneInfo(user_tz))
-            except Exception:
-                user_tz = "UTC"
-                now_local = datetime.now(UTC)
-
-            system_content = (
-                f"{self.build_prompt()}\n\n"
-                "<timezone_rules>\n"
-                "- Interpret all relative or ambiguous time expressions such as 'today', 'tomorrow', 'this week', '9am', or 'next Monday' in the user's timezone.\n"
-                "- When a tool expects `local_date`, send `YYYY-MM-DD` in the user's local calendar.\n"
-                "- When a tool expects `local_datetime`, send a local wall-clock datetime without timezone offset.\n"
-                "- When a tool expects `instant`, send an offset-aware ISO datetime.\n"
-                "- Do not assume naive datetimes are UTC.\n"
-                "</timezone_rules>\n\n"
-                "Execution context:\n"
-                f"- User timezone: {user_tz}\n"
-                f"- Current local datetime: {now_local.isoformat()}\n"
-                f"- User ID: {cfg.get('user_id', 'unknown')}\n"
-                f"- Thread ID: {cfg.get('thread_id', 'unknown')}\n"
-            )
-
-            from langchain_core.messages import SystemMessage
-
-            # Prepend system message to existing messages so the LLM receives:
-            # [SystemMessage(context + app prompt), ...existing messages...]
-            existing: list[BaseMessage] = state.get("messages", [])
-            return [SystemMessage(content=system_content)] + list(existing)
-
-        return prompt
 
     async def delegate(
         self,
-        subtask: str,
+        question: str,
         thread_id: str,
         user_id: str | None = None,
-        config: RunnableConfig | None = None,
         **_kwargs: Any,
     ) -> dict[str, Any]:
-        """Run the child agent graph for a single domain-specific subtask.
-
-        Context propagation:
-            user_id / thread_id are injected into a fresh ``RunnableConfig`` and
-            passed into ``graph.ainvoke``. LangGraph propagates ``configurable``
-            to every tool, so tools can read context via
-            ``shared.agent_config.require_user_id(config)``.
-        """
+        # Support explicit user_id (from @entrypoint) or ContextVar (from old-style invoke)
+        # Accept **_kwargs for forward-compat (e.g. `config` passed by workers.py)
+        if user_id is None:
+            user_id = get_user_context()
         if not user_id:
-            raise RuntimeError(f"{self.app_id} agent invoked without user_id")
-        logger.info(
-            "BaseAppAgent.delegate START  app={}  user={}  thread={}  subtask={}",
-            self.app_id,
-            user_id,
-            thread_id,
-            subtask[:80],
+            raise RuntimeError(f"{self.app_id} agent invoked without user context")
+        logger.info("BaseAppAgent.delegate START  app={}  user={}  thread={}  question={}", self.app_id, user_id, thread_id, question[:80])
+
+        parent_thread_id = thread_id
+        # M7: Child thread_id is scoped under the parent thread (which is already user-scoped
+        # via 'user:{user_id}:...' prefix enforced by RootAgent.astream). This provides an
+        # additional logical namespace but does NOT add security since child agents are stateless.
+        child_thread_id = f"{thread_id}:{self.app_id}"
+        set_user_context(user_id)
+        set_thread_context(child_thread_id)
+
+        # Inject current date/time so child agent knows "today" in user's timezone
+        user_obj = await User.find_one(User.id == user_id) if user_id else None
+        tz_ctx = get_user_timezone_context(user_obj)
+        date_str, time_str = tz_ctx.get_date_time_tuple()
+        prefixed_question = (
+            f"Current date: {date_str}, current time: {time_str}.\n\n{question}"
         )
 
-        # Child thread ids are namespaced under the parent thread id to keep
-        # sub-agent checkpoints distinct while preserving one frontend-owned
-        # root thread identity end-to-end.
-        child_thread_id = f"{thread_id}:{self.app_id}"
-
-        child_config = self._build_child_config(config, user_id, child_thread_id)
         final_status = "failed"
 
         try:
             result = await asyncio.wait_for(
                 self.graph.ainvoke(
-                    {"messages": [{"role": "user", "content": subtask}]},
-                    config=child_config,
+                    {"messages": [{"role": "user", "content": prefixed_question}]},
+                    config={
+                        "recursion_limit": AGENT_RECURSION_LIMIT,
+                    },
                 ),
                 timeout=settings.llm_request_timeout_seconds,
             )
             final_status = str(result.get("status", "success"))
             messages = result.get("messages", [])
-            return self._build_delegate_result(subtask, messages)
+            return self._build_delegate_result(question, messages)
         except TimeoutError:
             logger.error(
                 "{} child agent timed out after {}s",
@@ -170,76 +155,48 @@ class BaseAppAgent:
                 settings.llm_request_timeout_seconds,
             )
             return self._failed_result(
-                subtask,
+                question,
                 f"The {self.app_id} assistant timed out while waiting for the language model. "
                 "Please try again.",
             )
         except GraphRecursionError:
             logger.warning(
-                "{} child agent exceeded recursion limit ({})",
+                "%s child agent exceeded recursion limit (%d)",
                 self.app_id,
                 AGENT_RECURSION_LIMIT,
             )
             return self._failed_result(
-                subtask,
+                question,
                 f"The {self.app_id} assistant needed too many steps to complete this request. "
                 "Please try a simpler query.",
             )
         except (AttributeError, TypeError, ValueError) as exc:
-            logger.error("{} child agent encountered an error: {}", self.app_id, exc)
+            # Programming / domain errors — surface to caller with a clear message
+            logger.error("%s child agent encountered an error: %s", self.app_id, exc)
             return self._failed_result(
-                subtask,
+                question,
                 f"The {self.app_id} assistant hit an internal error while handling that request. "
                 "Please try again.",
             )
         finally:
-            logger.info(
-                "BaseAppAgent.delegate END  app={}  user={}  status={}",
-                self.app_id,
-                user_id,
-                final_status,
-            )
+            set_user_context(user_id)
+            set_thread_context(parent_thread_id)
+            logger.info("BaseAppAgent.delegate END  app={}  user={}  status={}", self.app_id, user_id, final_status)
 
-    def _build_child_config(
-        self,
-        parent_config: RunnableConfig | None,
-        user_id: str,
-        child_thread_id: str,
-    ) -> RunnableConfig:
-        """Merge parent config with child-scoped identifiers.
-
-        Produces a new RunnableConfig whose ``configurable`` section carries
-        the parent config's values, plus the child-scoped ``user_id`` and
-        ``thread_id`` that every downstream tool reads.
-        """
-        parent_configurable: dict[str, Any] = {}
-        if parent_config:
-            parent_configurable = dict(parent_config.get("configurable") or {})
-
-        configurable = {
-            **parent_configurable,
-            "user_id": user_id,
-            "thread_id": child_thread_id,
-        }
-        return {
-            "configurable": configurable,
-            "recursion_limit": AGENT_RECURSION_LIMIT,
-        }
-
-    def _failed_result(self, subtask: str, message: str) -> dict[str, Any]:
+    def _failed_result(self, question: str, message: str) -> dict[str, Any]:
         """Build a standardized failure result dict."""
         return {
             "app": self.app_id,
             "status": "failed",
             "ok": False,
             "message": message,
-            "subtask": subtask,
+            "question": question,
             "tool_results": [],
         }
 
     def _build_delegate_result(
         self,
-        subtask: str,
+        question: str,
         messages: list[BaseMessage],
     ) -> dict[str, Any]:
         tool_results = self._extract_tool_results(messages)
@@ -252,24 +209,28 @@ class BaseAppAgent:
             "status": status,
             "ok": ok,
             "message": reply or self._summarize_results(tool_results),
-            "subtask": subtask,
+            "question": question,
             "tool_results": tool_results,
         }
 
     def _extract_reply(self, messages: list[BaseMessage]) -> str:
         for message in reversed(messages):
             if isinstance(message, AIMessage):
-                text = message.text.strip()
+                text = _content_to_text(message.content)
                 if text:
                     return text
 
         if messages:
-            return messages[-1].text.strip()
+            return _content_to_text(getattr(messages[-1], "content", ""))
 
         return ""
 
     def _extract_tool_results(self, messages: list[BaseMessage]) -> list[dict[str, Any]]:
-        """Extract structured tool results from a ReAct message list."""
+        """Extract tool results from messages.
+
+        Note: Manual tool call counting (MAX_TOOL_CALLS_PER_DELEGATION) has been
+        removed — recursion_limit + GraphRecursionError handling is sufficient.
+        """
         results: list[dict[str, Any]] = []
 
         for message in messages:

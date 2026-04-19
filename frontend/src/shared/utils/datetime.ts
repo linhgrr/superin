@@ -4,7 +4,10 @@
  *
  * ── Architecture ──────────────────────────────────────────────────────────────
  *
- *   FE receives/sends UTC ISO strings from/to backend
+ *   FE exchanges temporal values with backend according to field semantic:
+ *   - instants use UTC ISO strings
+ *   - date-only values use YYYY-MM-DD
+ *   - time-only values use HH:MM[:SS]
  *   All display-side computation uses the user's timezone via Intl.DateTimeFormat
  *
  * ── Golden Rules ──────────────────────────────────────────────────────────────
@@ -23,7 +26,7 @@
  *   ALWAYS convert local calendar components with an explicit IANA timezone
  *           → buildUtcIsoString()/buildUtcIsoStringFromDate() do this safely
  *
- *   ALWAYS use .toISOString() when sending datetimes to the backend
+ *   ALWAYS use .toISOString() when sending instant datetimes to the backend
  *
  * ── Usage Quick-Reference ───────────────────────────────────────────────────
  *
@@ -41,6 +44,8 @@ import { STORAGE_KEYS } from '@/constants/storage';
 
 /** Accepts a UTC ISO string, a Date object, null, or undefined. */
 export type DateInput = string | Date | null | undefined;
+/** Accepts a semantic local date (`YYYY-MM-DD`), null, or undefined. */
+export type LocalDateInput = string | null | undefined;
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
@@ -182,6 +187,16 @@ function parseDateKey(value: string): TimeZoneDateParts | null {
     return null;
   }
   return { year, month, day };
+}
+
+function getValidLocalDateParts(value: LocalDateInput): TimeZoneDateParts | null {
+  if (typeof value !== 'string') return null;
+  return parseDateKey(value);
+}
+
+function getLocalDateAnchor(parts: TimeZoneDateParts): Date {
+  // Noon UTC avoids accidental day rollover when formatting date-only values.
+  return new Date(Date.UTC(parts.year, parts.month - 1, parts.day, 12, 0, 0, 0));
 }
 
 function addDaysToDateParts(parts: TimeZoneDateParts, days: number): TimeZoneDateParts {
@@ -408,6 +423,55 @@ export function formatLongWeekdayDate(
 }
 
 /**
+ * Format a semantic local date (`YYYY-MM-DD`) without applying timezone math.
+ */
+export function formatLocalDate(
+  value: LocalDateInput,
+  opts?: Intl.DateTimeFormatOptions,
+): string {
+  const parts = getValidLocalDateParts(value);
+  if (!parts) return '';
+  return new Intl.DateTimeFormat(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    ...opts,
+    timeZone: 'UTC',
+  }).format(getLocalDateAnchor(parts));
+}
+
+/**
+ * Format a semantic local date as weekday + date.
+ */
+export function formatLocalWeekdayDate(
+  value: LocalDateInput,
+  opts?: Intl.DateTimeFormatOptions,
+): string {
+  return formatLocalDate(value, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    ...opts,
+  });
+}
+
+/**
+ * Format a semantic local date as long weekday + full date.
+ */
+export function formatLongLocalDate(
+  value: LocalDateInput,
+  opts?: Intl.DateTimeFormatOptions,
+): string {
+  return formatLocalDate(value, {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+    ...opts,
+  });
+}
+
+/**
  * Get current date and time strings in the user's timezone.
  *
  * @param tz - IANA timezone (default: user's active timezone)
@@ -515,6 +579,16 @@ export function toDateInputValue(value: DateInput): string {
   const date = utcToLocalDate(value);
   if (!date) return '';
   return getDateKey(date);
+}
+
+/**
+ * Normalize a semantic local date for HTML date inputs.
+ *
+ * Use this for `local_date` fields that already travel as `YYYY-MM-DD`.
+ */
+export function toLocalDateInputValue(value: LocalDateInput): string {
+  const parts = getValidLocalDateParts(value);
+  return parts ? formatDateKey(parts) : '';
 }
 
 /**
@@ -645,6 +719,24 @@ export function isPast(utcString: DateInput, tz?: string): boolean {
       hour12: false,
     }).format(d);
   return fmt(date) < fmt(new Date());
+}
+
+/**
+ * Check whether a semantic local date is before today in the user's timezone.
+ */
+export function isLocalDatePast(value: LocalDateInput, tz?: string): boolean {
+  const parts = getValidLocalDateParts(value);
+  if (!parts) return false;
+  return formatDateKey(parts) < getLocalNow(tz).date;
+}
+
+/**
+ * Check whether a semantic local date is today in the user's timezone.
+ */
+export function isLocalDateToday(value: LocalDateInput, tz?: string): boolean {
+  const parts = getValidLocalDateParts(value);
+  if (!parts) return false;
+  return formatDateKey(parts) === getLocalNow(tz).date;
 }
 
 /**

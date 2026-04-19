@@ -84,7 +84,7 @@ export default function TransactionsTab() {
                   style={{ cursor: "pointer" }}
                 >
                   <td style={{ whiteSpace: "nowrap" }}>
-                    {formatWeekdayDate(transaction.date, { year: "numeric" })}
+                    {formatWeekdayDate(transaction.occurred_at, { year: "numeric" })}
                   </td>
                   <td>
                     <span
@@ -163,7 +163,7 @@ export default function TransactionsTab() {
               { label: "Amount", key: "amount", type: "number", placeholder: "0.00" },
               {
                 label: "Date",
-                key: "date",
+                key: "occurred_at",
                 type: "date",
                 initialValue: toDateInputValue(new Date()),
               },
@@ -177,8 +177,8 @@ export default function TransactionsTab() {
                 throw new Error("Amount must be greater than 0");
               }
 
-              const date = dateInputValueToUtcIso(values.date);
-              if (!date) {
+              const occurredAt = dateInputValueToUtcIso(values.occurred_at);
+              if (!occurredAt) {
                 throw new Error("Please select a valid transaction date");
               }
 
@@ -187,7 +187,7 @@ export default function TransactionsTab() {
                 category_id: values.category_id,
                 type: transactionType,
                 amount,
-                date,
+                occurred_at: occurredAt,
                 note: values.note || undefined,
               };
               await createTransaction(request);

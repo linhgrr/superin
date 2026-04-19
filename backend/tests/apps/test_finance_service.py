@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from types import SimpleNamespace
 
 import pytest
@@ -95,7 +95,7 @@ async def test_add_transaction_uses_atomic_balance_guard_for_expense(monkeypatch
         category_id="category-1",
         type="expense",
         amount=25,
-        date=created_at,
+        occurred_at=created_at,
         note=None,
         created_at=created_at,
     )
@@ -141,4 +141,37 @@ async def test_add_transaction_uses_atomic_balance_guard_for_expense(monkeypatch
         "delta": -25,
         "min_balance": 25,
         "session": "session",
+    }
+
+
+async def test_search_transactions_converts_local_dates_to_utc_range(monkeypatch) -> None:
+    service = FinanceService()
+    user = SimpleNamespace(settings={"timezone": "Asia/Ho_Chi_Minh"})
+    captured: dict[str, object] = {}
+
+    async def fake_get(_user_id: str):
+        return user
+
+    async def fake_find_by_user(*args, **kwargs):
+        captured["args"] = args
+        captured["kwargs"] = kwargs
+        return []
+
+    monkeypatch.setattr("apps.finance.service.User.get", fake_get)
+    service.transactions.find_by_user = fake_find_by_user  # type: ignore[method-assign]
+
+    result = await service.search_transactions(
+        "user-1",
+        start_date=date(2026, 4, 1),
+        end_date=date(2026, 4, 30),
+        limit=12,
+    )
+
+    assert result == []
+    assert captured["args"] == ("user-1",)
+    assert captured["kwargs"] == {
+        "start_date": datetime(2026, 3, 31, 17, 0, tzinfo=UTC),
+        "end_date": datetime(2026, 4, 30, 16, 59, 59, 999999, tzinfo=UTC),
+        "skip": 0,
+        "limit": 10000,
     }

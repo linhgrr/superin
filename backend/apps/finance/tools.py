@@ -182,7 +182,7 @@ async def finance_add_transaction(
     category_id: str,
     type_: TransactionType,
     amount: float,
-    date: str,
+    occurred_at: str,
     config: RunnableConfig,
     note: str | None = None,
 ) -> dict:
@@ -194,15 +194,15 @@ async def finance_add_transaction(
             category_id,
             type_,
             amount,
-            temporal["date"],
+            temporal["occurred_at"],
             note,
         )
 
     return await run_time_aware_tool_with_user(
         config,
         action="adding a transaction",
-        payload={"date": date},
-        temporal_fields={"date": "local_datetime"},
+        payload={"occurred_at": occurred_at},
+        temporal_fields={"occurred_at": "local_datetime"},
         operation=operation,
     )
 
@@ -214,7 +214,7 @@ async def finance_update_transaction(
     wallet_id: str | None = None,
     category_id: str | None = None,
     amount: float | None = None,
-    date: str | None = None,
+    occurred_at: str | None = None,
     note: str | None = None,
 ) -> dict:
     """Update an existing transaction."""
@@ -225,15 +225,15 @@ async def finance_update_transaction(
             wallet_id,
             category_id,
             amount,
-            temporal.get("date"),
+            temporal.get("occurred_at"),
             note,
         )
 
     return await run_time_aware_tool_with_user(
         config,
         action="updating a transaction",
-        payload={"date": date},
-        temporal_fields={"date": "local_datetime"},
+        payload={"occurred_at": occurred_at},
+        temporal_fields={"occurred_at": "local_datetime"},
         operation=operation,
     )
 
@@ -309,19 +309,11 @@ async def finance_search_transactions(
 ) -> list[dict]:
     """Search transactions by text/date."""
     async def operation(user_id: str, temporal: dict, time_context) -> list[dict]:
-        start_dt = None
-        if temporal.get("start_date") is not None:
-            start_dt, _ = time_context.local_date_range_utc(temporal["start_date"])
-
-        end_dt = None
-        if temporal.get("end_date") is not None:
-            _, end_dt = time_context.local_date_range_utc(temporal["end_date"])
-
         return await finance_service.search_transactions(
             user_id,
             query,
-            start_dt,
-            end_dt,
+            temporal.get("start_date"),
+            temporal.get("end_date"),
             limit,
         )
 

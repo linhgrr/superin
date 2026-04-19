@@ -1,4 +1,4 @@
-from datetime import UTC, datetime, time
+from datetime import date, time
 from types import SimpleNamespace
 
 import pytest
@@ -20,7 +20,7 @@ async def test_todo_add_task_uses_user_timezone_for_due_date_and_time(monkeypatc
         user_id: str,
         title: str,
         description: str | None,
-        due_date: datetime | None,
+        due_date: date | None,
         due_time: time | None,
         priority: str,
         tags: list[str] | None,
@@ -51,7 +51,7 @@ async def test_todo_add_task_uses_user_timezone_for_due_date_and_time(monkeypatc
 
     assert result["ok"] is True
     assert observed["user_id"] == "507f1f77bcf86cd799439011"
-    assert observed["due_date"] == datetime(2026, 4, 19, 17, 0, tzinfo=UTC)
+    assert observed["due_date"] == date(2026, 4, 20)
     assert observed["due_time"] == time(15, 30)
 
 
@@ -83,12 +83,12 @@ async def test_todo_update_task_uses_local_date_semantics(monkeypatch) -> None:
     assert result["ok"] is True
     assert observed["args"][2] is None
     assert observed["args"][3] is None
-    assert observed["args"][4] == datetime(2026, 4, 20, 17, 0, tzinfo=UTC)
+    assert observed["args"][4] == date(2026, 4, 21)
     assert observed["args"][5] == time(8, 0)
 
 
 @pytest.mark.asyncio
-async def test_todo_create_recurring_task_uses_end_of_local_day(monkeypatch) -> None:
+async def test_todo_create_recurring_task_uses_local_date_semantics(monkeypatch) -> None:
     user = SimpleNamespace(settings={"timezone": "Asia/Ho_Chi_Minh"})
 
     async def fake_get(_user_id: str):
@@ -102,7 +102,7 @@ async def test_todo_create_recurring_task_uses_end_of_local_day(monkeypatch) -> 
         frequency: str,
         interval: int,
         days_of_week: list[int] | None,
-        end_date: datetime | None,
+        end_date: date | None,
         max_occurrences: int | None,
     ) -> dict:
         observed["end_date"] = end_date
@@ -121,4 +121,4 @@ async def test_todo_create_recurring_task_uses_end_of_local_day(monkeypatch) -> 
     )
 
     assert result["ok"] is True
-    assert observed["end_date"] == datetime(2026, 4, 30, 16, 59, 59, 999999, tzinfo=UTC)
+    assert observed["end_date"] == date(2026, 4, 30)

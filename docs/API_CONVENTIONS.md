@@ -90,7 +90,7 @@ async def list_transactions(
 ) -> list[dict]:
     txs = (
         Transaction.find(Transaction.user_id == user_id)
-        .sort("-date")
+        .sort("-occurred_at")
         .skip(skip)
         .limit(limit)
         .to_list()

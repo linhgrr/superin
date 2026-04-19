@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 
 import { useAsyncTask } from "@/hooks/useAsyncTask";
-import { dateInputValueToUtcIso, toDateInputValue } from "@/shared/utils/datetime";
+import { toLocalDateInputValue } from "@/shared/utils/datetime";
 
 import type { CreateTaskRequest } from "../api";
 
@@ -22,16 +22,12 @@ export default function NewTaskForm({ onSubmit, onCancel }: NewTaskFormProps) {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!form.title.trim()) return;
-    const dueDate = dueDateInput ? dateInputValueToUtcIso(dueDateInput) : null;
-    if (dueDateInput && !dueDate) {
-      return;
-    }
     try {
       await run(() =>
         onSubmit({
           ...form,
           title: form.title.trim(),
-          due_date: dueDate,
+          due_date: dueDateInput || null,
         })
       );
     } catch {
@@ -76,7 +72,7 @@ export default function NewTaskForm({ onSubmit, onCancel }: NewTaskFormProps) {
         </select>
         <input
           type="date"
-          value={dueDateInput || toDateInputValue(form.due_date)}
+          value={dueDateInput || toLocalDateInputValue(form.due_date)}
           onChange={(event) => setDueDateInput(event.target.value)}
         />
       </div>

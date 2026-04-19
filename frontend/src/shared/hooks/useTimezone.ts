@@ -37,7 +37,9 @@ import { useAuth } from '@/hooks/useAuth';
 import {
   formatDate as formatDateUtil,
   formatDateTime as formatDateTimeUtil,
+  formatLocalWeekdayDate as formatLocalWeekdayDateUtil,
   formatLongWeekdayDate as formatLongWeekdayDateUtil,
+  formatLongLocalDate as formatLongLocalDateUtil,
   formatTime as formatTimeUtil,
   formatWeekdayDate as formatWeekdayDateUtil,
   formatWeekdayDateTime as formatWeekdayDateTimeUtil,
@@ -48,12 +50,14 @@ import {
   getWeekBoundaries as getWeekBoundariesUtil,
   getWeekDates as getWeekDatesUtil,
   getUserTimezone,
+  isLocalDatePast as isLocalDatePastUtil,
   isPast as isPastUtil,
   isSameDayAs as isSameDayAsUtil,
   isSameDayInTimezone as isSameDayInTimezoneUtil,
   isToday as isTodayUtil,
   setUserTimezone,
   type DateInput,
+  type LocalDateInput,
 } from '@/shared/utils/datetime';
 
 export interface UseTimezoneReturn {
@@ -75,12 +79,18 @@ export interface UseTimezoneReturn {
   formatWeekdayDateTime: (utcString: DateInput, options?: Intl.DateTimeFormatOptions) => string;
   /** Format UTC datetime as long weekday + date string */
   formatLongWeekdayDate: (utcString: DateInput, options?: Intl.DateTimeFormatOptions) => string;
+  /** Format semantic local date as weekday + date */
+  formatLocalWeekdayDate: (value: LocalDateInput, options?: Intl.DateTimeFormatOptions) => string;
+  /** Format semantic local date as long weekday + full date */
+  formatLongLocalDate: (value: LocalDateInput, options?: Intl.DateTimeFormatOptions) => string;
 
   // ── Comparisons ────────────────────────────────────────────────────────────
   /** True if UTC datetime falls on today in user timezone */
   isToday: (utcString: DateInput) => boolean;
   /** True if UTC datetime is in the past (user local time) */
   isPast: (utcString: DateInput) => boolean;
+  /** True if semantic local date is before today in user timezone */
+  isLocalDatePast: (value: LocalDateInput) => boolean;
   /** True if UTC datetime falls on the same calendar day as `date` (user tz) */
   isSameDayAs: (utcString: DateInput, date: Date) => boolean;
 
@@ -175,6 +185,18 @@ export function useTimezone(): UseTimezoneReturn {
     [timezone],
   );
 
+  const formatLocalWeekdayDate = useCallback(
+    (value: LocalDateInput, options?: Intl.DateTimeFormatOptions) =>
+      formatLocalWeekdayDateUtil(value, options),
+    [],
+  );
+
+  const formatLongLocalDate = useCallback(
+    (value: LocalDateInput, options?: Intl.DateTimeFormatOptions) =>
+      formatLongLocalDateUtil(value, options),
+    [],
+  );
+
   const isToday = useCallback(
     (utcString: DateInput) => isTodayUtil(utcString, timezone),
     [timezone],
@@ -182,6 +204,11 @@ export function useTimezone(): UseTimezoneReturn {
 
   const isPast = useCallback(
     (utcString: DateInput) => isPastUtil(utcString, timezone),
+    [timezone],
+  );
+
+  const isLocalDatePast = useCallback(
+    (value: LocalDateInput) => isLocalDatePastUtil(value, timezone),
     [timezone],
   );
 
@@ -234,8 +261,11 @@ export function useTimezone(): UseTimezoneReturn {
     formatWeekdayDate,
     formatWeekdayDateTime,
     formatLongWeekdayDate,
+    formatLocalWeekdayDate,
+    formatLongLocalDate,
     isToday,
     isPast,
+    isLocalDatePast,
     isSameDayAs,
     isSameDayInTimezone,
     getHourMinute,

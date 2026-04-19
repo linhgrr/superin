@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, time
+from datetime import date, datetime, time
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -13,7 +13,7 @@ from apps.todo.enums import RecurrenceFrequency, TaskPriority, TaskStatus
 class TodoCreateTaskRequest(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     description: str | None = None
-    due_date: datetime | None = None
+    due_date: date | None = None
     due_time: time | None = None
     priority: TaskPriority = "medium"
     tags: list[str] = Field(default_factory=list)
@@ -23,7 +23,7 @@ class TodoCreateTaskRequest(BaseModel):
 class TodoUpdateTaskRequest(BaseModel):
     title: str | None = Field(None, min_length=1, max_length=200)
     description: str | None = None
-    due_date: datetime | None = None
+    due_date: date | None = None
     due_time: time | None = None
     priority: TaskPriority | None = None
     status: TaskStatus | None = None
@@ -39,7 +39,7 @@ class TodoCreateRecurringRuleRequest(BaseModel):
     frequency: RecurrenceFrequency
     interval: int = Field(default=1, ge=1, le=52)
     days_of_week: list[int] | None = None  # 0=Monday, 6=Sunday
-    end_date: datetime | None = None
+    end_date: date | None = None
     max_occurrences: int | None = Field(None, ge=1, le=1000)
 
 
@@ -47,7 +47,7 @@ class TodoTaskRead(BaseModel):
     id: str
     title: str
     description: str | None = None
-    due_date: datetime | None = None
+    due_date: date | None = None
     due_time: time | None = None
     reminder_minutes: int | None = None
     priority: TaskPriority
@@ -85,7 +85,7 @@ class TodoRecurringRuleRead(BaseModel):
     frequency: RecurrenceFrequency
     interval: int
     days_of_week: list[int] | None = None
-    end_date: datetime | None = None
+    end_date: date | None = None
     max_occurrences: int | None = None
     occurrence_count: int
     is_active: bool

@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from types import SimpleNamespace
 
 import pytest
@@ -22,10 +22,10 @@ async def test_finance_add_transaction_uses_user_timezone(monkeypatch) -> None:
         category_id: str,
         type_: str,
         amount: float,
-        date: datetime,
+        occurred_at: datetime,
         note: str | None = None,
     ) -> dict:
-        observed["date"] = date
+        observed["occurred_at"] = occurred_at
         return {"id": "tx-1"}
 
     monkeypatch.setattr(User, "get", fake_get)
@@ -37,17 +37,17 @@ async def test_finance_add_transaction_uses_user_timezone(monkeypatch) -> None:
             "category_id": "category-1",
             "type_": "expense",
             "amount": 12.5,
-            "date": "2026-04-20T09:15:00",
+            "occurred_at": "2026-04-20T09:15:00",
         },
         config={"configurable": {"user_id": "507f1f77bcf86cd799439011"}},
     )
 
     assert result["ok"] is True
-    assert observed["date"] == datetime(2026, 4, 20, 2, 15, tzinfo=UTC)
+    assert observed["occurred_at"] == datetime(2026, 4, 20, 2, 15, tzinfo=UTC)
 
 
 @pytest.mark.asyncio
-async def test_finance_search_transactions_expands_local_date_range(monkeypatch) -> None:
+async def test_finance_search_transactions_passes_local_date_semantics(monkeypatch) -> None:
     user = SimpleNamespace(settings={"timezone": "Asia/Ho_Chi_Minh"})
 
     async def fake_get(_user_id: str):
@@ -58,8 +58,8 @@ async def test_finance_search_transactions_expands_local_date_range(monkeypatch)
     async def fake_search_transactions(
         user_id: str,
         query: str | None = None,
-        start_date: datetime | None = None,
-        end_date: datetime | None = None,
+        start_date: date | None = None,
+        end_date: date | None = None,
         limit: int = 20,
     ) -> list[dict]:
         observed["start_date"] = start_date
@@ -78,5 +78,5 @@ async def test_finance_search_transactions_expands_local_date_range(monkeypatch)
     )
 
     assert result["ok"] is True
-    assert observed["start_date"] == datetime(2026, 3, 31, 17, 0, tzinfo=UTC)
-    assert observed["end_date"] == datetime(2026, 4, 30, 16, 59, 59, 999999, tzinfo=UTC)
+    assert observed["start_date"] == date(2026, 4, 1)
+    assert observed["end_date"] == date(2026, 4, 30)

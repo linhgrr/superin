@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, time
+from datetime import date, datetime, time
 
 from beanie import Document, PydanticObjectId
 from pydantic import Field
@@ -17,7 +17,7 @@ class Task(Document):
     user_id: PydanticObjectId
     title: str
     description: str | None = None
-    due_date: datetime | None = None
+    due_date: date | None = None
     due_time: time | None = None  # New: specific time for the task
     reminder_minutes: int | None = None  # New: remind X minutes before due
     priority: TaskPriority = "medium"
@@ -67,7 +67,7 @@ class RecurringRule(Document):
     frequency: RecurrenceFrequency
     interval: int = 1  # Every N days/weeks/months
     days_of_week: list[int] | None = None  # For weekly: 0=Monday, 6=Sunday
-    end_date: datetime | None = None  # When to stop recurring
+    end_date: date | None = None  # When to stop recurring
     max_occurrences: int | None = None  # Max number of times to recur
     occurrence_count: int = 0  # How many times has occurred
     last_generated_date: datetime | None = None  # Last time a task was created

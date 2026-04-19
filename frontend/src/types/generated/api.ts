@@ -2418,10 +2418,10 @@ export interface components {
             /** Amount */
             amount: number;
             /**
-             * Date
+             * Occurred At
              * Format: date-time
              */
-            date: string;
+            occurred_at: string;
             /** Note */
             note?: string | null;
         };
@@ -2488,10 +2488,10 @@ export interface components {
             /** Amount */
             amount: number;
             /**
-             * Date
+             * Occurred At
              * Format: date-time
              */
-            date: string;
+            occurred_at: string;
             /** Note */
             note?: string | null;
             /**
@@ -2539,8 +2539,8 @@ export interface components {
             category_id?: string | null;
             /** Amount */
             amount?: number | null;
-            /** Date */
-            date?: string | null;
+            /** Occurred At */
+            occurred_at?: string | null;
             /** Note */
             note?: string | null;
         };

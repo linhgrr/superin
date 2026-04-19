@@ -1,7 +1,7 @@
 """Finance plugin business logic — thin wrappers over repository."""
 
 import asyncio
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 from beanie import PydanticObjectId
 from pymongo.asynchronous.client_session import AsyncClientSession
@@ -165,7 +165,7 @@ class FinanceService:
         category_id: str,
         type_: TransactionType,
         amount: float,
-        date: datetime,
+        occurred_at: datetime,
         note: str | None = None,
     ) -> dict:
         if amount <= 0:
@@ -194,7 +194,7 @@ class FinanceService:
                 str(category.id),
                 type_,
                 amount,
-                date,
+                occurred_at,
                 note,
                 session=session,
             )
@@ -208,7 +208,7 @@ class FinanceService:
         wallet_id: str | None = None,
         category_id: str | None = None,
         amount: float | None = None,
-        date: datetime | None = None,
+        occurred_at: datetime | None = None,
         note: str | None = None,
     ) -> dict:
         """Update a transaction and adjust wallet balances if needed."""
@@ -274,8 +274,8 @@ class FinanceService:
             tx.wallet_id = PydanticObjectId(new_wallet_id)
             tx.category_id = PydanticObjectId(str(category.id))
             tx.amount = new_amount
-            if date:
-                tx.date = date
+            if occurred_at is not None:
+                tx.occurred_at = occurred_at
             if note is not None:
                 tx.note = note
 
@@ -522,14 +522,25 @@ class FinanceService:
         self,
         user_id: str,
         query: str | None = None,
-        start_date: datetime | None = None,
-        end_date: datetime | None = None,
+        start_date: date | None = None,
+        end_date: date | None = None,
         limit: int = 20,
     ) -> list[dict]:
         """Search transactions by keyword or date range."""
+        user = await User.get(user_id)
+        ctx = get_user_timezone_context(user)
+
+        start_utc = None
+        if start_date is not None:
+            start_utc = datetime.combine(start_date, datetime.min.time(), tzinfo=ctx.tz).astimezone(UTC)
+
+        end_utc = None
+        if end_date is not None:
+            end_utc = datetime.combine(end_date, datetime.max.time(), tzinfo=ctx.tz).astimezone(UTC)
+
         # Use DB-level date filtering, only load what we need
         txs = await self.transactions.find_by_user(
-            user_id, start_date=start_date, end_date=end_date, skip=0, limit=10000
+            user_id, start_date=start_utc, end_date=end_utc, skip=0, limit=10000
         )
 
         # Filter by keyword in note (can't do text search in DB easily)
@@ -613,7 +624,7 @@ class FinanceService:
         pipeline = [
             {"$match": {"user_id": _Oid(user_id)}},
             {"$group": {
-                "_id": {"year": {"$year": "$date"}, "month": {"$month": "$date"}, "type": "$type"},
+                "_id": {"year": {"$year": "$occurred_at"}, "month": {"$month": "$occurred_at"}, "type": "$type"},
                 "total": {"$sum": "$amount"},
             }},
             {"$sort": {"_id.year": -1, "_id.month": -1}},
@@ -730,7 +741,7 @@ def _tx_to_dict(t: Transaction) -> dict:
         "category_id": str(t.category_id),
         "type": t.type,
         "amount": t.amount,
-        "date": t.date.isoformat(),
+        "occurred_at": t.occurred_at.isoformat(),
         "note": t.note,
         "created_at": t.created_at.isoformat(),
     }

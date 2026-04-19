@@ -29,16 +29,13 @@ async def calendar_make_recurring(
     - "Repeat daily for 30 days"
     """
     async def operation(user_id: str, temporal: dict, time_context) -> dict:
-        end_dt = None
-        if "end_date" in temporal and temporal["end_date"] is not None:
-            _, end_dt = time_context.local_date_range_utc(temporal["end_date"])
         return await calendar_service.create_recurring_rule(
             user_id=user_id,
             event_template_id=event_id,
             frequency=frequency,
             interval=interval,
             days_of_week=days_of_week,
-            end_date=end_dt,
+            end_date=temporal.get("end_date"),
             max_occurrences=max_occurrences,
         )
 

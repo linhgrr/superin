@@ -21,9 +21,10 @@ from shared.enums import (
     UserRole,
 )
 from shared.permissions import meets_minimum_tier
+from shared.tool_errors import ForbiddenError, NotFoundError
 
 
-class UnknownAppError(ValueError):
+class UnknownAppError(NotFoundError):
     """Raised when an app_id does not exist in the plugin registry."""
 
     def __init__(self, app_id: str) -> None:
@@ -31,7 +32,7 @@ class UnknownAppError(ValueError):
         self.app_id = app_id
 
 
-class InsufficientTierError(PermissionError):
+class InsufficientTierError(ForbiddenError):
     """Raised when the user tier cannot install a given app."""
 
     def __init__(self, app_id: str, required_tier: str) -> None:

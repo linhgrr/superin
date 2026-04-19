@@ -38,7 +38,7 @@ type TaskListItem = TaskRead & {
 };
 
 export default function TasksPanel() {
-  const { formatLongWeekdayDate } = useTimezone();
+  const { formatLongLocalDate } = useTimezone();
   const [tasks, setTasks] = useState<TaskListItem[]>([]);
   const [filter, setFilter] = useState<TaskFilter>("all");
   const [selectedTask, setSelectedTask] = useState<TaskListItem | null>(null);
@@ -249,7 +249,7 @@ export default function TasksPanel() {
                 {selectedTask.description || "No description"}
               </p>
               <p style={{ margin: 0, fontSize: "0.875rem", color: "var(--color-foreground-muted)" }}>
-                Due: {selectedTask.due_date ? formatLongWeekdayDate(selectedTask.due_date) : "Not set"} ·
+                Due: {selectedTask.due_date ? formatLongLocalDate(selectedTask.due_date) : "Not set"} ·
                 Priority: {selectedTask.priority} · Status: {selectedTask.status}
               </p>
             </div>

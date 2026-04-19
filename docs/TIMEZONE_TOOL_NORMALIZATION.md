@@ -6,7 +6,11 @@ Make every agent tool timezone-correct without duplicating parsing logic in each
 
 The normalization layer sits at the tool boundary:
 - agent reasoning stays in user-local semantics
-- services/repositories stay UTC-oriented
+- services/repositories stay semantic-type-oriented
+
+Meaning:
+- `instant` fields are normalized to UTC before they reach services/repositories
+- `local_date` and `local_time` fields keep their semantic value until a specific query or derived-instant use case needs conversion
 
 ## Pattern A
 
@@ -97,7 +101,6 @@ The shared wrapper builds:
 - `user_id`
 - `user`
 - `timezone`
-- `tzinfo`
 - `now_utc`
 - `now_local`
 
@@ -113,6 +116,7 @@ This allows tools to:
 3. If a field is date-only, keep it semantic until query/store boundaries require a UTC range.
 4. Use `instant` only for truly absolute inputs.
 5. Prefer `local_datetime` for agent-facing scheduling tools.
+6. Do not turn a date-only value like `"2026-04-19"` into a fake midnight UTC timestamp and then treat that timestamp as the source of truth.
 
 ## Migration Guidance
 
@@ -154,3 +158,21 @@ Normalized values:
 ```
 
 The service layer only sees UTC.
+
+For a `local_date` todo deadline:
+
+```json
+{
+  "due_date": "2026-04-19"
+}
+```
+
+Normalized values:
+
+```python
+{
+    "due_date": date(2026, 4, 19),
+}
+```
+
+The service layer sees a semantic calendar date, not a fabricated UTC instant.

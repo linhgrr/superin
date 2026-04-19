@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
 from beanie import Document, PydanticObjectId
 from pydantic import BaseModel, Field, model_validator
@@ -126,7 +126,7 @@ class RecurringRule(Document):
     days_of_week: list[int] | None = None  # 0=Monday for weekly
 
     # Limits
-    end_date: datetime | None = None
+    end_date: date | None = None
     max_occurrences: int | None = None
     occurrence_count: int = 0
 

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from pymongo.asynchronous.client_session import AsyncClientSession
 from pymongo.errors import DuplicateKeyError
@@ -289,7 +289,7 @@ class CalendarService:
         frequency: RecurrenceFrequency,
         interval: int = 1,
         days_of_week: list[int] | None = None,
-        end_date: datetime | None = None,
+        end_date: date | None = None,
         max_occurrences: int | None = None,
     ) -> dict:
         """Create recurring pattern for an event."""

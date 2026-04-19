@@ -1,6 +1,6 @@
 """Todo plugin business logic."""
 
-from datetime import datetime
+from datetime import date, time
 
 from pymongo.asynchronous.client_session import AsyncClientSession
 
@@ -47,8 +47,8 @@ class TaskService:
         user_id: str,
         title: str,
         description: str | None = None,
-        due_date: datetime | None = None,
-        due_time: datetime | None = None,
+        due_date: date | None = None,
+        due_time: time | None = None,
         priority: str = "medium",
         tags: list[str] | None = None,
         reminder_minutes: int | None = None,
@@ -97,8 +97,8 @@ class TaskService:
         user_id: str,
         title: str | None = None,
         description: str | None = None,
-        due_date: datetime | None = None,
-        due_time: datetime | None = None,
+        due_date: date | None = None,
+        due_time: time | None = None,
         priority: str | None = None,
         status: str | None = None,
         tags: list[str] | None = None,
@@ -222,7 +222,7 @@ class TaskService:
         frequency: RecurrenceFrequency,
         interval: int = 1,
         days_of_week: list[int] | None = None,
-        end_date: datetime | None = None,
+        end_date: date | None = None,
         max_occurrences: int | None = None,
     ) -> dict:
         """Create a recurring rule based on a task template."""
@@ -261,59 +261,44 @@ class TaskService:
 
     async def get_summary(self, user: User) -> dict:
         user_id = str(user.id)
-        # Use user's timezone context
         ctx = get_user_timezone_context(user)
-        today_range = ctx.today_range()
-        now_utc = ctx.now_utc()
+        tasks = await self.repo.find_by_user(user_id, include_archived=True, limit=None)
+        today_local = ctx.now_local().date()
 
-        from beanie import PydanticObjectId as _Oid
+        total = len(tasks)
+        pending = 0
+        completed = 0
+        overdue = 0
+        due_today = 0
+        archived = 0
+        tags: set[str] = set()
 
-        now_naive = now_utc.replace(tzinfo=None)
-        today_start_naive = today_range.start.replace(tzinfo=None)
-        today_end_naive = today_range.end.replace(tzinfo=None)
+        for task in tasks:
+            if task.is_archived:
+                archived += 1
+                continue
 
-        pipeline = [
-            {"$match": {"user_id": _Oid(user_id)}},
-            {"$facet": {
-                "total": [{"$count": "n"}],
-                "pending": [{"$match": {"status": "pending", "is_archived": False}}, {"$count": "n"}],
-                "completed": [{"$match": {"status": "completed", "is_archived": False}}, {"$count": "n"}],
-                "archived": [{"$match": {"is_archived": True}}, {"$count": "n"}],
-                "overdue": [
-                    {"$match": {"status": "pending", "is_archived": False, "due_date": {"$lt": now_naive}}},
-                    {"$count": "n"},
-                ],
-                "due_today": [
-                    {"$match": {
-                        "status": "pending",
-                        "is_archived": False,
-                        "due_date": {"$gte": today_start_naive, "$lte": today_end_naive},
-                    }},
-                    {"$count": "n"},
-                ],
-                "tags": [
-                    {"$match": {"is_archived": False}},
-                    {"$unwind": "$tags"},
-                    {"$group": {"_id": "$tags"}},
-                ],
-            }},
-        ]
-        results = await Task.aggregate(pipeline).to_list()
-        facets = results[0] if results else {}
+            tags.update(task.tags)
 
-        def _count(key: str) -> int:
-            arr = facets.get(key, [])
-            return arr[0]["n"] if arr else 0
+            if task.status == "pending":
+                pending += 1
+                if task.due_date is not None:
+                    if task.due_date < today_local:
+                        overdue += 1
+                    elif task.due_date == today_local:
+                        due_today += 1
+            elif task.status == "completed":
+                completed += 1
 
-        tag_list = sorted([t["_id"] for t in facets.get("tags", [])])
+        tag_list = sorted(tags)
 
         return {
-            "total": _count("total"),
-            "pending": _count("pending"),
-            "completed": _count("completed"),
-            "overdue": _count("overdue"),
-            "due_today": _count("due_today"),
-            "archived": _count("archived"),
+            "total": total,
+            "pending": pending,
+            "completed": completed,
+            "overdue": overdue,
+            "due_today": due_today,
+            "archived": archived,
             "total_tags": len(tag_list),
             "tag_list": tag_list,
         }

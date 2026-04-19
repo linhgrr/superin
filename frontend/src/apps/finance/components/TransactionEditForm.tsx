@@ -23,7 +23,7 @@ export default function TransactionEditForm({
   onCancel,
 }: TransactionEditFormProps) {
   const [amount, setAmount] = useState(String(transaction.amount));
-  const [date, setDate] = useState(toDateInputValue(transaction.date));
+  const [occurredAt, setOccurredAt] = useState(toDateInputValue(transaction.occurred_at));
   const [note, setNote] = useState(transaction.note || "");
   const [walletId, setWalletId] = useState(transaction.wallet_id);
   const [categoryId, setCategoryId] = useState(transaction.category_id);
@@ -38,8 +38,8 @@ export default function TransactionEditForm({
       return;
     }
 
-    const normalizedDate = dateInputValueToUtcIso(date);
-    if (!normalizedDate) {
+    const normalizedOccurredAt = dateInputValueToUtcIso(occurredAt);
+    if (!normalizedOccurredAt) {
       setError("Please select a valid date");
       return;
     }
@@ -49,7 +49,7 @@ export default function TransactionEditForm({
       const updated = await run(() =>
         updateTransaction(transaction.id, {
           amount: normalizedAmount,
-          date: normalizedDate,
+          occurred_at: normalizedOccurredAt,
           note: note.trim() || undefined,
           wallet_id: walletId,
           category_id: categoryId,
@@ -98,7 +98,7 @@ export default function TransactionEditForm({
           >
             Date
           </label>
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+          <input type="date" value={occurredAt} onChange={(e) => setOccurredAt(e.target.value)} required />
         </div>
       </div>
 

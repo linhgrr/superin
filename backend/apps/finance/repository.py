@@ -281,13 +281,13 @@ class TransactionRepository:
         if wallet_id:
             query = query and Transaction.wallet_id == PydanticObjectId(wallet_id)
         if start_date:
-            query = query and Transaction.date >= start_date
+            query = query and Transaction.occurred_at >= start_date
         if end_date:
-            query = query and Transaction.date <= end_date
+            query = query and Transaction.occurred_at <= end_date
 
         return (
             await Transaction.find(query, session=session)
-            .sort("-date")
+            .sort("-occurred_at")
             .skip(skip)
             .limit(limit)
             .to_list()
@@ -313,7 +313,7 @@ class TransactionRepository:
         category_id: str,
         type_: TransactionType,
         amount: float,
-        date: datetime,
+        occurred_at: datetime,
         note: str | None = None,
         *,
         session: AsyncClientSession | None = None,
@@ -324,7 +324,7 @@ class TransactionRepository:
             category_id=PydanticObjectId(category_id),
             type=type_,
             amount=amount,
-            date=date,
+            occurred_at=occurred_at,
             note=note,
         )
         await tx.insert(session=session)

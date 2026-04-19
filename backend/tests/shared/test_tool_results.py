@@ -1,5 +1,8 @@
+import pytest
+
 from core.utils.timezone import convert_utc_strings_to_local
-from shared.tool_results import tool_success
+from shared.tool_errors import ForbiddenError
+from shared.tool_results import safe_tool_call, tool_success
 
 
 def test_convert_utc_strings_to_local_recurses_nested_payloads() -> None:
@@ -21,3 +24,37 @@ def test_tool_success_shape_is_preserved() -> None:
 
     assert result["ok"] is True
     assert result["data"] == {"ok": True}
+
+
+@pytest.mark.asyncio
+async def test_safe_tool_call_maps_tool_user_error_to_structured_error() -> None:
+    async def operation():
+        raise ForbiddenError("App 'calendar' requires a paid subscription.")
+
+    result = await safe_tool_call(operation, action="installing app calendar", localize=False)
+
+    assert result == {
+        "ok": False,
+        "error": {
+            "message": "App 'calendar' requires a paid subscription.",
+            "code": "forbidden",
+            "retryable": False,
+        },
+    }
+
+
+@pytest.mark.asyncio
+async def test_safe_tool_call_keeps_permission_error_as_legacy_fallback() -> None:
+    async def operation():
+        raise PermissionError("App 'calendar' requires a paid subscription.")
+
+    result = await safe_tool_call(operation, action="installing app calendar", localize=False)
+
+    assert result == {
+        "ok": False,
+        "error": {
+            "message": "App 'calendar' requires a paid subscription.",
+            "code": "forbidden",
+            "retryable": False,
+        },
+    }

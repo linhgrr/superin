@@ -65,7 +65,7 @@ class Transaction(Document):
     category_id: PydanticObjectId
     type: TransactionType
     amount: float
-    date: datetime
+    occurred_at: datetime
     note: str | None = None
     created_at: datetime = Field(default_factory=utc_now)
 
@@ -73,8 +73,8 @@ class Transaction(Document):
         name = "finance_transactions"
         indexes = [
             IndexModel(
-                [("user_id", 1), ("date", -1)],
-                name="finance_transactions_user_id_date",
+                [("user_id", 1), ("occurred_at", -1)],
+                name="finance_transactions_user_id_occurred_at",
             ),
             IndexModel(
                 [("user_id", 1), ("type", 1)],

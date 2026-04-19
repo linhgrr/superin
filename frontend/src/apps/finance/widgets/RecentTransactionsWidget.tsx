@@ -88,7 +88,7 @@ export default function RecentTransactionsWidget({ widget }: DashboardWidgetRend
                     {item.note || "Untitled transaction"}
                   </div>
                   <div style={{ fontSize: "0.6875rem", color: "var(--color-foreground-muted)" }}>
-                    {formatWeekdayDate(item.date)}
+                    {formatWeekdayDate(item.occurred_at)}
                   </div>
                 </div>
               </div>

@@ -51,12 +51,10 @@ async def todo_add_task(
         - "Add high priority work task" → priority="high", tags=["work"]
     """
     async def operation(user_id: str, temporal: dict, time_context) -> dict:
-        dt = None
-        if temporal.get("due_date") is not None:
-            dt, _ = time_context.local_date_range_utc(temporal["due_date"])
+        due_date_value = temporal.get("due_date")
         dt_time = temporal.get("due_time")
         return await task_service.create_task(
-            user_id, title, description, dt, dt_time, priority, tags, reminder_minutes
+            user_id, title, description, due_date_value, dt_time, priority, tags, reminder_minutes
         )
 
     return await run_time_aware_tool_with_user(
@@ -218,12 +216,10 @@ async def todo_update_task(
         - "Set reminder 30 mins before" → reminder_minutes=30
     """
     async def operation(user_id: str, temporal: dict, time_context) -> dict:
-        dt = None
-        if temporal.get("due_date") is not None:
-            dt, _ = time_context.local_date_range_utc(temporal["due_date"])
+        due_date_value = temporal.get("due_date")
         dt_time = temporal.get("due_time")
         return await task_service.update_task(
-            task_id, user_id, title, description, dt, dt_time, priority, status, tags, reminder_minutes
+            task_id, user_id, title, description, due_date_value, dt_time, priority, status, tags, reminder_minutes
         )
 
     return await run_time_aware_tool_with_user(
@@ -615,11 +611,9 @@ async def todo_create_recurring_task(
         - "Monthly for 6 months" → frequency="monthly", max_occurrences=6
     """
     async def operation(user_id: str, temporal: dict, time_context) -> dict:
-        end_dt = None
-        if temporal.get("end_date") is not None:
-            _, end_dt = time_context.local_date_range_utc(temporal["end_date"])
+        end_date_value = temporal.get("end_date")
         return await task_service.create_recurring_rule(
-            user_id, task_template_id, frequency, interval, days_of_week, end_dt, max_occurrences
+            user_id, task_template_id, frequency, interval, days_of_week, end_date_value, max_occurrences
         )
 
     return await run_time_aware_tool_with_user(

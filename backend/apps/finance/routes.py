@@ -1,6 +1,6 @@
 """Finance plugin FastAPI routes — thin layer calling finance_service."""
 
-from datetime import datetime
+from datetime import date
 
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -364,7 +364,7 @@ async def create_transaction(
             str(request.category_id),
             request.type,
             request.amount,
-            request.date,
+            request.occurred_at,
             request.note,
         )
     except ValueError as e:
@@ -384,7 +384,7 @@ async def update_transaction(
             str(request.wallet_id) if request.wallet_id else None,
             str(request.category_id) if request.category_id else None,
             request.amount,
-            request.date,
+            request.occurred_at,
             request.note,
         )
     except ValueError as e:
@@ -408,8 +408,8 @@ async def delete_transaction(
 @router.get("/transactions/search", response_model=list[FinanceTransactionRead])
 async def search_transactions(
     query: str | None = None,
-    start_date: datetime | None = None,
-    end_date: datetime | None = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
     limit: int = Query(20, le=100),
     user_id: str = Depends(get_current_user),
 ):

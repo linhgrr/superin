@@ -1,6 +1,6 @@
 """Todo plugin data access layer."""
 
-from datetime import datetime
+from datetime import date, time
 
 from beanie import PydanticObjectId
 from pymongo.asynchronous.client_session import AsyncClientSession
@@ -18,7 +18,7 @@ class TaskRepository:
         priority: TaskPriority | None = None,
         tag: str | None = None,
         include_archived: bool = False,
-        limit: int = 20,
+        limit: int | None = 20,
         *,
         session: AsyncClientSession | None = None,
     ) -> list[Task]:
@@ -34,12 +34,10 @@ class TaskRepository:
         if tag:
             query["tags"] = {"$in": [tag]}
 
-        return (
-            await Task.find(query, session=session)
-            .sort("-created_at")
-            .limit(limit)
-            .to_list()
-        )
+        cursor = Task.find(query, session=session).sort("-created_at")
+        if limit is not None:
+            cursor = cursor.limit(limit)
+        return await cursor.to_list()
 
     async def search(
         self,
@@ -82,8 +80,8 @@ class TaskRepository:
         user_id: str,
         title: str,
         description: str | None = None,
-        due_date: datetime | None = None,
-        due_time: datetime | None = None,
+        due_date: date | None = None,
+        due_time: time | None = None,
         priority: str = "medium",
         tags: list[str] | None = None,
         parent_task_id: str | None = None,
@@ -96,7 +94,7 @@ class TaskRepository:
             title=title,
             description=description,
             due_date=due_date,
-            due_time=due_time.time() if due_time else None,
+            due_time=due_time,
             priority=priority,  # type: ignore[arg-type]
             tags=tags or [],
             parent_task_id=PydanticObjectId(parent_task_id) if parent_task_id else None,
@@ -110,8 +108,8 @@ class TaskRepository:
         task: Task,
         title: str | None = None,
         description: str | None = None,
-        due_date: datetime | None = None,
-        due_time: datetime | None = None,
+        due_date: date | None = None,
+        due_time: time | None = None,
         priority: str | None = None,
         status: str | None = None,
         tags: list[str] | None = None,
@@ -124,7 +122,7 @@ class TaskRepository:
         if due_date is not None:
             task.due_date = due_date
         if due_time is not None:
-            task.due_time = due_time.time() if due_time else None
+            task.due_time = due_time
         if priority is not None:
             task.priority = priority  # type: ignore[assignment]
         if status is not None:
@@ -270,7 +268,7 @@ class RecurringRuleRepository:
         frequency: RecurrenceFrequency,
         interval: int = 1,
         days_of_week: list[int] | None = None,
-        end_date: datetime | None = None,
+        end_date: date | None = None,
         max_occurrences: int | None = None,
     ) -> RecurringRule:
         rule = RecurringRule(

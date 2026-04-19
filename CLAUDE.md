@@ -250,21 +250,43 @@ cd frontend && npm run test -- datetime
 #### Architecture Overview
 
 ```
-FE  ←→  UTC ISO strings  ←→  BE  ←→  MongoDB (naive UTC)
+FE  ←→  semantic temporal values  ←→  BE  ←→  MongoDB
 
-FE display/query semantics: UTC ↔ user-configured IANA timezone
-BE storage: always UTC (aware → naive for Mongo)
+Instant fields: UTC ISO strings over API ↔ UTC datetimes in BE ↔ naive UTC in MongoDB
+Calendar fields: semantic date/time strings over API ↔ semantic values in BE ↔ semantic values in MongoDB
 ```
 
-**Rule #1 — BE stores UTC, FE stores/transmits UTC ISO strings.** No local-time datetimes cross the API boundary.
+**Rule #1 — Only `instant` values are UTC everywhere.** Use UTC ISO strings across the API and UTC datetimes in backend/storage for fields that represent an absolute point in time.
 
-**Rule #2 — User timezone controls display AND query semantics, never storage.** "Today", "this week", picker dates, and calendar grid boundaries must all be computed in the user's configured IANA timezone, then converted to UTC for API/DB.
+**Rule #2 — `date-only` and `time-only` values keep their own semantic form.** Do not coerce calendar dates or wall-clock times into fake midnight UTC instants just to satisfy a blanket storage rule.
+
+**Rule #3 — User timezone controls display AND query semantics.** "Today", "this week", picker dates, due dates, and calendar grid boundaries must all be computed in the user's configured IANA timezone.
+
+#### Temporal Types
+
+| Semantic type | API shape | Backend shape | Storage shape | Examples |
+|---|---|---|---|---|
+| `instant` | UTC ISO string | aware UTC `datetime` | naive UTC `datetime` in Mongo | `created_at`, `updated_at`, `completed_at`, calendar `start_at`, `end_at` |
+| `local_date` | `YYYY-MM-DD` | `date` | ISO date string `YYYY-MM-DD` unless a native date-only type exists | todo `due_date`, all-day event day, billing period date |
+| `local_time` | `HH:MM[:SS]` | `time` | ISO time string `HH:MM[:SS]` | todo `due_time`, preferred reminder time |
+| `local_datetime` | `YYYY-MM-DDTHH:MM[:SS]` without offset | naive local `datetime` until normalized at boundary | not persisted directly unless the field is intentionally wall-clock based | tool inputs like `"tomorrow at 9am"` before normalization |
+
+**Naming rule:**
+- `*_at` means an `instant`
+- `*_date` means `local_date`
+- `*_time` means `local_time`
+- `*_timezone` stores the IANA timezone when a local date/time must preserve its originating zone long-term
+
+**Design rule:**
+- If a business value is "a moment on the timeline", model it as `instant`
+- If a business value is "a day on the user's calendar", model it as `local_date`
+- If a business value is "a wall-clock time", model it as `local_time`
 
 ---
 
 #### Backend (`backend/core/utils/timezone.py`)
 
-**Source of truth for all BE datetime operations.**
+**Source of truth for all BE timezone operations on `instant` values and for converting between local calendar semantics and UTC.**
 
 ```python
 from core.utils.timezone import (
@@ -283,38 +305,44 @@ from core.utils.timezone import (
 | Convert user local to UTC for storage | `ctx.local_to_utc(local_dt)` |
 | Query "today in user's tz" | `ctx.today_range()` → `DayRange(start_utc, end_utc)` |
 | Query "this month in user's tz" | `ctx.month_range()` |
-| Get today's date in user's tz | `ctx.now_local()` then strip time |
+| Get today's date in user's tz | `ctx.now_local().date()` |
 
 **⚠️ NEVER do this in BE:**
 - `datetime.now()` directly (use `utc_now()`)
 - `astimezone()` without an argument (converts to system local TZ, not user TZ)
-- Store user-local datetimes without converting to UTC first
+- Store user-local instants without converting to UTC first
+- Convert a `local_date` such as a todo deadline into a fake midnight UTC timestamp and treat it as source of truth
 
-**⚠️ MongoDB / Beanie:** All stored `start_datetime`/`end_datetime` fields are naive UTC. Beanie can silently strip timezone from datetimes. Always run incoming datetimes through `ensure_naive_utc(ensure_aware_utc(dt))` before storing or querying.
+**⚠️ MongoDB / Beanie:** persisted `instant` fields are stored as naive UTC datetimes. Beanie can silently strip timezone from datetimes. Always run incoming instants through `ensure_naive_utc(ensure_aware_utc(dt))` before storing or querying.
 
-**⚠️ Model-level enforcement:** `Event.start_datetime` and `Event.end_datetime` have a Pydantic `model_validator` that auto-normalizes any input (aware, naive, or ISO string) to UTC-naive. Service layer also normalizes defensively — this is defense-in-depth.
+**⚠️ Date-only / time-only storage:** MongoDB has no first-class `date-only` or `time-only` type with timezone semantics. For fields like todo `due_date` and `due_time`, persist the semantic value directly as ISO strings (`YYYY-MM-DD`, `HH:MM[:SS]`) unless and until we adopt a different explicit encoding.
+
+**⚠️ Model-level enforcement:** instant-backed models like calendar events should auto-normalize any input (aware, naive, or ISO string) to UTC-naive. Do not apply this validator pattern to `local_date` or `local_time` fields.
 
 #### Tool / LLM Input Normalization
 
-> **Rule: Every datetime input from LLM MUST be normalized via `ensure_aware_utc()` BEFORE passing to service.**
+> **Rule: Every temporal input from LLM must be normalized according to its declared semantic kind before passing to service.**
 
-LLM agents can send datetime strings without explicit UTC offset (e.g. `"2025-04-01"` instead of `"2025-04-01T00:00:00Z"`). The tool layer must normalize all inputs:
+LLM agents can send local calendar values and local datetimes. The tool layer must not assume every temporal string is UTC:
 
 ```python
-# ❌ WRONG — datetime.fromisoformat() returns naive, assumes UTC but doesn't normalize
-dt = datetime.fromisoformat(due_date)
+# ❌ WRONG — turns a date-only semantic into a fake UTC instant
+dt = ensure_aware_utc(datetime.fromisoformat("2025-04-01"))
 
-# ✅ CORRECT — always normalize before passing to service
-dt = ensure_aware_utc(datetime.fromisoformat(due_date))
+# ✅ CORRECT — keep local_date as a date
+due_date = date.fromisoformat("2025-04-01")
+
+# ✅ CORRECT — normalize local_datetime to UTC only when the field semantic is instant-backed
+start_at = ctx.local_to_utc(datetime.fromisoformat("2025-04-01T09:00:00"))
 ```
 
-Affected files: `apps/*/tools.py` — always wrap `datetime.fromisoformat()` calls with `ensure_aware_utc()`.
+Affected files: `apps/*/tools.py` — every temporal field must declare whether it is `instant`, `local_datetime`, `local_date`, or `local_time`, and the shared wrapper must normalize accordingly.
 
 ---
 
 #### Frontend (`frontend/src/shared/utils/datetime.ts`)
 
-**Single source of truth for all FE datetime operations.**
+**Single source of truth for FE timezone operations. Separate helpers for instants vs calendar values.**
 
 ```typescript
 import {
@@ -322,7 +350,7 @@ import {
   setUserTimezone,            // Persist user preference
   buildUtcIsoString,         // local date/time in user tz → UTC ISO
   buildUtcIsoStringFromDate, // datePicker + hour/min → UTC ISO for API
-  getDateKey,                // UTC/value → YYYY-MM-DD in user tz
+  getDateKey,                // instant/value → YYYY-MM-DD in user tz
   formatTime,                // UTC string → "HH:MM" in user tz
   formatDate,                // UTC string → "13 Apr 2026" in user tz
   formatDateTime,            // UTC string → "13 Apr 2026, 09:00" in user tz
@@ -344,12 +372,14 @@ import {
 - `new Date(isoString).getHours()` — parses ISO correctly but then uses system local to extract hours
 - `isSameDayInTimezone` with undefined timezone — always pass `timezone` explicitly
 - Direct `Intl.DateTimeFormat` without `{ timeZone }` — implicit browser system tz
+- Convert a `date-only` field such as todo `due_date` into a UTC ISO string just because the transport layer already has helpers for instants
 
 **✅ ALWAYS in FE:**
 - Use `Intl.DateTimeFormat(..., { timeZone: userTz })` for any display or comparison
-- Convert local calendar dates in the user's timezone to UTC via `buildUtcIsoString()` / `buildUtcIsoStringFromDate()`
+- Convert local calendar dates/times to UTC only for APIs that expect an `instant`
 - Use `getDateKey()` / `getWeekBoundaries()` when day identity matters; never key calendar logic by `Date.toDateString()`
 - Always pass `timezone` explicitly — no hidden fallback in domain utilities
+- Keep `date-only` values in `YYYY-MM-DD` form through forms, stores, APIs, and app logic
 
 **React Components:** Use `useTimezone()` hook (reactive — auto-updates when user changes timezone):
 ```typescript
@@ -365,21 +395,31 @@ const { timezone, formatTime, isToday, getWeekBoundaries, getHourMinute } = useT
 ```
 User picks: 2026-04-13, time 09:00 (in Asia/Ho_Chi_Minh, UTC+7)
 
-FE (picker → API):
+Calendar event FE (picker → API, instant semantic):
   buildUtcIsoStringFromDate(datePickerDate, 9, 0)
   → "2026-04-13T02:00:00Z"   ← correct! 9am UTC+7 = 2am UTC
 
-BE (API → DB):
+Calendar event BE (API → DB):
   ensure_aware_utc(datetime) → datetime in UTC
   ensure_naive_utc(...) → naive UTC for MongoDB
   → stored as 2026-04-13 02:00:00 (naive, UTC)
 
-BE → FE (API response):
+Calendar event BE → FE (API response):
   "start_datetime": "2026-04-13T02:00:00Z"
 
-FE (display):
+Calendar event FE (display):
   formatTime("2026-04-13T02:00:00Z", "Asia/Ho_Chi_Minh")
   → "09:00"   ← correct!
+
+Todo task FE (date-only semantic):
+  due_date = "2026-04-13"
+
+Todo task BE:
+  date.fromisoformat("2026-04-13")
+  → stored as semantic `due_date`, not converted to fake midnight UTC
+
+Todo task FE (display):
+  render the same semantic date in the user's timezone/calendar conventions
 ```
 
 ### Backend `shared/` Conventions

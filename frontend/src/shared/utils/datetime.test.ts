@@ -8,13 +8,19 @@ import {
   dateInputValueToUtcIso,
   formatDate,
   formatDateTime,
+  formatLocalDate,
+  formatLocalWeekdayDate,
   formatLongWeekdayDate,
+  formatLongLocalDate,
   formatWeekdayDate,
   formatWeekdayDateTime,
   getDateKey,
   getDayRange,
   getWeekBoundaries,
+  isLocalDatePast,
+  isLocalDateToday,
   shiftDateKey,
+  toLocalDateInputValue,
   toDateInputValue,
 } from "./datetime";
 
@@ -34,6 +40,7 @@ describe("datetime timezone utilities", () => {
     localStorage.setItem(STORAGE_KEYS.USER_TIMEZONE, "Asia/Ho_Chi_Minh");
 
     expect(toDateInputValue("2026-04-12T17:00:00.000Z")).toBe("2026-04-13");
+    expect(toLocalDateInputValue("2026-04-13")).toBe("2026-04-13");
     expect(getDateKey("2026-04-13T02:30:00.000Z", "Asia/Ho_Chi_Minh")).toBe("2026-04-13");
   });
 
@@ -97,5 +104,36 @@ describe("datetime timezone utilities", () => {
         year: "numeric",
       })
     );
+  });
+
+  it("formats semantic local dates without converting them into UTC instants", () => {
+    expect(formatLocalDate("2026-04-19")).toBe(
+      formatDate("2026-04-19T12:00:00.000Z", "UTC")
+    );
+    expect(formatLocalWeekdayDate("2026-04-19")).toBe(
+      formatLocalDate("2026-04-19", { weekday: "short", month: "short", day: "numeric" })
+    );
+    expect(formatLongLocalDate("2026-04-19")).toBe(
+      formatLocalDate("2026-04-19", {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      })
+    );
+  });
+
+  it("compares semantic local dates against the user's current local day", () => {
+    localStorage.setItem(STORAGE_KEYS.USER_TIMEZONE, "Asia/Ho_Chi_Minh");
+    const realDateNow = Date.now;
+    Date.now = () => new Date("2026-04-19T05:00:00.000Z").getTime();
+
+    try {
+      expect(isLocalDateToday("2026-04-19", "Asia/Ho_Chi_Minh")).toBe(true);
+      expect(isLocalDatePast("2026-04-18", "Asia/Ho_Chi_Minh")).toBe(true);
+      expect(isLocalDatePast("2026-04-19", "Asia/Ho_Chi_Minh")).toBe(false);
+    } finally {
+      Date.now = realDateNow;
+    }
   });
 });

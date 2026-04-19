@@ -1,6 +1,8 @@
 """Todo plugin FastAPI routes."""
 
 
+from datetime import time as time_value
+
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query
 
@@ -61,11 +63,8 @@ async def get_task_list_widget_data(
     if config.filter == "today":
         user = await User.get(PydanticObjectId(user_id))
         ctx = get_user_timezone_context(user)
-        start, end = ctx.today_range()
-        items = [
-            task for task in tasks
-            if task.get("due_date") and start <= task["due_date"] <= end
-        ]
+        today_key = ctx.now_local().date().isoformat()
+        items = [task for task in tasks if task.get("due_date") == today_key]
     elif config.filter == "high":
         items = [task for task in tasks if task.get("priority") == "high"]
     else:
@@ -88,13 +87,17 @@ async def get_today_widget_data(
 
     summary = await task_service.get_summary(user)
     tasks = await task_service.list_tasks(user_id, "pending", None, None, False, 50)
-    next_due_task = next(
-        (
-            task for task in tasks
-            if task.get("due_date") is not None
-        ),
-        None,
-    )
+    next_due_task = None
+    dated_tasks = [task for task in tasks if task.get("due_date")]
+    if dated_tasks:
+        next_due_task = min(
+            dated_tasks,
+            key=lambda task: (
+                str(task.get("due_date")),
+                str(task.get("due_time") or time_value.max.isoformat()),
+                str(task.get("created_at") or ""),
+            ),
+        )
 
     overdue = summary["overdue"] if config.include_overdue else 0
     return TodayWidgetData(

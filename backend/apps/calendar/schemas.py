@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, Field
 
@@ -51,7 +51,7 @@ class CalendarCreateRecurringRuleRequest(BaseModel):
     frequency: RecurrenceFrequency
     interval: int = Field(default=1, ge=1, le=52)
     days_of_week: list[int] | None = None  # 0=Monday, 6=Sunday
-    end_date: datetime | None = None
+    end_date: date | None = None
     max_occurrences: int | None = Field(None, ge=1, le=1000)
 
 
@@ -102,7 +102,7 @@ class CalendarRecurringRuleRead(BaseModel):
     frequency: RecurrenceFrequency
     interval: int
     days_of_week: list[int] | None = None
-    end_date: datetime | None = None
+    end_date: date | None = None
     max_occurrences: int | None = None
     occurrence_count: int
     is_active: bool

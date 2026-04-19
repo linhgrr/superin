@@ -18,6 +18,7 @@ from core.models import User
 from core.utils.sanitizer import sanitize_db_content_for_llm
 from core.utils.timezone import convert_utc_strings_to_local, get_user_timezone_context
 from shared.agent_config import require_user_id
+from shared.tool_errors import ToolUserError
 from shared.tool_time import (
     TemporalFieldKind,
     ToolTimeContext,
@@ -118,8 +119,14 @@ async def safe_tool_call(
     try:
         result = await operation()
         return await _tool_success_async(result, localize=localize, user_id=user_id)
+    except ToolUserError as exc:
+        return tool_error(str(exc), code=exc.code, retryable=exc.retryable)
     except ValueError as exc:
+        # Legacy fallback for older code that has not been migrated to ToolUserError yet.
         return tool_error(str(exc), code="invalid_request", retryable=False)
+    except PermissionError as exc:
+        # Legacy fallback for older code that still raises bare PermissionError.
+        return tool_error(str(exc), code="forbidden", retryable=False)
     except RuntimeError as exc:
         # Context/config errors (e.g. missing user_id in RunnableConfig).
         logger.warning("Tool action rejected: {} — {}", action, exc)
