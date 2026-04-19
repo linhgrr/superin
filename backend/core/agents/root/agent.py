@@ -81,59 +81,51 @@ class RootAgent:
           - {type: "token", content}                  — streaming token
           - {type: "done"}                            — final answer complete
         """
-        from shared.agent_context import clear_agent_context, set_thread_context, set_user_context
-
         thread = _resolve_thread(user_id, thread_id)
-        set_user_context(user_id)
-        set_thread_context(thread)
+        langchain_messages = await self._build_message_list(user_id, messages)
+        installed_app_ids = await _load_installed_app_ids(user_id)
 
-        try:
-            langchain_messages = await self._build_message_list(user_id, messages)
-            installed_app_ids = await _load_installed_app_ids(user_id)
+        graph_input: ParallelGraphInput = {
+            "messages": langchain_messages,
+            "user_id": user_id,
+            "thread_id": thread,
+            "installed_app_ids": list(installed_app_ids),
+        }
 
-            graph_input: ParallelGraphInput = {
-                "messages": langchain_messages,
+        graph = get_root_agent_graph()
+        config = {
+            "configurable": {
                 "user_id": user_id,
                 "thread_id": thread,
-                "installed_app_ids": list(installed_app_ids),
-            }
+            },
+        }
 
-            graph = get_root_agent_graph()
-            config = {
-                "configurable": {
-                    "thread_id": thread,
-                },
-            }
+        # Use stream_mode="custom" so writer() calls inside @entrypoint
+        # emit dicts directly (not wrapped in node-key dicts).
+        async for chunk in graph.astream(graph_input, config=config, stream_mode="custom"):
+            # chunk is a dict from writer({"type": "...", ...})
+            if not isinstance(chunk, dict):
+                continue
 
-            # Use stream_mode="custom" so writer() calls inside @entrypoint
-            # emit dicts directly (not wrapped in node-key dicts).
-            async for chunk in graph.astream(graph_input, config=config, stream_mode="custom"):
-                # chunk is a dict from writer({"type": "...", ...})
-                if not isinstance(chunk, dict):
-                    continue
+            event_type = chunk.get("type")
+            if event_type == "app_result":
+                yield {
+                    "type": "app_result",
+                    "app_id": chunk.get("app_id"),
+                    "status": chunk.get("status"),
+                    "ok": chunk.get("ok"),
+                }
+            elif event_type == "merged_context":
+                yield {
+                    "type": "merged_context",
+                    "content": chunk.get("content", "")[:500],
+                }
+            elif event_type == "token":
+                yield {"type": "text", "content": chunk.get("content", "")}
+            elif event_type == "done":
+                yield {"type": "done", "content": chunk.get("content", "")}
 
-                event_type = chunk.get("type")
-                if event_type == "app_result":
-                    yield {
-                        "type": "app_result",
-                        "app_id": chunk.get("app_id"),
-                        "status": chunk.get("status"),
-                        "ok": chunk.get("ok"),
-                    }
-                elif event_type == "merged_context":
-                    yield {
-                        "type": "merged_context",
-                        "content": chunk.get("content", "")[:500],
-                    }
-                elif event_type == "token":
-                    yield {"type": "text", "content": chunk.get("content", "")}
-                elif event_type == "done":
-                    yield {"type": "done", "content": chunk.get("content", "")}
-
-            # Terminal done is emitted by the graph itself via writer()
-
-        finally:
-            clear_agent_context()
+        # Terminal done is emitted by the graph itself via writer()
 
     async def _build_message_list(
         self,

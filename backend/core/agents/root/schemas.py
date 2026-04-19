@@ -59,6 +59,24 @@ class PlatformDecision(BaseModel):
     )
 
 
+class ParallelGraphInput(TypedDict):
+    """Input payload for the root @entrypoint graph."""
+
+    messages: list[BaseMessage]
+    user_id: str
+    thread_id: str
+    installed_app_ids: list[str]
+
+
+class ParallelGraphOutput(TypedDict):
+    """Output payload returned by the root @entrypoint graph."""
+
+    app_results: list[dict]
+    app_errors: list[dict]
+    merged_context: str
+    final_answer: str
+
+
 class RootState(TypedDict, total=False):
     """State persisted per thread_id via MongoDBSaver checkpointer.
 

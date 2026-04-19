@@ -4,7 +4,8 @@ Parallel root agent using LangGraph v2 @entrypoint + @task API.
 Architecture:
   @entrypoint root_agent
       │
-      ├── decide_target_apps(messages, installed_apps)
+      ├── detect_platform_request(messages, installed_apps)
+      ├── route_and_craft(messages, installed_apps)
       │       ↓
       └── direct await of @task partials in a for loop
               ↓
@@ -24,12 +25,10 @@ from typing import TYPE_CHECKING, Any
 from langchain_core.messages import BaseMessage
 from loguru import logger
 
-from .helpers import (
-    decide_target_apps,
-    merge_app_results,
-    synthesize,
-)
-from .schemas import ParallelGraphInput, ParallelGraphOutput
+from .context import extract_question
+from .routing import detect_platform_request, route_and_craft
+from .schemas import AppDecision, ParallelGraphInput, ParallelGraphOutput
+from .synthesis import merge_app_results, synthesize
 from .workers import get_task, refresh_workers
 
 if TYPE_CHECKING:
@@ -69,16 +68,27 @@ def _build_entrypoint(store: BaseStore) -> Any:
             installed_app_ids,
         )
 
-        # ── Step 1: Dispatcher — decide which apps to query ──────────────────
-        target_apps, question = await decide_target_apps(messages, installed_app_ids)
+        # ── Step 1: Classify request + build app subtasks ────────────────────
+        platform_decision = await detect_platform_request(messages, installed_app_ids)
+        if platform_decision.route == "platform":
+            decisions = [
+                AppDecision(
+                    app_id="platform",
+                    subtask=extract_question(messages),
+                )
+            ]
+        else:
+            routing_decision = await route_and_craft(messages, installed_app_ids)
+            decisions = routing_decision.app_decisions
 
-        if not target_apps:
+        if not decisions:
             logger.info("PARALLEL_ROOT_NO_APPS  user={}  → direct synthesize", user_id)
             final_answer = await synthesize(
                 messages=messages,
                 writer=writer,
                 user_id=user_id,
                 store=store,
+                installed_app_ids=installed_app_ids,
             )
             writer({"type": "done", "content": final_answer})
             return ParallelGraphOutput(
@@ -91,13 +101,14 @@ def _build_entrypoint(store: BaseStore) -> Any:
         logger.info(
             "PARALLEL_ROOT_DISPATCH  user={}  target_apps={}  total={}",
             user_id,
-            target_apps,
-            len(target_apps),
+            [decision.app_id for decision in decisions],
+            len(decisions),
         )
 
         # ── Step 2: Fan-out — invoke @task workers in parallel ───────────────
         futures: list[tuple[str, Any]] = []
-        for app_id in target_apps:
+        for decision in decisions:
+            app_id = decision.app_id
             task_fn = get_task(app_id)
             if task_fn is None:
                 logger.warning(
@@ -109,7 +120,7 @@ def _build_entrypoint(store: BaseStore) -> Any:
             # @task returns a functools.partial — call it directly to get the future.
             # Do NOT use .invoke() — that attribute doesn't exist on partial.
             future = task_fn(
-                question=question,
+                subtask=decision.subtask,
                 user_id=user_id,
                 thread_id=thread_id,
             )
@@ -122,6 +133,7 @@ def _build_entrypoint(store: BaseStore) -> Any:
                 writer=writer,
                 user_id=user_id,
                 store=store,
+                installed_app_ids=installed_app_ids,
             )
             writer({"type": "done", "content": final_answer})
             return ParallelGraphOutput(
@@ -151,7 +163,7 @@ def _build_entrypoint(store: BaseStore) -> Any:
                     "message": (
                         f"The {app_id} assistant hit an unexpected error. Please try again."
                     ),
-                    "question": question,
+                    "question": "",
                     "tool_results": [],
                     "error": str(exc),
                 }
@@ -178,6 +190,7 @@ def _build_entrypoint(store: BaseStore) -> Any:
             writer=writer,
             user_id=user_id,
             store=store,
+            installed_app_ids=installed_app_ids,
             merged_context=merged,
         )
 

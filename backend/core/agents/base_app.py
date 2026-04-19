@@ -7,12 +7,12 @@ import json
 from typing import Any, Literal
 
 from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
+from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import BaseTool
 from langgraph.errors import GraphRecursionError
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import create_react_agent
 from loguru import logger
-from shared.agent_context import get_user_context, set_thread_context, set_user_context
 
 from core.config import settings
 from core.constants import AGENT_RECURSION_LIMIT
@@ -106,24 +106,15 @@ class BaseAppAgent:
         self,
         question: str,
         thread_id: str,
-        user_id: str | None = None,
+        user_id: str,
+        config: RunnableConfig | None = None,
         **_kwargs: Any,
     ) -> dict[str, Any]:
-        # Support explicit user_id (from @entrypoint) or ContextVar (from old-style invoke)
-        # Accept **_kwargs for forward-compat (e.g. `config` passed by workers.py)
-        if user_id is None:
-            user_id = get_user_context()
         if not user_id:
             raise RuntimeError(f"{self.app_id} agent invoked without user context")
         logger.info("BaseAppAgent.delegate START  app={}  user={}  thread={}  question={}", self.app_id, user_id, thread_id, question[:80])
 
-        parent_thread_id = thread_id
-        # M7: Child thread_id is scoped under the parent thread (which is already user-scoped
-        # via 'user:{user_id}:...' prefix enforced by RootAgent.astream). This provides an
-        # additional logical namespace but does NOT add security since child agents are stateless.
         child_thread_id = f"{thread_id}:{self.app_id}"
-        set_user_context(user_id)
-        set_thread_context(child_thread_id)
 
         # Inject current date/time so child agent knows "today" in user's timezone
         user_obj = await User.find_one(User.id == user_id) if user_id else None
@@ -140,6 +131,12 @@ class BaseAppAgent:
                 self.graph.ainvoke(
                     {"messages": [{"role": "user", "content": prefixed_question}]},
                     config={
+                        **(config or {}),
+                        "configurable": {
+                            **((config or {}).get("configurable") or {}),
+                            "user_id": user_id,
+                            "thread_id": child_thread_id,
+                        },
                         "recursion_limit": AGENT_RECURSION_LIMIT,
                     },
                 ),
@@ -179,8 +176,6 @@ class BaseAppAgent:
                 "Please try again.",
             )
         finally:
-            set_user_context(user_id)
-            set_thread_context(parent_thread_id)
             logger.info("BaseAppAgent.delegate END  app={}  user={}  status={}", self.app_id, user_id, final_status)
 
     def _failed_result(self, question: str, message: str) -> dict[str, Any]:

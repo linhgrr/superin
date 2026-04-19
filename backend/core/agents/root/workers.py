@@ -44,11 +44,12 @@ async def _run_app_delegate(
     start = time.monotonic()
     try:
         result = await agent.delegate(
-            subtask=subtask,
+            question=subtask,
             thread_id=thread_id,
             user_id=user_id,
             config=config,
         )
+        result.setdefault("subtask", subtask)
         elapsed = time.monotonic() - start
         logger.info(
             "PARALLEL_WORKER_DONE  app={}  user={}  status={}  elapsed={:.2f}s",
