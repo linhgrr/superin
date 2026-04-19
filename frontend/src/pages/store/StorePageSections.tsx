@@ -1,5 +1,3 @@
-import type { ReactNode } from "react";
-
 import { DynamicIcon } from "@/lib/icon-resolver";
 import AppCard from "@/components/store/AppCard";
 import AppListItem from "@/components/store/AppListItem";

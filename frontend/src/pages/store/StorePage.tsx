@@ -11,19 +11,21 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 
-import type { AppCatalogEntry, AppCategoryRead } from "@/types/generated";
 import { useToast } from "@/components/providers/ToastProvider";
 import { ROUTES } from "@/constants/routes";
+import { useWorkspaceStore } from "@/stores/platform/workspaceStore";
+import type { AppCatalogEntry, AppCategoryRead } from "@/types/generated";
+
 import {
   StorePageEmpty,
   StorePageFilters,
   StorePageLoading,
   StorePageResults,
-} from "@/pages/StorePageSections";
-import { useWorkspaceStore } from "@/stores/platform/workspaceStore";
+} from "./StorePageSections";
 import {
   buildCategoryMap,
   DEFAULT_STORE_CATEGORY,
+  DEFAULT_STORE_VIEW_MODE,
   fetchStoreCatalogData,
   filterCatalogApps,
   getAvailableStoreCategories,
@@ -44,7 +46,7 @@ export default function StorePage() {
       installedAppIds: state.installedAppIds,
       refreshWorkspace: state.refreshWorkspace,
       setAppInstalled: state.setAppInstalled,
-    }))
+    })),
   );
   const toast = useToast();
 
@@ -53,7 +55,6 @@ export default function StorePage() {
   const [installing, setInstalling] = useState<Set<string>>(new Set());
   const [categories, setCategories] = useState<AppCategoryRead[]>([]);
 
-  // Fetch catalog + categories in parallel
   useEffect(() => {
     void fetchStoreCatalogData()
       .then(({ catalog: catalogData, categories: categoriesData }) => {
@@ -67,9 +68,8 @@ export default function StorePage() {
   }, []);
 
   const mergedCatalog = useMemo(
-    () =>
-      catalog.map((app) => ({ ...app, is_installed: installedAppIds.has(app.id) })),
-    [catalog, installedAppIds]
+    () => catalog.map((app) => ({ ...app, is_installed: installedAppIds.has(app.id) })),
+    [catalog, installedAppIds],
   );
 
   const categoryMap = useMemo(() => buildCategoryMap(categories), [categories]);
@@ -89,39 +89,42 @@ export default function StorePage() {
 
   const updateStoreSearchParams = useCallback(
     (updates: { category?: string; q?: string; view?: StoreViewMode }) => {
-      setSearchParams((currentParams) => {
-        const nextParams = new URLSearchParams(currentParams);
+      setSearchParams(
+        (currentParams) => {
+          const nextParams = new URLSearchParams(currentParams);
 
-        if (updates.category !== undefined) {
-          const nextCategory = updates.category.trim().toLowerCase();
-          if (!nextCategory || nextCategory === DEFAULT_STORE_CATEGORY) {
-            nextParams.delete("category");
-          } else {
-            nextParams.set("category", nextCategory);
+          if (updates.category !== undefined) {
+            const nextCategory = updates.category.trim().toLowerCase();
+            if (!nextCategory || nextCategory === DEFAULT_STORE_CATEGORY) {
+              nextParams.delete("category");
+            } else {
+              nextParams.set("category", nextCategory);
+            }
           }
-        }
 
-        if (updates.q !== undefined) {
-          const nextQuery = updates.q.trim();
-          if (!nextQuery) {
-            nextParams.delete("q");
-          } else {
-            nextParams.set("q", nextQuery);
+          if (updates.q !== undefined) {
+            const nextQuery = updates.q.trim();
+            if (!nextQuery) {
+              nextParams.delete("q");
+            } else {
+              nextParams.set("q", nextQuery);
+            }
           }
-        }
 
-        if (updates.view !== undefined) {
-          if (updates.view === DEFAULT_STORE_VIEW_MODE) {
-            nextParams.delete("view");
-          } else {
-            nextParams.set("view", updates.view);
+          if (updates.view !== undefined) {
+            if (updates.view === DEFAULT_STORE_VIEW_MODE) {
+              nextParams.delete("view");
+            } else {
+              nextParams.set("view", updates.view);
+            }
           }
-        }
 
-        return nextParams;
-      }, { replace: true });
+          return nextParams;
+        },
+        { replace: true },
+      );
     },
-    [setSearchParams]
+    [setSearchParams],
   );
 
   const filtered = useMemo(
@@ -164,7 +167,9 @@ export default function StorePage() {
           description: `The ${app.name} app requires a Pro subscription to install.`,
           action: {
             label: "Upgrade",
-            onClick: () => { window.location.href = ROUTES.BILLING; },
+            onClick: () => {
+              window.location.href = ROUTES.BILLING;
+            },
           },
         });
       } else {
@@ -172,7 +177,7 @@ export default function StorePage() {
           description: typeof detail === "string" ? detail : "Please try again later",
         });
       }
-      setAppInstalled(app, app.is_installed); // revert
+      setAppInstalled(app, app.is_installed);
       await refreshWorkspace();
     } finally {
       setInstalling((current) => {

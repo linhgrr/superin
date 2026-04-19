@@ -2,9 +2,10 @@
  * Header — top navigation with user menu and tour trigger.
  */
 
-import { UserMenu, TourMenu } from "@/pages/header-menus";
 import { DynamicIcon } from "@/lib/icon-resolver";
 import { platformUiSelectors, usePlatformUiStore } from "@/stores/platform/platformUiStore";
+
+import { TourMenu, UserMenu } from "./header-menus";
 
 interface HeaderProps {
   title?: string;
@@ -41,7 +42,6 @@ export default function Header({ title, showTourTrigger = true }: HeaderProps) {
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-        {/* Command Palette trigger */}
         <button
           className="btn btn-ghost btn-icon"
           onClick={openCommandPalette}
@@ -50,8 +50,7 @@ export default function Header({ title, showTourTrigger = true }: HeaderProps) {
           <DynamicIcon name="Command" size={16} />
         </button>
 
-        {showTourTrigger && <TourMenu />}
-
+        {showTourTrigger ? <TourMenu /> : null}
         <UserMenu />
       </div>
     </header>

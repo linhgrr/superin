@@ -15,11 +15,11 @@ import { AppProviders } from "@/components/providers/AppProviders";
 import { DiscoveryInitializer } from "@/components/providers/DiscoveryInitializer";
 import { ProtectedShellRuntime } from "@/components/providers/platform/ProtectedShellRuntime";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
-import AppShell from "@/pages/AppShell";
+import AppShell from "@/pages/shell/AppShell";
 
 const LoginPage = lazy(() => import("@/pages/LoginPage"));
 const DashboardPage = lazy(() => import("@/pages/dashboard/DashboardPage"));
-const StorePage = lazy(() => import("@/pages/StorePage"));
+const StorePage = lazy(() => import("@/pages/store/StorePage"));
 const BillingPage = lazy(() => import("@/pages/billing/BillingPage"));
 const BillingSuccessPage = lazy(() => import("@/pages/billing/BillingSuccessPage"));
 const BillingCancelPage = lazy(() => import("@/pages/billing/BillingCancelPage"));

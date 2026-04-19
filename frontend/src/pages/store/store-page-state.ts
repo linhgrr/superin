@@ -1,7 +1,7 @@
-import type { AppCatalogEntry, AppCategoryRead } from "@/types/generated";
 import { getCatalog, getCategories, installApp, uninstallApp } from "@/api/catalog";
 import { ROUTES } from "@/constants/routes";
 import { STORAGE_KEYS } from "@/constants/storage";
+import type { AppCatalogEntry, AppCategoryRead } from "@/types/generated";
 
 export interface PersistedCatalogSnapshot {
   catalog: AppCatalogEntry[];
