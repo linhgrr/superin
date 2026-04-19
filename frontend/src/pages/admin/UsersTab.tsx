@@ -1,17 +1,18 @@
 import { useMemo } from "react";
 
 import { UserRole } from "@/types/generated";
-import type { AdminUserRead } from "@/types/generated";
+import type { AdminUserRead, SubscriptionTier } from "@/types/generated";
 import { Pill } from "./Pill";
 import { Table } from "./AdminTable";
 import { TierSelect } from "./TierSelect";
+import { getRoleBusyKey, getSubscriptionBusyKey, getNextRole } from "./admin-page-state";
 
 interface UsersTabProps {
   users: AdminUserRead[];
   currentUserId: string | undefined;
   busyKey: string | null;
   onSetRole: (user: AdminUserRead, role: UserRole) => void;
-  onSetTier: (userId: string, tier: import("@/types/generated").SubscriptionTier) => void;
+  onSetTier: (userId: string, tier: SubscriptionTier) => void;
 }
 
 export function UsersTab({ users, currentUserId, busyKey, onSetRole, onSetTier }: UsersTabProps) {
@@ -27,15 +28,15 @@ export function UsersTab({ users, currentUserId, busyKey, onSetRole, onSetTier }
         <div key={`actions:${item.id}`} style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
           <button
             className="btn btn-sm btn-ghost"
-            onClick={() => onSetRole(item, item.role === UserRole.ADMIN ? UserRole.USER : UserRole.ADMIN)}
-            disabled={busyKey === `role:${item.id}` || item.id === currentUserId}
+            onClick={() => onSetRole(item, getNextRole(item.role))}
+            disabled={busyKey === getRoleBusyKey(item.id) || item.id === currentUserId}
             title={item.id === currentUserId ? "Cannot change your own role here" : undefined}
           >
             {item.role === UserRole.ADMIN ? "Demote" : "Promote"}
           </button>
           <TierSelect
             value={item.subscription.tier}
-            disabled={busyKey === `sub:${item.id}`}
+            disabled={busyKey === getSubscriptionBusyKey(item.id)}
             onChange={(next) => onSetTier(item.id, next)}
           />
         </div>,

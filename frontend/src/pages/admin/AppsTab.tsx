@@ -5,6 +5,7 @@ import type { SubscriptionTier } from "@/types/generated";
 import { Pill } from "./Pill";
 import { Table } from "./AdminTable";
 import { TierSelect } from "./TierSelect";
+import { getAppBusyKey } from "./admin-page-state";
 
 interface AppsTabProps {
   apps: AdminAppRead[];
@@ -24,7 +25,7 @@ export function AppsTab({ apps, busyKey, onSetTier }: AppsTabProps) {
         <TierSelect
           key={`app-tier:${item.id}`}
           value={item.requires_tier}
-          disabled={busyKey === `app:${item.id}`}
+          disabled={busyKey === getAppBusyKey(item.id)}
           onChange={(next) => onSetTier(item, next)}
         />,
         <Pill key={`app-installs:${item.id}`}>{item.install_count}</Pill>,
