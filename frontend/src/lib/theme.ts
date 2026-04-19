@@ -1,4 +1,4 @@
-import { STORAGE_KEYS } from "@/constants";
+import { STORAGE_KEYS } from "@/constants/storage";
 
 export type AppTheme = "light" | "dark" | "system";
 export type ResolvedTheme = "light" | "dark";

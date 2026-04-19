@@ -6,26 +6,15 @@
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 
-import { useCallback } from "react";
-import { Responsive } from "react-grid-layout";
+import type { AppRuntimeEntry, PreferenceUpdate, WidgetPreferenceSchema } from "@/types/generated";
 
-import { DynamicIcon } from "@/lib/icon-resolver";
-import AddWidgetDialog from "@/components/dashboard/AddWidgetDialog";
-import { platformUiSelectors, usePlatformUiStore } from "@/stores/platform/platformUiStore";
-import {
-  useWidgetPreferences,
-  GRID_COLS,
-  GRID_BREAKPOINTS,
-  ROW_HEIGHT,
-} from "./useWidgetPreferences";
-import { getSizeConfig } from "./layout-engine";
-import WidgetCard from "./WidgetCard";
-import LazyWidget from "@/components/LazyWidget";
+import { DashboardActionBar, DashboardGridContent } from "./DashboardGridSections";
+import { useWidgetPreferences } from "./useWidgetPreferences";
 
 interface DashboardGridProps {
-  installedApps: import("@/types/generated").AppRuntimeEntry[];
-  workspacePreferences: import("@/types/generated").WidgetPreferenceSchema[];
-  onCommit: (updates: import("@/types/generated").PreferenceUpdate[]) => void;
+  installedApps: AppRuntimeEntry[];
+  workspacePreferences: WidgetPreferenceSchema[];
+  onCommit: (updates: PreferenceUpdate[]) => void;
 }
 
 export default function DashboardGrid({
@@ -46,127 +35,22 @@ export default function DashboardGrid({
     handleAutoRearrange,
   } = useWidgetPreferences({ installedApps, workspacePreferences, onCommit });
 
-  const MOBILE_BREAKPOINT = 1024;
-  const DEFAULT_AUTO_HEIGHT = "200px";
-  const isMobileLayout = containerWidth <= MOBILE_BREAKPOINT;
-
   return (
     <div ref={containerRef} style={{ animation: "fadeIn 0.4s ease" }}>
-      {/* Action bar */}
-      <div className="dashboard-action-bar">
-        <button
-          type="button"
-          className="btn btn-ghost btn-sm"
-          onClick={() => handleAutoRearrange(visibleWidgets)}
-          aria-label="Auto arrange widgets"
-        >
-          <span className="btn-auto-arrange-content">
-            <DynamicIcon name="LayoutGrid" size={16} />
-            Auto Arrange
-          </span>
-        </button>
-        <AddWidgetButton
-          installedApps={installedApps}
-          enabledWidgetIds={enabledWidgetIds}
-          busyWidgetId={busyWidgetId}
-          onToggleWidget={handleWidgetVisibilityChange}
-        />
-      </div>
-
-      {/* Grid */}
-      {isMobileLayout ? (
-        <div className="dashboard-mobile-layout">
-          {visibleWidgets.map(({ widgetId, appId, widget }) => {
-            const config = getSizeConfig(widget.size);
-            const minHeight = config.height === "auto" ? DEFAULT_AUTO_HEIGHT : config.height;
-            
-            return (
-              <div 
-                key={widgetId} 
-                className="mobile-widget-wrapper"
-                style={{ minHeight }}
-              >
-                <WidgetCard widget={widget} widgetId={widgetId}>
-                  <LazyWidget appId={appId} widgetId={widgetId} widget={widget} />
-                </WidgetCard>
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <Responsive
-          className="dashboard-grid-layout"
-          layouts={responsiveLayouts}
-          breakpoints={GRID_BREAKPOINTS}
-          cols={GRID_COLS}
-          rowHeight={ROW_HEIGHT}
-          width={containerWidth}
-          compactType="vertical"
-          useCSSTransforms={true}
-          preventCollision={false}
-          dragConfig={{ enabled: true, threshold: 3 }}
-          resizeConfig={{ enabled: true, handles: ["se", "s", "e"] }}
-          onLayoutChange={handleLayoutChange}
-          onDragStop={handleLayoutCommit}
-          onResizeStop={handleLayoutCommit}
-          margin={[16, 16]}
-          containerPadding={[0, 0]}
-        >
-          {visibleWidgets.map(({ widgetId, appId, widget }) => (
-            <div key={widgetId} className="rgl-item-view">
-              <WidgetCard widget={widget} widgetId={widgetId}>
-                <LazyWidget appId={appId} widgetId={widgetId} widget={widget} />
-              </WidgetCard>
-            </div>
-          ))}
-        </Responsive>
-      )}
+      <DashboardActionBar
+        installedApps={installedApps}
+        enabledWidgetIds={enabledWidgetIds}
+        busyWidgetId={busyWidgetId}
+        onAutoArrange={() => handleAutoRearrange(visibleWidgets)}
+        onToggleWidget={handleWidgetVisibilityChange}
+      />
+      <DashboardGridContent
+        containerWidth={containerWidth}
+        visibleWidgets={visibleWidgets}
+        responsiveLayouts={responsiveLayouts}
+        onLayoutChange={handleLayoutChange}
+        onLayoutCommit={handleLayoutCommit}
+      />
     </div>
-  );
-}
-
-// ─── Sub-component ────────────────────────────────────────────────────────────
-
-interface AddWidgetButtonProps {
-  installedApps: import("@/types/generated").AppRuntimeEntry[];
-  enabledWidgetIds: Set<string>;
-  busyWidgetId: string | null;
-  onToggleWidget: (widgetId: string, enabled: boolean) => void;
-}
-
-function AddWidgetButton({
-  installedApps,
-  enabledWidgetIds,
-  busyWidgetId,
-  onToggleWidget,
-}: AddWidgetButtonProps) {
-  const isOpen = usePlatformUiStore(platformUiSelectors.isAddWidgetDialogOpen);
-  const openDialog = usePlatformUiStore(platformUiSelectors.openAddWidgetDialog);
-  const closeDialog = usePlatformUiStore(platformUiSelectors.closeAddWidgetDialog);
-  const open = useCallback(() => openDialog(), [openDialog]);
-  const close = useCallback(() => closeDialog(), [closeDialog]);
-
-  return (
-    <>
-      <button
-        type="button"
-        className="btn btn-secondary btn-sm"
-        onClick={open}
-        aria-label="Add widget"
-        style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
-      >
-        <DynamicIcon name="Plus" size={16} />
-        Add Widget
-      </button>
-      {isOpen && (
-        <AddWidgetDialog
-          catalog={installedApps}
-          enabledWidgetIds={enabledWidgetIds}
-          busyWidgetId={busyWidgetId}
-          onToggleWidget={onToggleWidget}
-          onClose={close}
-        />
-      )}
-    </>
   );
 }

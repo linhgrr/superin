@@ -63,11 +63,12 @@ function createAppMetadata(
   };
 }
 
-function extractAppId(path: string, leafName: string): string | null {
-  const match = path.match(
-    new RegExp(`^(?:\\./|\\.\\./apps/)([^/]+)/${leafName.replace(".", "\\.")}$`)
-  );
-  return match?.[1] ?? null;
+function extractAppId(path: string, kind: "app-view" | "dashboard-widget"): string | null {
+  const pattern =
+    kind === "app-view"
+      ? /^(?:\.\.\/apps\/|\.\/)([^/]+)\/views\/[^/]+Screen\.tsx$/
+      : /^(?:\.\.\/apps\/|\.\/)([^/]+)\/DashboardWidget\.tsx$/;
+  return path.match(pattern)?.[1] ?? null;
 }
 
 export function registerAppMetadata(
@@ -92,14 +93,14 @@ export function registerAvailableApps(
   >();
 
   for (const [path, loader] of Object.entries(appViewLoadersByPath)) {
-    const appId = extractAppId(path, "AppView.tsx");
+    const appId = extractAppId(path, "app-view");
     if (appId) {
       appViewLoaders.set(appId, loader as () => Promise<{ default: ComponentType }>);
     }
   }
 
   for (const [path, loader] of Object.entries(dashboardWidgetLoadersByPath)) {
-    const appId = extractAppId(path, "DashboardWidget.tsx");
+    const appId = extractAppId(path, "dashboard-widget");
     if (appId) {
       dashboardWidgetLoaders.set(
         appId,
@@ -118,7 +119,7 @@ export function registerAvailableApps(
 
     if (!loadAppView || !loadDashboardWidget) {
       console.warn(
-        `[discovery] Skipping app "${appId}" because ${!loadAppView ? "AppView.tsx" : "DashboardWidget.tsx"} is missing`
+        `[discovery] Skipping app "${appId}" because ${!loadAppView ? "views/*Screen.tsx" : "DashboardWidget.tsx"} is missing`
       );
       continue;
     }

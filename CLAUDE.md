@@ -11,6 +11,7 @@ Superin là nền tảng plugin-based với:
 - **Frontend:** React + Vite + Tailwind v4 + HeroUI v3 + assistant-ui
 - **Backend:** FastAPI + LangGraph + Beanie ODM + MongoDB
 - **Chat:** SSE streaming qua assistant-stream protocol
+- **Chat Threading:** `thread_id` do frontend tạo và giữ làm source of truth; stream đầu tiên tự materialize `ThreadMeta` + LangGraph checkpoint
 - **Auth:** JWT (access/refresh tokens)
 - **Plugin Model:** Auto-discovery qua `backend/apps/*`
 - **Category Registry:** Categories tự động đăng ký từ app manifests, API `/api/catalog/categories`
@@ -154,6 +155,18 @@ frontend/
 └── src/app/globals.css       # Design tokens
 ```
 
+### Chat Runtime Files
+
+| File | Vai trò |
+|------|---------|
+| `backend/core/chat/routes.py` | Stream-first chat endpoint, materialize thread/checkpoint từ turn đầu |
+| `backend/core/chat/service.py` | Validate/persist FE-owned `thread_id`, quản lý `ThreadMeta` |
+| `backend/core/agents/root/graph.py` | Root LangGraph orchestration, emits stream events và persist state |
+| `backend/core/agents/root/context.py` | Build short-term context từ checkpoint + explicit memories |
+| `backend/core/agents/root/synthesis.py` | Direct reply synthesis, phải include recent history |
+| `frontend/src/components/providers/InnerProviders.tsx` | Thin `useLangGraphRuntime` integration + outer thread-list runtime |
+| `frontend/src/api/chat.ts` | FE chat adapter, stream-first thread materialization |
+
 ---
 
 ## 4. Widget Size Contract
@@ -208,6 +221,11 @@ npm run superin -- db check-indexes
 npm run validate:manifests
 ruff check backend
 cd frontend && npm run build
+
+# Targeted regression checks used recently
+/home/linh/miniconda3/envs/linhdz/bin/pytest backend/tests/core/test_chat_route_helpers.py backend/tests/core/test_registry.py backend/tests/core/test_root_agent_tool_scoping.py backend/tests/core/test_catalog_service.py -q
+cd frontend && npm run typecheck
+cd frontend && npm run test -- datetime
 ```
 
 ---
@@ -234,13 +252,13 @@ cd frontend && npm run build
 ```
 FE  ←→  UTC ISO strings  ←→  BE  ←→  MongoDB (naive UTC)
 
-FE display: UTC → user local (Intl.DateTimeFormat + user timezone)
+FE display/query semantics: UTC ↔ user-configured IANA timezone
 BE storage: always UTC (aware → naive for Mongo)
 ```
 
 **Rule #1 — BE stores UTC, FE stores/transmits UTC ISO strings.** No local-time datetimes cross the API boundary.
 
-**Rule #2 — User timezone is display-only, never storage.** BE does not store events in user's local time; it always converts to/from UTC.
+**Rule #2 — User timezone controls display AND query semantics, never storage.** "Today", "this week", picker dates, and calendar grid boundaries must all be computed in the user's configured IANA timezone, then converted to UTC for API/DB.
 
 ---
 
@@ -302,8 +320,9 @@ Affected files: `apps/*/tools.py` — always wrap `datetime.fromisoformat()` cal
 import {
   getUserTimezone,           // Read active timezone (localStorage → browser → UTC)
   setUserTimezone,            // Persist user preference
-  buildUtcIsoString,         // Date(y,m,d,h,min) → .toISOString() (correct UTC)
+  buildUtcIsoString,         // local date/time in user tz → UTC ISO
   buildUtcIsoStringFromDate, // datePicker + hour/min → UTC ISO for API
+  getDateKey,                // UTC/value → YYYY-MM-DD in user tz
   formatTime,                // UTC string → "HH:MM" in user tz
   formatDate,                // UTC string → "13 Apr 2026" in user tz
   formatDateTime,            // UTC string → "13 Apr 2026, 09:00" in user tz
@@ -313,7 +332,7 @@ import {
   isSameDayAs,               // UTC string + Date → boolean (user tz, REPLACES .getDate())
   getDayRange,               // Date → {start, end} UTC ISO strings (user tz)
   getTodayRange,             // → today's range in UTC ISO strings
-  getWeekBoundaries,         // Date → {weekDatesLocal[], weekDatesUtcIso[]}
+  getWeekBoundaries,         // Date → {weekDatesLocal[], weekDatesUtcIso[], rangeStartUtcIso, rangeEndUtcIso}
   isSameDayInTimezone,       // Date + Date → boolean (user tz)
   getWeekDates,              // Date → Date[7] Mon–Sun local midnight
 } from '@/shared/utils/datetime'
@@ -328,8 +347,8 @@ import {
 
 **✅ ALWAYS in FE:**
 - Use `Intl.DateTimeFormat(..., { timeZone: userTz })` for any display or comparison
-- Use `new Date(year, month, day, h, min, s, ms)` to construct dates from picker values (interprets args as local time)
-- Use `buildUtcIsoStringFromDate(date, hour, min)` to create UTC ISO from picker values
+- Convert local calendar dates in the user's timezone to UTC via `buildUtcIsoString()` / `buildUtcIsoStringFromDate()`
+- Use `getDateKey()` / `getWeekBoundaries()` when day identity matters; never key calendar logic by `Date.toDateString()`
 - Always pass `timezone` explicitly — no hidden fallback in domain utilities
 
 **React Components:** Use `useTimezone()` hook (reactive — auto-updates when user changes timezone):
@@ -448,12 +467,17 @@ FE (display):
 - Mọi BE schema public phải có tên globally unique theo mẫu `{App}{Entity}{Suffix}`.
 - Public tool names phải được pin explicit bằng `@tool("...")`; Python function name chỉ là implementation detail.
 - Root agent chỉ được expose tool của app đã cài; nếu bước resolve installed-app thất bại thì phải fail-closed.
-- **`routes.py` datetime range → BE service:** Luôn convert user-local datetime sang UTC (`.astimezone(UTC)`) TRƯỚC khi truyền vào service layer. Không bao giờ truyền aware-local datetime trực tiếp.
-- **Tạo event từ picker (FE → BE):** Luôn dùng `new Date(year, month, day, h, min)` constructor (interpret as local) rồi `.toISOString()`. KHÔNG dùng `.setHours()` trên Date object.
+- **`routes.py` datetime range → BE service:** Mọi datetime từ API phải được normalize về UTC trước khi vào repository/query logic. Không bao giờ dựa vào timezone hệ điều hành của server.
+- **Tạo event từ picker (FE → BE):** Dùng `buildUtcIsoString()` / `buildUtcIsoStringFromDate()` với user timezone. KHÔNG dựng local-time theo browser timezone, KHÔNG dùng `.setHours()` trên `Date`.
 - **Hour extraction từ UTC string:** Luôn dùng `getHourMinute(utc, tz)` hoặc `Intl.DateTimeFormat(..., { timeZone: tz })`. KHÔNG dùng `.getHours()` trực tiếp — nó dùng browser system timezone.
 - **Event model storage:** `Event.start_datetime`/`end_datetime` luôn là naive UTC. Mọi incoming datetime (aware any tz, naive, ISO string) phải đi qua `ensure_naive_utc(ensure_aware_utc(dt))` ở service layer và model validator.
 - **`to_naive_datetime()` assumptions:** Chỉ gọi `to_naive_datetime()` / `ensure_naive_utc()` trên datetimes mà đã biết là UTC (aware hoặc naive-labeled-UTC). Không dùng trên local-time naive datetimes.
-- **Week range query:** Luôn dùng `getWeekBoundaries(date, tz)` từ `@/shared/utils/datetime` — trả cả `weekDatesLocal[]` (grid columns) và `weekDatesUtcIso[]` (API query).
+- **Week range query:** Luôn dùng `getWeekBoundaries(date, tz)` từ `@/shared/utils/datetime` và query bằng `rangeStartUtcIso` / `rangeEndUtcIso`. Không dùng midnight của ngày cuối tuần làm `end`.
+- **Calendar cell state:** Slot được represent bằng `{date, startMinutes}` hoặc equivalent plain local-date model; không encode selected hour bằng cách mutate `Date` object.
+- **assistant-ui + LangGraph:** Runtime chat chính phải là thin `useLangGraphRuntime`; thread list/sidebar chỉ bọc ngoài để quản lý multi-thread UI.
+- **Thread source of truth:** `thread_id` do frontend tạo và tái sử dụng. Backend chỉ validate/persist metadata, không được rewrite sang id khác.
+- **Thread materialization:** Không cần `/api/chat/threads/initialize`; stream turn đầu tiên phải tự tạo `ThreadMeta` + checkpoint nếu chưa tồn tại.
+- **Checkpoint vs metadata:** Nội dung message/history là source of truth trong LangGraph checkpoint; `ThreadMeta` chỉ giữ metadata sidebar (`title`, timestamps, ownership).
 
 ### Chat/Agent
 
@@ -463,6 +487,9 @@ FE (display):
 4. **Mọi app tool** phải dùng `safe_tool_call()` để convert errors thành tool results
 5. **Root agent tool scoping phải fail-closed** — Nếu không xác minh được installed apps thì chỉ expose platform-safe tools, không bao giờ fallback sang toàn bộ `ask_*` tools.
 6. **Persisted agent history phải scope theo user + thread** — Không query hay replay history chỉ dựa trên `thread_id`.
+7. **Root là agent orchestration layer thực sự** — turn mới append vào checkpoint state của cùng `thread_id`; routing tới app con là behavior nội bộ của root graph, không phải chat thread mới.
+8. **Short-term memory = checkpoint, long-term memory = explicit store-backed memory** — direct synthesis path phải inject recent checkpoint history thay vì trả lời như turn đầu.
+9. **`done` event chỉ được phát sau khi checkpoint cuối turn đã persisted** — nếu không FE sẽ nhận history cũ và collapse message list.
 
 ---
 

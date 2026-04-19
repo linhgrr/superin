@@ -15,7 +15,7 @@ import type {
   AdminUsersResponse,
   operations,
 } from "@/types/generated";
-import { API_PATHS } from "@/constants";
+import { API_PATHS } from "@/constants/api";
 import { api } from "./axios";
 
 type AdminUsersParams =

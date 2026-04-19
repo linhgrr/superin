@@ -83,28 +83,21 @@ INDEX_REQUIREMENTS: tuple[IndexRequirement, ...] = (
         unique=True,
     ),
     IndexRequirement(
-        collection="conversation_messages",
-        index_name="conversation_messages_user_thread_created_at",
-        key=(("user_id", 1), ("thread_id", 1), ("created_at", 1)),
-        unique=False,
-    ),
-    IndexRequirement(
-        collection="conversation_messages",
-        index_name="conversation_messages_thread_created_at",
-        key=(("thread_id", 1), ("created_at", 1)),
-        unique=False,
-    ),
-    IndexRequirement(
-        collection="conversation_messages",
-        index_name="conversation_messages_user_thread_client_message_id_unique",
-        key=(("user_id", 1), ("thread_id", 1), ("client_message_id", 1)),
-        unique=True,
-        partial_filter_expression={"client_message_id": {"$type": "string"}},
-    ),
-    IndexRequirement(
         collection="subscriptions",
         index_name="subscriptions_user_id_unique",
         key=(("user_id", 1),),
+        unique=True,
+    ),
+    IndexRequirement(
+        collection="thread_metas",
+        index_name="thread_metas_user_status_updated_at",
+        key=(("user_id", 1), ("status", 1), ("updated_at", -1)),
+        unique=False,
+    ),
+    IndexRequirement(
+        collection="thread_metas",
+        index_name="thread_metas_user_thread_unique",
+        key=(("user_id", 1), ("thread_id", 1)),
         unique=True,
     ),
     IndexRequirement(
@@ -155,6 +148,26 @@ INDEX_REQUIREMENTS: tuple[IndexRequirement, ...] = (
         key=(("user_id", 1), ("is_default", 1)),
         unique=True,
         partial_filter_expression={"is_default": True},
+    ),
+    # ─── LangGraph agent checkpoint collections (managed by MongoDBSaver) ───────
+    # These collections are created and indexed by LangGraph during saver init.
+    IndexRequirement(
+        collection="agent_checkpoints",
+        index_name="thread_id_1_checkpoint_ns_1_checkpoint_id_-1",
+        key=(("thread_id", 1), ("checkpoint_ns", 1), ("checkpoint_id", -1)),
+        unique=True,
+    ),
+    IndexRequirement(
+        collection="agent_checkpoint_writes",
+        index_name="thread_id_1_checkpoint_ns_1_checkpoint_id_-1_task_id_1_idx_1",
+        key=(
+            ("thread_id", 1),
+            ("checkpoint_ns", 1),
+            ("checkpoint_id", -1),
+            ("task_id", 1),
+            ("idx", 1),
+        ),
+        unique=True,
     ),
 )
 

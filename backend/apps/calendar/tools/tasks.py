@@ -2,14 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-
+from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
 
 from apps.calendar.service import calendar_service
-from core.utils.timezone import ensure_aware_utc
-from shared.agent_context import get_user_context
-from shared.tool_results import safe_tool_call
+from shared.tool_results import run_time_aware_tool_with_user
 
 
 @tool("calendar_block_task_time")
@@ -17,6 +14,7 @@ async def calendar_block_task_time(
     task_id: str,
     start: str,
     duration_minutes: int,
+    config: RunnableConfig,
     calendar_id: str | None = None,
 ) -> dict:
     """
@@ -27,9 +25,8 @@ async def calendar_block_task_time(
     - "Schedule my Write Report task for Friday 9am"
     - "Put 'Prepare Presentation' on my calendar tomorrow"
     """
-    async def operation() -> dict:
-        user_id = get_user_context()
-        start_dt = ensure_aware_utc(datetime.fromisoformat(start))
+    async def operation(user_id: str, temporal: dict, _time_context) -> dict:
+        start_dt = temporal["start"]
         return await calendar_service.schedule_task(
             user_id=user_id,
             task_id=task_id,
@@ -38,4 +35,10 @@ async def calendar_block_task_time(
             calendar_id=calendar_id,
         )
 
-    return await safe_tool_call(operation, action="blocking task time")
+    return await run_time_aware_tool_with_user(
+        config,
+        action="blocking task time",
+        payload={"start": start},
+        temporal_fields={"start": "local_datetime"},
+        operation=operation,
+    )

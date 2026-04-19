@@ -8,7 +8,7 @@ import type {
   CheckoutRequest,
   CheckoutResponse,
 } from "@/types/generated";
-import { API_PATHS } from "@/constants";
+import { API_PATHS } from "@/constants/api";
 
 import { api } from "./axios";
 

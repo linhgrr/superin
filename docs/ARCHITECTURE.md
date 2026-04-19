@@ -259,6 +259,18 @@ Contract:
 - `delegate(question, thread_id)` returns a structured result envelope for the root agent
 - app tools must use `safe_tool_call()` so domain failures become structured tool results
 
+## Timezone Architecture
+
+Canonical references:
+- [2026-04-19-timezone-architecture.md](/home/linh/Downloads/superin/docs/adr/2026-04-19-timezone-architecture.md)
+- [TIMEZONE_TOOL_NORMALIZATION.md](/home/linh/Downloads/superin/docs/TIMEZONE_TOOL_NORMALIZATION.md)
+
+Rules:
+- `user.settings.timezone` is the only business source of truth
+- API and DB contracts remain UTC
+- agent reasoning uses user-local semantics
+- tool boundary normalization converts declared temporal fields into UTC or structured local values before calling services
+
 Current child agents:
 - [finance/agent.py](/home/linh/Downloads/superin/backend/apps/finance/agent.py)
 - [todo/agent.py](/home/linh/Downloads/superin/backend/apps/todo/agent.py)

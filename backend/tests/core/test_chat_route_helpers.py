@@ -1,13 +1,21 @@
+import pytest
 from fastapi import HTTPException
 
 from core.chat.routes import _extract_latest_user_message
 from core.chat.service import normalize_thread_id
 
 
-def test_normalize_thread_id_prefixes_user_scope() -> None:
-    assert normalize_thread_id("user-1", "thread-abc") == "user:user-1:thread-abc"
-    assert normalize_thread_id("user-1", "user:user-1:thread-abc") == "user:user-1:thread-abc"
-    assert normalize_thread_id("user-1", None) == "user:user-1"
+def test_normalize_thread_id_preserves_frontend_thread_id() -> None:
+    assert normalize_thread_id("user-1", "thread-abc") == "thread-abc"
+    assert normalize_thread_id("user-1", "  thread-abc  ") == "thread-abc"
+
+
+def test_normalize_thread_id_rejects_missing_or_empty_values() -> None:
+    with pytest.raises(ValueError):
+        normalize_thread_id("user-1", None)
+
+    with pytest.raises(ValueError):
+        normalize_thread_id("user-1", "   ")
 
 
 def test_extract_latest_user_message_uses_last_non_empty_user_message() -> None:

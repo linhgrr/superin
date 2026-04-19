@@ -1,62 +1,97 @@
 /**
- * Inner providers — internal implementation details.
+ * Inner providers — runtime wiring for LangGraph chat + remote thread list.
  */
 
-import { memo, useCallback, useMemo } from "react";
+import { memo, useMemo } from "react";
 import type { ReactNode } from "react";
 
-import { AssistantRuntimeProvider } from "@assistant-ui/react";
-import { useDataStreamRuntime } from "@assistant-ui/react-data-stream";
+import {
+  AssistantRuntimeProvider,
+  useRemoteThreadListRuntime,
+} from "@assistant-ui/react";
+import type { RemoteThreadListAdapter } from "@assistant-ui/react";
+import { useLangGraphRuntime } from "@assistant-ui/react-langgraph";
 
-import { getAccessToken } from "@/api/axios";
-import { API_BASE_URL } from "@/config";
-import { API_PATHS } from "@/constants";
-import { useRenderLoopDebug } from "@/lib/debug-render-loop";
+import { chatApi } from "@/api/chat";
 
-const CHAT_STREAM_API = `${API_BASE_URL}${API_PATHS.CHAT_STREAM}`;
+function useBackendThreadListAdapter(): RemoteThreadListAdapter {
+  return useMemo(
+    () => ({
+      list: async () => {
+        const { threads } = await chatApi.getThreads();
+        return {
+          threads: threads.map((thread) => ({
+            remoteId: thread.threadId,
+            externalId: thread.threadId,
+            title: thread.title,
+            status: thread.status,
+          })),
+        };
+      },
+      initialize: async (threadId) => {
+        return {
+          remoteId: threadId,
+          externalId: threadId,
+        };
+      },
+      fetch: async (threadId) => {
+        const thread = await chatApi.getThread(threadId);
+        return {
+          remoteId: thread.threadId,
+          externalId: thread.threadId,
+          title: thread.title,
+          status: thread.status,
+        };
+      },
+      rename: async (threadId, title) => {
+        await chatApi.renameThread(threadId, title);
+      },
+      archive: async (threadId) => {
+        await chatApi.archiveThread(threadId);
+      },
+      unarchive: async (threadId) => {
+        await chatApi.unarchiveThread(threadId);
+      },
+      delete: async (threadId) => {
+        await chatApi.deleteThread(threadId);
+      },
+      generateTitle: async () => new ReadableStream(),
+    }),
+    [],
+  );
+}
+
+function useChatThreadRuntime() {
+  return useLangGraphRuntime({
+    load: async (externalId) => chatApi.loadLangGraphThread(externalId),
+    stream: async function* (messages, { abortSignal, initialize }) {
+      const { externalId, remoteId } = await initialize();
+      const threadId = externalId ?? remoteId;
+
+      yield* chatApi.streamLangGraph({
+        threadId,
+        messages,
+        abortSignal,
+      });
+    },
+    eventHandlers: {
+      onError: (error) => {
+        console.error("[ChatRuntime]", error);
+      },
+    },
+  });
+}
 
 const ChatRuntimeProvider = memo(function ChatRuntimeProvider({
   children,
-  threadId,
 }: {
   children: ReactNode;
-  /** Client-generated thread identity. Must be stable across page reloads. */
-  threadId: string;
 }) {
-  useRenderLoopDebug("ChatRuntimeProvider");
-
-  const getHeaders = useCallback(async () => {
-    const token = getAccessToken();
-    const headers: Record<string, string> = {};
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
-    }
-    return headers;
-  }, []);
-
-  const handleError = useCallback((error: Error) => {
-    if (error.name === "AbortError" || error.message?.includes("BodyStreamBuffer")) {
-      return;
-    }
-    console.error("[ChatRuntime]", error);
-  }, []);
-
-  const runtimeOptions = useMemo(
-    () => ({
-      api: CHAT_STREAM_API,
-      protocol: "ui-message-stream" as const,
-      credentials: "include" as const,
-      headers: getHeaders,
-      onError: handleError,
-      // Enable so backend can deduplicate by message id on retries
-      sendExtraMessageFields: true,
-      // Inject threadId into every request body — backend requires it
-      body: { threadId },
-    }),
-    [getHeaders, handleError, threadId]
-  );
-
-  const runtime = useDataStreamRuntime(runtimeOptions);
+  const adapter = useBackendThreadListAdapter();
+  const runtime = useRemoteThreadListRuntime({
+    adapter,
+    runtimeHook: useChatThreadRuntime,
+  });
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>

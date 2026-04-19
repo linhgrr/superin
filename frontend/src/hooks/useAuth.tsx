@@ -16,7 +16,7 @@ import {
 } from "react";
 
 import { getMe, login as apiLogin, logout as apiLogout, register as apiRegister } from "@/api/auth";
-import { isAuthenticated, triggerLogout } from "@/api/axios";
+import { isAuthenticated, triggerLogout } from "@/api/auth-session";
 import { UserRole } from "@/types/generated";
 import type { LoginRequest, RegisterRequest, UserPublic } from "@/types/generated";
 

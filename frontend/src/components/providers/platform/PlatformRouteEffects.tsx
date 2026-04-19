@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
-import { ROUTES } from "@/constants";
+import { ROUTES } from "@/constants/routes";
 import { platformUiSelectors, usePlatformUiStore } from "@/stores/platform/platformUiStore";
 
 export function PlatformRouteEffects() {

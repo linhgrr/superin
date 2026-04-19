@@ -1,17 +1,22 @@
+import { ThreadListItemPrimitive, ThreadListPrimitive } from "@assistant-ui/react";
+import { useAuiState } from "@assistant-ui/react";
+
 import { DynamicIcon } from "@/lib/icon-resolver";
 
 import { useChatThreads } from "@/hooks/useChatThreads";
 
 interface ThreadHistorySidebarProps {
   onClose: () => void;
-  onSelectThread: (threadId: string) => void;
 }
 
 export default function ThreadHistorySidebar({
   onClose,
-  onSelectThread,
 }: ThreadHistorySidebarProps) {
   const { threads, loading, error } = useChatThreads();
+  const knownThreads = new Map(
+    threads.map((thread) => [thread.threadId, thread]),
+  );
+  const isThreadListLoading = useAuiState((state) => state.threads.isLoading);
 
   return (
     <div className="chat-history-sidebar">
@@ -22,29 +27,35 @@ export default function ThreadHistorySidebar({
         </button>
       </div>
 
-      {loading ? (
+      {loading || isThreadListLoading ? (
         <div className="text-muted text-xs">Loading…</div>
       ) : error ? (
         <div className="text-muted text-xs">Failed to load history.</div>
       ) : threads.length === 0 ? (
         <div className="text-muted text-xs">No conversations yet.</div>
       ) : (
-        <div className="flex flex-col gap-1">
-          {threads.map((thread) => (
-            <button
-              key={thread.threadId}
-              onClick={() => onSelectThread(thread.threadId)}
-              className="thread-history-item text-left"
-            >
-              <div className="thread-history-title truncate">
-                {thread.title || "New conversation"}
-              </div>
-              <div className="thread-history-preview truncate">
-                {thread.preview || "—"}
-              </div>
-            </button>
-          ))}
-        </div>
+        <ThreadListPrimitive.Root className="flex flex-col gap-1">
+          <ThreadListPrimitive.Items>
+            {({ threadListItem }) => {
+              const thread = knownThreads.get(threadListItem.remoteId ?? threadListItem.id);
+              const title = thread?.title || threadListItem.title || "New conversation";
+              const preview = thread?.preview || "—";
+
+              return (
+                <ThreadListItemPrimitive.Root className="thread-history-item text-left">
+                  <ThreadListItemPrimitive.Trigger className="block w-full text-left">
+                    <div className="thread-history-title truncate">
+                      {title}
+                    </div>
+                    <div className="thread-history-preview truncate">
+                      {preview}
+                    </div>
+                  </ThreadListItemPrimitive.Trigger>
+                </ThreadListItemPrimitive.Root>
+              );
+            }}
+          </ThreadListPrimitive.Items>
+        </ThreadListPrimitive.Root>
       )}
     </div>
   );

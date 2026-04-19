@@ -9,7 +9,7 @@
 
 import { NavLink } from "react-router-dom";
 import { DynamicIcon } from "@/lib/icon-resolver";
-import { ROUTES } from "@/constants";
+import { ROUTES } from "@/constants/routes";
 
 const TABS = [
   { to: ROUTES.DASHBOARD, label: "Dashboard", Icon: "LayoutDashboard" as const },

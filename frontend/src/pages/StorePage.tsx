@@ -12,57 +12,30 @@ import { useSearchParams } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 
 import type { AppCatalogEntry, AppCategoryRead } from "@/types/generated";
-import { getCatalog, getCategories, installApp, uninstallApp } from "@/api/catalog";
-import { DynamicIcon } from "@/lib/icon-resolver";
 import { useToast } from "@/components/providers/ToastProvider";
-import { ROUTES, STORAGE_KEYS } from "@/constants";
-import AppCard from "@/components/store/AppCard";
-import AppListItem from "@/components/store/AppListItem";
-import StoreFilters from "@/components/store/StoreFilters";
+import { ROUTES } from "@/constants/routes";
+import {
+  StorePageEmpty,
+  StorePageFilters,
+  StorePageLoading,
+  StorePageResults,
+} from "@/pages/StorePageSections";
 import { useWorkspaceStore } from "@/stores/platform/workspaceStore";
-
-interface PersistedCatalogSnapshot {
-  catalog: AppCatalogEntry[];
-  storedAt: number;
-  version: 1;
-}
-
-const STORE_CATALOG_CACHE_VERSION = 1;
-const DEFAULT_STORE_CATEGORY = "all";
-const DEFAULT_STORE_VIEW_MODE = "grid";
-
-type StoreViewMode = "grid" | "list";
-
-function readCatalogSnapshot(): AppCatalogEntry[] {
-  try {
-    const raw = sessionStorage.getItem(STORAGE_KEYS.STORE_CATALOG_SNAPSHOT);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as PersistedCatalogSnapshot;
-    if (parsed.version !== STORE_CATALOG_CACHE_VERSION || !Array.isArray(parsed.catalog)) return [];
-    return parsed.catalog;
-  } catch {
-    return [];
-  }
-}
-
-function writeCatalogSnapshot(catalog: AppCatalogEntry[]): void {
-  try {
-    sessionStorage.setItem(
-      STORAGE_KEYS.STORE_CATALOG_SNAPSHOT,
-      JSON.stringify({ catalog, storedAt: Date.now(), version: STORE_CATALOG_CACHE_VERSION })
-    );
-  } catch {
-    // Non-critical: sessionStorage may be full or unavailable
-  }
-}
-
-function formatCategoryLabel(category: string): string {
-  return category.charAt(0).toUpperCase() + category.slice(1).toLowerCase();
-}
-
-function normalizeStoreViewMode(value: string | null): StoreViewMode {
-  return value === "list" ? "list" : DEFAULT_STORE_VIEW_MODE;
-}
+import {
+  buildCategoryMap,
+  DEFAULT_STORE_CATEGORY,
+  fetchStoreCatalogData,
+  filterCatalogApps,
+  getAvailableStoreCategories,
+  getCategoryResolver,
+  getStoreActionRoute,
+  getStoreErrorDetail,
+  normalizeStoreViewMode,
+  readCatalogSnapshot,
+  toggleStoreAppInstallation,
+  type StoreViewMode,
+  writeCatalogSnapshot,
+} from "./store-page-state";
 
 export default function StorePage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -82,13 +55,15 @@ export default function StorePage() {
 
   // Fetch catalog + categories in parallel
   useEffect(() => {
-    void Promise.all([getCatalog(), getCategories()])
-      .then(([catalogData, categoriesData]) => {
+    void fetchStoreCatalogData()
+      .then(({ catalog: catalogData, categories: categoriesData }) => {
         setCatalog(catalogData);
         setCategories(categoriesData);
         writeCatalogSnapshot(catalogData);
       })
-      .finally(() => setIsCatalogLoading(false));
+      .finally(() => {
+        setIsCatalogLoading(false);
+      });
   }, []);
 
   const mergedCatalog = useMemo(
@@ -97,32 +72,11 @@ export default function StorePage() {
     [catalog, installedAppIds]
   );
 
-  const categoryMap = useMemo(() => {
-    const map: Record<string, AppCategoryRead> = {};
-    for (const cat of categories) {
-      map[cat.name.toLowerCase()] = cat;
-      map[cat.id.toLowerCase()] = cat;
-    }
-    return map;
-  }, [categories]);
-
-  const getCategory = (categoryId: string): AppCategoryRead => {
-    const key = categoryId.toLowerCase();
-    return (
-      categoryMap[key] ?? {
-        id: categoryId,
-        name: formatCategoryLabel(categoryId),
-        icon: "Package",
-        color: "oklch(0.5 0.05 80)",
-        order: 999,
-      }
-    );
-  };
+  const categoryMap = useMemo(() => buildCategoryMap(categories), [categories]);
+  const getCategory = useMemo(() => getCategoryResolver(categoryMap), [categoryMap]);
 
   const availableCategories = useMemo(() => {
-    const catIds = new Set(mergedCatalog.map((a) => a.category.toLowerCase()));
-    const merged = new Set([...categories.map((c) => c.name.toLowerCase()), ...catIds]);
-    return [DEFAULT_STORE_CATEGORY, ...Array.from(merged).sort()];
+    return getAvailableStoreCategories(categories, mergedCatalog);
   }, [categories, mergedCatalog]);
 
   const rawSearchQuery = searchParams.get("q") ?? "";
@@ -170,44 +124,41 @@ export default function StorePage() {
     [setSearchParams]
   );
 
-  const filtered = useMemo(() => {
-    return mergedCatalog.filter((app) => {
-      const matchCat = filter === "all" || app.category.toLowerCase() === filter.toLowerCase();
-      const matchSearch =
-        searchQuery === "" ||
-        app.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        app.description.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchCat && matchSearch;
-    });
-  }, [mergedCatalog, filter, searchQuery]);
+  const filtered = useMemo(
+    () => filterCatalogApps({ catalog: mergedCatalog, filter, searchQuery }),
+    [mergedCatalog, filter, searchQuery],
+  );
 
-  async function handleToggle(app: AppCatalogEntry) {
+  const handleToggle = async (app: AppCatalogEntry) => {
     if (installing.has(app.id)) return;
-    setInstalling((s) => new Set([...s, app.id]));
+    setInstalling((current) => new Set([...current, app.id]));
     const nextInstalled = !app.is_installed;
     setAppInstalled(app, nextInstalled);
 
     try {
+      await toggleStoreAppInstallation({
+        app,
+        isInstalled: app.is_installed,
+      });
+
       if (app.is_installed) {
-        await uninstallApp({ app_id: app.id });
         toast.success(`${app.name} uninstalled`, {
           description: "The app has been removed from your workspace",
         });
       } else {
-        await installApp({ app_id: app.id });
         toast.success(`${app.name} installed`, {
           description: "The app is now available in your workspace",
           action: {
             label: "Open",
-            onClick: () => { window.location.href = ROUTES.APP_DETAIL(app.id); },
+            onClick: () => {
+              window.location.href = getStoreActionRoute(app.id);
+            },
           },
         });
       }
       await refreshWorkspace();
-    } catch (err) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const error = err as any;
-      const detail = error?.response?.data?.detail || error?.response?.data?.error || error.message || "Please try again later";
+    } catch (error: unknown) {
+      const detail = getStoreErrorDetail(error);
       if (typeof detail === "string" && detail.toLowerCase().includes("requires a paid subscription")) {
         toast.error(`Premium Required`, {
           description: `The ${app.name} app requires a Pro subscription to install.`,
@@ -224,45 +175,21 @@ export default function StorePage() {
       setAppInstalled(app, app.is_installed); // revert
       await refreshWorkspace();
     } finally {
-      setInstalling((s) => {
-        const next = new Set(s);
+      setInstalling((current) => {
+        const next = new Set(current);
         next.delete(app.id);
         return next;
       });
     }
-  }
+  };
 
   if (isCatalogLoading && catalog.length === 0) {
-    return (
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-          gap: "1.25rem",
-        }}
-      >
-        {[...Array(6)].map((_, i) => (
-          <div
-            key={i}
-            className="store-card"
-            style={{
-              height: "240px",
-              animation: `fadeIn 0.4s ease ${i * 0.1}s both`,
-            }}
-          >
-            <div
-              className="animate-shimmer"
-              style={{ height: "100%", borderRadius: "16px" }}
-            />
-          </div>
-        ))}
-      </div>
-    );
+    return <StorePageLoading />;
   }
 
   return (
     <div style={{ animation: "fadeIn 0.4s ease" }}>
-      <StoreFilters
+      <StorePageFilters
         searchQuery={rawSearchQuery}
         onSearchChange={(query) => updateStoreSearchParams({ q: query })}
         filter={filter}
@@ -274,47 +201,15 @@ export default function StorePage() {
       />
 
       {filtered.length === 0 ? (
-        <div className="empty-state">
-          <div className="empty-state-icon">
-            <DynamicIcon name="Search" size={32} />
-          </div>
-          <h3 className="empty-state-title">No apps found</h3>
-          <p className="empty-state-description">
-            Try adjusting your search or category filter.
-          </p>
-        </div>
-      ) : viewMode === "grid" ? (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
-            gap: "1.5rem",
-          }}
-        >
-          {filtered.map((app, i) => (
-            <AppCard
-              key={app.id}
-              app={app}
-              getCategory={getCategory}
-              installing={installing}
-              onToggle={handleToggle}
-              delay={i * 0.05}
-            />
-          ))}
-        </div>
+        <StorePageEmpty />
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-          {filtered.map((app, i) => (
-            <AppListItem
-              key={app.id}
-              app={app}
-              getCategory={getCategory}
-              installing={installing}
-              onToggle={handleToggle}
-              delay={i * 0.03}
-            />
-          ))}
-        </div>
+        <StorePageResults
+          apps={filtered}
+          getCategory={getCategory}
+          installing={installing}
+          onToggle={handleToggle}
+          viewMode={viewMode}
+        />
       )}
     </div>
   );

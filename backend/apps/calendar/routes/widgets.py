@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import calendar
 from calendar import month_name
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -49,6 +50,28 @@ def _get_widget_manifest(widget_id: str) -> WidgetManifestSchema:
 def _weekday_offset(year: int, month: int) -> int:
     """Weekday of day 1 of the given month (Mon=0)."""
     return calendar.monthrange(year, month)[0]
+
+
+def _get_event_local_day(
+    start_datetime: object,
+    *,
+    user_id: str,
+    widget_id: str,
+    formatter,
+) -> int:
+    """Resolve an event start instant into the user's local calendar day."""
+    if isinstance(start_datetime, datetime):
+        parsed = start_datetime
+    else:
+        try:
+            parsed = datetime.fromisoformat(str(start_datetime).replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Invalid event start_datetime in {widget_id} payload for user {user_id}",
+            ) from exc
+    local_start = formatter(parsed)
+    return local_start.day
 
 
 async def _resolve_widget_options(
@@ -101,7 +124,12 @@ async def get_month_view_widget_data(
 
     day_map: dict[int, list[dict]] = {}
     for event in events:
-        event_day = __import__("datetime").datetime.fromisoformat(str(event["start_datetime"])).day
+        event_day = _get_event_local_day(
+            event["start_datetime"],
+            user_id=user_id,
+            widget_id="calendar.month-view",
+            formatter=ctx.utc_to_local,
+        )
         day_map.setdefault(event_day, []).append(event)
 
     calendars = await calendar_service.list_calendars(user_id)

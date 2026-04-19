@@ -2,9 +2,9 @@ import { useCallback, useEffect, useState } from "react";
 import { DynamicIcon } from "@/lib/icon-resolver";
 import { useAsyncTask } from "@/hooks/useAsyncTask";
 import { useDisclosure } from "@/hooks/useDisclosure";
+import { AppModal } from "@/shared/components/AppModal";
 import { createCategory, getCategories, type CategoryRead } from "../../api";
 import type { CreateCategoryRequest } from "../../api";
-import Modal from "../../components/Modal";
 import SimpleForm from "../../components/SimpleForm";
 import CategoryEditForm from "../../components/CategoryEditForm";
 
@@ -91,7 +91,7 @@ export default function CategoriesTab() {
       )}
 
       {createCategoryModal.isOpen && (
-        <Modal title="New Category" onClose={createCategoryModal.close}>
+        <AppModal title="New Category" onClose={createCategoryModal.close}>
           <SimpleForm
             fields={[
               { label: "Name", key: "name", placeholder: "e.g. Food" },
@@ -117,12 +117,12 @@ export default function CategoriesTab() {
               void load();
             }}
           />
-        </Modal>
+        </AppModal>
       )}
 
       {/* Edit Modal */}
       {editingCategory && (
-        <Modal title="Edit Category" onClose={() => setEditingCategory(null)}>
+        <AppModal title="Edit Category" onClose={() => setEditingCategory(null)}>
           <CategoryEditForm
             category={editingCategory}
             onSave={(updated) => {
@@ -137,7 +137,7 @@ export default function CategoriesTab() {
             }}
             onCancel={() => setEditingCategory(null)}
           />
-        </Modal>
+        </AppModal>
       )}
     </div>
   );

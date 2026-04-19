@@ -21,6 +21,9 @@ PERMISSIONS: dict[PermissionKey, dict[SubscriptionTier, bool]] = {
     #   "finance_wallet_multiple": {"free": False, "paid": True},
     #
     # Platform-wide feature flags belong here:
+    # Informational/UI-facing permission only.
+    # Authoritative chat throughput limits are enforced in core/chat/routes.py
+    # via tier-based rate limits, not via require_permission().
     PermissionKey.CHAT_AI_UNLIMITED: {
         SubscriptionTier.FREE: False,
         SubscriptionTier.PAID: True,

@@ -159,7 +159,7 @@ async def lifespan(app: FastAPI):
         )
 
     # 3. Refresh RootAgent system prompt from discovered manifests
-    from core.agents.root import root_agent
+    from core.agents.root.agent import root_agent
     root_agent.refresh()
 
     # 4. Verify plugins before accepting any requests

@@ -12,7 +12,7 @@ import type {
   PreferenceUpdate,
   WidgetPreferenceSchema,
 } from "@/types/generated";
-import { API_PATHS } from "@/constants";
+import { API_PATHS } from "@/constants/api";
 import { api } from "./axios";
 
 // ─── Catalog ──────────────────────────────────────────────────────────────────

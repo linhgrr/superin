@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta
 
+from pymongo.asynchronous.client_session import AsyncClientSession
 from pymongo.errors import DuplicateKeyError
 
 from apps.calendar.enums import EventType, RecurrenceFrequency
@@ -339,7 +340,7 @@ class CalendarService:
         """
         from core.registry import get_task_finder
 
-        task_finder = get_task_finder(user_id)
+        task_finder = await get_task_finder(user_id)
         if task_finder is None:
             raise ValueError("Todo plugin is not installed")
 
@@ -378,51 +379,59 @@ class CalendarService:
 
     # ─── Install / Uninstall ────────────────────────────────────────────────────
 
-    async def on_install(self, user_id: str) -> None:
+    async def on_install(self, user_id: str, session: AsyncClientSession | None = None) -> None:
         """Create default calendars for new user."""
-        async with calendar_transaction() as session:
-            personal = await self.calendars.find_by_name(user_id, "Personal", session=session)
-            if not personal:
-                try:
-                    personal = await self.calendars.create(
-                        user_id,
-                        "Personal",
-                        DEFAULT_CALENDAR_COLOR,
-                        True,
-                        session=session,
-                    )
-                except DuplicateKeyError:
-                    personal = await self.calendars.find_by_name(
-                        user_id,
-                        "Personal",
-                        session=session,
-                    )
+        if session is None:
+            async with calendar_transaction() as tx_session:
+                await self.on_install(user_id, session=tx_session)
+            return
 
+        personal = await self.calendars.find_by_name(user_id, "Personal", session=session)
+        if not personal:
             try:
-                await self.calendars.create(
+                personal = await self.calendars.create(
                     user_id,
-                    "Work",
-                    WORK_CALENDAR_COLOR,
-                    False,
+                    "Personal",
+                    DEFAULT_CALENDAR_COLOR,
+                    True,
                     session=session,
                 )
             except DuplicateKeyError:
-                logger.warning("on_install: Work calendar already exists for user %s", user_id)
+                personal = await self.calendars.find_by_name(
+                    user_id,
+                    "Personal",
+                    session=session,
+                )
 
-            if personal and not personal.is_default:
-                await self.calendars.update(personal, is_default=True, session=session)
+        try:
+            await self.calendars.create(
+                user_id,
+                "Work",
+                WORK_CALENDAR_COLOR,
+                False,
+                session=session,
+            )
+        except DuplicateKeyError:
+            logger.warning("on_install: Work calendar already exists for user %s", user_id)
 
-    async def on_uninstall(self, user_id: str) -> None:
+        if personal and not personal.is_default:
+            await self.calendars.update(personal, is_default=True, session=session)
+
+    async def on_uninstall(self, user_id: str, session: AsyncClientSession | None = None) -> None:
         """Clean up all user data."""
-        async with calendar_transaction() as session:
-            calendars = await self.calendars.find_by_user(user_id, session=session)
-            for cal in calendars:
-                await self.events.delete_by_calendar(str(cal.id), session=session)
-                await self.calendars.delete(cal, session=session)
+        if session is None:
+            async with calendar_transaction() as tx_session:
+                await self.on_uninstall(user_id, session=tx_session)
+            return
 
-            rules = await self.recurring.find_by_user(user_id, session=session)
-            for rule in rules:
-                await self.recurring.delete(rule, session=session)
+        calendars = await self.calendars.find_by_user(user_id, session=session)
+        for cal in calendars:
+            await self.events.delete_by_calendar(str(cal.id), session=session)
+            await self.calendars.delete(cal, session=session)
+
+        rules = await self.recurring.find_by_user(user_id, session=session)
+        for rule in rules:
+            await self.recurring.delete(rule, session=session)
 
 
 # ─── DTO helpers ───────────────────────────────────────────────────────────────

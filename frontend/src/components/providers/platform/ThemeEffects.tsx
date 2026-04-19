@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-import { STORAGE_KEYS } from "@/constants";
+import { STORAGE_KEYS } from "@/constants/storage";
 import { applyTheme } from "@/lib/theme";
 import { settingsSelectors, useSettingsStore } from "@/stores/platform/settingsStore";
 

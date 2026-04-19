@@ -2,6 +2,13 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 
 import { useAsyncTask } from "@/hooks/useAsyncTask";
+import {
+  FORM_STACK_STYLE,
+  FormField,
+  FormInput,
+  FormMessage,
+  FormSelect,
+} from "@/shared/components/FormControls";
 
 export interface SimpleFormField {
   label: string;
@@ -50,22 +57,17 @@ export default function SimpleForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+    <form onSubmit={handleSubmit} style={FORM_STACK_STYLE}>
       {fields.map((field) => (
-        <div key={field.key}>
-          <label
-            style={{
-              display: "block",
-              fontSize: "0.875rem",
-              fontWeight: 500,
-              marginBottom: "0.25rem",
-              color: "var(--color-foreground-muted)",
-            }}
-          >
-            {field.label}
-          </label>
+        <FormField
+          key={field.key}
+          label={field.label}
+          htmlFor={field.key}
+          required={field.required ?? true}
+        >
           {field.options ? (
-            <select
+            <FormSelect
+              id={field.key}
               value={values[field.key] ?? ""}
               onChange={(event) =>
                 setValues((current) => ({ ...current, [field.key]: event.target.value }))
@@ -77,9 +79,10 @@ export default function SimpleForm({
                   {option.label}
                 </option>
               ))}
-            </select>
+            </FormSelect>
           ) : (
-            <input
+            <FormInput
+              id={field.key}
               type={field.type ?? "text"}
               placeholder={field.placeholder}
               value={values[field.key] ?? ""}
@@ -89,10 +92,10 @@ export default function SimpleForm({
               required={field.required ?? true}
             />
           )}
-        </div>
+        </FormField>
       ))}
       {error && (
-        <p style={{ color: "var(--color-danger)", fontSize: "0.875rem", margin: 0 }}>{error}</p>
+        <FormMessage>{error}</FormMessage>
       )}
       <button type="submit" className="btn btn-primary" disabled={loading} style={{ justifyContent: "center" }}>
         {loading ? "…" : submitLabel}

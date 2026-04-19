@@ -18,8 +18,8 @@ vi.mock("@/lib/lazy-registry", () => ({
   getAppMetadata: vi.fn(),
 }));
 
-vi.mock("@/constants", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/constants")>();
+vi.mock("@/constants/routes", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/constants/routes")>();
 
   return {
     ...actual,

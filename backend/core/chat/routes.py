@@ -1,30 +1,30 @@
 """Chat streaming route for assistant-ui's modern UI message stream protocol."""
 
+import asyncio
 import json
 import logging
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
+from pydantic import BaseModel, Field
 
-from core.agents.root import root_agent
+from core.agents.root.agent import root_agent
+from core.agents.root.graph import get_root_agent_graph
 from core.auth.dependencies import get_current_user
 from core.chat.service import (
-    append_thread_message,
-    get_message_by_client_id,
-    list_thread_messages,
+    delete_thread_meta,
+    get_thread_meta,
     list_user_threads,
     normalize_thread_id,
+    rename_thread,
+    set_thread_status,
     upsert_thread_meta,
 )
-from core.constants import (
-    CHAT_STREAM_FRIENDLY_ERROR_TEXT,
-    RATE_LIMIT_CHAT_DAILY_FREE,
-    RATE_LIMIT_CHAT_DAILY_PAID,
-    RATE_LIMIT_CHAT_FREE,
-    RATE_LIMIT_CHAT_PAID,
-)
-from core.models import ConversationMessage, User
+from core.constants import CHAT_STREAM_FRIENDLY_ERROR_TEXT, RATE_LIMIT_CHAT_DAILY_FREE, RATE_LIMIT_CHAT_DAILY_PAID, RATE_LIMIT_CHAT_FREE, RATE_LIMIT_CHAT_PAID
+from core.db import get_checkpointer
+from core.models import ThreadMeta, User
 from core.subscriptions.service import get_effective_tier
 from core.utils.limiter import tiered_limiter
 from shared.enums import ChatEventType, SubscriptionTier, UserRole
@@ -37,6 +37,10 @@ router = APIRouter()
 _CHAT_BODY_MAX_BYTES = 1 * 1024 * 1024  # 1 MB
 
 
+class ThreadUpdateRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+
+
 def _encode_chunk(chunk: dict[str, object]) -> bytes:
     return f"data: {json.dumps(chunk, separators=(',', ':'))}\n\n".encode()
 
@@ -45,18 +49,66 @@ def _encode_done() -> bytes:
     return b"data: [DONE]\n\n"
 
 
-def _is_error(result: object) -> bool:
-    return isinstance(result, dict) and result.get("ok") is False
+def _message_to_api(item: BaseMessage, fallback_id: str) -> dict[str, object]:
+    """Serialize a LangChain message from LangGraph state for the REST API."""
+    role: str | None = None
+    if isinstance(item, HumanMessage):
+        role = "user"
+    elif isinstance(item, AIMessage):
+        role = "assistant"
 
+    if role is None:
+        raise ValueError(f"Unsupported chat history message type: {type(item)!r}")
 
-def _message_to_api(item: ConversationMessage) -> dict[str, object]:
-    """Serialize a ConversationMessage for the REST API."""
     return {
-        "id": str(item.client_message_id or item.id),
-        "role": item.role,
-        "content": item.content,
-        "createdAt": item.created_at.isoformat(),
+        "id": str(item.id or fallback_id),
+        "role": role,
+        "content": item.text,
     }
+
+
+def _thread_meta_to_api(meta: ThreadMeta) -> dict[str, object]:
+    return {
+        "threadId": meta.thread_id,
+        "status": meta.status,
+        "title": meta.title,
+        "preview": meta.preview,
+        "messageCount": meta.message_count,
+        "createdAt": meta.created_at.isoformat(),
+        "updatedAt": meta.updated_at.isoformat(),
+    }
+
+
+async def _load_thread_state_messages(
+    user_id: str,
+    thread_id: str,
+) -> list[BaseMessage]:
+    """Load thread messages from LangGraph checkpoint state."""
+    graph = get_root_agent_graph()
+    state = await graph.aget_state(
+        {
+            "configurable": {
+                "thread_id": thread_id,
+                "user_id": user_id,
+            }
+        }
+    )
+    values = state.values if isinstance(state.values, dict) else {}
+    messages = values.get("messages", [])
+    return [msg for msg in messages if isinstance(msg, BaseMessage)]
+
+
+def _is_duplicate_latest_user_turn(
+    *,
+    thread_messages: list[BaseMessage],
+    latest_user_message_id: str | None,
+) -> bool:
+    """Detect client retry of the latest user turn against persisted thread state."""
+    if not latest_user_message_id or not thread_messages:
+        return False
+
+    last_message = thread_messages[-1]
+    return isinstance(last_message, HumanMessage) and str(last_message.id or "") == latest_user_message_id
 
 
 def _extract_text_content(content: object) -> str:
@@ -88,38 +140,96 @@ def _extract_latest_user_message(messages: list[object]) -> tuple[str, str | Non
 
 
 @router.get("/threads")
-async def list_threads(user_id: str = Depends(get_current_user)):
+async def list_threads(
+    include_archived: bool = True,
+    user_id: str = Depends(get_current_user),
+):
     """
     GET /api/chat/threads
     Returns list of thread metadata for the current user (most-recently-updated first).
     """
-    threads = await list_user_threads(user_id)
+    threads = await list_user_threads(user_id, include_archived=include_archived)
     return {
-        "threads": [
-            {
-                "threadId": t.thread_id,
-                "title": t.title,
-                "preview": t.preview,
-                "messageCount": t.message_count,
-                "createdAt": t.created_at.isoformat(),
-                "updatedAt": t.updated_at.isoformat(),
-            }
-            for t in threads
-        ],
+        "threads": [_thread_meta_to_api(t) for t in threads],
     }
+
+
+@router.get("/threads/{thread_id}")
+async def get_thread(thread_id: str, user_id: str = Depends(get_current_user)):
+    """Return one thread metadata row for the authenticated user."""
+    normalized_thread_id = normalize_thread_id(user_id, thread_id)
+    thread = await get_thread_meta(user_id, normalized_thread_id)
+    if thread is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found.")
+    return _thread_meta_to_api(thread)
+
+
+@router.patch("/threads/{thread_id}")
+async def update_thread(
+    thread_id: str,
+    payload: ThreadUpdateRequest,
+    user_id: str = Depends(get_current_user),
+):
+    """Rename one thread for the authenticated user."""
+    normalized_thread_id = normalize_thread_id(user_id, thread_id)
+    thread = await rename_thread(user_id, normalized_thread_id, payload.title)
+    if thread is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found.")
+    return _thread_meta_to_api(thread)
+
+
+@router.post("/threads/{thread_id}/archive")
+async def archive_thread(thread_id: str, user_id: str = Depends(get_current_user)):
+    """Archive one thread for the authenticated user."""
+    normalized_thread_id = normalize_thread_id(user_id, thread_id)
+    thread = await set_thread_status(user_id, normalized_thread_id, status="archived")
+    if thread is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found.")
+    return _thread_meta_to_api(thread)
+
+
+@router.post("/threads/{thread_id}/unarchive")
+async def unarchive_thread(thread_id: str, user_id: str = Depends(get_current_user)):
+    """Restore one archived thread for the authenticated user."""
+    normalized_thread_id = normalize_thread_id(user_id, thread_id)
+    thread = await set_thread_status(user_id, normalized_thread_id, status="regular")
+    if thread is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found.")
+    return _thread_meta_to_api(thread)
+
+
+@router.delete("/threads/{thread_id}")
+async def delete_thread(thread_id: str, user_id: str = Depends(get_current_user)):
+    """Delete one thread and its LangGraph checkpoints."""
+    normalized_thread_id = normalize_thread_id(user_id, thread_id)
+    thread = await get_thread_meta(user_id, normalized_thread_id)
+    if thread is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found.")
+
+    checkpointer = get_checkpointer()
+    delete_thread_fn = getattr(checkpointer, "adelete_thread", None)
+    if callable(delete_thread_fn):
+        await delete_thread_fn(normalized_thread_id)
+
+    await delete_thread_meta(user_id, normalized_thread_id)
+    return {"threadId": normalized_thread_id, "deleted": True}
 
 
 @router.get("/history")
 async def chat_history(thread_id: str, user_id: str = Depends(get_current_user)):
     """
-    GET /api/chat/history?thread_id=<canonical_or_client_thread_id>
-    Returns persisted messages for a thread in chronological order.
+    GET /api/chat/history?thread_id=<thread_id>
+    Returns messages for a thread from LangGraph checkpoint state.
     """
-    canonical = normalize_thread_id(user_id, thread_id)
-    history = await list_thread_messages(user_id, canonical)
+    normalized_thread_id = normalize_thread_id(user_id, thread_id)
+    history = await _load_thread_state_messages(user_id, normalized_thread_id)
     return {
-        "threadId": canonical,
-        "messages": [_message_to_api(item) for item in history],
+        "threadId": normalized_thread_id,
+        "messages": [
+            _message_to_api(item, fallback_id=f"{normalized_thread_id}:{index}")
+            for index, item in enumerate(history)
+            if isinstance(item, (HumanMessage, AIMessage))
+        ],
     }
 
 
@@ -132,7 +242,7 @@ async def chat_stream(request: Request, user_id: str = Depends(get_current_user)
         "threadTitle": str    # optional — override auto-generated title from first msg
         "messages": GenericMessage[],
     }
-    Returns: SSE (assistant-ui UI message stream protocol)
+    Returns: SSE of LangGraph-compatible `{event, data}` chunks for `useLangGraphRuntime`.
     """
     content_length = request.headers.get("content-length")
     if content_length and int(content_length) > _CHAT_BODY_MAX_BYTES:
@@ -170,7 +280,7 @@ async def chat_stream(request: Request, user_id: str = Depends(get_current_user)
     if not isinstance(messages, list):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="'messages' must be an array.")
 
-    canonical_thread_id = normalize_thread_id(user_id, raw_thread_id.strip())
+    thread_id = normalize_thread_id(user_id, raw_thread_id.strip())
     thread_title = body.get("threadTitle")
     latest_user_text, latest_user_message_id = _extract_latest_user_message(messages)
     assistant_message_id_raw = body.get("unstable_assistantMessageId")
@@ -211,117 +321,99 @@ async def chat_stream(request: Request, user_id: str = Depends(get_current_user)
     async def event_stream():
         message_id = assistant_message_id or f"msg_{uuid4().hex}"
         assistant_parts: list[str] = []
-
-        existing_user_message = await get_message_by_client_id(
+        saw_done_event = False
+        logger.info(
+            "CHAT_STREAM_START user=%s thread=%s latest_user_len=%d",
             user_id,
-            canonical_thread_id,
-            latest_user_message_id,
+            thread_id,
+            len(latest_user_text),
         )
-        if existing_user_message is None:
-            await append_thread_message(
-                user_id=user_id,
-                thread_id=canonical_thread_id,
-                role="user",
-                content=latest_user_text,
-                client_message_id=latest_user_message_id,
-            )
-            # Create thread meta only when first user message is confirmed persisted
+
+        thread_messages = await _load_thread_state_messages(user_id, thread_id)
+        if not _is_duplicate_latest_user_turn(
+            thread_messages=thread_messages,
+            latest_user_message_id=latest_user_message_id,
+        ):
             await upsert_thread_meta(
-                user_id,
-                canonical_thread_id,
+                user_id=user_id,
+                thread_id=thread_id,
                 title=thread_title,
                 preview=latest_user_text,
             )
 
-        history = await list_thread_messages(user_id, canonical_thread_id)
-        canonical_messages = [
-            {
-                "id": str(item.client_message_id or item.id),
-                "role": item.role,
-                "content": item.content,
-            }
-            for item in history
-        ]
-
-        yield _encode_chunk({"type": "start", "messageId": message_id})
-
         try:
             async for event in root_agent.astream(
-                user_id, canonical_messages, thread_id=canonical_thread_id
+                user_id,
+                [{"id": latest_user_message_id, "role": "user", "content": latest_user_text}],
+                thread_id=thread_id,
             ):
                 event_type = event.get("type")
 
                 if event_type in {"text", ChatEventType.TOKEN}:
                     assistant_parts.append(str(event["content"]))
                     yield _encode_chunk({
-                        "type": "text-delta",
-                        "textDelta": event["content"],
+                        "event": "messages/partial",
+                        "data": [
+                            {
+                                "id": message_id,
+                                "type": "AIMessageChunk",
+                                "content": str(event["content"]),
+                            }
+                        ],
                     })
-                    continue
-
-                if event_type == ChatEventType.TOOL_CALL:
-                    tool_call_id = event["toolCallId"]
-                    yield _encode_chunk({
-                        "type": "tool-call-start",
-                        "id": tool_call_id,
-                        "toolCallId": tool_call_id,
-                        "toolName": event["toolName"],
-                    })
-                    args = event.get("args")
-                    if args is not None:
-                        yield _encode_chunk({
-                            "type": "tool-call-delta",
-                            "argsText": json.dumps(args, separators=(",", ":")),
-                        })
-                    yield _encode_chunk({"type": "tool-call-end"})
-                    continue
-
-                if event_type == ChatEventType.TOOL_RESULT:
-                    result = event["result"]
-                    payload: dict[str, object] = {
-                        "type": "tool-result",
-                        "toolCallId": event["toolCallId"],
-                        "result": result,
-                    }
-                    if _is_error(result):
-                        payload["isError"] = True
-                    yield _encode_chunk(payload)
                     continue
 
                 if event_type == ChatEventType.DONE:
-                    final_assistant_text = "".join(assistant_parts).strip()
-                    if final_assistant_text and await get_message_by_client_id(
-                        user_id,
-                        canonical_thread_id,
-                        message_id,
-                    ) is None:
-                        await append_thread_message(
-                            user_id=user_id,
-                            thread_id=canonical_thread_id,
-                            role="assistant",
-                            content=final_assistant_text,
-                            client_message_id=message_id,
-                        )
-                        # Update thread meta after assistant reply: bump counter + refresh preview
-                        await upsert_thread_meta(
-                            user_id,
-                            canonical_thread_id,
-                            preview=final_assistant_text,
-                            increment_count=1,
-                        )
-                    yield _encode_chunk({
-                        "type": "finish",
-                        "finishReason": "stop",
-                        "usage": {"inputTokens": 0, "outputTokens": 0},
-                    })
-                    yield _encode_done()
-                    return
+                    saw_done_event = True
+                    continue
 
+            if saw_done_event:
+                final_assistant_text = "".join(assistant_parts).strip()
+                thread_messages = await _load_thread_state_messages(
+                    user_id,
+                    thread_id,
+                )
+                if final_assistant_text:
+                    visible_message_count = sum(
+                        1 for item in thread_messages
+                        if isinstance(item, (HumanMessage, AIMessage))
+                    )
+                    await upsert_thread_meta(
+                        user_id,
+                        thread_id,
+                        preview=final_assistant_text,
+                        message_count=visible_message_count,
+                    )
+                yield _encode_chunk({
+                    "event": "updates",
+                    "data": {
+                        "messages": [
+                            {
+                                "id": str(item.id or f"{thread_id}:{index}"),
+                                "type": "human" if isinstance(item, HumanMessage) else "ai",
+                                "content": item.text,
+                            }
+                            for index, item in enumerate(thread_messages)
+                            if isinstance(item, (HumanMessage, AIMessage))
+                        ]
+                    },
+                })
+                yield _encode_done()
+                return
+
+        except (asyncio.CancelledError, GeneratorExit):
+            logger.info(
+                "CHAT_STREAM_CANCELLED user=%s thread=%s partial_assistant_len=%d",
+                user_id,
+                thread_id,
+                len("".join(assistant_parts)),
+            )
+            return
         except Exception as exc:
             logger.exception("Chat stream error: %s", exc)
             yield _encode_chunk({
-                "type": ChatEventType.ERROR,
-                "errorText": CHAT_STREAM_FRIENDLY_ERROR_TEXT,
+                "event": "error",
+                "data": {"message": CHAT_STREAM_FRIENDLY_ERROR_TEXT},
             })
             yield _encode_done()
 

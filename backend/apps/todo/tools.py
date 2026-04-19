@@ -1,21 +1,24 @@
-"""Todo plugin LangGraph tools (LLM-facing)."""
+"""Todo plugin LangGraph tools (LLM-facing).
 
-from datetime import datetime
+All tools accept ``config: RunnableConfig`` (auto-injected by LangChain — hidden
+from the LLM-facing schema). ``user_id`` is read from ``config['configurable']``
+via ``require_user_id``; see ``backend/shared/agent_config.py``.
+"""
 
+from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
 
 from apps.todo.enums import RecurrenceFrequency, TaskPriority, TaskStatus
 from apps.todo.service import task_service
 from core.models import User
-from core.utils.timezone import ensure_aware_utc
-from shared.agent_context import get_user_context
-from shared.tool_results import safe_tool_call
+from shared.tool_results import run_time_aware_tool_with_user, run_tool_with_user
 
 # ─── Core Task Tools ──────────────────────────────────────────────────────────
 
 @tool("todo_add_task")
 async def todo_add_task(
     title: str,
+    config: RunnableConfig,
     description: str | None = None,
     due_date: str | None = None,
     due_time: str | None = None,
@@ -47,19 +50,27 @@ async def todo_add_task(
         - "Remind me to call mom tomorrow at 3pm" → due_date=tomorrow, due_time="15:00"
         - "Add high priority work task" → priority="high", tags=["work"]
     """
-    async def operation() -> dict:
-        user_id = get_user_context()
-        dt = ensure_aware_utc(datetime.fromisoformat(due_date)) if due_date else None
-        dt_time = datetime.strptime(due_time, "%H:%M") if due_time else None
+    async def operation(user_id: str, temporal: dict, time_context) -> dict:
+        dt = None
+        if temporal.get("due_date") is not None:
+            dt, _ = time_context.local_date_range_utc(temporal["due_date"])
+        dt_time = temporal.get("due_time")
         return await task_service.create_task(
             user_id, title, description, dt, dt_time, priority, tags, reminder_minutes
         )
 
-    return await safe_tool_call(operation, action="adding a task")
+    return await run_time_aware_tool_with_user(
+        config,
+        action="adding a task",
+        payload={"due_date": due_date, "due_time": due_time},
+        temporal_fields={"due_date": "local_date", "due_time": "local_time"},
+        operation=operation,
+    )
 
 
 @tool("todo_list_tasks")
 async def todo_list_tasks(
+    config: RunnableConfig,
     status: TaskStatus | None = None,
     priority: TaskPriority | None = None,
     tag: str | None = None,
@@ -87,16 +98,20 @@ async def todo_list_tasks(
         - "What did I complete?" → status="completed"
         - "Show my work tasks" → tag="work"
     """
-    async def operation() -> list[dict]:
-        user_id = get_user_context()
+    async def operation(user_id: str) -> list[dict]:
         return await task_service.list_tasks(user_id, status, priority, tag, False, limit)
 
-    return await safe_tool_call(operation, action="listing tasks")
+    return await run_tool_with_user(
+        config,
+        action="listing tasks",
+        operation=operation,
+    )
 
 
 @tool("todo_search_tasks")
 async def todo_search_tasks(
     query: str,
+    config: RunnableConfig,
     include_archived: bool = False,
     limit: int = 20,
 ) -> list[dict]:
@@ -120,15 +135,18 @@ async def todo_search_tasks(
         - "Find my meeting tasks" → query="meeting"
         - "Search for urgent work" → query="urgent work"
     """
-    async def operation() -> list[dict]:
-        user_id = get_user_context()
+    async def operation(user_id: str) -> list[dict]:
         return await task_service.search_tasks(user_id, query, include_archived, limit)
 
-    return await safe_tool_call(operation, action="searching tasks")
+    return await run_tool_with_user(
+        config,
+        action="searching tasks",
+        operation=operation,
+    )
 
 
 @tool("todo_get_task")
-async def todo_get_task(task_id: str) -> dict:
+async def todo_get_task(task_id: str, config: RunnableConfig) -> dict:
     """
     Get a single task by ID, including subtasks.
 
@@ -146,19 +164,23 @@ async def todo_get_task(task_id: str) -> dict:
     Errors:
         NOT_FOUND: Task ID does not exist
     """
-    async def operation() -> dict:
-        user_id = get_user_context()
+    async def operation(user_id: str) -> dict:
         task = await task_service.get_task_with_subtasks(task_id, user_id)
         if not task:
             raise ValueError(f"Task '{task_id}' not found")
         return task
 
-    return await safe_tool_call(operation, action="getting a task")
+    return await run_tool_with_user(
+        config,
+        action="getting a task",
+        operation=operation,
+    )
 
 
 @tool("todo_update_task")
 async def todo_update_task(
     task_id: str,
+    config: RunnableConfig,
     title: str | None = None,
     description: str | None = None,
     due_date: str | None = None,
@@ -195,19 +217,26 @@ async def todo_update_task(
         - "Add work tag to my task" → tags=["work"]
         - "Set reminder 30 mins before" → reminder_minutes=30
     """
-    async def operation() -> dict:
-        user_id = get_user_context()
-        dt = ensure_aware_utc(datetime.fromisoformat(due_date)) if due_date else None
-        dt_time = datetime.strptime(due_time, "%H:%M") if due_time else None
+    async def operation(user_id: str, temporal: dict, time_context) -> dict:
+        dt = None
+        if temporal.get("due_date") is not None:
+            dt, _ = time_context.local_date_range_utc(temporal["due_date"])
+        dt_time = temporal.get("due_time")
         return await task_service.update_task(
             task_id, user_id, title, description, dt, dt_time, priority, status, tags, reminder_minutes
         )
 
-    return await safe_tool_call(operation, action="updating a task")
+    return await run_time_aware_tool_with_user(
+        config,
+        action="updating a task",
+        payload={"due_date": due_date, "due_time": due_time},
+        temporal_fields={"due_date": "local_date", "due_time": "local_time"},
+        operation=operation,
+    )
 
 
 @tool("todo_toggle_task")
-async def todo_toggle_task(task_id: str) -> dict:
+async def todo_toggle_task(task_id: str, config: RunnableConfig) -> dict:
     """
     Toggle task status between pending and completed.
 
@@ -222,15 +251,18 @@ async def todo_toggle_task(task_id: str) -> dict:
     Returns:
         Task with new status
     """
-    async def operation() -> dict:
-        user_id = get_user_context()
+    async def operation(user_id: str) -> dict:
         return await task_service.toggle_task(task_id, user_id)
 
-    return await safe_tool_call(operation, action="toggling a task")
+    return await run_tool_with_user(
+        config,
+        action="toggling a task",
+        operation=operation,
+    )
 
 
 @tool("todo_complete_task")
-async def todo_complete_task(task_id: str) -> dict:
+async def todo_complete_task(task_id: str, config: RunnableConfig) -> dict:
     """
     Mark a task as completed.
 
@@ -245,15 +277,18 @@ async def todo_complete_task(task_id: str) -> dict:
     Returns:
         Completed task with completed_at timestamp
     """
-    async def operation() -> dict:
-        user_id = get_user_context()
+    async def operation(user_id: str) -> dict:
         return await task_service.complete_task(task_id, user_id)
 
-    return await safe_tool_call(operation, action="completing a task")
+    return await run_tool_with_user(
+        config,
+        action="completing a task",
+        operation=operation,
+    )
 
 
 @tool("todo_delete_task")
-async def todo_delete_task(task_id: str) -> dict:
+async def todo_delete_task(task_id: str, config: RunnableConfig) -> dict:
     """
     Delete a task permanently (including all subtasks).
 
@@ -273,17 +308,20 @@ async def todo_delete_task(task_id: str) -> dict:
         - "Delete task ABC permanently"
         - "Remove my meeting task completely"
     """
-    async def operation() -> dict:
-        user_id = get_user_context()
+    async def operation(user_id: str) -> dict:
         return await task_service.delete_task(task_id, user_id)
 
-    return await safe_tool_call(operation, action="deleting a task")
+    return await run_tool_with_user(
+        config,
+        action="deleting a task",
+        operation=operation,
+    )
 
 
 # ─── Archive / Soft Delete ────────────────────────────────────────────────────
 
 @tool("todo_archive_task")
-async def todo_archive_task(task_id: str) -> dict:
+async def todo_archive_task(task_id: str, config: RunnableConfig) -> dict:
     """
     Archive (soft delete) a task - hides from normal lists but can be restored.
 
@@ -301,15 +339,18 @@ async def todo_archive_task(task_id: str) -> dict:
 
     Note: Archived tasks don't appear in normal lists. Use todo_list_archived to see them.
     """
-    async def operation() -> dict:
-        user_id = get_user_context()
+    async def operation(user_id: str) -> dict:
         return await task_service.archive_task(task_id, user_id)
 
-    return await safe_tool_call(operation, action="archiving a task")
+    return await run_tool_with_user(
+        config,
+        action="archiving a task",
+        operation=operation,
+    )
 
 
 @tool("todo_restore_task")
-async def todo_restore_task(task_id: str) -> dict:
+async def todo_restore_task(task_id: str, config: RunnableConfig) -> dict:
     """
     Restore an archived task back to active status.
 
@@ -324,15 +365,18 @@ async def todo_restore_task(task_id: str) -> dict:
     Returns:
         Restored task details
     """
-    async def operation() -> dict:
-        user_id = get_user_context()
+    async def operation(user_id: str) -> dict:
         return await task_service.restore_task(task_id, user_id)
 
-    return await safe_tool_call(operation, action="restoring a task")
+    return await run_tool_with_user(
+        config,
+        action="restoring a task",
+        operation=operation,
+    )
 
 
 @tool("todo_list_archived")
-async def todo_list_archived(limit: int = 20) -> list[dict]:
+async def todo_list_archived(config: RunnableConfig, limit: int = 20) -> list[dict]:
     """
     List archived (soft deleted) tasks.
 
@@ -347,17 +391,20 @@ async def todo_list_archived(limit: int = 20) -> list[dict]:
     Returns:
         List of archived tasks
     """
-    async def operation() -> list[dict]:
-        user_id = get_user_context()
+    async def operation(user_id: str) -> list[dict]:
         return await task_service.list_archived(user_id, limit)
 
-    return await safe_tool_call(operation, action="listing archived tasks")
+    return await run_tool_with_user(
+        config,
+        action="listing archived tasks",
+        operation=operation,
+    )
 
 
 # ─── Tag Management ────────────────────────────────────────────────────────────
 
 @tool("todo_add_tag")
-async def todo_add_tag(task_id: str, tag: str) -> dict:
+async def todo_add_tag(task_id: str, tag: str, config: RunnableConfig) -> dict:
     """
     Add a tag/label to a task.
 
@@ -377,15 +424,18 @@ async def todo_add_tag(task_id: str, tag: str) -> dict:
         - "Tag task ABC as work" → tag="work"
         - "Add shopping label" → tag="shopping"
     """
-    async def operation() -> dict:
-        user_id = get_user_context()
+    async def operation(user_id: str) -> dict:
         return await task_service.add_task_tag(task_id, user_id, tag)
 
-    return await safe_tool_call(operation, action="adding tag to task")
+    return await run_tool_with_user(
+        config,
+        action="adding tag to task",
+        operation=operation,
+    )
 
 
 @tool("todo_remove_tag")
-async def todo_remove_tag(task_id: str, tag: str) -> dict:
+async def todo_remove_tag(task_id: str, tag: str, config: RunnableConfig) -> dict:
     """
     Remove a tag/label from a task.
 
@@ -401,17 +451,20 @@ async def todo_remove_tag(task_id: str, tag: str) -> dict:
     Returns:
         Updated task without the tag
     """
-    async def operation() -> dict:
-        user_id = get_user_context()
+    async def operation(user_id: str) -> dict:
         return await task_service.remove_task_tag(task_id, user_id, tag)
 
-    return await safe_tool_call(operation, action="removing tag from task")
+    return await run_tool_with_user(
+        config,
+        action="removing tag from task",
+        operation=operation,
+    )
 
 
 # ─── Subtasks ─────────────────────────────────────────────────────────────────
 
 @tool("todo_add_subtask")
-async def todo_add_subtask(parent_task_id: str, title: str) -> dict:
+async def todo_add_subtask(parent_task_id: str, title: str, config: RunnableConfig) -> dict:
     """
     Add a subtask to a parent task.
 
@@ -431,15 +484,18 @@ async def todo_add_subtask(parent_task_id: str, title: str) -> dict:
         - "Add 'buy groceries' as subtask of shopping"
         - "Create subtask: prepare slides for presentation"
     """
-    async def operation() -> dict:
-        user_id = get_user_context()
+    async def operation(user_id: str) -> dict:
         return await task_service.add_subtask(parent_task_id, user_id, title)
 
-    return await safe_tool_call(operation, action="adding subtask")
+    return await run_tool_with_user(
+        config,
+        action="adding subtask",
+        operation=operation,
+    )
 
 
 @tool("todo_complete_subtask")
-async def todo_complete_subtask(subtask_id: str) -> dict:
+async def todo_complete_subtask(subtask_id: str, config: RunnableConfig) -> dict:
     """
     Mark a subtask as completed.
 
@@ -456,15 +512,18 @@ async def todo_complete_subtask(subtask_id: str) -> dict:
 
     Note: Completing all subtasks doesn't auto-complete the parent task.
     """
-    async def operation() -> dict:
-        user_id = get_user_context()
+    async def operation(user_id: str) -> dict:
         return await task_service.complete_subtask(subtask_id, user_id)
 
-    return await safe_tool_call(operation, action="completing subtask")
+    return await run_tool_with_user(
+        config,
+        action="completing subtask",
+        operation=operation,
+    )
 
 
 @tool("todo_uncomplete_subtask")
-async def todo_uncomplete_subtask(subtask_id: str) -> dict:
+async def todo_uncomplete_subtask(subtask_id: str, config: RunnableConfig) -> dict:
     """
     Mark a completed subtask as not completed (reopen).
 
@@ -479,15 +538,18 @@ async def todo_uncomplete_subtask(subtask_id: str) -> dict:
     Returns:
         Uncompleted subtask
     """
-    async def operation() -> dict:
-        user_id = get_user_context()
+    async def operation(user_id: str) -> dict:
         return await task_service.uncomplete_subtask(subtask_id, user_id)
 
-    return await safe_tool_call(operation, action="uncompleting subtask")
+    return await run_tool_with_user(
+        config,
+        action="uncompleting subtask",
+        operation=operation,
+    )
 
 
 @tool("todo_delete_subtask")
-async def todo_delete_subtask(subtask_id: str) -> dict:
+async def todo_delete_subtask(subtask_id: str, config: RunnableConfig) -> dict:
     """
     Delete a subtask permanently.
 
@@ -504,11 +566,14 @@ async def todo_delete_subtask(subtask_id: str) -> dict:
 
     Warning: This action cannot be undone.
     """
-    async def operation() -> dict:
-        user_id = get_user_context()
+    async def operation(user_id: str) -> dict:
         return await task_service.delete_subtask(subtask_id, user_id)
 
-    return await safe_tool_call(operation, action="deleting subtask")
+    return await run_tool_with_user(
+        config,
+        action="deleting subtask",
+        operation=operation,
+    )
 
 
 # ─── Recurring Tasks ──────────────────────────────────────────────────────────
@@ -517,6 +582,7 @@ async def todo_delete_subtask(subtask_id: str) -> dict:
 async def todo_create_recurring_task(
     task_template_id: str,
     frequency: RecurrenceFrequency,
+    config: RunnableConfig,
     interval: int = 1,
     days_of_week: list[int] | None = None,
     end_date: str | None = None,
@@ -548,18 +614,25 @@ async def todo_create_recurring_task(
         - "Every 2 weeks" → frequency="weekly", interval=2
         - "Monthly for 6 months" → frequency="monthly", max_occurrences=6
     """
-    async def operation() -> dict:
-        user_id = get_user_context()
-        end_dt = datetime.fromisoformat(end_date) if end_date else None
+    async def operation(user_id: str, temporal: dict, time_context) -> dict:
+        end_dt = None
+        if temporal.get("end_date") is not None:
+            _, end_dt = time_context.local_date_range_utc(temporal["end_date"])
         return await task_service.create_recurring_rule(
             user_id, task_template_id, frequency, interval, days_of_week, end_dt, max_occurrences
         )
 
-    return await safe_tool_call(operation, action="creating recurring task")
+    return await run_time_aware_tool_with_user(
+        config,
+        action="creating recurring task",
+        payload={"end_date": end_date},
+        temporal_fields={"end_date": "local_date"},
+        operation=operation,
+    )
 
 
 @tool("todo_list_recurring_tasks")
-async def todo_list_recurring_tasks() -> list[dict]:
+async def todo_list_recurring_tasks(config: RunnableConfig) -> list[dict]:
     """
     List all recurring task patterns.
 
@@ -571,15 +644,18 @@ async def todo_list_recurring_tasks() -> list[dict]:
     Returns:
         List of recurring rules with frequency, next occurrence, etc.
     """
-    async def operation() -> list[dict]:
-        user_id = get_user_context()
+    async def operation(user_id: str) -> list[dict]:
         return await task_service.list_recurring_rules(user_id)
 
-    return await safe_tool_call(operation, action="listing recurring tasks")
+    return await run_tool_with_user(
+        config,
+        action="listing recurring tasks",
+        operation=operation,
+    )
 
 
 @tool("todo_stop_recurring_task")
-async def todo_stop_recurring_task(rule_id: str) -> dict:
+async def todo_stop_recurring_task(rule_id: str, config: RunnableConfig) -> dict:
     """
     Stop a task from recurring (deactivate the recurring rule).
 
@@ -596,17 +672,20 @@ async def todo_stop_recurring_task(rule_id: str) -> dict:
 
     Note: This stops future instances but doesn't delete existing tasks.
     """
-    async def operation() -> dict:
-        user_id = get_user_context()
+    async def operation(user_id: str) -> dict:
         return await task_service.deactivate_recurring_rule(rule_id, user_id)
 
-    return await safe_tool_call(operation, action="stopping recurring task")
+    return await run_tool_with_user(
+        config,
+        action="stopping recurring task",
+        operation=operation,
+    )
 
 
 # ─── Summary ───────────────────────────────────────────────────────────────────
 
 @tool("todo_get_summary")
-async def todo_get_summary() -> dict:
+async def todo_get_summary(config: RunnableConfig) -> dict:
     """
     Get a comprehensive summary of all tasks.
 
@@ -626,9 +705,12 @@ async def todo_get_summary() -> dict:
         - "How many tasks do I have?"
         - "What's my progress?"
     """
-    async def operation() -> dict:
-        user_id = get_user_context()
+    async def operation(user_id: str) -> dict:
         user = await User.get(user_id)
         return await task_service.get_summary(user)
 
-    return await safe_tool_call(operation, action="getting task summary")
+    return await run_tool_with_user(
+        config,
+        action="getting task summary",
+        operation=operation,
+    )

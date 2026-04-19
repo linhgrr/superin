@@ -1,7 +1,8 @@
 import { create } from "zustand";
+import { z } from "zod";
 
 import { updateUserSettings } from "@/api/auth";
-import { STORAGE_KEYS } from "@/constants";
+import { STORAGE_KEYS } from "@/constants/storage";
 import { resolveTheme } from "@/lib/theme";
 import {
   DEFAULT_SETTINGS,
@@ -26,14 +27,50 @@ interface SettingsStoreState {
   toggleTheme: () => void;
 }
 
-function readStoredSettings(raw?: string | null): SettingsState {
+const storedSettingsSchema = z
+  .object({
+    animations: z.boolean(),
+    density: z.enum(["comfortable", "compact", "spacious"]),
+    emailNotifications: z.boolean(),
+    marketingEmails: z.boolean(),
+    pushNotifications: z.boolean(),
+    theme: z.enum(["light", "dark", "system"]),
+    timezone: z.string().min(1),
+  })
+  .partial();
+
+function getSettingsStorageValue(raw?: string | null): string | null {
+  if (raw !== undefined) {
+    return raw;
+  }
+
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  return localStorage.getItem(STORAGE_KEYS.USER_SETTINGS);
+}
+
+export function readStoredSettings(raw?: string | null): SettingsState {
+  const storedRaw = getSettingsStorageValue(raw);
+  if (!storedRaw) return DEFAULT_SETTINGS;
+
+  let parsed: unknown;
+
   try {
-    const storedRaw = raw ?? localStorage.getItem(STORAGE_KEYS.USER_SETTINGS);
-    if (!storedRaw) return DEFAULT_SETTINGS;
-    return { ...DEFAULT_SETTINGS, ...JSON.parse(storedRaw) };
-  } catch {
+    parsed = JSON.parse(storedRaw);
+  } catch (error: unknown) {
+    console.error("Failed to parse stored settings", error);
     return DEFAULT_SETTINGS;
   }
+
+  const result = storedSettingsSchema.safeParse(parsed);
+  if (!result.success) {
+    console.error("Stored settings payload is invalid", result.error);
+    return DEFAULT_SETTINGS;
+  }
+
+  return { ...DEFAULT_SETTINGS, ...result.data };
 }
 
 function writeStoredSettings(settings: SettingsState): void {
@@ -53,7 +90,8 @@ export const useSettingsStore = create<SettingsStoreState>((set, get) => ({
   },
   saveSettings: async (updates) => {
     set({ isSaving: true });
-    const updatedSettings = { ...get().settings, ...updates };
+    const previousSettings = get().settings;
+    const updatedSettings = { ...previousSettings, ...updates };
     get().internal_setSettings(updatedSettings);
 
     let timezoneSynced = true;
@@ -62,8 +100,16 @@ export const useSettingsStore = create<SettingsStoreState>((set, get) => ({
       if (updates.timezone) {
         await updateUserSettings({ settings: { timezone: updates.timezone } });
       }
-    } catch {
+    } catch (error: unknown) {
+      console.error("Failed to sync settings to server", error);
       timezoneSynced = false;
+
+      if (updates.timezone && previousSettings.timezone !== updatedSettings.timezone) {
+        get().internal_setSettings({
+          ...get().settings,
+          timezone: previousSettings.timezone,
+        });
+      }
     } finally {
       set({ isSaving: false });
     }

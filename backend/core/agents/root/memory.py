@@ -1,9 +1,9 @@
 """Memory helpers — wraps LangGraph BaseStore for Superin's user memory needs.
 
 Architecture:
-  - Short-term: AsyncMongoDBSaver checkpointer (core/db.py) manages per-thread
-    conversation history. RootAgent._build_message_list() is DEPRECATED and will
-    be removed after the checkpointer rollout is complete.
+  - Short-term: MongoDBSaver checkpointer (core/db.py) manages per-thread
+    conversation history; the @entrypoint root agent reads it through the
+    ``previous`` argument. No manual history rebuild is done here.
   - Long-term: MongoDBStore (via get_store()) → store.aput/asearch/aget
     Provides persistent user memories across all threads and sessions.
 """
@@ -21,6 +21,12 @@ if TYPE_CHECKING:
 def _namespace(user_id: str, category: str) -> tuple[str, ...]:
     """Build a store namespace tuple: (user_id, "memories", category)."""
     return (user_id, "memories", category)
+
+
+def _supports_semantic_search(store: BaseStore) -> bool:
+    """Return whether the concrete store is configured for query-based search."""
+    index_config = getattr(store, "index_config", None)
+    return bool(index_config)
 
 
 async def save_memory(
@@ -58,6 +64,7 @@ async def save_memory(
             "content": sanitized,
             "category": category,
         },
+        index=["content", "category"],
     )
     logger.debug("save_memory  user={}  key={}  category={}", user_id, key, category)
     return key
@@ -67,6 +74,7 @@ async def recall_memories(
     store: BaseStore,
     user_id: str,
     category: str | None = None,
+    query: str | None = None,
     limit: int = 20,
     offset: int = 0,
 ) -> list[dict[str, Any]]:
@@ -84,7 +92,8 @@ async def recall_memories(
         List of memory dicts with 'key', 'content', 'category', 'saved_at'.
     """
     ns: tuple[str, ...] = _namespace(user_id, category) if category else (user_id, "memories")
-    items = await store.asearch(ns, limit=limit, offset=offset)
+    semantic_query = query if query and _supports_semantic_search(store) else None
+    items = await store.asearch(ns, query=semantic_query, limit=limit, offset=offset)
     return [
         {"key": item.key, **({"content": item.value} if not isinstance(item.value, dict) else item.value)}
         for item in items
@@ -101,6 +110,7 @@ async def delete_memory(store: BaseStore, user_id: str, key: str, category: str 
 async def recall_memories_for_context(
     store: BaseStore,
     user_id: str,
+    query: str | None = None,
     limit: int = 5,
 ) -> str:
     """
@@ -110,9 +120,9 @@ async def recall_memories_for_context(
         Formatted memory string like "[memory/category] content" or "" if none.
     """
     try:
-        memories = await recall_memories(store, user_id, limit=limit)
+        memories = await recall_memories(store, user_id, query=query, limit=limit)
     except Exception as exc:
-        logger.warning("recall_memories_for_context failed: %s", exc)
+        logger.warning("recall_memories_for_context failed: {}", exc)
         return ""
 
     if not memories:

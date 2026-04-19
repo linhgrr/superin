@@ -1,26 +1,35 @@
-import { useEffect, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 
-import { useClickOutside } from "@/hooks/useClickOutside";
+import { AppModal } from "@/shared/components/AppModal";
+import {
+  FORM_ACTIONS_STYLE,
+  FORM_STACK_STYLE,
+  FormCheckbox,
+  FormField,
+  FormInput,
+  FormSelect,
+  FormTextarea,
+  FormValue,
+} from "@/shared/components/FormControls";
 import { useTimezone } from "@/shared/hooks/useTimezone";
-import { TIME_OPTIONS, formatDuration, formatMinutesToString, parseTimeString } from "../utils/dateHelpers";
+import { formatDuration } from "../utils/dateHelpers";
+import {
+  createInitialEventFormState,
+  isEventFormValid,
+  normalizeEndMinutes,
+  toEventFormData,
+  type EventFormData,
+} from "./create-event-form";
+import { TimeInput } from "./TimeInput";
 
 import type { CalendarRead, EventRead } from "../api";
 
 import "./CreateEventModal.css";
 
-export interface EventFormData {
-  title: string;
-  startMinutes: number;
-  endMinutes: number;
-  description: string;
-  location: string;
-  calendar_id: string;
-  is_all_day: boolean;
-}
-
 interface CreateEventModalProps {
   date: Date;
   calendars: CalendarRead[];
+  initialStartMinutes?: number;
   onClose: () => void;
   onCreate?: (data: EventFormData) => void;
   onUpdate?: (eventId: string, data: EventFormData) => void;
@@ -28,307 +37,105 @@ interface CreateEventModalProps {
   initialEvent?: EventRead;
 }
 
-// ─── Time input with both text input and dropdown ────────────────────────────────
-
-interface TimeInputProps {
-  label: string;
-  value: number; // total minutes from midnight
-  onChange: (minutes: number) => void;
-  earliest?: number; // minimum allowed value (minutes)
-}
-
-function TimeInput({ label, value, onChange, earliest }: TimeInputProps) {
-  const [textValue, setTextValue] = useState(() => formatMinutesToString(value));
-  const [open, setOpen] = useState(false);
-  const [textError, setTextError] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  // Keep text display in sync when value changes externally
-  useEffect(() => {
-    setTextValue(formatMinutesToString(value));
-  }, [value]);
-
-  useClickOutside(
-    containerRef,
-    () => {
-      setOpen(false);
-    },
-    open
-  );
-
-  const applyValue = (mins: number) => {
-    const effective = earliest !== undefined ? Math.max(mins, earliest) : mins;
-    onChange(effective);
-    setTextValue(formatMinutesToString(effective));
-    setTextError(false);
-    setOpen(false);
-  };
-
-  const handleTextChange = (raw: string) => {
-    setTextValue(raw);
-    const parsed = parseTimeString(raw);
-    if (parsed !== null && (!earliest || parsed >= earliest)) {
-      setTextError(false);
-    } else {
-      setTextError(true);
-    }
-  };
-
-  const handleTextBlur = () => {
-    const parsed = parseTimeString(textValue);
-    if (parsed !== null && (!earliest || parsed >= earliest)) {
-      applyValue(parsed);
-    } else {
-      // Revert to current value
-      setTextValue(formatMinutesToString(value));
-      setTextError(false);
-    }
-  };
-
-  const handleTextKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      inputRef.current?.blur();
-    }
-    if (e.key === "Escape") {
-      setTextValue(formatMinutesToString(value));
-      setTextError(false);
-      setOpen(false);
-    }
-  };
-
-  const options = earliest !== undefined
-    ? TIME_OPTIONS.filter((o) => o.value >= earliest)
-    : TIME_OPTIONS;
-
-  return (
-    <div>
-      <label
-        style={{
-          display: "block",
-          fontSize: "0.75rem",
-          color: "var(--color-foreground-muted)",
-          marginBottom: "0.25rem",
-        }}
-      >
-        {label}
-      </label>
-      <div ref={containerRef} style={{ position: "relative" }}>
-        <input
-          ref={inputRef}
-          type="text"
-          inputMode="numeric"
-          value={textValue}
-          onChange={(e) => handleTextChange(e.target.value)}
-          onFocus={() => setOpen(true)}
-          onBlur={handleTextBlur}
-          onKeyDown={handleTextKeyDown}
-          placeholder="HH:MM"
-          maxLength={5}
-          style={{
-            width: "100%",
-            padding: "0.625rem",
-            border: `1px solid ${textError ? "var(--color-danger)" : "var(--color-border)"}`,
-            borderRadius: "8px",
-            fontSize: "0.875rem",
-            background: "var(--color-surface-elevated)",
-            outline: "none",
-          }}
-        />
-        {/* Dropdown list */}
-        {open && (
-          <ul className="time-dropdown">
-            {options.map((opt) => (
-              <li
-                key={opt.value}
-                className="time-dropdown-item"
-                onMouseDown={() => applyValue(opt.value)}
-              >
-                {opt.label}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </div>
-  );
-}
+const TWO_COLUMN_GRID_STYLE = {
+  display: "grid",
+  gridTemplateColumns: "1fr 1fr",
+  gap: "0.75rem",
+} as const;
 
 // ─── Modal ────────────────────────────────────────────────────────────────────────
 
-export function CreateEventModal({ date, calendars, onClose, onCreate, onUpdate, onDelete, initialEvent }: CreateEventModalProps) {
-  const { formatDate } = useTimezone();
-  const [title, setTitle] = useState(initialEvent ? initialEvent.title : "");
-  const [description, setDescription] = useState(initialEvent?.description || "");
-  const [location, setLocation] = useState(initialEvent?.location || "");
-  const [calendarId, setCalendarId] = useState(initialEvent?.calendar_id || (calendars.length > 0 ? calendars[0].id : ""));
-  const [isAllDay, setIsAllDay] = useState(initialEvent?.is_all_day || false);
-  
-  const getInitialMinutes = () => {
-    if (initialEvent) {
-      // Dùng hàm từ dateHelpers để lấy chính xác giờ phút theo locale
-      const startLocal = new Date(initialEvent.start_datetime);
-      const endLocal = new Date(initialEvent.end_datetime);
-      // NOTE: getHourMinute handles TZ correctly on display, but here we can just calc difference?
-      // Since dateHelpers formatEventTime etc handles timezone.
-      // Let's use standard local logic inside modal, since `CreateEventModal` builds from components.
-      return {
-        start: startLocal.getHours() * 60 + startLocal.getMinutes(),
-        end: endLocal.getHours() * 60 + endLocal.getMinutes(),
-      };
-    }
-    const start = date.getHours() * 60 + date.getMinutes();
-    return { start, end: start + 60 };
-  };
-
-  const [startMinutes, setStartMinutes] = useState(getInitialMinutes().start);
-  const [endMinutes, setEndMinutes] = useState(getInitialMinutes().end);
+export function CreateEventModal({
+  date,
+  calendars,
+  initialStartMinutes,
+  onClose,
+  onCreate,
+  onUpdate,
+  onDelete,
+  initialEvent,
+}: CreateEventModalProps) {
+  const { formatDate, timezone } = useTimezone();
+  const initialState = useMemo(
+    () =>
+      createInitialEventFormState({
+        calendars,
+        date,
+        initialEvent,
+        initialStartMinutes,
+        timezone,
+      }),
+    [calendars, date, initialEvent, initialStartMinutes, timezone],
+  );
+  const [title, setTitle] = useState(initialState.title);
+  const [description, setDescription] = useState(initialState.description);
+  const [location, setLocation] = useState(initialState.location);
+  const [calendarId, setCalendarId] = useState(initialState.calendarId);
+  const [isAllDay, setIsAllDay] = useState(initialState.isAllDay);
+  const [startMinutes, setStartMinutes] = useState(initialState.startMinutes);
+  const [endMinutes, setEndMinutes] = useState(initialState.endMinutes);
 
   const handleStartChange = (value: number) => {
     setStartMinutes(value);
-    if (value >= endMinutes) {
-      setEndMinutes(value + 30);
-    }
+    setEndMinutes((current) => normalizeEndMinutes(value, current));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (title.trim() && calendarId) {
-      const formData: EventFormData = {
-        title: title.trim(),
-        startMinutes,
-        endMinutes,
-        description: description.trim(),
-        location: location.trim(),
-        calendar_id: calendarId,
-        is_all_day: isAllDay,
-      };
-      
-      if (initialEvent && onUpdate) {
-        onUpdate(initialEvent.id, formData);
-      } else if (onCreate) {
-        onCreate(formData);
-      }
+    const formState = { title, startMinutes, endMinutes, description, location, calendarId, isAllDay };
+    if (!isEventFormValid(formState)) return;
+
+    const formData = toEventFormData(formState);
+    if (initialEvent && onUpdate) {
+      onUpdate(initialEvent.id, formData);
+    } else if (onCreate) {
+      onCreate(formData);
     }
   };
 
-  const isValid = Boolean(title.trim() && calendarId && endMinutes > startMinutes);
+  const isValid = isEventFormValid({
+    title,
+    startMinutes,
+    endMinutes,
+    description,
+    location,
+    calendarId,
+    isAllDay,
+  });
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: "rgba(0,0,0,0.5)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 1000,
-      }}
-      onClick={onClose}
+    <AppModal
+      title={initialEvent ? "Edit Event" : "Create Event"}
+      onClose={onClose}
+      maxWidth={420}
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: "var(--color-surface)",
-          borderRadius: "12px",
-          padding: "1.5rem",
-          width: "420px",
-          maxWidth: "90vw",
-          maxHeight: "90vh",
-          overflowY: "auto",
-          boxShadow: "0 4px 24px rgba(0,0,0,0.2)",
-        }}
-      >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
-          <h2 style={{ fontSize: "1.125rem", fontWeight: 600, color: "var(--color-foreground)" }}>
-            {initialEvent ? "Edit Event" : "Create Event"}
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              background: "transparent",
-              border: "none",
-              color: "var(--color-foreground-muted)",
-              cursor: "pointer",
-              padding: "0.25rem",
-              borderRadius: "4px",
-            }}
-            aria-label="Close"
-          >
-            ×
-          </button>
-        </div>
-
         {calendars.length === 0 ? (
           <div style={{ padding: "2rem", textAlign: "center", color: "var(--color-foreground-muted)" }}>
             <p style={{ marginBottom: "1rem" }}>You need a calendar to create events.</p>
-            <button
-              type="button"
-              onClick={onClose}
-              style={{
-                padding: "0.5rem 1rem",
-                background: "var(--color-surface-hover)",
-                color: "var(--color-foreground)",
-                border: "none",
-                borderRadius: "6px",
-                cursor: "pointer",
-              }}
-            >
+            <button type="button" className="btn btn-ghost" onClick={onClose}>
               Close
             </button>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-            <div style={{ marginBottom: "1rem" }}>
-              <label
-                style={{
-                  display: "block",
-                  fontSize: "0.75rem",
-                  color: "var(--color-foreground-muted)",
-                  marginBottom: "0.25rem",
-                }}
-              >
-                Date
-              </label>
-              <div style={{ fontSize: "0.875rem", fontWeight: 500 }}>
+          <form onSubmit={handleSubmit} style={FORM_STACK_STYLE}>
+            <FormField label="Date">
+              <FormValue>
                 {formatDate(date, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
-              </div>
-            </div>
+              </FormValue>
+            </FormField>
 
-            <div style={{ marginBottom: "1rem" }}>
-              <label
-                style={{
-                  display: "block",
-                  fontSize: "0.75rem",
-                  color: "var(--color-foreground-muted)",
-                  marginBottom: "0.25rem",
-                }}
-              >
-                Event Title *
-              </label>
-              <input
+            <FormField htmlFor="event-title" label="Event Title" required>
+              <FormInput
+                id="event-title"
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="e.g., Team meeting, Doctor appointment..."
                 autoFocus
-                style={{
-                  width: "100%",
-                  padding: "0.75rem",
-                  border: "1px solid var(--color-border)",
-                  borderRadius: "8px",
-                  fontSize: "0.875rem",
-                  background: "var(--color-surface-elevated)",
-                }}
               />
-            </div>
+            </FormField>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", opacity: isAllDay ? 0.5 : 1, pointerEvents: isAllDay ? "none" : "auto" }}>
+            <div style={{ ...TWO_COLUMN_GRID_STYLE, opacity: isAllDay ? 0.5 : 1, pointerEvents: isAllDay ? "none" : "auto" }}>
               <TimeInput
                 label="Start Time"
                 value={startMinutes}
@@ -342,7 +149,7 @@ export function CreateEventModal({ date, calendars, onClose, onCreate, onUpdate,
               />
             </div>
 
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", marginTop: "0.5rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               {!isAllDay ? (
                 <div style={{ fontSize: "0.75rem", color: "var(--color-foreground-muted)" }}>
                   Duration: {formatDuration(startMinutes, endMinutes)}
@@ -350,122 +157,56 @@ export function CreateEventModal({ date, calendars, onClose, onCreate, onUpdate,
               ) : (
                 <div />
               )}
-              
-              <label style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem", fontSize: "0.875rem", cursor: "pointer" }}>
-                <input 
-                  type="checkbox" 
-                  checked={isAllDay} 
-                  onChange={(e) => setIsAllDay(e.target.checked)} 
-                  style={{ width: "auto", margin: 0, cursor: "pointer" }}
-                />
-                All-day event
-              </label>
+
+              <FormCheckbox
+                checked={isAllDay}
+                onChange={setIsAllDay}
+                label="All-day event"
+              />
             </div>
 
-            <div style={{ marginBottom: "1rem" }}>
-              <label
-                style={{
-                  display: "block",
-                  fontSize: "0.75rem",
-                  color: "var(--color-foreground-muted)",
-                  marginBottom: "0.25rem",
-                }}
-              >
-                Calendar *
-              </label>
-              <select
+            <FormField htmlFor="event-calendar" label="Calendar" required>
+              <FormSelect
+                id="event-calendar"
                 value={calendarId}
                 onChange={(e) => setCalendarId(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "0.75rem",
-                  border: "1px solid var(--color-border)",
-                  borderRadius: "8px",
-                  fontSize: "0.875rem",
-                  background: "var(--color-surface-elevated)",
-                  color: "var(--color-foreground)",
-                }}
               >
-                {calendars.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
+                {calendars.map((calendar) => (
+                  <option key={calendar.id} value={calendar.id}>
+                    {calendar.name}
+                  </option>
                 ))}
-              </select>
-            </div>
-            
-            <div style={{ marginBottom: "1rem" }}>
-              <label
-                style={{
-                  display: "block",
-                  fontSize: "0.75rem",
-                  color: "var(--color-foreground-muted)",
-                  marginBottom: "0.25rem",
-                }}
-              >
-                Location
-              </label>
-              <input
+              </FormSelect>
+            </FormField>
+
+            <FormField htmlFor="event-location" label="Location">
+              <FormInput
+                id="event-location"
                 type="text"
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
                 placeholder="Add location"
-                style={{
-                  width: "100%",
-                  padding: "0.75rem",
-                  border: "1px solid var(--color-border)",
-                  borderRadius: "8px",
-                  fontSize: "0.875rem",
-                  background: "var(--color-surface-elevated)",
-                  color: "var(--color-foreground)",
-                }}
               />
-            </div>
+            </FormField>
 
-            <div style={{ marginBottom: "1.5rem" }}>
-              <label
-                style={{
-                  display: "block",
-                  fontSize: "0.75rem",
-                  color: "var(--color-foreground-muted)",
-                  marginBottom: "0.25rem",
-                }}
-              >
-                Description
-              </label>
-              <textarea
+            <FormField htmlFor="event-description" label="Description">
+              <FormTextarea
+                id="event-description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Add description"
                 rows={3}
-                style={{
-                  width: "100%",
-                  padding: "0.75rem",
-                  border: "1px solid var(--color-border)",
-                  borderRadius: "8px",
-                  fontSize: "0.875rem",
-                  background: "var(--color-surface-elevated)",
-                  color: "var(--color-foreground)",
-                  resize: "vertical",
-                }}
               />
-            </div>
+            </FormField>
 
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "1rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "0.5rem" }}>
               {initialEvent && onDelete ? (
                 <button
                   type="button"
                   onClick={() => {
                     onDelete(initialEvent.id);
                   }}
-                  style={{
-                    padding: "0.625rem 1rem",
-                    border: "1px solid var(--color-danger-muted-border)",
-                    background: "var(--color-danger-muted-bg)",
-                    color: "var(--color-danger)",
-                    borderRadius: "8px",
-                    cursor: "pointer",
-                    fontSize: "0.875rem",
-                    fontWeight: 500,
-                  }}
+                  className="btn btn-danger"
                 >
                   Delete
                 </button>
@@ -473,36 +214,14 @@ export function CreateEventModal({ date, calendars, onClose, onCreate, onUpdate,
                 <div />
               )}
 
-              <div style={{ display: "flex", gap: "0.75rem" }}>
-                <button
-                  type="button"
-                  onClick={onClose}
-                  style={{
-                    padding: "0.625rem 1rem",
-                    border: "1px solid var(--color-border)",
-                    background: "transparent",
-                    color: "var(--color-foreground)",
-                    borderRadius: "8px",
-                    cursor: "pointer",
-                    fontSize: "0.875rem",
-                  }}
-                >
+              <div style={FORM_ACTIONS_STYLE}>
+                <button type="button" className="btn btn-ghost" onClick={onClose}>
                   Cancel
                 </button>
                 <button
                   type="submit"
+                  className="btn btn-primary"
                   disabled={!isValid}
-                  style={{
-                    padding: "0.625rem 1rem",
-                    border: "none",
-                    background: "var(--color-primary)",
-                    color: "white",
-                    borderRadius: "8px",
-                    cursor: isValid ? "pointer" : "not-allowed",
-                    fontSize: "0.875rem",
-                    fontWeight: 500,
-                    opacity: isValid ? 1 : 0.5,
-                  }}
                 >
                   {initialEvent ? "Update Event" : "Add Event"}
                 </button>
@@ -510,7 +229,6 @@ export function CreateEventModal({ date, calendars, onClose, onCreate, onUpdate,
             </div>
           </form>
         )}
-      </div>
-    </div>
+    </AppModal>
   );
 }

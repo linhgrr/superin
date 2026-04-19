@@ -1,19 +1,20 @@
 """Tests for the parallel LangGraph v2 root agent architecture."""
 
+from __future__ import annotations
+
 import asyncio
-import functools
+import sys
+import types
 from unittest.mock import MagicMock
 
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage
+from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.store.memory import InMemoryStore
 
-from core.agents.root.graph import get_root_agent_graph, refresh_graph
-from core.agents.root.helpers import (
-    decide_target_apps,
-    direct_synthesize,
-    extract_question,
-    merge_app_results,
-)
-from core.agents.root.schemas import ParallelGraphInput, ParallelGraphOutput
+from core.agents.root.context import extract_question
+from core.agents.root.routing import detect_platform_request, route_and_craft
+from core.agents.root.synthesis import merge_app_results, synthesize
+from core.agents.root.schemas import NewTurnInput, RootState
 
 
 def _finance_manifest() -> dict:
@@ -34,143 +35,42 @@ def _finance_manifest() -> dict:
     )
 
 
-class TestParallelGraphSchemas:
-    def test_parallel_graph_output_is_frozen_dataclass(self) -> None:
-        output = ParallelGraphOutput(
-            app_results=[],
-            app_errors=[],
-            merged_context="",
-            final_answer="Hello",
-        )
-        assert output.app_results == []
-        assert output.final_answer == "Hello"
-
-    def test_parallel_graph_input_typeddict_fields(self) -> None:
-        # TypedDict enforces field names at static type check time;
-        # runtime we just verify the dict shape is correct.
-        inp: ParallelGraphInput = {
-            "messages": [],
-            "user_id": "user-1",
-            "thread_id": "thread-1",
-            "installed_app_ids": ["finance", "todo"],
-        }
-        assert inp["user_id"] == "user-1"
-        assert len(inp["installed_app_ids"]) == 2
+# ─────────────────────────────────────────────────────────────────────────────
+# Schema types
+# ─────────────────────────────────────────────────────────────────────────────
 
 
-class TestMergeAppResults:
-    def test_merge_app_results_empty(self) -> None:
-        assert merge_app_results([]) == ""
+class TestSchemaTypes:
+    def test_new_turn_input_requires_new_messages(self) -> None:
+        inp: NewTurnInput = {"new_messages": [HumanMessage(content="hello")]}
+        assert len(inp["new_messages"]) == 1
 
-    def test_merge_app_results_single_success(self) -> None:
-        results = [
-            {
-                "app": "finance",
-                "status": "success",
-                "message": "Balance is $100.",
-                "tool_results": [],
-            }
-        ]
-        merged = merge_app_results(results)
-        assert "[finance]" in merged
-        assert "Balance is $100." in merged
-
-    def test_merge_app_results_with_tool_results(self) -> None:
-        results = [
-            {
-                "app": "finance",
-                "status": "success",
-                "message": "Done.",
-                "tool_results": [
-                    {
-                        "tool_name": "list_wallets",
-                        "ok": True,
-                        "data": [{"id": "w1", "name": "Main"}],
-                        "error": None,
-                    }
-                ],
-            }
-        ]
-        merged = merge_app_results(results)
-        assert "[finance]" in merged
-        assert "list_wallets: OK" in merged
-
-    def test_merge_app_results_error_app(self) -> None:
-        results = [
-            {
-                "app": "todo",
-                "status": "failed",
-                "message": "Could not fetch tasks.",
-                "tool_results": [
-                    {
-                        "tool_name": "list_tasks",
-                        "ok": False,
-                        "data": None,
-                        "error": {"message": "Network error", "code": "network"},
-                    }
-                ],
-            }
-        ]
-        merged = merge_app_results(results)
-        assert "[todo]" in merged
-        assert "list_tasks: ERROR" in merged
-
-    def test_merge_app_results_multiple_apps(self) -> None:
-        results = [
-            {"app": "finance", "status": "success", "message": "Finance result.", "tool_results": []},
-            {"app": "todo", "status": "no_action", "message": "Nothing to do.", "tool_results": []},
-        ]
-        merged = merge_app_results(results)
-        assert "[finance]" in merged
-        assert "[todo]" in merged
-        assert "Finance result." in merged
-        assert "Nothing to do." in merged
+    def test_root_state_accepts_messages_only(self) -> None:
+        state: RootState = {"messages": []}
+        assert state["messages"] == []
 
 
-class TestRefreshGraph:
-    def test_get_root_agent_graph_returns_same_instance(self, monkeypatch) -> None:
-        # Patch get_store so the singleton can be built without init_db()
-        from unittest.mock import MagicMock
-
-        mock_store = MagicMock()
-        monkeypatch.setattr("core.db.get_store", lambda: mock_store)
-
-        g1 = get_root_agent_graph()
-        g2 = get_root_agent_graph()
-        assert g1 is g2
-
-    def test_refresh_graph_invalidates_singleton(self, monkeypatch) -> None:
-        from unittest.mock import MagicMock
-
-        mock_store = MagicMock()
-        monkeypatch.setattr("core.db.get_store", lambda: mock_store)
-
-        get_root_agent_graph()  # warm up
-        refresh_graph()
-        g2 = get_root_agent_graph()
-        # After refresh the module-level singleton is cleared and rebuilt;
-        # identity may differ (new object) which is the expected behavior.
-        assert g2 is not None
+# ─────────────────────────────────────────────────────────────────────────────
+# extract_question
+# ─────────────────────────────────────────────────────────────────────────────
 
 
 class TestExtractQuestion:
-    """Unit tests for extract_question() — does not call the LLM."""
+    def test_string_content(self) -> None:
+        assert extract_question([HumanMessage(content="What is my balance?")]) == "What is my balance?"
 
-    async def test_extract_question_string_content(self) -> None:
-        messages = [HumanMessage(content="What is my balance?")]
-        assert extract_question(messages) == "What is my balance?"
-
-    async def test_extract_question_multimodal_content(self) -> None:
+    def test_multimodal_content(self) -> None:
         messages = [
             HumanMessage(
-                content=[{"type": "text", "text": "Add a task"}, {"type": "image_url", "image_url": {"url": "http://x"}}]
+                content=[
+                    {"type": "text", "text": "Add a task"},
+                    {"type": "image_url", "image_url": {"url": "http://x"}},
+                ]
             )
         ]
         assert extract_question(messages) == "Add a task"
 
-    async def test_extract_question_last_human_message_wins(self) -> None:
-        from langchain_core.messages import AIMessage
-
+    def test_last_human_message_wins(self) -> None:
         messages = [
             AIMessage(content="Hello"),
             HumanMessage(content="First question?"),
@@ -179,207 +79,386 @@ class TestExtractQuestion:
         ]
         assert extract_question(messages) == "Second question!"
 
-    async def test_extract_question_empty_when_only_ai_messages(self) -> None:
-        from langchain_core.messages import AIMessage
+    def test_empty_when_only_ai_messages(self) -> None:
+        assert extract_question([AIMessage(content="Hello")]) == ""
 
-        messages = [AIMessage(content="Hello")]
-        assert extract_question(messages) == ""
+
+# ─────────────────────────────────────────────────────────────────────────────
+# merge_app_results
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class TestMergeAppResults:
+    def test_empty(self) -> None:
+        assert merge_app_results([]) == ""
+
+    def test_single_success(self) -> None:
+        merged = merge_app_results(
+            [{"app": "finance", "status": "success", "message": "Balance is $100.", "tool_results": []}]
+        )
+        assert "[finance]" in merged
+        assert "Balance is $100." in merged
+
+    def test_with_tool_results(self) -> None:
+        merged = merge_app_results(
+            [
+                {
+                    "app": "finance",
+                    "status": "success",
+                    "message": "Done.",
+                    "tool_results": [
+                        {"tool_name": "list_wallets", "ok": True, "data": [{"id": "w1"}], "error": None}
+                    ],
+                }
+            ]
+        )
+        assert "list_wallets: OK" in merged
+
+    def test_error_app(self) -> None:
+        merged = merge_app_results(
+            [
+                {
+                    "app": "todo",
+                    "status": "failed",
+                    "message": "Could not fetch tasks.",
+                    "tool_results": [
+                        {
+                            "tool_name": "list_tasks",
+                            "ok": False,
+                            "data": None,
+                            "error": {"message": "Network error", "code": "network"},
+                        }
+                    ],
+                }
+            ]
+        )
+        assert "[todo]" in merged
+        assert "list_tasks: ERROR" in merged
+
+    def test_multiple_apps(self) -> None:
+        merged = merge_app_results(
+            [
+                {"app": "finance", "status": "success", "message": "Finance result.", "tool_results": []},
+                {"app": "todo", "status": "no_action", "message": "Nothing to do.", "tool_results": []},
+            ]
+        )
+        assert "[finance]" in merged
+        assert "[todo]" in merged
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# decide_target_apps
+# ─────────────────────────────────────────────────────────────────────────────
 
 
 class _MockRoutingLLM:
-    """Stub LLM that returns a RoutingDecision with the requested app_ids."""
+    """Stub LLM that returns RoutingDecision based on question content."""
 
     def with_structured_output(self, schema):
         return self
 
     async def ainvoke(self, messages, **kwargs):
-        from core.agents.root.schemas import RoutingDecision
+        from core.agents.root.schemas import AppDecision, RoutingDecision
 
-        # Parse question from the invoke call
         for msg in messages:
             if hasattr(msg, "content") and isinstance(msg.content, str):
                 content_lower = msg.content.lower()
                 if "finance" in content_lower:
-                    return RoutingDecision(app_ids=["finance"])
+                    return RoutingDecision(
+                        app_decisions=[
+                            AppDecision(
+                                app_id="finance",
+                                subtask="Check the user's finance balance.",
+                            )
+                        ]
+                    )
                 if "todo" in content_lower:
-                    return RoutingDecision(app_ids=["todo"])
-        return RoutingDecision(app_ids=[])
-
-
-class TestDecideTargetApps:
-    async def test_decide_target_apps_returns_empty_when_no_installed_apps(self) -> None:
-        from langchain_core.messages import HumanMessage
-
-        messages = [HumanMessage(content="What is my balance?")]
-        apps, question = await decide_target_apps(messages, [])
-        assert apps == []
-        assert question == ""
-
-    async def test_decide_target_apps_returns_matching_app_ids(self, monkeypatch) -> None:
-        manifest = _finance_manifest()
-        monkeypatch.setattr(
-            "core.registry.PLUGIN_REGISTRY",
-            {"finance": {"manifest": manifest}},
-        )
-        monkeypatch.setattr(
-            "core.agents.root.helpers.get_llm",
-            lambda: _MockRoutingLLM(),
-        )
-        from langchain_core.messages import HumanMessage
-
-        messages = [HumanMessage(content="What is my finance balance?")]
-        apps, question = await decide_target_apps(messages, ["finance"])
-        assert isinstance(apps, list)
-        assert apps == ["finance"]
-        assert question == "What is my finance balance?"
-
-    async def test_decide_target_apps_fails_closed_on_llm_error(self, monkeypatch) -> None:
-
-        manifest = _finance_manifest()
-        monkeypatch.setattr(
-            "core.registry.PLUGIN_REGISTRY",
-            {"finance": {"manifest": manifest}},
-        )
-        monkeypatch.setattr(
-            "core.agents.root.helpers.get_llm",
-            lambda: _FailingLLM(),
-        )
-        from langchain_core.messages import HumanMessage
-
-        messages = [HumanMessage(content="What is my balance?")]
-        apps, question = await decide_target_apps(messages, ["finance"])
-        # Fails closed → returns empty list
-        assert apps == []
-        assert question == ""
+                    return RoutingDecision(
+                        app_decisions=[
+                            AppDecision(
+                                app_id="todo",
+                                subtask="Check the user's pending tasks.",
+                            )
+                        ]
+                    )
+        return RoutingDecision(app_decisions=[])
 
 
 class _FailingLLM:
-    """Stub LLM that raises so we can test fail-closed behavior."""
-
-    async def ainvoke(self, *_args, **_kwargs):
+    async def ainvoke(self, *_args, **_kwargs) -> None:
         raise RuntimeError("LLM unavailable")
 
 
+class _MockPlatformLLM:
+    """Stub LLM that routes install/memory requests to platform."""
+
+    def with_structured_output(self, schema):
+        return self
+
+    async def ainvoke(self, messages, **kwargs):
+        from core.agents.root.schemas import PlatformDecision
+
+        for msg in reversed(messages):
+            if isinstance(getattr(msg, "content", None), str):
+                content_lower = msg.content.lower()
+                if "install" in content_lower or "remember" in content_lower:
+                    return PlatformDecision(route="platform", reason="explicit platform request")
+                break
+        return PlatformDecision(route="none")
+
+
+class TestRouteAndCraft:
+    def test_returns_empty_when_no_installed_apps(self) -> None:
+        decision = asyncio.run(
+            route_and_craft(
+                [HumanMessage(content="What is my balance?")],
+                [],
+            )
+        )
+        assert decision.app_decisions == []
+
+
+class TestDetectPlatformRequest:
+    def test_returns_platform_for_install_request(self, monkeypatch) -> None:
+        monkeypatch.setattr("core.agents.root.routing.get_llm", lambda: _MockPlatformLLM())
+        decision = asyncio.run(
+            detect_platform_request(
+                [HumanMessage(content="Install calendar for me")],
+                ["todo"],
+            )
+        )
+        assert decision.route == "platform"
+
+    def test_returns_none_for_domain_request(self, monkeypatch) -> None:
+        monkeypatch.setattr("core.agents.root.routing.get_llm", lambda: _MockPlatformLLM())
+        decision = asyncio.run(
+            detect_platform_request(
+                [HumanMessage(content="Schedule a meeting tomorrow")],
+                ["calendar"],
+            )
+        )
+        assert decision.route == "none"
+
+    def test_returns_matching_app_ids(self, monkeypatch) -> None:
+        monkeypatch.setattr(
+            "core.registry.PLUGIN_REGISTRY",
+            {"finance": {"manifest": _finance_manifest()}},
+        )
+        monkeypatch.setattr(
+            "core.agents.root.routing.get_llm",
+            lambda: _MockRoutingLLM(),
+        )
+        messages = [HumanMessage(content="What is my finance balance?")]
+        decision = asyncio.run(route_and_craft(messages, ["finance"]))
+        assert [item.app_id for item in decision.app_decisions] == ["finance"]
+        assert decision.app_decisions[0].subtask == "Check the user's finance balance."
+
+    def test_fails_closed_on_llm_error(self, monkeypatch) -> None:
+        monkeypatch.setattr(
+            "core.registry.PLUGIN_REGISTRY",
+            {"finance": {"manifest": _finance_manifest()}},
+        )
+        monkeypatch.setattr(
+            "core.agents.root.routing.get_llm",
+            lambda: _FailingLLM(),
+        )
+        decision = asyncio.run(
+            route_and_craft(
+                [HumanMessage(content="What is my balance?")],
+                ["finance"],
+            )
+        )
+        assert decision.app_decisions == []
+
+
 # ─────────────────────────────────────────────────────────────────────────────
-# Integration tests — verify the full @entrypoint graph runs end-to-end
-# including parallel worker dispatch and direct await of @task partials.
-# These catch bugs like wrong .invoke() call, wrong Future type, and
-# misuse of asyncio.gather/as_completed with concurrent.futures.Future.
+# direct_synthesize
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-class TestEntrypointIntegration:
-    """Verify the compiled @entrypoint graph can be invoked without raising."""
-
-    async def test_root_agent_compiles_with_mock_store(self, monkeypatch) -> None:
-        """The @entrypoint must compile when passed a mock store."""
-        from core.agents.root.graph import _build_entrypoint
-
-        mock_store = MagicMock()
-        graph = _build_entrypoint(mock_store)
-        assert graph is not None
-        assert hasattr(graph, "astream")
-        assert hasattr(graph, "ainvoke")
-
-    async def test_direct_await_partial_in_for_loop(self) -> None:
-        """Verify functools.partial is awaitable and works in a zip+for-loop pattern.
-
-        graph.py uses: for (app_id, partial_future) in zip(futures, cf_futures):
-                            result = await partial_future
-        functools.partial (returned by @task) is awaitable in any async context.
-        concurrent.futures.Future is NOT awaitable outside @entrypoint — only partial.
-        """
-
-        async def app_worker(question: str, user_id: str, thread_id: str) -> dict:
-            await asyncio.sleep(0.05)
-            return {"app": "finance", "status": "success", "message": "Balance is $100."}
-
-        # Mimic @task: calling the partial starts execution and returns a future-like
-        # awaitable object (functools.partial wraps the coroutine)
-        partials = [
-            functools.partial(app_worker, question="q1", user_id="u1", thread_id="t1"),
-            functools.partial(app_worker, question="q2", user_id="u2", thread_id="t2"),
-        ]
-        futures = [("app1", partials[0]), ("app2", partials[1])]
-
-        results: list[dict] = []
-        for (app_id, pf), _pf in zip(futures, partials):
-            result = await pf()  # call partial → get awaitable
-            results.append({"app_id": app_id, "result": result})
-
-        mapped = {r["app_id"]: r["result"] for r in results}
-        assert mapped["app1"]["status"] == "success"
-        assert mapped["app2"]["status"] == "success"
-
-    async def test_direct_synthesize_streams_tokens_and_returns_full_answer(
-        self, monkeypatch
-    ) -> None:
-        """Verify direct_synthesize: async for chunk in astream() works, writer called."""
+class TestSynthesize:
+    def test_streams_tokens(self, monkeypatch) -> None:
         emitted: list[dict] = []
 
-        def writer(event: dict) -> None:
-            emitted.append(event)
-
-        # Correct mock: get_llm().astream(prompt) must return an async generator
-        async def fake_stream(prompt):
+        async def fake_stream(_):
             yield MagicMock(content="Hello from direct!")
 
         mock_llm = MagicMock()
         mock_llm.astream = fake_stream
-        monkeypatch.setattr("core.agents.root.helpers.get_llm", lambda: mock_llm)
+        monkeypatch.setattr("core.agents.root.synthesis.get_llm", lambda: mock_llm)
 
-        messages = [HumanMessage(content="hi")]
-        result = await direct_synthesize(messages=messages, writer=writer, user_id="u1", store=None)
-
+        result = asyncio.run(
+            synthesize(
+                messages=[HumanMessage(content="hi")],
+                writer=lambda e: emitted.append(e),
+                user_id="u1",
+                store=None,
+            )
+        )
         assert result == "Hello from direct!"
         assert any(e.get("type") == "token" for e in emitted)
 
-    async def test_direct_synthesize_fails_closed_when_llm_raises(self, monkeypatch) -> None:
-        """direct_synthesize must not raise — it returns an error string on exception."""
+    def test_direct_synthesis_includes_installed_and_available_catalogs(self, monkeypatch) -> None:
+        captured_prompts: list[object] = []
+
+        async def fake_stream(prompt):
+            captured_prompts.append(prompt)
+            yield MagicMock(content="Use calendar.")
+
+        mock_llm = MagicMock()
+        mock_llm.astream = fake_stream
+        monkeypatch.setattr("core.agents.root.synthesis.get_llm", lambda: mock_llm)
+        monkeypatch.setattr(
+            "core.registry.PLUGIN_REGISTRY",
+            {
+                "calendar": {"manifest": type("Manifest", (), {"agent_description": "Manage events."})()},
+                "todo": {"manifest": type("Manifest", (), {"agent_description": "Manage tasks."})()},
+            },
+        )
+
+        result = asyncio.run(
+            synthesize(
+                messages=[HumanMessage(content="I need help scheduling")],
+                writer=lambda _: None,
+                user_id="u1",
+                store=None,
+                installed_app_ids=["calendar"],
+            )
+        )
+
+        assert result == "Use calendar."
+        assert len(captured_prompts) == 1
+        prompt = captured_prompts[0]
+        assert isinstance(prompt, list)
+        system_message = prompt[0]
+        assert "Manage events." in system_message.content
+        assert "Manage tasks." in system_message.content
+        assert "<installed_apps>" in system_message.content
+        assert "<available_apps>" in system_message.content
+
+    def test_fails_closed_when_llm_raises(self, monkeypatch) -> None:
         async def bad_stream(_):
-            await asyncio.sleep(0)  # yield once so the coroutine is "started"
+            await asyncio.sleep(0)
             raise RuntimeError("LLM is down")
+            yield None
 
         mock_llm = MagicMock()
         mock_llm.astream = bad_stream
-        monkeypatch.setattr("core.agents.root.helpers.get_llm", lambda: mock_llm)
+        monkeypatch.setattr("core.agents.root.synthesis.get_llm", lambda: mock_llm)
 
-        result = await direct_synthesize(
-            messages=[HumanMessage(content="hi")],
-            writer=lambda _: None,
-            user_id="u1",
-            store=None,
+        result = asyncio.run(
+            synthesize(
+                messages=[HumanMessage(content="hi")],
+                writer=lambda _: None,
+                user_id="u1",
+                store=None,
+            )
         )
         # Must not raise; must return an error string
         assert "error" in result.lower() or "LLM" in result
 
-    async def test_astream_completes_without_raising(self, monkeypatch) -> None:
-        """RootAgent.astream() must not raise on a well-formed request.
 
-        Verifies that the compile-time graph path (import → _build_entrypoint →
-        get_root_agent_graph) doesn't raise, and that the singleton is valid.
-        """
-        from unittest.mock import MagicMock
+# ─────────────────────────────────────────────────────────────────────────────
+# _parse_new_turn
+# ─────────────────────────────────────────────────────────────────────────────
 
-        from core.agents.root.agent import RootAgent
 
-        # Patch get_store so the singleton can be built without init_db()
-        mock_store = MagicMock()
+class TestParseNewTurn:
+    @staticmethod
+    def _stub_sanitizer(monkeypatch) -> None:
+        module = types.ModuleType("core.utils.sanitizer")
+
+        async def sanitize_user_content_async(text: str) -> tuple[str, list[str]]:
+            return text.lower(), []
+
+        module.sanitize_user_content_async = sanitize_user_content_async
+        monkeypatch.setitem(sys.modules, "core.utils.sanitizer", module)
+
+    def test_parses_user_message(self, monkeypatch) -> None:
+        from core.agents.root.agent import _parse_new_turn
+
+        self._stub_sanitizer(monkeypatch)
+        raw = [{"role": "user", "content": "hello world", "id": "msg-1"}]
+        out = asyncio.run(_parse_new_turn(raw))
+        assert len(out) == 1
+        assert out[0].content == "hello world"
+        assert out[0].id == "msg-1"
+
+    def test_parses_multimodal_user_message(self, monkeypatch) -> None:
+        from core.agents.root.agent import _parse_new_turn
+
+        self._stub_sanitizer(monkeypatch)
+        raw = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "Check this"},
+                    {"type": "image_url", "image_url": {"url": "http://x"}},
+                ],
+            }
+        ]
+        out = asyncio.run(_parse_new_turn(raw))
+        assert len(out) == 1
+        assert "check this" in out[0].content  # sanitizer lowercases
+
+    def test_ignores_assistant_and_tool_messages(self, monkeypatch) -> None:
+        from core.agents.root.agent import _parse_new_turn
+
+        self._stub_sanitizer(monkeypatch)
+        raw = [
+            {"role": "assistant", "content": "Hello"},
+            {"role": "user", "content": "hi"},
+            {"role": "tool", "content": "result"},
+        ]
+        out = asyncio.run(_parse_new_turn(raw))
+        assert len(out) == 1
+        assert out[0].content == "hi"
+
+    def test_returns_empty_list_when_no_user_message(self, monkeypatch) -> None:
+        from core.agents.root.agent import _parse_new_turn
+
+        self._stub_sanitizer(monkeypatch)
+        raw = [{"role": "assistant", "content": "Hello"}]
+        out = asyncio.run(_parse_new_turn(raw))
+        assert out == []
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Graph singleton + refresh
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class TestGraphSingleton:
+    def test_returns_same_instance(self, monkeypatch) -> None:
+        from core.agents.root.graph import get_root_agent_graph
+
+        mock_store = InMemoryStore()
+        mock_checkpointer = InMemorySaver()
         monkeypatch.setattr("core.db.get_store", lambda: mock_store)
+        monkeypatch.setattr("core.db.get_checkpointer", lambda: mock_checkpointer)
 
-        # Verify graph singleton is accessible and has the expected LangGraph methods
-        graph = get_root_agent_graph()
-        assert graph is not None
-        assert hasattr(graph, "astream")
-        assert hasattr(graph, "ainvoke")
+        # Reset the module-level singleton
+        import core.agents.root.graph as graph_module
 
-        # Verify RootAgent.__init__ is a no-op (singleton lives in graph.py)
-        agent = RootAgent()
-        assert agent is not None
+        graph_module._root_agent_graph = None
 
-        # Verify refresh() invalidates the singleton
+        g1 = get_root_agent_graph()
+        g2 = get_root_agent_graph()
+        assert g1 is g2
+
+    def test_refresh_invalidates_singleton(self, monkeypatch) -> None:
+        from core.agents.root.graph import get_root_agent_graph, refresh_graph
+
+        mock_store = InMemoryStore()
+        mock_checkpointer = InMemorySaver()
+        monkeypatch.setattr("core.db.get_store", lambda: mock_store)
+        monkeypatch.setattr("core.db.get_checkpointer", lambda: mock_checkpointer)
+
+        import core.agents.root.graph as graph_module
+
+        graph_module._root_agent_graph = None
+
+        g1 = get_root_agent_graph()
         refresh_graph()
-        graph2 = get_root_agent_graph()
-        assert graph2 is not None
-
-
+        g2 = get_root_agent_graph()
+        assert g1 is not g2

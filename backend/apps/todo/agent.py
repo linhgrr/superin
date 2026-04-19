@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from langchain_core.tools import BaseTool
+from pymongo.asynchronous.client_session import AsyncClientSession
 
 from apps.todo.prompts import get_todo_prompt
 from apps.todo.service import task_service
@@ -32,7 +33,6 @@ from apps.todo.tools import (
     todo_update_task,
 )
 from core.agents.base_app import BaseAppAgent
-from shared.agent_context import set_user_context
 
 
 class TodoAgent(BaseAppAgent):
@@ -72,6 +72,12 @@ class TodoAgent(BaseAppAgent):
     def build_prompt(self) -> str:
         return get_todo_prompt()
 
+    async def on_install(self, user_id: str, session: AsyncClientSession | None = None) -> None:
+        await task_service.on_install(user_id, session=session)
+
+    async def on_uninstall(self, user_id: str, session: AsyncClientSession | None = None) -> None:
+        await task_service.on_uninstall(user_id, session=session)
+
     def get_task_finder(self) -> TodoTaskFinder:
         """Return a TaskFinder backed by TodoAgent's TaskService."""
         return TodoTaskFinder()
@@ -106,15 +112,6 @@ class TodoTaskFinder:
             include_archived=include_archived,
             limit=limit,
         )
-
-    async def on_install(self, user_id: str) -> None:
-        set_user_context(user_id)
-        await task_service.on_install(user_id)
-
-    async def on_uninstall(self, user_id: str) -> None:
-        set_user_context(user_id)
-        await task_service.on_uninstall(user_id)
-
 
 if TYPE_CHECKING:
     from apps.todo.models import Task

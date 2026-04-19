@@ -19,6 +19,7 @@ class FakeInstallCollection:
 class FakeDatabase:
     def __init__(self, previous: dict | None) -> None:
         self.collection = FakeInstallCollection(previous)
+        self.client = FakeMongoClient()
 
     def __getitem__(self, name: str) -> FakeInstallCollection:
         assert name == "user_app_installations"
@@ -55,8 +56,23 @@ class FakeWidgetPreference:
         return FakeQuery(FakeWidgetPreference.existing)
 
     @staticmethod
-    async def insert_many(documents):
+    async def insert_many(documents, session=None):
         FakeWidgetPreference.inserted = documents
+
+
+class FakeWidgetDataConfig:
+    user_id = FakeField("user_id")
+
+    def __init__(self, **kwargs) -> None:
+        self.__dict__.update(kwargs)
+
+    @staticmethod
+    def find(*_args, **_kwargs):
+        return FakeQuery([])
+
+    @staticmethod
+    async def insert_many(documents, session=None):
+        return None
 
 
 class FakeInstallationField:
@@ -76,7 +92,7 @@ class FakeInstallation:
         self.status = status
         self.saved = False
 
-    async def save(self) -> None:
+    async def save(self, session=None) -> None:
         self.saved = True
 
 
@@ -87,8 +103,24 @@ class FakeUserAppInstallation:
     installation = None
 
     @staticmethod
-    async def find_one(*_args):
+    async def find_one(*_args, **_kwargs):
         return FakeUserAppInstallation.installation
+
+
+class FakeSession:
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+
+    def start_transaction(self):
+        return self
+
+
+class FakeMongoClient:
+    async def start_session(self):
+        return FakeSession()
 
 
 async def test_install_app_for_user_installs_and_seeds_widgets(monkeypatch) -> None:
@@ -116,6 +148,7 @@ async def test_install_app_for_user_installs_and_seeds_widgets(monkeypatch) -> N
     monkeypatch.setattr(catalog_service, "get_plugin", lambda app_id: plugin if app_id == "finance" else None)
     monkeypatch.setattr(catalog_service, "get_db", lambda: FakeDatabase(previous=None))
     monkeypatch.setattr(catalog_service, "WidgetPreference", FakeWidgetPreference)
+    monkeypatch.setattr(catalog_service, "WidgetDataConfig", FakeWidgetDataConfig)
     monkeypatch.setattr(catalog_service, "In", lambda field, values: ("in", field, values))
 
     result = await catalog_service.install_app_for_user(
@@ -144,6 +177,7 @@ async def test_install_app_for_user_returns_already_installed_without_hooks(monk
 
     monkeypatch.setattr(catalog_service, "get_plugin", lambda app_id: plugin if app_id == "finance" else None)
     monkeypatch.setattr(catalog_service, "get_db", lambda: db)
+    monkeypatch.setattr(catalog_service, "WidgetDataConfig", FakeWidgetDataConfig)
 
     result = await catalog_service.install_app_for_user(
         "64f000000000000000000001",
@@ -170,6 +204,32 @@ async def test_install_app_for_user_rejects_unknown_app(monkeypatch) -> None:
     assert exc_info.value.app_id == "missing"
 
 
+async def test_install_app_for_user_uses_effective_tier_for_paid_gate(monkeypatch) -> None:
+    plugin = {
+        "manifest": SimpleNamespace(
+            name="Finance",
+            widgets=[],
+            requires_tier=catalog_service.SubscriptionTier.PAID,
+        ),
+        "agent": SimpleNamespace(on_install=None),
+    }
+
+    async def fake_get_effective_tier(_user_id: str):
+        return catalog_service.SubscriptionTier.FREE
+
+    monkeypatch.setattr(catalog_service, "get_plugin", lambda app_id: plugin if app_id == "finance" else None)
+    monkeypatch.setattr(catalog_service, "get_effective_tier", fake_get_effective_tier)
+
+    with pytest.raises(catalog_service.InsufficientTierError) as exc_info:
+        await catalog_service.install_app_for_user(
+            "64f000000000000000000001",
+            "finance",
+        )
+
+    assert exc_info.value.app_id == "finance"
+    assert exc_info.value.required_tier == catalog_service.SubscriptionTier.PAID
+
+
 async def test_uninstall_app_for_user_disables_installation(monkeypatch) -> None:
     uninstall_calls: list[str] = []
     installation = FakeInstallation(status="active")
@@ -183,6 +243,7 @@ async def test_uninstall_app_for_user_disables_installation(monkeypatch) -> None
 
     plugin["agent"].on_uninstall = fake_on_uninstall
     monkeypatch.setattr(catalog_service, "get_plugin", lambda app_id: plugin if app_id == "finance" else None)
+    monkeypatch.setattr(catalog_service, "get_db", lambda: FakeDatabase(previous=None))
     FakeUserAppInstallation.installation = installation
     monkeypatch.setattr(catalog_service, "UserAppInstallation", FakeUserAppInstallation)
 
@@ -208,6 +269,7 @@ async def test_uninstall_app_for_user_returns_already_uninstalled(monkeypatch) -
     }
 
     monkeypatch.setattr(catalog_service, "get_plugin", lambda app_id: plugin if app_id == "finance" else None)
+    monkeypatch.setattr(catalog_service, "get_db", lambda: FakeDatabase(previous=None))
     FakeUserAppInstallation.installation = None
     monkeypatch.setattr(catalog_service, "UserAppInstallation", FakeUserAppInstallation)
 

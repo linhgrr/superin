@@ -3,8 +3,6 @@ import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
 
 import { getWorkspaceBootstrap } from "@/api/workspace";
-import { clearActiveApps } from "@/lib/lazy-registry";
-import { mergePreferenceUpdates } from "@/pages/dashboard/preference-utils";
 import type {
   AppCatalogEntry,
   AppRuntimeEntry,
@@ -12,17 +10,25 @@ import type {
   WidgetPreferenceSchema,
   WorkspaceBootstrap,
 } from "@/types/generated";
-
-interface WorkspaceEntities {
-  installedAppOrder: string[];
-  installedAppsById: Record<string, AppRuntimeEntry>;
-  widgetPreferencesById: Record<string, WidgetPreferenceSchema>;
-}
+import {
+  createHydratedWorkspaceState,
+  createResetWorkspaceState,
+  createWorkspaceEntitiesState,
+  getInstalledAppsSnapshot,
+  getWidgetPreferencesSnapshot,
+  getWorkspaceErrorMessage,
+  indexWidgetPreferences,
+  initialWorkspaceState,
+  isActiveRefreshRequest,
+  reduceInstalledAppChange,
+  reducePreferenceUpdates,
+} from "./workspaceState";
 
 interface WorkspaceStoreState {
   installedAppIds: Set<string>;
   installedAppOrder: string[];
   installedAppsById: Record<string, AppRuntimeEntry>;
+  workspaceError: string | null;
   isWorkspaceLoading: boolean;
   isWorkspaceRefreshing: boolean;
   refreshRequestId: number;
@@ -38,138 +44,22 @@ interface WorkspaceStoreState {
   setAppInstalled: (app: AppCatalogEntry, isInstalled: boolean) => void;
 }
 
-function toRuntimeApp(app: AppCatalogEntry): AppRuntimeEntry {
-  return {
-    id: app.id,
-    name: app.name,
-    description: app.description,
-    icon: app.icon,
-    color: app.color,
-    category: app.category,
-    version: app.version,
-    author: app.author,
-    widgets: app.widgets ?? [],
-  };
-}
-
-function toInstalledAppIds(installedApps: AppRuntimeEntry[]): Set<string> {
-  return new Set(installedApps.map((app) => app.id));
-}
-
-function normalizeWorkspaceEntities(
-  installedApps: AppRuntimeEntry[],
-  widgetPreferences: WidgetPreferenceSchema[]
-): WorkspaceEntities {
-  return {
-    installedAppOrder: installedApps.map((app) => app.id),
-    installedAppsById: indexInstalledApps(installedApps),
-    widgetPreferencesById: indexWidgetPreferences(widgetPreferences),
-  };
-}
-
-function indexInstalledApps(installedApps: AppRuntimeEntry[]): Record<string, AppRuntimeEntry> {
-  const installedAppsById: Record<string, AppRuntimeEntry> = {};
-
-  for (const app of installedApps) {
-    installedAppsById[app.id] = app;
-  }
-
-  return installedAppsById;
-}
-
-function indexWidgetPreferences(
-  widgetPreferences: WidgetPreferenceSchema[]
-): Record<string, WidgetPreferenceSchema> {
-  const widgetPreferencesById: Record<string, WidgetPreferenceSchema> = {};
-
-  for (const preference of widgetPreferences) {
-    widgetPreferencesById[preference.widget_id] = preference;
-  }
-
-  return widgetPreferencesById;
-}
-
-function getInstalledAppsSnapshot(
-  state: Pick<WorkspaceStoreState, "installedAppOrder" | "installedAppsById">
-) {
-  return state.installedAppOrder
-    .map((appId) => state.installedAppsById[appId])
-    .filter((app): app is AppRuntimeEntry => Boolean(app));
-}
-
-function getWidgetPreferencesSnapshot(
-  state: Pick<WorkspaceStoreState, "widgetPreferencesById">
-) {
-  return Object.values(state.widgetPreferencesById);
-}
-
-const initialState = {
-  installedAppIds: new Set<string>(),
-  installedAppOrder: [],
-  installedAppsById: {},
-  isWorkspaceLoading: true,
-  isWorkspaceRefreshing: false,
-  refreshRequestId: 0,
-  sessionRevision: 0,
-  userId: null,
-  widgetPreferencesById: {},
-} satisfies Pick<
-  WorkspaceStoreState,
-  | "installedAppIds"
-  | "installedAppOrder"
-  | "installedAppsById"
-  | "isWorkspaceLoading"
-  | "isWorkspaceRefreshing"
-  | "refreshRequestId"
-  | "sessionRevision"
-  | "userId"
-  | "widgetPreferencesById"
->;
-
 export const useWorkspaceStore = create<WorkspaceStoreState>((set, get) => ({
-  ...initialState,
+  ...initialWorkspaceState,
   applyPreferenceUpdates: (updates) => {
-    set((state) => {
-      const widgetPreferences = mergePreferenceUpdates(
-        getWidgetPreferencesSnapshot(state),
-        updates
-      );
-
-      return normalizeWorkspaceEntities(getInstalledAppsSnapshot(state), widgetPreferences);
-    });
+    set((state) => reducePreferenceUpdates(state, updates));
   },
   hydrateWorkspace: (userId, snapshot) => {
     const nextSessionRevision = get().sessionRevision + 1;
-
-    if (!snapshot) {
-      set({
-        installedAppIds: new Set<string>(),
-        installedAppOrder: [],
-        installedAppsById: {},
-        isWorkspaceLoading: true,
-        isWorkspaceRefreshing: false,
-        sessionRevision: nextSessionRevision,
-        userId,
-        widgetPreferencesById: {},
-      });
-      return;
-    }
-
-    get().internal_applyWorkspace(snapshot);
-    set({
-      isWorkspaceLoading: false,
-      isWorkspaceRefreshing: false,
-      sessionRevision: nextSessionRevision,
-      userId,
-    });
+    set(createHydratedWorkspaceState(userId, nextSessionRevision, snapshot));
   },
   internal_applyWorkspace: (workspace) => {
-    const installedApps = workspace.installed_apps ?? [];
-    const widgetPreferences = workspace.widget_preferences ?? [];
-
     set({
-      installedAppIds: toInstalledAppIds(installedApps),
-      ...normalizeWorkspaceEntities(installedApps, widgetPreferences),
+      ...createWorkspaceEntitiesState(
+        workspace.installed_apps ?? [],
+        workspace.widget_preferences ?? []
+      ),
+      workspaceError: null,
     });
   },
   refreshWorkspace: async () => {
@@ -185,25 +75,26 @@ export const useWorkspaceStore = create<WorkspaceStoreState>((set, get) => ({
     set({
       isWorkspaceRefreshing: true,
       refreshRequestId: requestId,
+      workspaceError: null,
     });
 
     try {
       const workspace = await getWorkspaceBootstrap();
-      if (
-        get().refreshRequestId !== requestId ||
-        get().sessionRevision !== sessionRevision ||
-        get().userId !== userId
-      ) {
+      if (!isActiveRefreshRequest(get(), requestId, sessionRevision, userId)) {
         return;
       }
 
       get().internal_applyWorkspace(workspace);
+    } catch (error) {
+      if (isActiveRefreshRequest(get(), requestId, sessionRevision, userId)) {
+        set({
+          workspaceError: getWorkspaceErrorMessage(error),
+        });
+      }
+
+      throw error;
     } finally {
-      if (
-        get().refreshRequestId === requestId &&
-        get().sessionRevision === sessionRevision &&
-        get().userId === userId
-      ) {
+      if (isActiveRefreshRequest(get(), requestId, sessionRevision, userId)) {
         set({
           isWorkspaceLoading: false,
           isWorkspaceRefreshing: false,
@@ -217,59 +108,10 @@ export const useWorkspaceStore = create<WorkspaceStoreState>((set, get) => ({
     });
   },
   resetWorkspace: () => {
-    clearActiveApps();
-    set({
-      ...initialState,
-      isWorkspaceLoading: false,
-      sessionRevision: get().sessionRevision + 1,
-    });
+    set(createResetWorkspaceState(get().sessionRevision + 1));
   },
   setAppInstalled: (app, isInstalled) => {
-    const runtimeApp = toRuntimeApp(app);
-
-    set((state) => {
-      const installedApps = getInstalledAppsSnapshot(state);
-      const widgetPreferences = getWidgetPreferencesSnapshot(state);
-      const nextInstalledApps = isInstalled
-        ? state.installedAppIds.has(app.id)
-          ? installedApps.map((entry) => (entry.id === app.id ? runtimeApp : entry))
-          : [...installedApps, runtimeApp]
-        : installedApps.filter((entry) => entry.id !== app.id);
-
-      const nextPreferences = new Map(
-        widgetPreferences.map((pref) => [pref.widget_id, pref] as const)
-      );
-
-      if (isInstalled) {
-        for (const [index, widget] of (app.widgets ?? []).entries()) {
-          if (nextPreferences.has(widget.id)) continue;
-
-          nextPreferences.set(widget.id, {
-            _id: null,
-            user_id: state.userId ?? "",
-            widget_id: widget.id,
-            app_id: app.id,
-            enabled: true,
-            sort_order: index,
-            grid_x: 0,
-            grid_y: index * 2,
-            size_w: null,
-            size_h: null,
-          });
-        }
-      } else {
-        for (const pref of widgetPreferences) {
-          if (pref.app_id === app.id) {
-            nextPreferences.delete(pref.widget_id);
-          }
-        }
-      }
-
-      return {
-        installedAppIds: toInstalledAppIds(nextInstalledApps),
-        ...normalizeWorkspaceEntities(nextInstalledApps, Array.from(nextPreferences.values())),
-      };
-    });
+    set((state) => reduceInstalledAppChange(state, app, isInstalled));
   },
 }));
 
@@ -277,6 +119,7 @@ export const workspaceSelectors = {
   installedAppIds: (state: WorkspaceStoreState) => state.installedAppIds,
   isWorkspaceLoading: (state: WorkspaceStoreState) => state.isWorkspaceLoading,
   isWorkspaceRefreshing: (state: WorkspaceStoreState) => state.isWorkspaceRefreshing,
+  workspaceError: (state: WorkspaceStoreState) => state.workspaceError,
   refreshWorkspace: (state: WorkspaceStoreState) => state.refreshWorkspace,
   applyPreferenceUpdates: (state: WorkspaceStoreState) => state.applyPreferenceUpdates,
   hydrateWorkspace: (state: WorkspaceStoreState) => state.hydrateWorkspace,

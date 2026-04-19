@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { ROUTES } from "@/constants";
+import { ROUTES } from "@/constants/routes";
 import { DynamicIcon } from "@/lib/icon-resolver";
 import { useAuth } from "@/hooks/useAuth";
 import { platformUiSelectors, usePlatformUiStore } from "@/stores/platform/platformUiStore";

@@ -2,14 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-
+from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
 
 from apps.calendar.service import calendar_service
-from core.utils.timezone import ensure_aware_utc
-from shared.agent_context import get_user_context
-from shared.tool_results import safe_tool_call
+from shared.tool_results import run_time_aware_tool_with_user, run_tool_with_user
 
 
 @tool("calendar_schedule_event")
@@ -18,6 +15,7 @@ async def calendar_schedule_event(
     start: str,
     end: str,
     calendar_id: str,
+    config: RunnableConfig,
     description: str | None = None,
     location: str | None = None,
     is_all_day: bool = False,
@@ -38,10 +36,9 @@ async def calendar_schedule_event(
 
     Returns created event or list of conflicts (if any).
     """
-    async def operation() -> dict:
-        user_id = get_user_context()
-        start_dt = ensure_aware_utc(datetime.fromisoformat(start))
-        end_dt = ensure_aware_utc(datetime.fromisoformat(end))
+    async def operation(user_id: str, temporal: dict, _time_context) -> dict:
+        start_dt = temporal["start"]
+        end_dt = temporal["end"]
 
         conflicts = await calendar_service.check_conflicts(
             user_id, start_dt, end_dt, exclude_event_id=None
@@ -78,7 +75,13 @@ async def calendar_schedule_event(
             "had_conflicts": len(conflicts) > 0,
         }
 
-    return await safe_tool_call(operation, action="scheduling event")
+    return await run_time_aware_tool_with_user(
+        config,
+        action="scheduling event",
+        payload={"start": start, "end": end},
+        temporal_fields={"start": "local_datetime", "end": "local_datetime"},
+        operation=operation,
+    )
 
 
 @tool("calendar_reschedule_event")
@@ -86,6 +89,7 @@ async def calendar_reschedule_event(
     event_id: str,
     new_start: str,
     new_end: str,
+    config: RunnableConfig,
     allow_conflicts: bool = False,
 ) -> dict:
     """
@@ -96,10 +100,9 @@ async def calendar_reschedule_event(
     - "Move my meeting to 3pm"
     - "Reschedule tomorrow's dentist to next week"
     """
-    async def operation() -> dict:
-        user_id = get_user_context()
-        new_start_dt = ensure_aware_utc(datetime.fromisoformat(new_start))
-        new_end_dt = ensure_aware_utc(datetime.fromisoformat(new_end))
+    async def operation(user_id: str, temporal: dict, _time_context) -> dict:
+        new_start_dt = temporal["new_start"]
+        new_end_dt = temporal["new_end"]
 
         conflicts = await calendar_service.check_conflicts(
             user_id, new_start_dt, new_end_dt, exclude_event_id=event_id
@@ -128,12 +131,19 @@ async def calendar_reschedule_event(
             "had_conflicts": len(conflicts) > 0,
         }
 
-    return await safe_tool_call(operation, action="rescheduling event")
+    return await run_time_aware_tool_with_user(
+        config,
+        action="rescheduling event",
+        payload={"new_start": new_start, "new_end": new_end},
+        temporal_fields={"new_start": "local_datetime", "new_end": "local_datetime"},
+        operation=operation,
+    )
 
 
 @tool("calendar_edit_event")
 async def calendar_edit_event(
     event_id: str,
+    config: RunnableConfig,
     title: str | None = None,
     description: str | None = None,
     location: str | None = None,
@@ -149,8 +159,7 @@ async def calendar_edit_event(
     - "Add location: Conference Room B"
     - "Change the meeting description"
     """
-    async def operation() -> dict:
-        user_id = get_user_context()
+    async def operation(user_id: str) -> dict:
 
         kwargs = {
             k: v
@@ -167,12 +176,17 @@ async def calendar_edit_event(
 
         return await calendar_service.update_event(event_id, user_id, **kwargs)
 
-    return await safe_tool_call(operation, action="editing event")
+    return await run_tool_with_user(
+        config,
+        action="editing event",
+        operation=operation,
+    )
 
 
 @tool("calendar_cancel_event")
 async def calendar_cancel_event(
     event_id: str,
+    config: RunnableConfig,
     permanent: bool = True,
 ) -> dict:
     """
@@ -182,8 +196,7 @@ async def calendar_cancel_event(
     - "Cancel my meeting tomorrow"
     - "Delete the dentist appointment"
     """
-    async def operation() -> dict:
-        user_id = get_user_context()
+    async def operation(user_id: str) -> dict:
         result = await calendar_service.delete_event(event_id, user_id)
         return {
             "success": True,
@@ -191,11 +204,16 @@ async def calendar_cancel_event(
             "id": event_id,
         }
 
-    return await safe_tool_call(operation, action="cancelling event")
+    return await run_tool_with_user(
+        config,
+        action="cancelling event",
+        operation=operation,
+    )
 
 
 @tool("calendar_find_events")
 async def calendar_find_events(
+    config: RunnableConfig,
     query: str | None = None,
     start: str | None = None,
     end: str | None = None,
@@ -210,14 +228,19 @@ async def calendar_find_events(
     - "Find my meeting with John"
     - "Show me events for next week"
     """
-    async def operation() -> list[dict]:
-        user_id = get_user_context()
+    async def operation(user_id: str, temporal: dict, _time_context) -> list[dict]:
 
         if query:
             return await calendar_service.search_events(user_id, query, limit)
 
-        start_dt = ensure_aware_utc(datetime.fromisoformat(start)) if start else None
-        end_dt = ensure_aware_utc(datetime.fromisoformat(end)) if end else None
+        start_dt = temporal.get("start")
+        end_dt = temporal.get("end")
         return await calendar_service.list_events(user_id, start_dt, end_dt, calendar_id, limit)
 
-    return await safe_tool_call(operation, action="finding events")
+    return await run_time_aware_tool_with_user(
+        config,
+        action="finding events",
+        payload={"start": start, "end": end},
+        temporal_fields={"start": "local_datetime", "end": "local_datetime"},
+        operation=operation,
+    )

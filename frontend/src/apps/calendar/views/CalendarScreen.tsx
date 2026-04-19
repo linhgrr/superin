@@ -30,6 +30,10 @@ import type { EventFormData } from "../components/CreateEventModal";
 
 export type ViewMode = "list" | "week";
 const CALENDAR_EVENT_TYPE: CreateEventRequest["type"] = "event";
+interface EventSlotSelection {
+  date: Date;
+  startMinutes: number;
+}
 
 export default function CalendarScreen() {
   const { timezone, getWeekBoundaries } = useTimezone();
@@ -38,7 +42,7 @@ export default function CalendarScreen() {
   const [viewMode, setViewMode] = useState<ViewMode>("week");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedCalendar, setSelectedCalendar] = useState<string | null>(null);
-  const [newEventDate, setNewEventDate] = useState<Date | null>(null);
+  const [newEventSlot, setNewEventSlot] = useState<EventSlotSelection | null>(null);
   const [selectedEventForUpdate, setSelectedEventForUpdate] = useState<EventRead | null>(null);
   const [eventToDeleteId, setEventToDeleteId] = useState<string | null>(null);
   const {
@@ -60,8 +64,8 @@ export default function CalendarScreen() {
   // SWR data — query with UTC ISO range
   const { data: calendars = [], isLoading: calendarsLoading } = useCalendars();
   const { data: events = [], isLoading: eventsLoading } = useEvents(
-    weekInfo.weekDatesUtcIso[0],
-    weekInfo.weekDatesUtcIso[6],
+    weekInfo.rangeStartUtcIso,
+    weekInfo.rangeEndUtcIso,
     selectedCalendar ?? undefined,
     200,
   );
@@ -96,15 +100,16 @@ export default function CalendarScreen() {
   const goToToday = useCallback(() => setCurrentDate(new Date()), []);
 
   const handleCellClick = useCallback((date: Date, hour: number) => {
-    const newDate = new Date(date);
-    newDate.setHours(hour, 0, 0, 0);
-    setNewEventDate(newDate);
+    setNewEventSlot({
+      date,
+      startMinutes: hour * 60,
+    });
     openCreateEventModal();
   }, [openCreateEventModal]);
 
   const closeCreateEventModal = useCallback(() => {
     closeCreateEventDisclosure();
-    setNewEventDate(null);
+    setNewEventSlot(null);
   }, [closeCreateEventDisclosure]);
 
   const closeDeleteConfirmModal = useCallback(() => {
@@ -124,11 +129,11 @@ export default function CalendarScreen() {
   );
 
   // ── Event creation ────────────────────────────────────────────────────────
-  // buildUtcIsoStringFromDate: uses Date(year,month,day,h,m,s,ms) constructor
-  // → JS interprets all args as LOCAL time → .toISOString() produces correct UTC
+  // buildUtcIsoStringFromDate converts the selected calendar day in the user's
+  // configured timezone into a UTC ISO string for the API.
   const handleCreateEvent = useCallback(
     async (formData: EventFormData) => {
-      if (!newEventDate) return;
+      if (!newEventSlot) return;
       if (calendars.length === 0) {
         toast.error("Please create a calendar first.");
         return;
@@ -142,8 +147,8 @@ export default function CalendarScreen() {
       try {
         await swrCreateEvent({
           title: formData.title,
-          start_datetime: buildUtcIsoStringFromDate(newEventDate, start_hour, start_min),
-          end_datetime: buildUtcIsoStringFromDate(newEventDate, end_hour, end_min),
+          start_datetime: buildUtcIsoStringFromDate(newEventSlot.date, start_hour, start_min, timezone),
+          end_datetime: buildUtcIsoStringFromDate(newEventSlot.date, end_hour, end_min, timezone),
           calendar_id: formData.calendar_id,
           is_all_day: formData.is_all_day,
           description: formData.description || null,
@@ -160,7 +165,7 @@ export default function CalendarScreen() {
         toast.error(errorMessage);
       }
     },
-    [calendars, closeCreateEventModal, newEventDate, toast],
+    [calendars, closeCreateEventModal, newEventSlot, timezone, toast],
   );
 
   const handleUpdateEvent = useCallback(
@@ -176,8 +181,8 @@ export default function CalendarScreen() {
       try {
         await swrUpdateEvent(eventId, {
           title: formData.title,
-          start_datetime: buildUtcIsoStringFromDate(date, start_hour, start_min),
-          end_datetime: buildUtcIsoStringFromDate(date, end_hour, end_min),
+          start_datetime: buildUtcIsoStringFromDate(date, start_hour, start_min, timezone),
+          end_datetime: buildUtcIsoStringFromDate(date, end_hour, end_min, timezone),
           calendar_id: formData.calendar_id,
           is_all_day: formData.is_all_day,
           description: formData.description || null,
@@ -188,7 +193,7 @@ export default function CalendarScreen() {
         console.error("Failed to update event:", err);
       }
     },
-    [selectedEventForUpdate],
+    [selectedEventForUpdate, timezone],
   );
 
   const handleDeleteEvent = useCallback(
@@ -258,10 +263,11 @@ export default function CalendarScreen() {
           onCreate={handleCreateCalendar}
         />
       ) : null}
-      {isCreateEventModalOpen && newEventDate && !selectedEventForUpdate && (
+      {isCreateEventModalOpen && newEventSlot && !selectedEventForUpdate && (
         <CreateEventModal
-          date={newEventDate}
+          date={newEventSlot.date}
           calendars={calendars}
+          initialStartMinutes={newEventSlot.startMinutes}
           onClose={closeCreateEventModal}
           onCreate={handleCreateEvent}
         />

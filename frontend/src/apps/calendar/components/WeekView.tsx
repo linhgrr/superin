@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { HOURS, HOUR_HEIGHT, DAY_NAMES } from "../utils/dateHelpers";
 import { computeOverlappingEvents, computeEventPosition, formatEventTime, getColorStyleForEvent, splitEventsByType } from "../utils/eventHelpers";
-import { isSameDayAs } from "@/shared/utils/datetime";
+import { getDateKey, isSameDayAs } from "@/shared/utils/datetime";
 import type { CalendarRead, EventRead } from "../api";
 import { useTimezone } from "@/shared/hooks/useTimezone";
 import "./WeekView.css";
@@ -15,15 +15,16 @@ interface WeekViewProps {
 }
 
 export function WeekView({ weekDates, calendars: _calendars, events, onCellClick, onEventClick }: WeekViewProps) {
-  const { timezone } = useTimezone();
+  const { formatDate, timezone } = useTimezone();
   const today = new Date();
 
   // Memoize per-day filtering — uses isSameDayAs which takes explicit timezone
   const dayEventsMap = useMemo(() => {
     const map = new Map<string, EventRead[]>();
     for (const date of weekDates) {
+      const dateKey = getDateKey(date, timezone);
       map.set(
-        date.toDateString(),
+        dateKey,
         events.filter((e) => isSameDayAs(e.start_datetime, date, timezone)),
       );
     }
@@ -34,8 +35,9 @@ export function WeekView({ weekDates, calendars: _calendars, events, onCellClick
   const positionedEventsMap = useMemo(() => {
     const map = new Map<string, ReturnType<typeof computeOverlappingEvents>>();
     for (const date of weekDates) {
-      const dayEvents = dayEventsMap.get(date.toDateString()) ?? [];
-      map.set(date.toDateString(), computeOverlappingEvents(dayEvents, timezone));
+      const dateKey = getDateKey(date, timezone);
+      const dayEvents = dayEventsMap.get(dateKey) ?? [];
+      map.set(dateKey, computeOverlappingEvents(dayEvents, timezone));
     }
     return map;
   }, [dayEventsMap, timezone, weekDates]);
@@ -51,7 +53,7 @@ export function WeekView({ weekDates, calendars: _calendars, events, onCellClick
           return (
             <div key={i} className={`week-view__day-header${isToday ? " week-view__day-header--today" : ""}`}>
               <div className="week-view__day-name">{DAY_NAMES[i]}</div>
-              <div className="week-view__day-number">{date.getDate()}</div>
+              <div className="week-view__day-number">{formatDate(date, { day: "numeric" })}</div>
             </div>
           );
         })}
@@ -61,7 +63,7 @@ export function WeekView({ weekDates, calendars: _calendars, events, onCellClick
       <div className="week-view__all-day-row">
         <div className="week-view__all-day-label">All day</div>
         {weekDates.map((date, i) => {
-          const dayEvents = dayEventsMap.get(date.toDateString()) ?? [];
+          const dayEvents = dayEventsMap.get(getDateKey(date, timezone)) ?? [];
           const { allDay } = splitEventsByType(dayEvents, timezone);
           return (
             <div key={i} className="week-view__all-day-cell">
@@ -91,7 +93,7 @@ export function WeekView({ weekDates, calendars: _calendars, events, onCellClick
 
         {/* Day columns */}
         {weekDates.map((date, dayIndex) => {
-          const positioned = positionedEventsMap.get(date.toDateString()) ?? [];
+          const positioned = positionedEventsMap.get(getDateKey(date, timezone)) ?? [];
           const isToday = isSameDayAs(date, today, timezone);
 
           return (

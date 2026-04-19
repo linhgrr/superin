@@ -12,13 +12,13 @@ import {
 } from "./lazy-registry";
 import type { DashboardWidgetProps } from "./types";
 
-const appViewLoaders = import.meta.glob<AppViewModule>("../apps/*/AppView.tsx");
+const appViewScreenLoaders = import.meta.glob<AppViewModule>("../apps/*/views/*Screen.tsx");
 const dashboardWidgetLoaders =
   import.meta.glob<DashboardWidgetModule>("../apps/*/DashboardWidget.tsx");
 
 export function discoverAndRegisterApps(): AppMetadata[] {
   return registerAvailableApps(
-    appViewLoaders as Record<string, () => Promise<{ default: ComponentType }>>,
+    appViewScreenLoaders as Record<string, () => Promise<{ default: ComponentType }>>,
     dashboardWidgetLoaders as Record<
       string,
       () => Promise<{ default: ComponentType<DashboardWidgetProps> }>

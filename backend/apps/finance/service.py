@@ -657,31 +657,39 @@ class FinanceService:
 
     # ─── Install / Uninstall hooks ──────────────────────────────────────────────
 
-    async def on_install(self, user_id: str) -> None:
+    async def on_install(self, user_id: str, session: AsyncClientSession | None = None) -> None:
         """Seed default data for a new user."""
-        async with finance_transaction() as session:
-            if await self.wallets.count_by_user(user_id, session=session) == 0:
-                try:
-                    await self.wallets.create(
-                        user_id,
-                        "Main Wallet",
-                        "USD",
-                        session=session,
-                    )
-                except DuplicateKeyError:
-                    pass
+        if session is None:
+            async with finance_transaction() as tx_session:
+                await self.on_install(user_id, session=tx_session)
+            return
 
-            for name in ["Food", "Transport", "Entertainment", "Shopping", "Salary"]:
-                try:
-                    await self.categories.create(user_id, name, session=session)
-                except DuplicateKeyError:
-                    continue
+        if await self.wallets.count_by_user(user_id, session=session) == 0:
+            try:
+                await self.wallets.create(
+                    user_id,
+                    "Main Wallet",
+                    "USD",
+                    session=session,
+                )
+            except DuplicateKeyError:
+                pass
 
-    async def on_uninstall(self, user_id: str) -> None:
-        async with finance_transaction() as session:
-            await self.wallets.delete_all_by_user(user_id, session=session)
-            await self.categories.delete_all_by_user(user_id, session=session)
-            await self.transactions.delete_all_by_user(user_id, session=session)
+        for name in ["Food", "Transport", "Entertainment", "Shopping", "Salary"]:
+            try:
+                await self.categories.create(user_id, name, session=session)
+            except DuplicateKeyError:
+                continue
+
+    async def on_uninstall(self, user_id: str, session: AsyncClientSession | None = None) -> None:
+        if session is None:
+            async with finance_transaction() as tx_session:
+                await self.on_uninstall(user_id, session=tx_session)
+            return
+
+        await self.wallets.delete_all_by_user(user_id, session=session)
+        await self.categories.delete_all_by_user(user_id, session=session)
+        await self.transactions.delete_all_by_user(user_id, session=session)
 
 
 # ─── DTO helpers ───────────────────────────────────────────────────────────────

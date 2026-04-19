@@ -4,7 +4,7 @@
 
 import { createContext, ReactNode, useContext, useCallback, useState, useEffect, useRef, useMemo } from "react";
 import type { Driver } from "driver.js";
-import { STORAGE_KEYS } from "@/constants";
+import { STORAGE_KEYS } from "@/constants/storage";
 import { TOURS, type TourId } from "./onboarding-tours";
 
 interface OnboardingState {

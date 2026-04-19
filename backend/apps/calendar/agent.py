@@ -1,6 +1,7 @@
 """Calendar plugin LangGraph agent."""
 
 from langchain_core.tools import BaseTool
+from pymongo.asynchronous.client_session import AsyncClientSession
 
 from apps.calendar.prompts import get_calendar_prompt
 from apps.calendar.service import calendar_service
@@ -16,7 +17,6 @@ from apps.calendar.tools import (
     calendar_stop_recurring,
 )
 from core.agents.base_app import BaseAppAgent
-from shared.agent_context import set_user_context
 
 
 class CalendarAgent(BaseAppAgent):
@@ -44,10 +44,8 @@ class CalendarAgent(BaseAppAgent):
     def build_prompt(self) -> str:
         return get_calendar_prompt()
 
-    async def on_install(self, user_id: str) -> None:
-        set_user_context(user_id)
-        await calendar_service.on_install(user_id)
+    async def on_install(self, user_id: str, session: AsyncClientSession | None = None) -> None:
+        await calendar_service.on_install(user_id, session=session)
 
-    async def on_uninstall(self, user_id: str) -> None:
-        set_user_context(user_id)
-        await calendar_service.on_uninstall(user_id)
+    async def on_uninstall(self, user_id: str, session: AsyncClientSession | None = None) -> None:
+        await calendar_service.on_uninstall(user_id, session=session)

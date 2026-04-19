@@ -2,6 +2,8 @@
 
 from datetime import datetime
 
+from pymongo.asynchronous.client_session import AsyncClientSession
+
 from apps.todo.enums import RecurrenceFrequency
 from apps.todo.models import RecurringRule, SubTask, Task
 from apps.todo.repository import RecurringRuleRepository, SubTaskRepository, TaskRepository
@@ -325,8 +327,8 @@ class TaskService:
         await self.repo.delete(task)
         return {"success": True, "id": task_id}
 
-    async def on_install(self, user_id: str) -> None:
-        existing_tasks = await self.repo.find_by_user(user_id, limit=1)
+    async def on_install(self, user_id: str, session: AsyncClientSession | None = None) -> None:
+        existing_tasks = await self.repo.find_by_user(user_id, limit=1, session=session)
         if existing_tasks:
             return
 
@@ -335,10 +337,11 @@ class TaskService:
             title="Welcome to To-Do!",
             description="Add your first task using chat or the widget.",
             priority="low",
+            session=session,
         )
 
-    async def on_uninstall(self, user_id: str) -> None:
-        await self.repo.delete_all_by_user(user_id)
+    async def on_uninstall(self, user_id: str, session: AsyncClientSession | None = None) -> None:
+        await self.repo.delete_all_by_user(user_id, session=session)
 
 
 # ─── DTO helpers ───────────────────────────────────────────────────────────────

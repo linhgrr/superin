@@ -2,9 +2,9 @@ import { useCallback, useEffect, useState } from "react";
 import { DynamicIcon } from "@/lib/icon-resolver";
 import { useAsyncTask } from "@/hooks/useAsyncTask";
 import { useDisclosure } from "@/hooks/useDisclosure";
+import { AppModal } from "@/shared/components/AppModal";
 import { createWallet, getWallets, type WalletRead } from "../../api";
 import type { CreateWalletRequest } from "../../api";
-import Modal from "../../components/Modal";
 import SimpleForm from "../../components/SimpleForm";
 import WalletEditForm from "../../components/WalletEditForm";
 import { formatCurrency } from "../../lib/formatCurrency";
@@ -94,7 +94,7 @@ export default function WalletsTab() {
       )}
 
       {createWalletModal.isOpen && (
-        <Modal title="New Wallet" onClose={createWalletModal.close}>
+        <AppModal title="New Wallet" onClose={createWalletModal.close}>
           <SimpleForm
             fields={[
               { label: "Wallet Name", key: "name", placeholder: "e.g. Main Account" },
@@ -111,12 +111,12 @@ export default function WalletsTab() {
               void load();
             }}
           />
-        </Modal>
+        </AppModal>
       )}
 
       {/* Edit Modal */}
       {editingWallet && (
-        <Modal title="Edit Wallet" onClose={() => setEditingWallet(null)}>
+        <AppModal title="Edit Wallet" onClose={() => setEditingWallet(null)}>
           <WalletEditForm
             wallet={editingWallet}
             onSave={(updated) => {
@@ -127,7 +127,7 @@ export default function WalletsTab() {
             }}
             onCancel={() => setEditingWallet(null)}
           />
-        </Modal>
+        </AppModal>
       )}
     </div>
   );

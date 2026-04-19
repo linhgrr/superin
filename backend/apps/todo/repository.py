@@ -3,6 +3,7 @@
 from datetime import datetime
 
 from beanie import PydanticObjectId
+from pymongo.asynchronous.client_session import AsyncClientSession
 
 from apps.todo.enums import RecurrenceFrequency, TaskPriority, TaskStatus
 from apps.todo.models import RecurringRule, SubTask, Task
@@ -18,6 +19,8 @@ class TaskRepository:
         tag: str | None = None,
         include_archived: bool = False,
         limit: int = 20,
+        *,
+        session: AsyncClientSession | None = None,
     ) -> list[Task]:
         query: dict[str, object] = {"user_id": PydanticObjectId(user_id)}
 
@@ -32,7 +35,7 @@ class TaskRepository:
             query["tags"] = {"$in": [tag]}
 
         return (
-            await Task.find(query)
+            await Task.find(query, session=session)
             .sort("-created_at")
             .limit(limit)
             .to_list()
@@ -85,6 +88,8 @@ class TaskRepository:
         tags: list[str] | None = None,
         parent_task_id: str | None = None,
         reminder_minutes: int | None = None,
+        *,
+        session: AsyncClientSession | None = None,
     ) -> Task:
         task = Task(
             user_id=PydanticObjectId(user_id),
@@ -97,7 +102,7 @@ class TaskRepository:
             parent_task_id=PydanticObjectId(parent_task_id) if parent_task_id else None,
             reminder_minutes=reminder_minutes,
         )
-        await task.insert()
+        await task.insert(session=session)
         return task
 
     async def update(
@@ -164,10 +169,15 @@ class TaskRepository:
     async def delete(self, task: Task) -> None:
         await task.delete()
 
-    async def delete_all_by_user(self, user_id: str) -> int:
+    async def delete_all_by_user(
+        self,
+        user_id: str,
+        *,
+        session: AsyncClientSession | None = None,
+    ) -> int:
         count = 0
-        async for t in Task.find({"user_id": PydanticObjectId(user_id)}):
-            await t.delete()
+        async for t in Task.find({"user_id": PydanticObjectId(user_id)}, session=session):
+            await t.delete(session=session)
             count += 1
         return count
 

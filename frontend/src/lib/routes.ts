@@ -1,4 +1,4 @@
-import { ROUTE_NAMES, ROUTES } from "@/constants";
+import { ROUTE_NAMES, ROUTES } from "@/constants/routes";
 import type { AppRuntimeEntry } from "@/types/generated";
 
 function toTitleCase(value: string): string {

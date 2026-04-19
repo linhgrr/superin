@@ -12,8 +12,9 @@ import type {
   UpdateUserSettingsRequest,
   UserPublic,
 } from "@/types/generated";
-import { API_PATHS } from "@/constants";
-import { api, setAccessToken, clearAccessToken } from "./axios";
+import { API_PATHS } from "@/constants/api";
+import { clearAccessToken, setAccessToken } from "./auth-session";
+import { api } from "./axios";
 
 // POST /api/auth/login
 export async function login(payload: LoginRequest): Promise<TokenResponse> {

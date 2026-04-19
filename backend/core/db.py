@@ -1,8 +1,10 @@
 """Beanie MongoDB initialization and connection management."""
 
-from typing import Any
+from __future__ import annotations
 
-from langgraph.checkpoint.mongodb.aio import AsyncMongoDBSaver
+from typing import TYPE_CHECKING, Any
+
+from langgraph.checkpoint.mongodb import MongoDBSaver
 from langgraph.store.mongodb import MongoDBStore
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo import MongoClient
@@ -10,12 +12,15 @@ from pymongo import MongoClient
 from core.config import settings
 from core.utils.index_contract import validate_index_contract
 
+if TYPE_CHECKING:
+    from langgraph.checkpoint.base import BaseCheckpointSaver
+
 # ─── Global clients (set during lifespan) ─────────────────────────────────────
 
 _client: AsyncIOMotorClient | None = None
 _sync_client: MongoClient | None = None  # Required by MongoDBStore (sync pymongo)
 _store: MongoDBStore | None = None
-_checkpointer: AsyncMongoDBSaver | None = None
+_checkpointer: BaseCheckpointSaver | None = None
 
 
 async def init_db() -> None:
@@ -33,11 +38,11 @@ async def init_db() -> None:
     store_collection = _sync_client[settings.mongodb_database]["agent_store"]
     _store = MongoDBStore(store_collection)
 
-    _checkpointer = AsyncMongoDBSaver(
-        client=_client,
+    _checkpointer = MongoDBSaver(
+        client=_sync_client,
         db_name=settings.mongodb_database,
         checkpoint_collection_name="agent_checkpoints",
-        writes_collection_name="agent_checkpoint_writes"
+        writes_collection_name="agent_checkpoint_writes",
     )
 
     # Import here to avoid circular imports
@@ -45,8 +50,7 @@ async def init_db() -> None:
 
     from core.models import (
         AppCategory,
-        ConversationMessage,
- ThreadMeta,
+        ThreadMeta,
         TokenBlacklist,
         User,
         UserAppInstallation,
@@ -68,8 +72,7 @@ async def init_db() -> None:
             WidgetPreference,
             WidgetDataConfig,
             TokenBlacklist,
-            ConversationMessage,
- ThreadMeta,
+            ThreadMeta,
             Subscription,
             SubscriptionWebhookEvent,
             *get_plugin_models(),
@@ -96,13 +99,15 @@ def get_db():
         raise RuntimeError("Database not initialized. Call init_db() first.")
     return _client[settings.mongodb_database]
 
+
 def get_store() -> MongoDBStore:
     """Return the LangGraph Store connected to MongoDB."""
     if _store is None:
         raise RuntimeError("Store not initialized. Call init_db() first.")
     return _store
 
-def get_checkpointer() -> AsyncMongoDBSaver:
+
+def get_checkpointer() -> BaseCheckpointSaver:
     """Return the LangGraph Checkpointer connected to MongoDB."""
     if _checkpointer is None:
         raise RuntimeError("Checkpointer not initialized. Call init_db() first.")

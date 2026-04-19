@@ -1,7 +1,7 @@
 import useSWR from "swr";
 
 import type { ChatThreadMeta } from "@/api/chat";
-import { chatApi } from "@/api/chat";
+import { CHAT_THREADS_CACHE_KEY, chatApi } from "@/api/chat";
 import { swrConfig } from "@/lib/swr";
 
 export interface UseChatThreadsReturn {
@@ -13,7 +13,7 @@ export interface UseChatThreadsReturn {
 
 export function useChatThreads(): UseChatThreadsReturn {
   const threadsSwr = useSWR(
-    "chat/threads",
+    CHAT_THREADS_CACHE_KEY,
     () => chatApi.getThreads(),
     {
       ...swrConfig,

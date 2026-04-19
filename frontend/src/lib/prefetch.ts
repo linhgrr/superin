@@ -74,7 +74,7 @@ export function prefetchApp(appId: string): void {
 
 /**
  * Prefetch widget component for an app.
- * Widgets share the same chunk with AppView nên thường đã được load cùng.
+ * Widgets usually share the same app-local bundle as the screen module.
  */
 export function prefetchWidget(appId: string): void {
   loadWidget(appId, false);
@@ -88,9 +88,7 @@ export function primeWidget(appId: string): void {
   loadWidget(appId, true);
 }
 
-/**
- * Prefetch cả AppView và Widget cho một app.
- */
+/** Prefetch both the app screen and widget bundle for one app. */
 export function prefetchAppAndWidget(appId: string): void {
   prefetchApp(appId);
   prefetchWidget(appId);
@@ -114,10 +112,7 @@ export function prefetchHandlers(appId: string) {
   };
 }
 
-/**
- * Prefetch multiple apps at once (e.g., installed apps on dashboard).
- * Bao gồm cả widgets.
- */
+/** Prefetch multiple apps at once, including their widgets. */
 export function prefetchApps(appIds: string[]): () => void {
   const handles = appIds.map((appId, index) =>
     window.setTimeout(() => {

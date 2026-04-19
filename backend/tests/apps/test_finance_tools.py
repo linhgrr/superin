@@ -1,0 +1,82 @@
+from datetime import UTC, datetime
+from types import SimpleNamespace
+
+import pytest
+
+from apps.finance import tools as finance_tools
+from core.models import User
+
+
+@pytest.mark.asyncio
+async def test_finance_add_transaction_uses_user_timezone(monkeypatch) -> None:
+    user = SimpleNamespace(settings={"timezone": "Asia/Ho_Chi_Minh"})
+
+    async def fake_get(_user_id: str):
+        return user
+
+    observed: dict = {}
+
+    async def fake_add_transaction(
+        user_id: str,
+        wallet_id: str,
+        category_id: str,
+        type_: str,
+        amount: float,
+        date: datetime,
+        note: str | None = None,
+    ) -> dict:
+        observed["date"] = date
+        return {"id": "tx-1"}
+
+    monkeypatch.setattr(User, "get", fake_get)
+    monkeypatch.setattr(finance_tools.finance_service, "add_transaction", fake_add_transaction)
+
+    result = await finance_tools.finance_add_transaction.ainvoke(
+        {
+            "wallet_id": "wallet-1",
+            "category_id": "category-1",
+            "type_": "expense",
+            "amount": 12.5,
+            "date": "2026-04-20T09:15:00",
+        },
+        config={"configurable": {"user_id": "507f1f77bcf86cd799439011"}},
+    )
+
+    assert result["ok"] is True
+    assert observed["date"] == datetime(2026, 4, 20, 2, 15, tzinfo=UTC)
+
+
+@pytest.mark.asyncio
+async def test_finance_search_transactions_expands_local_date_range(monkeypatch) -> None:
+    user = SimpleNamespace(settings={"timezone": "Asia/Ho_Chi_Minh"})
+
+    async def fake_get(_user_id: str):
+        return user
+
+    observed: dict = {}
+
+    async def fake_search_transactions(
+        user_id: str,
+        query: str | None = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+        limit: int = 20,
+    ) -> list[dict]:
+        observed["start_date"] = start_date
+        observed["end_date"] = end_date
+        return []
+
+    monkeypatch.setattr(User, "get", fake_get)
+    monkeypatch.setattr(finance_tools.finance_service, "search_transactions", fake_search_transactions)
+
+    result = await finance_tools.finance_search_transactions.ainvoke(
+        {
+            "start_date": "2026-04-01",
+            "end_date": "2026-04-30",
+        },
+        config={"configurable": {"user_id": "507f1f77bcf86cd799439011"}},
+    )
+
+    assert result["ok"] is True
+    assert observed["start_date"] == datetime(2026, 3, 31, 17, 0, tzinfo=UTC)
+    assert observed["end_date"] == datetime(2026, 4, 30, 16, 59, 59, 999999, tzinfo=UTC)

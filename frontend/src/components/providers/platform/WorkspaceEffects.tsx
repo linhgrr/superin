@@ -3,6 +3,7 @@ import { useShallow } from "zustand/react/shallow";
 
 import { useRenderLoopDebug } from "@/lib/debug-render-loop";
 import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/components/providers/ToastProvider";
 import {
   useInstalledApps,
   useWidgetPreferences,
@@ -18,6 +19,7 @@ import {
 
 export function WorkspaceEffects() {
   const { user } = useAuth();
+  const toast = useToast();
   const installedApps = useInstalledApps();
   const widgetPreferences = useWidgetPreferences();
   const {
@@ -26,6 +28,7 @@ export function WorkspaceEffects() {
     isWorkspaceRefreshing,
     refreshWorkspace,
     resetWorkspace,
+    workspaceError,
   } = useWorkspaceStore(
     useShallow((state) => ({
       hydrateWorkspace: state.hydrateWorkspace,
@@ -33,6 +36,7 @@ export function WorkspaceEffects() {
       isWorkspaceRefreshing: state.isWorkspaceRefreshing,
       refreshWorkspace: state.refreshWorkspace,
       resetWorkspace: state.resetWorkspace,
+      workspaceError: state.workspaceError,
     }))
   );
 
@@ -45,6 +49,7 @@ export function WorkspaceEffects() {
       widgetPreferences: widgetPreferences.length,
       isWorkspaceLoading,
       isWorkspaceRefreshing,
+      workspaceError,
     }),
   });
 
@@ -60,8 +65,18 @@ export function WorkspaceEffects() {
     const snapshot = readWorkspaceSnapshot(userId);
     hydrateWorkspace(userId, snapshot);
 
-    void refreshWorkspace();
+    void refreshWorkspace().catch((error: unknown) => {
+      console.error("Failed to bootstrap workspace", error);
+    });
   }, [hydrateWorkspace, refreshWorkspace, resetWorkspace, userId]);
+
+  useEffect(() => {
+    if (!workspaceError) return;
+
+    toast.error("Failed to refresh workspace", {
+      description: workspaceError,
+    });
+  }, [toast, workspaceError]);
 
   useEffect(() => {
     if (!userId || isWorkspaceLoading) return;

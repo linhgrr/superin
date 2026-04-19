@@ -3,7 +3,7 @@
  */
 
 import type { WorkspaceBootstrap } from "@/types/generated";
-import { STORAGE_KEYS } from "@/constants";
+import { STORAGE_KEYS } from "@/constants/storage";
 
 const WORKSPACE_CACHE_VERSION = 1;
 

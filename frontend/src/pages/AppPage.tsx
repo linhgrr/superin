@@ -13,7 +13,7 @@ import Construction from "lucide-react/dist/esm/icons/construction";
 import Download from "lucide-react/dist/esm/icons/download";
 import Loader2 from "lucide-react/dist/esm/icons/loader-2";
 import { getAppMetadata, getLoadedAppView, loadAppViewComponent } from "@/lib/lazy-registry";
-import { ROUTES } from "@/constants";
+import { ROUTES } from "@/constants/routes";
 import { useWorkspaceStore } from "@/stores/platform/workspaceStore";
 
 const SKELETON_DELAY_MS = 120;
@@ -35,7 +35,7 @@ export const AppSkeleton = memo(function AppSkeleton() {
   );
 });
 
-// Error view — app registered in FE but load failed (e.g. missing AppView.tsx)
+// Error view — app registered in FE but its screen module failed to load.
 const AppNotAvailable = memo(function AppNotAvailable({ appId }: { appId: string }) {
   return (
     <div

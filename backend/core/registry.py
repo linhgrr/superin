@@ -138,11 +138,17 @@ def list_plugins() -> list[AppManifestSchema]:
     return [entry["manifest"] for entry in PLUGIN_REGISTRY.values()]
 
 
-def get_task_finder(user_id: str) -> "TaskFinder | None":
+async def get_task_finder(user_id: str) -> "TaskFinder | None":
     """Look up a task by ID using the registered todo plugin's TaskFinder.
 
     Returns None if the todo plugin is not installed — calendar degrades gracefully.
     """
+    from core.workspace.service import list_installed_app_ids
+
+    installed_app_ids = await list_installed_app_ids(user_id)
+    if "todo" not in installed_app_ids:
+        return None
+
     todo_entry = PLUGIN_REGISTRY.get("todo")
     if todo_entry is None:
         return None
