@@ -681,21 +681,6 @@ tr:hover td {
   letter-spacing: 0.01em;
 }
 
-.assistant-thinking-live-pill {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 2.5rem;
-  padding: 0.18rem 0.45rem;
-  border-radius: 999px;
-  background: oklch(from var(--color-primary) l c h / 0.12);
-  color: var(--color-primary);
-  font-size: 0.625rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
 .assistant-thinking-steps {
   display: grid;
   gap: 0.45rem;

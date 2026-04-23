@@ -51,7 +51,6 @@ function ThinkingPanel({ compact }: { compact: boolean }) {
           <Spinner size="sm" color="current" className="assistant-thinking-spinner" />
           <span>Working through your workspace</span>
         </div>
-        <span className="assistant-thinking-live-pill">Live</span>
       </div>
 
       <div className="assistant-thinking-steps">
