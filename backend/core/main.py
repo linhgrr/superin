@@ -4,15 +4,18 @@ import asyncio
 import importlib.util
 import logging
 import os
+from collections.abc import AsyncIterator, Awaitable, Callable
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
+from typing import cast
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import Depends, FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.responses import Response
 
 from core.config import settings
 from core.constants import (
@@ -31,6 +34,7 @@ from core.exceptions import (
     http_exception_handler,
     validation_handler,
 )
+from core.http_utils import build_local_dev_origin_regex
 from core.middleware.logging import RequestLoggingMiddleware
 from core.middleware.security import SecurityHeadersMiddleware
 from core.verify import verify_plugins
@@ -41,7 +45,6 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s — %(message)s",
 )
 logger = logging.getLogger(__name__)
-
 
 def _log_langsmith_startup_state() -> None:
     """Emit a startup snapshot for LangSmith wiring without logging secrets."""
@@ -117,7 +120,7 @@ async def _run_subscription_expiry_cron(stop_event: asyncio.Event) -> None:
 # ─── Lifespan ─────────────────────────────────────────────────────────────────
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Server lifecycle: startup → serve → shutdown."""
     _log_langsmith_startup_state()
 
@@ -228,6 +231,7 @@ def create_app() -> FastAPI:
 
     # CORS - hardened configuration
     cors_origins = settings.cors_origins
+    cors_origin_regex = build_local_dev_origin_regex(cors_origins)
     # Fail hard: wildcard + credentials = security hole (any site can make auth'd requests)
     if "*" in cors_origins and not settings.hf_space:
         raise RuntimeError(
@@ -238,6 +242,7 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=cors_origins,
+        allow_origin_regex=cors_origin_regex,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
         allow_headers=[
@@ -253,8 +258,10 @@ def create_app() -> FastAPI:
     app.add_middleware(RequestLoggingMiddleware)
 
     # ── Exception handlers ────────────────────────────────────────────────
-    app.add_exception_handler(StarletteHTTPException, http_exception_handler)
-    app.add_exception_handler(RequestValidationError, validation_handler)
+    exception_handler = cast(Callable[..., Response | Awaitable[Response]], http_exception_handler)
+    validation_exception_handler = cast(Callable[..., Response | Awaitable[Response]], validation_handler)
+    app.add_exception_handler(StarletteHTTPException, exception_handler)
+    app.add_exception_handler(RequestValidationError, validation_exception_handler)
     app.add_exception_handler(Exception, generic_handler)
 
     # ── Core routers ──────────────────────────────────────────────────────
@@ -291,7 +298,7 @@ def create_app() -> FastAPI:
 
     # ── Health check ───────────────────────────────────────────────────────
     @app.get("/health", tags=["health"])
-    async def health():
+    async def health() -> dict[str, str]:
         return {"status": "ok", "version": "2.1.0"}
 
     return app

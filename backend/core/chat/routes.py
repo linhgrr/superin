@@ -3,6 +3,8 @@
 import asyncio
 import json
 import logging
+from collections.abc import AsyncIterator
+from typing import cast
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -10,7 +12,7 @@ from fastapi.responses import StreamingResponse
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from pydantic import BaseModel, Field
 
-from core.agents.root.agent import root_agent
+from core.agents.root.agent import RawChatMessage, TextStreamEvent, root_agent
 from core.agents.root.graph import get_root_agent_graph
 from core.auth.dependencies import get_current_user
 from core.chat.service import (
@@ -22,7 +24,13 @@ from core.chat.service import (
     set_thread_status,
     upsert_thread_meta,
 )
-from core.constants import CHAT_STREAM_FRIENDLY_ERROR_TEXT, RATE_LIMIT_CHAT_DAILY_FREE, RATE_LIMIT_CHAT_DAILY_PAID, RATE_LIMIT_CHAT_FREE, RATE_LIMIT_CHAT_PAID
+from core.constants import (
+    CHAT_STREAM_FRIENDLY_ERROR_TEXT,
+    RATE_LIMIT_CHAT_DAILY_FREE,
+    RATE_LIMIT_CHAT_DAILY_PAID,
+    RATE_LIMIT_CHAT_FREE,
+    RATE_LIMIT_CHAT_PAID,
+)
 from core.db import get_checkpointer
 from core.models import ThreadMeta, User
 from core.subscriptions.service import get_effective_tier
@@ -143,7 +151,7 @@ def _extract_latest_user_message(messages: list[object]) -> tuple[str, str | Non
 async def list_threads(
     include_archived: bool = True,
     user_id: str = Depends(get_current_user),
-):
+) -> dict[str, list[dict[str, object]]]:
     """
     GET /api/chat/threads
     Returns list of thread metadata for the current user (most-recently-updated first).
@@ -155,7 +163,7 @@ async def list_threads(
 
 
 @router.get("/threads/{thread_id}")
-async def get_thread(thread_id: str, user_id: str = Depends(get_current_user)):
+async def get_thread(thread_id: str, user_id: str = Depends(get_current_user)) -> dict[str, object]:
     """Return one thread metadata row for the authenticated user."""
     normalized_thread_id = normalize_thread_id(user_id, thread_id)
     thread = await get_thread_meta(user_id, normalized_thread_id)
@@ -169,7 +177,7 @@ async def update_thread(
     thread_id: str,
     payload: ThreadUpdateRequest,
     user_id: str = Depends(get_current_user),
-):
+) -> dict[str, object]:
     """Rename one thread for the authenticated user."""
     normalized_thread_id = normalize_thread_id(user_id, thread_id)
     thread = await rename_thread(user_id, normalized_thread_id, payload.title)
@@ -179,7 +187,7 @@ async def update_thread(
 
 
 @router.post("/threads/{thread_id}/archive")
-async def archive_thread(thread_id: str, user_id: str = Depends(get_current_user)):
+async def archive_thread(thread_id: str, user_id: str = Depends(get_current_user)) -> dict[str, object]:
     """Archive one thread for the authenticated user."""
     normalized_thread_id = normalize_thread_id(user_id, thread_id)
     thread = await set_thread_status(user_id, normalized_thread_id, status="archived")
@@ -189,7 +197,7 @@ async def archive_thread(thread_id: str, user_id: str = Depends(get_current_user
 
 
 @router.post("/threads/{thread_id}/unarchive")
-async def unarchive_thread(thread_id: str, user_id: str = Depends(get_current_user)):
+async def unarchive_thread(thread_id: str, user_id: str = Depends(get_current_user)) -> dict[str, object]:
     """Restore one archived thread for the authenticated user."""
     normalized_thread_id = normalize_thread_id(user_id, thread_id)
     thread = await set_thread_status(user_id, normalized_thread_id, status="regular")
@@ -199,7 +207,7 @@ async def unarchive_thread(thread_id: str, user_id: str = Depends(get_current_us
 
 
 @router.delete("/threads/{thread_id}")
-async def delete_thread(thread_id: str, user_id: str = Depends(get_current_user)):
+async def delete_thread(thread_id: str, user_id: str = Depends(get_current_user)) -> dict[str, object]:
     """Delete one thread and its LangGraph checkpoints."""
     normalized_thread_id = normalize_thread_id(user_id, thread_id)
     thread = await get_thread_meta(user_id, normalized_thread_id)
@@ -216,7 +224,7 @@ async def delete_thread(thread_id: str, user_id: str = Depends(get_current_user)
 
 
 @router.get("/history")
-async def chat_history(thread_id: str, user_id: str = Depends(get_current_user)):
+async def chat_history(thread_id: str, user_id: str = Depends(get_current_user)) -> dict[str, object]:
     """
     GET /api/chat/history?thread_id=<thread_id>
     Returns messages for a thread from LangGraph checkpoint state.
@@ -234,7 +242,7 @@ async def chat_history(thread_id: str, user_id: str = Depends(get_current_user))
 
 
 @router.post("/stream")
-async def chat_stream(request: Request, user_id: str = Depends(get_current_user)):
+async def chat_stream(request: Request, user_id: str = Depends(get_current_user)) -> StreamingResponse:
     """
     POST /api/chat/stream
     Body: {
@@ -318,7 +326,7 @@ async def chat_stream(request: Request, user_id: str = Depends(get_current_user)
                 detail=friendly_err,
             )
 
-    async def event_stream():
+    async def event_stream() -> AsyncIterator[bytes]:
         message_id = assistant_message_id or f"msg_{uuid4().hex}"
         assistant_parts: list[str] = []
         saw_done_event = False
@@ -342,24 +350,44 @@ async def chat_stream(request: Request, user_id: str = Depends(get_current_user)
             )
 
         try:
+            raw_message: RawChatMessage = {
+                "role": "user",
+                "content": latest_user_text,
+            }
+            if latest_user_message_id is not None:
+                raw_message["id"] = latest_user_message_id
+
             async for event in root_agent.astream(
                 user_id,
-                [{"id": latest_user_message_id, "role": "user", "content": latest_user_text}],
+                [raw_message],
                 thread_id=thread_id,
+                assistant_message_id=message_id,
             ):
-                event_type = event.get("type")
+                event_type = event["type"]
 
-                if event_type in {"text", ChatEventType.TOKEN}:
-                    assistant_parts.append(str(event["content"]))
+                if event_type == "text":
+                    content = cast(TextStreamEvent, event)["content"]
+                    assistant_parts.append(content)
                     yield _encode_chunk({
                         "event": "messages/partial",
                         "data": [
                             {
                                 "id": message_id,
                                 "type": "AIMessageChunk",
-                                "content": str(event["content"]),
+                                "content": content,
                             }
                         ],
+                    })
+                    continue
+
+                if event_type == "thinking":
+                    yield _encode_chunk({
+                        "event": "thinking",
+                        "data": {
+                            "stepId": event.get("step_id"),
+                            "label": event.get("label"),
+                            "status": event.get("status"),
+                        },
                     })
                     continue
 

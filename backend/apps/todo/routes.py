@@ -2,6 +2,7 @@
 
 
 from datetime import time as time_value
+from typing import cast
 
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -64,9 +65,9 @@ async def get_task_list_widget_data(
         user = await User.get(PydanticObjectId(user_id))
         ctx = get_user_timezone_context(user)
         today_key = ctx.now_local().date().isoformat()
-        items = [task for task in tasks if task.get("due_date") == today_key]
+        items = [task for task in tasks if task.due_date and task.due_date.isoformat() == today_key]
     elif config.filter == "high":
-        items = [task for task in tasks if task.get("priority") == "high"]
+        items = [task for task in tasks if task.priority == "high"]
     else:
         items = tasks
 
@@ -82,26 +83,26 @@ async def get_today_widget_data(
     config: TodayWidgetConfig,
 ) -> TodayWidgetData:
     user = await User.get(user_id)
-    if user is None:
+    if not isinstance(user, User):
         raise HTTPException(status_code=404, detail="User not found")
 
     summary = await task_service.get_summary(user)
     tasks = await task_service.list_tasks(user_id, "pending", None, None, False, 50)
     next_due_task = None
-    dated_tasks = [task for task in tasks if task.get("due_date")]
+    dated_tasks = [task for task in tasks if task.due_date]
     if dated_tasks:
         next_due_task = min(
             dated_tasks,
             key=lambda task: (
-                str(task.get("due_date")),
-                str(task.get("due_time") or time_value.max.isoformat()),
-                str(task.get("created_at") or ""),
+                str(task.due_date),
+                str(task.due_time or time_value.max),
+                str(task.created_at),
             ),
         )
 
-    overdue = summary["overdue"] if config.include_overdue else 0
+    overdue = summary.overdue if config.include_overdue else 0
     return TodayWidgetData(
-        due_today=summary["due_today"],
+        due_today=summary.due_today,
         overdue=overdue,
         next_due_task=next_due_task,
     )
@@ -126,7 +127,7 @@ async def get_widget_data(
     if handler is None:
         raise HTTPException(status_code=404, detail=f"Widget '{widget_id}' is not registered")
     config = await resolve_widget_config(user_id, widget_id)
-    return await handler(user_id, config)
+    return cast(TodoWidgetDataResponse, await handler(user_id, config))
 
 
 @router.put("/widgets/{widget_id}/config", response_model=WidgetDataConfigSchema)
@@ -141,7 +142,7 @@ async def update_widget_config(
 
     doc = await upsert_widget_config(user_id, widget_id, update.config)
     return WidgetDataConfigSchema(
-        id=str(doc.id),
+        _id=str(doc.id),
         user_id=str(doc.user_id),
         widget_id=doc.widget_id,
         config=doc.config,
@@ -166,7 +167,7 @@ async def list_tasks(
     priority: TaskPriority | None = Query(None),
     tag: str | None = Query(None),
     limit: int = Query(20, le=100),
-):
+) -> list[TodoTaskRead]:
     """List tasks with optional filtering."""
     return await task_service.list_tasks(user_id, status, priority, tag, False, limit)
 
@@ -177,7 +178,7 @@ async def search_tasks(
     user_id: str = Depends(get_current_user),
     include_archived: bool = Query(False),
     limit: int = Query(20, le=100),
-):
+) -> list[TodoTaskRead]:
     """Search tasks by query string."""
     return await task_service.search_tasks(user_id, q, include_archived, limit)
 
@@ -186,13 +187,13 @@ async def search_tasks(
 async def list_archived(
     user_id: str = Depends(get_current_user),
     limit: int = Query(20, le=100),
-):
+) -> list[TodoTaskRead]:
     """List archived (soft deleted) tasks."""
     return await task_service.list_archived(user_id, limit)
 
 
 @router.get("/tasks/{task_id}", response_model=TodoTaskDetailRead)
-async def get_task(task_id: str, user_id: str = Depends(get_current_user)):
+async def get_task(task_id: str, user_id: str = Depends(get_current_user)) -> TodoTaskDetailRead:
     """Get a single task by ID with subtasks."""
     task = await task_service.get_task_with_subtasks(task_id, user_id)
     if not task:
@@ -204,7 +205,7 @@ async def get_task(task_id: str, user_id: str = Depends(get_current_user)):
 async def create_task(
     request: TodoCreateTaskRequest,
     user_id: str = Depends(get_current_user),
-):
+) -> TodoTaskRead:
     try:
         return await task_service.create_task(
             user_id,
@@ -225,7 +226,7 @@ async def update_task(
     task_id: str,
     request: TodoUpdateTaskRequest,
     user_id: str = Depends(get_current_user),
-):
+) -> TodoTaskRead:
     try:
         return await task_service.update_task(
             task_id,
@@ -244,7 +245,7 @@ async def update_task(
 
 
 @router.delete("/tasks/{task_id}", response_model=TodoActionResponse)
-async def delete_task(task_id: str, user_id: str = Depends(get_current_user)):
+async def delete_task(task_id: str, user_id: str = Depends(get_current_user)) -> TodoActionResponse:
     """Permanently delete a task and all its subtasks."""
     try:
         return await task_service.delete_task(task_id, user_id)
@@ -253,7 +254,7 @@ async def delete_task(task_id: str, user_id: str = Depends(get_current_user)):
 
 
 @router.patch("/tasks/{task_id}/toggle", response_model=TodoTaskRead)
-async def toggle_task(task_id: str, user_id: str = Depends(get_current_user)):
+async def toggle_task(task_id: str, user_id: str = Depends(get_current_user)) -> TodoTaskRead:
     """Flip task between pending and completed."""
     try:
         return await task_service.toggle_task(task_id, user_id)
@@ -264,7 +265,7 @@ async def toggle_task(task_id: str, user_id: str = Depends(get_current_user)):
 # ─── Archive ──────────────────────────────────────────────────────────────────
 
 @router.patch("/tasks/{task_id}/archive", response_model=TodoTaskRead)
-async def archive_task(task_id: str, user_id: str = Depends(get_current_user)):
+async def archive_task(task_id: str, user_id: str = Depends(get_current_user)) -> TodoTaskRead:
     """Archive (soft delete) a task."""
     try:
         return await task_service.archive_task(task_id, user_id)
@@ -273,7 +274,7 @@ async def archive_task(task_id: str, user_id: str = Depends(get_current_user)):
 
 
 @router.patch("/tasks/{task_id}/restore", response_model=TodoTaskRead)
-async def restore_task(task_id: str, user_id: str = Depends(get_current_user)):
+async def restore_task(task_id: str, user_id: str = Depends(get_current_user)) -> TodoTaskRead:
     """Restore an archived task."""
     try:
         return await task_service.restore_task(task_id, user_id)
@@ -288,7 +289,7 @@ async def add_tag(
     task_id: str,
     tag: str,
     user_id: str = Depends(get_current_user),
-):
+) -> TodoTaskRead:
     """Add a tag to a task."""
     try:
         return await task_service.add_task_tag(task_id, user_id, tag)
@@ -301,7 +302,7 @@ async def remove_tag(
     task_id: str,
     tag: str,
     user_id: str = Depends(get_current_user),
-):
+) -> TodoTaskRead:
     """Remove a tag from a task."""
     try:
         return await task_service.remove_task_tag(task_id, user_id, tag)
@@ -312,7 +313,7 @@ async def remove_tag(
 # ─── Subtasks ─────────────────────────────────────────────────────────────────
 
 @router.get("/tasks/{task_id}/subtasks", response_model=list[TodoSubTaskRead])
-async def get_subtasks(task_id: str, user_id: str = Depends(get_current_user)):
+async def get_subtasks(task_id: str, user_id: str = Depends(get_current_user)) -> list[TodoSubTaskRead]:
     """Get all subtasks for a parent task."""
     return await task_service.get_subtasks(task_id, user_id)
 
@@ -322,7 +323,7 @@ async def add_subtask(
     task_id: str,
     request: TodoCreateSubTaskRequest,
     user_id: str = Depends(get_current_user),
-):
+) -> TodoSubTaskRead:
     """Add a subtask to a parent task."""
     try:
         return await task_service.add_subtask(task_id, user_id, request.title)
@@ -334,7 +335,7 @@ async def add_subtask(
 async def complete_subtask(
     subtask_id: str,
     user_id: str = Depends(get_current_user),
-):
+) -> TodoSubTaskRead:
     """Mark a subtask as completed."""
     try:
         return await task_service.complete_subtask(subtask_id, user_id)
@@ -346,7 +347,7 @@ async def complete_subtask(
 async def uncomplete_subtask(
     subtask_id: str,
     user_id: str = Depends(get_current_user),
-):
+) -> TodoSubTaskRead:
     """Mark a completed subtask as not completed."""
     try:
         return await task_service.uncomplete_subtask(subtask_id, user_id)
@@ -358,7 +359,7 @@ async def uncomplete_subtask(
 async def delete_subtask(
     subtask_id: str,
     user_id: str = Depends(get_current_user),
-):
+) -> TodoActionResponse:
     """Delete a subtask permanently."""
     try:
         return await task_service.delete_subtask(subtask_id, user_id)
@@ -373,7 +374,7 @@ async def create_recurring_rule(
     task_id: str,
     request: TodoCreateRecurringRuleRequest,
     user_id: str = Depends(get_current_user),
-):
+) -> TodoRecurringRuleRead:
     """Create a recurring rule based on a task template."""
     try:
         return await task_service.create_recurring_rule(
@@ -390,7 +391,7 @@ async def create_recurring_rule(
 
 
 @router.get("/recurring", response_model=list[TodoRecurringRuleRead])
-async def list_recurring_rules(user_id: str = Depends(get_current_user)):
+async def list_recurring_rules(user_id: str = Depends(get_current_user)) -> list[TodoRecurringRuleRead]:
     """List all recurring task rules."""
     return await task_service.list_recurring_rules(user_id)
 
@@ -399,7 +400,7 @@ async def list_recurring_rules(user_id: str = Depends(get_current_user)):
 async def stop_recurring_rule(
     rule_id: str,
     user_id: str = Depends(get_current_user),
-):
+) -> TodoRecurringRuleRead:
     """Stop a task from recurring."""
     try:
         return await task_service.deactivate_recurring_rule(rule_id, user_id)
@@ -410,10 +411,12 @@ async def stop_recurring_rule(
 # ─── Summary ──────────────────────────────────────────────────────────────────
 
 @router.get("/summary", response_model=TodoSummaryResponse)
-async def todo_summary(user_id: str = Depends(get_current_user)):
+async def todo_summary(user_id: str = Depends(get_current_user)) -> TodoSummaryResponse:
     # Fetch user to pass to service for timezone-aware calculations
     from core.models import User
     user = await User.get(user_id)
+    if not isinstance(user, User):
+        raise HTTPException(status_code=404, detail="User not found")
     return await task_service.get_summary(user)
 
 

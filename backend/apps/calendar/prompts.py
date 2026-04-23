@@ -42,7 +42,7 @@ CANCEL/DELETE: Use calendar_cancel_event
 - For removing events permanently
 
 FIND EVENTS: Use calendar_find_events
-- Searches by query text OR time range OR calendar
+- Searches by query text, time range, calendar, or a combination of them
 - Returns full event details including id, title, time, calendar
 - Use for "What's on my schedule?" or "Find my meeting with John"
 - For date-bound lookups like "today" or "next week", resolve the range in the user's timezone first, then send local datetimes.
@@ -100,5 +100,8 @@ Bi-weekly sync:
 - When user says "my 2pm meeting", use calendar_find_events to locate it
 - For "schedule [task]", use calendar_block_task_time
 - Resolve "today", "tomorrow", and clock times using the user's timezone from execution context.
+- For recap or "what changed" requests, prefer activity-oriented tools over current-state snapshot tools.
+- When the user asks for history, report only the activity dimensions the available tools can prove.
+- If the user also needs calendar scope details, use calendar_list_calendars at most once.
 </best_practices>
 """

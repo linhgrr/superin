@@ -1,4 +1,7 @@
 from types import SimpleNamespace
+from typing import Any
+
+import pytest
 
 import shared.preference_utils as preference_utils
 from shared.preference_utils import update_multiple_preferences
@@ -7,19 +10,19 @@ from shared.schemas import PreferenceUpdate
 
 class FakeCollection:
     def __init__(self) -> None:
-        self.operations = None
-        self.ordered = None
+        self.operations: list[Any] = []
+        self.ordered = False
 
-    async def bulk_write(self, operations, ordered=False):
+    async def bulk_write(self, operations: list[Any], ordered: bool = False) -> None:
         self.operations = operations
         self.ordered = ordered
 
 
 class FakeQuery:
-    def __init__(self, items):
+    def __init__(self, items: list[Any]):
         self.items = items
 
-    async def to_list(self):
+    async def to_list(self) -> list[Any]:
         return self.items
 
 
@@ -27,8 +30,8 @@ class FakeField:
     def __init__(self, name: str) -> None:
         self.name = name
 
-    def __eq__(self, other):
-        return (self.name, other)
+    def __eq__(self, other: object) -> bool:
+        return self.name == str(other)
 
 
 class FakeWidgetPreference:
@@ -36,18 +39,20 @@ class FakeWidgetPreference:
     app_id = FakeField("app_id")
     widget_id = FakeField("widget_id")
     collection = FakeCollection()
-    items = []
+    items: list[Any] = []
 
     @staticmethod
-    def get_pymongo_collection():
+    def get_pymongo_collection() -> FakeCollection:
         return FakeWidgetPreference.collection
 
     @staticmethod
-    def find(*_args, **_kwargs):
+    def find(*_args: object, **_kwargs: object) -> FakeQuery:
         return FakeQuery(FakeWidgetPreference.items)
 
 
-async def test_update_multiple_preferences_upserts_missing_rows(monkeypatch) -> None:
+async def test_update_multiple_preferences_upserts_missing_rows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     returned_pref = SimpleNamespace(widget_id="finance.total-balance")
     FakeWidgetPreference.collection = FakeCollection()
     FakeWidgetPreference.items = [returned_pref]

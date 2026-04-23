@@ -1,24 +1,20 @@
-"""Helpers for returning tool results without aborting the agent run.
-
-Provides:
-- Structured success/error responses
-- Safe execution wrapper with automatic sanitization
-- Database content sanitization before returning to LLM
-"""
+"""Tool result serialization helpers for the agent runtime."""
 
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable, Callable
-from typing import Any, TypeVar
+import json
+import time
+from collections.abc import Awaitable, Callable, Mapping, Sequence
+from typing import Any, NotRequired, Protocol, TypeAlias, TypedDict, TypeVar, cast
 
+from langchain.tools import ToolRuntime
 from loguru import logger
+from pydantic import BaseModel
 
 from core.models import User
 from core.utils.sanitizer import sanitize_db_content_for_llm
 from core.utils.timezone import convert_utc_strings_to_local, get_user_timezone_context
-from shared.agent_config import require_user_id
-from shared.tool_errors import ToolUserError
 from shared.tool_time import (
     TemporalFieldKind,
     ToolTimeContext,
@@ -26,49 +22,195 @@ from shared.tool_time import (
     normalize_temporal_payload,
 )
 
-T = TypeVar("T")
+JsonScalar: TypeAlias = str | int | float | bool | None
+ToolPayload: TypeAlias = dict[str, Any] | list[Any] | JsonScalar
+ToolSerializable: TypeAlias = BaseModel | Mapping[str, Any] | Sequence[Any] | JsonScalar
+TResult = TypeVar("TResult")
 
 
-def tool_success(data: T) -> dict[str, Any]:
-    """Return a successful tool result.
+class RuntimeContextWithUserId(Protocol):
+    """Minimum runtime context contract required by user-scoped tools."""
 
-    Automatically sanitizes database content to prevent malicious content
-    from reaching the LLM (LLM05: Output Handling security).
-    """
-    sanitized_data = sanitize_db_content_for_llm(data)
+    @property
+    def user_id(self) -> str: ...
 
+
+TRuntimeContext = TypeVar("TRuntimeContext", bound=RuntimeContextWithUserId)
+
+
+class ToolErrorPayload(TypedDict):
+    message: str
+    code: str
+    retryable: bool
+
+
+class ToolSuccessResult(TypedDict):
+    ok: bool
+    data: ToolPayload
+
+
+class ToolFailureResult(TypedDict):
+    ok: bool
+    error: ToolErrorPayload
+    data: NotRequired[ToolPayload]
+
+
+ToolExecutionResult: TypeAlias = ToolSuccessResult | ToolFailureResult
+_SLOW_TOOL_RESULT_INFO_SECONDS = 0.5
+_SLOW_TOOL_RESULT_WARNING_SECONDS = 2.0
+
+
+def _to_tool_payload(data: ToolSerializable) -> ToolPayload:
+    """Convert supported tool data into plain JSON-like structures."""
+    if isinstance(data, BaseModel):
+        return _to_tool_payload(data.model_dump(mode="json"))
+    if isinstance(data, (bytes, bytearray)):
+        return data.decode("utf-8", errors="replace")
+    if isinstance(data, Mapping):
+        return {str(key): _to_tool_payload(value) for key, value in data.items()}
+    if isinstance(data, Sequence) and not isinstance(data, (str, bytes, bytearray)):
+        return [_to_tool_payload(item) for item in data]
+    return cast(ToolPayload, data)
+
+
+def _sanitize_tool_payload(payload: ToolPayload) -> ToolPayload:
+    if isinstance(payload, (dict, list, str)) or payload is None:
+        return cast(ToolPayload, sanitize_db_content_for_llm(payload))
+    return cast(ToolPayload, payload)
+
+
+def summarize_tool_payload(payload: object) -> str:
+    """Return a compact shape summary for logs without dumping full content."""
+    if payload is None:
+        return "none"
+    if isinstance(payload, str):
+        return f"str(len={len(payload)})"
+    if isinstance(payload, list):
+        sample_types = [type(item).__name__ for item in payload[:3]]
+        suffix = "..." if len(payload) > 3 else ""
+        return f"list(len={len(payload)}, sample_types={sample_types}{suffix})"
+    if isinstance(payload, dict):
+        keys = list(payload.keys())[:5]
+        suffix = "..." if len(payload) > 5 else ""
+        return f"dict(len={len(payload)}, keys={keys}{suffix})"
+    return type(payload).__name__
+
+
+def _log_tool_result_timings(
+    *,
+    tool_name: str | None,
+    tool_call_id: str | None,
+    payload_summary: str,
+    localize: bool,
+    to_payload_elapsed: float,
+    user_lookup_elapsed: float,
+    localize_elapsed: float,
+    sanitize_elapsed: float,
+    total_elapsed: float,
+) -> None:
+    log_method = logger.debug
+    if total_elapsed >= _SLOW_TOOL_RESULT_WARNING_SECONDS or sanitize_elapsed >= _SLOW_TOOL_RESULT_WARNING_SECONDS:
+        log_method = logger.warning
+    elif total_elapsed >= _SLOW_TOOL_RESULT_INFO_SECONDS or sanitize_elapsed >= _SLOW_TOOL_RESULT_INFO_SECONDS:
+        log_method = logger.info
+
+    log_method(
+        "TOOL_RESULT_POSTPROCESS  tool={}  call_id={}  localize={}  to_payload={:.3f}s  user_lookup={:.3f}s  localize_phase={:.3f}s  sanitize={:.3f}s  total={:.3f}s  payload={}",
+        tool_name or "unknown_tool",
+        tool_call_id or "unknown_tool_call",
+        localize,
+        to_payload_elapsed,
+        user_lookup_elapsed,
+        localize_elapsed,
+        sanitize_elapsed,
+        total_elapsed,
+        payload_summary,
+    )
+
+
+def require_runtime_user_id(runtime: ToolRuntime[TRuntimeContext]) -> str:
+    user_id = runtime.context.user_id
+    if not user_id:
+        raise RuntimeError(
+            "Tool invoked without runtime.context.user_id. "
+            "Ensure the parent agent forwards a valid runtime context."
+        )
+    return user_id
+
+
+def tool_success(data: ToolSerializable) -> ToolSuccessResult:
+    """Return a successful tool result after sanitizing LLM-visible content."""
+    sanitized_data = _sanitize_tool_payload(_to_tool_payload(data))
     return {
         "ok": True,
         "data": sanitized_data,
     }
 
 
-async def _tool_success_async(
-    data: T,
+async def tool_success_async(
+    data: ToolSerializable,
     *,
     localize: bool = True,
     user_id: str | None = None,
-) -> dict[str, Any]:
-    """Sanitize tool payloads off the event loop before returning to the LLM.
+    tool_name: str | None = None,
+    tool_call_id: str | None = None,
+) -> ToolSuccessResult:
+    """Sanitize tool payloads off the event loop before returning to the LLM."""
+    started_at = time.perf_counter()
+    phase = "to_payload"
+    localized_data = _to_tool_payload(data)
+    to_payload_elapsed = time.perf_counter() - started_at
+    user_lookup_elapsed = 0.0
+    localize_elapsed = 0.0
 
-    ``user_id`` is used to look up the user's timezone for datetime localization.
-    When ``user_id`` is not provided (or the lookup fails), output is returned
-    in UTC — callers should prefer passing ``user_id`` explicitly from
-    ``RunnableConfig`` via ``shared.agent_config.get_user_id``.
-    """
-    localized_data = data
-    if localize and user_id:
-        try:
-            user = await User.get(user_id)
-        except (AttributeError, TypeError):
-            user = None
-        except Exception:
-            logger.exception("User lookup failed during tool result localization")
-            user = None
-        formatter = get_user_timezone_context(user).format_datetime
-        localized_data = convert_utc_strings_to_local(data, formatter)
+    try:
+        if localize and user_id:
+            phase = "user_lookup"
+            lookup_started_at = time.perf_counter()
+            try:
+                user = await User.get(user_id)
+            except (AttributeError, TypeError):
+                user = None
+            except Exception:
+                logger.exception("User lookup failed during tool result localization")
+                user = None
+            user_lookup_elapsed = time.perf_counter() - lookup_started_at
 
-    sanitized_data = await asyncio.to_thread(sanitize_db_content_for_llm, localized_data)
+            phase = "localize"
+            localize_started_at = time.perf_counter()
+            formatter = get_user_timezone_context(user).format_datetime
+            localized_data = convert_utc_strings_to_local(localized_data, formatter)
+            localize_elapsed = time.perf_counter() - localize_started_at
+
+        payload_summary = summarize_tool_payload(localized_data)
+        phase = "sanitize"
+        sanitize_started_at = time.perf_counter()
+        sanitized_data = await asyncio.to_thread(_sanitize_tool_payload, localized_data)
+        sanitize_elapsed = time.perf_counter() - sanitize_started_at
+        total_elapsed = time.perf_counter() - started_at
+
+        _log_tool_result_timings(
+            tool_name=tool_name,
+            tool_call_id=tool_call_id,
+            payload_summary=payload_summary,
+            localize=localize and bool(user_id),
+            to_payload_elapsed=to_payload_elapsed,
+            user_lookup_elapsed=user_lookup_elapsed,
+            localize_elapsed=localize_elapsed,
+            sanitize_elapsed=sanitize_elapsed,
+            total_elapsed=total_elapsed,
+        )
+    except asyncio.CancelledError:
+        logger.warning(
+            "TOOL_RESULT_POSTPROCESS_CANCELLED  tool={}  call_id={}  phase={}  elapsed={:.3f}s  localize={}",
+            tool_name or "unknown_tool",
+            tool_call_id or "unknown_tool_call",
+            phase,
+            time.perf_counter() - started_at,
+            localize and bool(user_id),
+        )
+        raise
+
     return {
         "ok": True,
         "data": sanitized_data,
@@ -80,7 +222,7 @@ def tool_error(
     *,
     code: str = "domain_error",
     retryable: bool = False,
-) -> dict[str, Any]:
+) -> ToolFailureResult:
     """Return a failed tool result."""
     return {
         "ok": False,
@@ -92,99 +234,45 @@ def tool_error(
     }
 
 
-async def safe_tool_call(
-    operation: Callable[[], Awaitable[T]],
+def encode_tool_result(result: ToolExecutionResult) -> str:
+    """Serialize a structured tool result for ToolMessage.content."""
+    return json.dumps(result, ensure_ascii=False)
+
+
+def parse_tool_message_content(content: object) -> ToolPayload | str | list[dict[str, Any]]:
+    """Decode ToolMessage content back into a JSON-like payload when possible."""
+    if isinstance(content, str):
+        try:
+            parsed = json.loads(content)
+        except Exception:
+            return content
+        return cast(ToolPayload | str | list[dict[str, Any]], parsed)
+    return cast(ToolPayload | str | list[dict[str, Any]], content)
+
+
+async def run_tool_with_runtime(
+    runtime: ToolRuntime[TRuntimeContext],
     *,
-    action: str,
-    localize: bool = True,
-    user_id: str | None = None,
-) -> dict[str, Any]:
-    """Execute a tool operation safely, catching exceptions and sanitizing output.
-
-    This wrapper ensures:
-    1. Errors don't crash the agent (converted to tool_error)
-    2. Database content is sanitized before reaching LLM (XSS prevention)
-    3. Operations are logged for debugging
-    4. Datetimes are optionally localized for the user when ``user_id`` is given.
-
-    Example::
-
-        user_id = require_user_id(config)
-        return await safe_tool_call(
-            lambda: finance_service.transfer(user_id, from_id, to_id, amount),
-            action="transferring funds",
-            user_id=user_id,
-        )
-    """
-    try:
-        result = await operation()
-        return await _tool_success_async(result, localize=localize, user_id=user_id)
-    except ToolUserError as exc:
-        return tool_error(str(exc), code=exc.code, retryable=exc.retryable)
-    except ValueError as exc:
-        # Legacy fallback for older code that has not been migrated to ToolUserError yet.
-        return tool_error(str(exc), code="invalid_request", retryable=False)
-    except PermissionError as exc:
-        # Legacy fallback for older code that still raises bare PermissionError.
-        return tool_error(str(exc), code="forbidden", retryable=False)
-    except RuntimeError as exc:
-        # Context/config errors (e.g. missing user_id in RunnableConfig).
-        logger.warning("Tool action rejected: {} — {}", action, exc)
-        return tool_error(str(exc), code="invalid_context", retryable=False)
-    except Exception:
-        logger.exception("Tool action failed: {}", action)
-        return tool_error(
-            f"Unexpected error while {action}.",
-            code="internal_error",
-            retryable=True,
-        )
+    operation: Callable[[str], Awaitable[TResult]],
+) -> TResult:
+    """Resolve ``user_id`` from runtime context and execute a user-scoped operation."""
+    user_id = require_runtime_user_id(runtime)
+    return await operation(user_id)
 
 
-async def run_tool_with_user(
-    config: Any,
+async def run_time_aware_tool_with_runtime(
+    runtime: ToolRuntime[TRuntimeContext],
     *,
-    action: str,
-    operation: Callable[[str], Awaitable[T]],
-    localize: bool = True,
-) -> dict[str, Any]:
-    """Resolve user_id from RunnableConfig and run operation safely.
-
-    This is a thin convenience wrapper over ``safe_tool_call`` to remove
-    repeated boilerplate in tool implementations.
-    """
-    user_id = require_user_id(config)
-    return await safe_tool_call(
-        lambda: operation(user_id),
-        action=action,
-        localize=localize,
-        user_id=user_id,
-    )
-
-
-async def run_time_aware_tool_with_user(
-    config: Any,
-    *,
-    action: str,
     payload: dict[str, Any],
     temporal_fields: dict[str, TemporalFieldKind],
-    operation: Callable[[str, dict[str, Any], ToolTimeContext], Awaitable[T]],
-    localize: bool = True,
-) -> dict[str, Any]:
-    """Resolve user + timezone context, normalize temporal inputs, then run safely."""
-    user_id = require_user_id(config)
-
-    async def time_aware_operation() -> T:
-        time_context = await build_tool_time_context(user_id)
-        normalized_temporals = normalize_temporal_payload(
-            payload,
-            temporal_fields,
-            time_context,
-        )
-        return await operation(user_id, normalized_temporals, time_context)
-
-    return await safe_tool_call(
-        time_aware_operation,
-        action=action,
-        localize=localize,
-        user_id=user_id,
+    operation: Callable[[str, dict[str, Any], ToolTimeContext], Awaitable[TResult]],
+) -> TResult:
+    """Normalize temporal inputs using the runtime user context before execution."""
+    user_id = require_runtime_user_id(runtime)
+    time_context = await build_tool_time_context(user_id)
+    normalized_temporals = normalize_temporal_payload(
+        payload,
+        temporal_fields,
+        time_context,
     )
+    return await operation(user_id, normalized_temporals, time_context)

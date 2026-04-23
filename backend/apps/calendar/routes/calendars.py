@@ -7,6 +7,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from apps.calendar.schemas import (
+    CalendarActionResponse,
     CalendarCalendarRead,
     CalendarCreateCalendarRequest,
     CalendarCreateRecurringRuleRequest,
@@ -26,7 +27,7 @@ calendar_router = APIRouter()
 
 
 @calendar_router.get("/", response_model=list[CalendarCalendarRead])
-async def list_calendars(user_id: str = Depends(get_current_user)):
+async def list_calendars(user_id: str = Depends(get_current_user)) -> list[CalendarCalendarRead]:
     """List all calendars."""
     return await calendar_service.list_calendars(user_id)
 
@@ -35,7 +36,7 @@ async def list_calendars(user_id: str = Depends(get_current_user)):
 async def create_calendar(
     request: CalendarCreateCalendarRequest,
     user_id: str = Depends(get_current_user),
-):
+) -> CalendarCalendarRead:
     """Create new calendar."""
     try:
         return await calendar_service.create_calendar(user_id, request.name, request.color)
@@ -48,7 +49,7 @@ async def update_calendar(
     calendar_id: str,
     request: CalendarUpdateCalendarRequest,
     user_id: str = Depends(get_current_user),
-):
+) -> CalendarCalendarRead:
     """Update calendar — only fields set in the request are updated."""
     try:
         return await calendar_service.update_calendar(
@@ -64,7 +65,7 @@ async def update_calendar(
 
 
 @calendar_router.delete("/{calendar_id}")
-async def delete_calendar(calendar_id: str, user_id: str = Depends(get_current_user)):
+async def delete_calendar(calendar_id: str, user_id: str = Depends(get_current_user)) -> CalendarActionResponse:
     """Delete calendar and all its events."""
     try:
         return await calendar_service.delete_calendar(calendar_id, user_id)
@@ -81,7 +82,7 @@ async def check_conflicts(
     end: datetime,
     exclude_event_id: str | None = Query(None),
     user_id: str = Depends(get_current_user),
-):
+) -> list[CalendarEventRead]:
     """Check for conflicting events."""
     return await calendar_service.check_conflicts(user_id, start, end, exclude_event_id)
 
@@ -94,7 +95,7 @@ async def create_recurring(
     event_id: str,
     request: CalendarCreateRecurringRuleRequest,
     user_id: str = Depends(get_current_user),
-):
+) -> CalendarRecurringRuleRead:
     """Make event recurring."""
     try:
         return await calendar_service.create_recurring_rule(
@@ -111,7 +112,7 @@ async def create_recurring(
 
 
 @router.get("/recurring", response_model=list[CalendarRecurringRuleRead])
-async def list_recurring_rules(user_id: str = Depends(get_current_user)):
+async def list_recurring_rules(user_id: str = Depends(get_current_user)) -> list[CalendarRecurringRuleRead]:
     """List recurring rules."""
     return await calendar_service.list_recurring_rules(user_id)
 
@@ -120,7 +121,7 @@ async def list_recurring_rules(user_id: str = Depends(get_current_user)):
 async def stop_recurring(
     rule_id: str,
     user_id: str = Depends(get_current_user),
-):
+) -> CalendarRecurringRuleRead:
     """Stop recurring rule."""
     try:
         return await calendar_service.stop_recurring_rule(rule_id, user_id)
@@ -136,7 +137,7 @@ async def schedule_task(
     task_id: str,
     request: CalendarScheduleTaskRequest,
     user_id: str = Depends(get_current_user),
-):
+) -> CalendarEventRead:
     """Schedule Todo task as time-blocked event."""
     try:
         return await calendar_service.schedule_task(

@@ -93,8 +93,8 @@ function SidebarBrand({ collapsed, onToggle }: SidebarBrandProps) {
     <div className="sidebar-brand">
       <div className="sidebar-brand-lockup">
         <div className="sidebar-brand-icon" style={{ background: "transparent", boxShadow: "none" }}>
-          <img src="/branding/logo.png" alt="Logo" className="theme-logo-light" style={{ width: "40px", height: "auto" }} />
-          <img src="/branding/logo-white.png" alt="Logo" className="theme-logo-dark" style={{ width: "40px", height: "auto" }} />
+          <img src="/branding/logo.png" alt="Logo" width="40" height="40" className="theme-logo-light" style={{ width: "40px", height: "auto" }} />
+          <img src="/branding/logo-white.png" alt="Logo" width="40" height="40" className="theme-logo-dark" style={{ width: "40px", height: "auto" }} />
         </div>
         <span className="sidebar-brand-text">Superin</span>
       </div>

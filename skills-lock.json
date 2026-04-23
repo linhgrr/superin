@@ -1,6 +1,11 @@
 {
   "version": 1,
   "skills": {
+    "agent-browser": {
+      "source": "vercel-labs/agent-browser",
+      "sourceType": "github",
+      "computedHash": "c19a532a3777698b80b35270939a1dc559da451381971b3e1e78174d1ab54863"
+    },
     "async-python-patterns": {
       "source": "wshobson/agents",
       "sourceType": "github",
@@ -15,6 +20,11 @@
       "source": "wshobson/agents",
       "sourceType": "github",
       "computedHash": "8fdfb9bad6aef892b4f16ef3b07ef5eea3b0497d37eeaeddb07244d657cc8711"
+    },
+    "langsmith-fetch": {
+      "source": "composiohq/awesome-claude-skills",
+      "sourceType": "github",
+      "computedHash": "7953660eee3f80ce985956e4ad2ed1f551efca6aad596b7f3479d5a829602180"
     },
     "llm-security": {
       "source": "semgrep/skills",
@@ -50,6 +60,11 @@
       "source": "sickn33/antigravity-awesome-skills",
       "sourceType": "github",
       "computedHash": "c67b39bdbf564beab3adc0672cc3235a0e6ff7e3bc006d3972bd92477001eca1"
+    },
+    "web-design-guidelines": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "github",
+      "computedHash": "f3bc47f890f42a44db1007ab390709ec368e4b8c089baee6b0007182236ac474"
     },
     "zustand": {
       "source": "lobehub/lobe-chat",

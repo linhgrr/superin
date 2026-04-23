@@ -5,17 +5,24 @@ from __future__ import annotations
 import logging
 from datetime import date, datetime, timedelta
 
-from pymongo.asynchronous.client_session import AsyncClientSession
+from motor.motor_asyncio import AsyncIOMotorClientSession
 from pymongo.errors import DuplicateKeyError
 
 from apps.calendar.enums import EventType, RecurrenceFrequency
-from apps.calendar.models import Calendar, Event, RecurringRule
+from apps.calendar.mappers import calendar_to_read, event_to_read, recurring_rule_to_read
 from apps.calendar.repository import (
     DEFAULT_CALENDAR_COLOR,
     CalendarRepository,
     EventRepository,
     RecurringRuleRepository,
     calendar_transaction,
+)
+from apps.calendar.schemas import (
+    CalendarActionResponse,
+    CalendarActivitySummaryResponse,
+    CalendarCalendarRead,
+    CalendarEventRead,
+    CalendarRecurringRuleRead,
 )
 from core.models import User
 from core.utils.timezone import get_user_timezone_context
@@ -40,25 +47,28 @@ class CalendarService:
         end: datetime | None = None,
         calendar_id: str | None = None,
         limit: int = 100,
-    ) -> list[dict]:
+    ) -> list[CalendarEventRead]:
         """List events with optional time range and calendar filter."""
         events = await self.events.find_by_user(user_id, start, end, calendar_id, limit)
-        return [_event_to_dict(e) for e in events]
+        return [event_to_read(e) for e in events]
 
     async def search_events(
         self,
         user_id: str,
         query: str,
+        start: datetime | None = None,
+        end: datetime | None = None,
+        calendar_id: str | None = None,
         limit: int = 20,
-    ) -> list[dict]:
-        """Search events by title/description."""
-        events = await self.events.search(user_id, query, limit)
-        return [_event_to_dict(e) for e in events]
+    ) -> list[CalendarEventRead]:
+        """Search events by text, optionally narrowed by time range or calendar."""
+        events = await self.events.search(user_id, query, start, end, calendar_id, limit)
+        return [event_to_read(e) for e in events]
 
-    async def get_event(self, event_id: str, user_id: str) -> dict | None:
+    async def get_event(self, event_id: str, user_id: str) -> CalendarEventRead | None:
         """Get single event by ID."""
         event = await self.events.find_by_id(event_id, user_id)
-        return _event_to_dict(event) if event else None
+        return event_to_read(event) if event else None
 
     async def create_event(
         self,
@@ -74,7 +84,7 @@ class CalendarService:
         task_id: str | None = None,
         color: str | None = None,
         reminders: list[int] | None = None,
-    ) -> dict:
+    ) -> CalendarEventRead:
         """Create event with conflict check.
 
         All incoming datetimes are normalized to UTC-naive via ensure_aware_utc
@@ -101,7 +111,7 @@ class CalendarService:
             user_id, title, start_utc, end_utc, calendar_id,
             description, location, is_all_day, timezone_name, type_, task_id, color, reminders
         )
-        return _event_to_dict(event)
+        return event_to_read(event)
 
     async def update_event(
         self,
@@ -116,7 +126,7 @@ class CalendarService:
         color: str | None = None,
         reminders: list[int] | None = None,
         is_all_day: bool | None = None,
-    ) -> dict:
+    ) -> CalendarEventRead:
         """Update event with validation.
 
         Only fields set to non-None values are updated (patch semantics).
@@ -152,16 +162,16 @@ class CalendarService:
             reminders=reminders,
             is_all_day=is_all_day,
         )
-        return _event_to_dict(updated)
+        return event_to_read(updated)
 
-    async def delete_event(self, event_id: str, user_id: str) -> dict:
+    async def delete_event(self, event_id: str, user_id: str) -> CalendarActionResponse:
         """Delete single event."""
         event = await self.events.find_by_id(event_id, user_id)
         if not event:
             raise ValueError("Event not found")
 
         await self.events.delete(event)
-        return {"success": True, "id": event_id, "message": "Event deleted successfully"}
+        return CalendarActionResponse(success=True, id=event_id, message="Event deleted successfully")
 
     async def check_conflicts(
         self,
@@ -169,32 +179,60 @@ class CalendarService:
         start: datetime,
         end: datetime,
         exclude_event_id: str | None = None,
-    ) -> list[dict]:
+    ) -> list[CalendarEventRead]:
         """Check for conflicting events in time range."""
         conflicts = await self.events.find_conflicts(user_id, start, end, exclude_event_id)
-        return [_event_to_dict(e) for e in conflicts]
+        return [event_to_read(e) for e in conflicts]
+
+    async def summarize_activity(
+        self,
+        user_id: str,
+        start: datetime,
+        end: datetime,
+        *,
+        limit: int = 10,
+    ) -> CalendarActivitySummaryResponse:
+        created_events = await self.events.find_created_between(user_id, start, end, limit=None)
+        updated_events = await self.events.find_updated_between(user_id, start, end, limit=None)
+        scheduled_events = await self.events.find_by_user(user_id, start, end, limit=1000)
+
+        materially_updated_events = [
+            event for event in updated_events if event.updated_at > event.created_at
+        ]
+
+        return CalendarActivitySummaryResponse(
+            start_datetime=start,
+            end_datetime=end,
+            created_count=len(created_events),
+            updated_count=len(materially_updated_events),
+            scheduled_count=len(scheduled_events),
+            created_events=[event_to_read(event) for event in created_events[:limit]],
+            updated_events=[event_to_read(event) for event in materially_updated_events[:limit]],
+            scheduled_events=[event_to_read(event) for event in scheduled_events[:limit]],
+            unsupported_activity=["event_deletions_not_tracked"],
+        )
 
     # ─── Calendars ──────────────────────────────────────────────────────────────
 
-    async def list_calendars(self, user_id: str) -> list[dict]:
+    async def list_calendars(self, user_id: str) -> list[CalendarCalendarRead]:
         """List all user calendars."""
         calendars = await self.calendars.find_by_user(user_id)
         if not calendars:
             await self.on_install(user_id)
             calendars = await self.calendars.find_by_user(user_id)
-        return [_calendar_to_dict(c) for c in calendars]
+        return [calendar_to_read(c) for c in calendars]
 
-    async def get_calendar(self, calendar_id: str, user_id: str) -> dict | None:
+    async def get_calendar(self, calendar_id: str, user_id: str) -> CalendarCalendarRead | None:
         """Get single calendar."""
         calendar = await self.calendars.find_by_id(calendar_id, user_id)
-        return _calendar_to_dict(calendar) if calendar else None
+        return calendar_to_read(calendar) if calendar else None
 
     async def create_calendar(
         self,
         user_id: str,
         name: str,
         color: str | None = None,
-    ) -> dict:
+    ) -> CalendarCalendarRead:
         """Create new calendar."""
         async with calendar_transaction() as session:
             is_default = await self.calendars.count_by_user(user_id, session=session) == 0
@@ -208,7 +246,7 @@ class CalendarService:
                 )
             except DuplicateKeyError as exc:
                 raise ValueError(_calendar_name_exists_message(name)) from exc
-        return _calendar_to_dict(calendar)
+        return calendar_to_read(calendar)
 
     async def update_calendar(
         self,
@@ -218,7 +256,7 @@ class CalendarService:
         color: str | None = None,
         is_visible: bool | None = None,
         is_default: bool | None = None,
-    ) -> dict:
+    ) -> CalendarCalendarRead:
         """Update calendar — only fields set to non-None are updated."""
         async with calendar_transaction() as session:
             calendar = await self.calendars.find_by_id(calendar_id, user_id, session=session)
@@ -245,9 +283,9 @@ class CalendarService:
                 raise ValueError(
                     _calendar_name_exists_message(name or calendar.name)
                 ) from exc
-        return _calendar_to_dict(updated)
+        return calendar_to_read(updated)
 
-    async def delete_calendar(self, calendar_id: str, user_id: str) -> dict:
+    async def delete_calendar(self, calendar_id: str, user_id: str) -> CalendarActionResponse:
         """Delete calendar and all its events."""
         async with calendar_transaction() as session:
             calendar = await self.calendars.find_by_id(calendar_id, user_id, session=session)
@@ -278,7 +316,7 @@ class CalendarService:
                     is_default=True,
                     session=session,
                 )
-        return {"success": True, "id": calendar_id}
+        return CalendarActionResponse(success=True, id=calendar_id)
 
     # ─── Recurring Rules ────────────────────────────────────────────────────────
 
@@ -291,7 +329,7 @@ class CalendarService:
         days_of_week: list[int] | None = None,
         end_date: date | None = None,
         max_occurrences: int | None = None,
-    ) -> dict:
+    ) -> CalendarRecurringRuleRead:
         """Create recurring pattern for an event."""
         # Verify event template exists
         template = await self.events.find_by_id(event_template_id, user_id)
@@ -307,21 +345,21 @@ class CalendarService:
                 days_of_week, end_date, max_occurrences,
                 session=session,
             )
-        return _recurring_rule_to_dict(rule)
+        return recurring_rule_to_read(rule)
 
-    async def list_recurring_rules(self, user_id: str) -> list[dict]:
+    async def list_recurring_rules(self, user_id: str) -> list[CalendarRecurringRuleRead]:
         """List all recurring rules."""
         rules = await self.recurring.find_by_user(user_id)
-        return [_recurring_rule_to_dict(r) for r in rules]
+        return [recurring_rule_to_read(r) for r in rules]
 
-    async def stop_recurring_rule(self, rule_id: str, user_id: str) -> dict:
+    async def stop_recurring_rule(self, rule_id: str, user_id: str) -> CalendarRecurringRuleRead:
         """Stop future occurrences of a recurring rule."""
         rule = await self.recurring.find_by_id(rule_id, user_id)
         if not rule:
             raise ValueError("Recurring rule not found")
 
         deactivated = await self.recurring.deactivate(rule)
-        return _recurring_rule_to_dict(deactivated)
+        return recurring_rule_to_read(deactivated)
 
     # ─── Todo Integration ───────────────────────────────────────────────────────
 
@@ -332,7 +370,7 @@ class CalendarService:
         start_datetime: datetime,
         duration_minutes: int,
         calendar_id: str | None = None,
-    ) -> dict:
+    ) -> CalendarEventRead:
         """Create time-blocked event from Todo task.
 
         The start_datetime may come from various callers (agents, tools, etc.)
@@ -375,11 +413,11 @@ class CalendarService:
             type_="time_blocked_task",
             task_id=task_id,
         )
-        return _event_to_dict(event)
+        return event_to_read(event)
 
     # ─── Install / Uninstall ────────────────────────────────────────────────────
 
-    async def on_install(self, user_id: str, session: AsyncClientSession | None = None) -> None:
+    async def on_install(self, user_id: str, session: AsyncIOMotorClientSession | None = None) -> None:
         """Create default calendars for new user."""
         if session is None:
             async with calendar_transaction() as tx_session:
@@ -417,7 +455,7 @@ class CalendarService:
         if personal and not personal.is_default:
             await self.calendars.update(personal, is_default=True, session=session)
 
-    async def on_uninstall(self, user_id: str, session: AsyncClientSession | None = None) -> None:
+    async def on_uninstall(self, user_id: str, session: AsyncIOMotorClientSession | None = None) -> None:
         """Clean up all user data."""
         if session is None:
             async with calendar_transaction() as tx_session:
@@ -433,70 +471,8 @@ class CalendarService:
         for rule in rules:
             await self.recurring.delete(rule, session=session)
 
-
-# ─── DTO helpers ───────────────────────────────────────────────────────────────
-
-
 def _calendar_name_exists_message(name: str) -> str:
     return f"Calendar '{name}' already exists"
-
-
-def _event_to_dict(e: Event) -> dict:
-    d = {
-        "id": str(e.id),
-        "title": e.title,
-        "description": e.description,
-        "location": e.location,
-        "start_datetime": e.start_datetime.isoformat() + "Z",
-        "end_datetime": e.end_datetime.isoformat() + "Z",
-        "is_all_day": e.is_all_day,
-        "timezone": e.timezone,
-        "calendar_id": str(e.calendar_id),
-        "type": e.type,
-        "task_id": str(e.task_id) if e.task_id else None,
-        "color": e.color,
-        "is_recurring": e.is_recurring,
-        "reminders": e.reminders,
-        "attendees": [a.model_dump() for a in e.attendees] if e.attendees else [],
-        "created_at": e.created_at.isoformat(),
-        "updated_at": e.updated_at.isoformat(),
-    }
-    # Fail-fast if dict shape drifts from CalendarEventRead schema
-    from apps.calendar.schemas import CalendarEventRead
-    CalendarEventRead.model_validate(d)
-    return d
-
-
-def _calendar_to_dict(c: Calendar) -> dict:
-    from apps.calendar.schemas import CalendarCalendarRead
-    d = {
-        "id": str(c.id),
-        "name": c.name,
-        "color": c.color,
-        "is_visible": c.is_visible,
-        "is_default": c.is_default,
-        "created_at": c.created_at.isoformat(),
-    }
-    CalendarCalendarRead.model_validate(d)
-    return d
-
-
-def _recurring_rule_to_dict(r: RecurringRule) -> dict:
-    from apps.calendar.schemas import CalendarRecurringRuleRead
-    d = {
-        "id": str(r.id),
-        "event_template_id": str(r.event_template_id),
-        "frequency": r.frequency,
-        "interval": r.interval,
-        "days_of_week": r.days_of_week,
-        "end_date": r.end_date.isoformat() if r.end_date else None,
-        "max_occurrences": r.max_occurrences,
-        "occurrence_count": r.occurrence_count,
-        "is_active": r.is_active,
-        "created_at": r.created_at.isoformat(),
-    }
-    CalendarRecurringRuleRead.model_validate(d)
-    return d
 
 
 # Singleton

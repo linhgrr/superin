@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
-from typing import Annotated
+from typing import Annotated, Any, cast
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -26,7 +27,7 @@ def create_access_token(data: dict) -> str:
         "type": "access",
         "jti": str(uuid.uuid4()),
     })
-    return jwt.encode(to_encode, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+    return cast(str, jwt.encode(to_encode, settings.jwt_secret, algorithm=settings.jwt_algorithm))
 
 
 def create_refresh_token(data: dict) -> str:
@@ -37,16 +38,16 @@ def create_refresh_token(data: dict) -> str:
         "type": "refresh",
         "jti": str(uuid.uuid4()),
     })
-    return jwt.encode(to_encode, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+    return cast(str, jwt.encode(to_encode, settings.jwt_secret, algorithm=settings.jwt_algorithm))
 
 
-def decode_token(token: str) -> dict:
+def decode_token(token: str) -> dict[str, Any]:
     """Decode and validate a JWT without checking type."""
-    return jwt.decode(
+    return cast(dict[str, Any], jwt.decode(
         token,
         settings.jwt_secret,
         algorithms=[settings.jwt_algorithm],
-    )
+    ))
 
 
 async def get_current_user(
@@ -111,7 +112,7 @@ async def get_current_admin_user(
     return user_id
 
 
-def require_permission(permission: PermissionKey | str):
+def require_permission(permission: PermissionKey | str) -> Callable[..., Awaitable[str]]:
     """FastAPI dependency factory — raises 403 if user lacks the permission."""
     async def dependency(
         user_id: Annotated[str, Depends(get_current_user)],

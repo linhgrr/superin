@@ -8,11 +8,12 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 
 import { useToast } from "@/components/providers/ToastProvider";
 import { ROUTES } from "@/constants/routes";
+import { ConfirmationModal } from "@/shared/components/ConfirmationModal";
 import { useWorkspaceStore } from "@/stores/platform/workspaceStore";
 import type { AppCatalogEntry, AppCategoryRead } from "@/types/generated";
 
@@ -40,6 +41,7 @@ import {
 } from "./store-page-state";
 
 export default function StorePage() {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { installedAppIds, refreshWorkspace, setAppInstalled } = useWorkspaceStore(
     useShallow((state) => ({
@@ -53,6 +55,7 @@ export default function StorePage() {
   const [catalog, setCatalog] = useState<AppCatalogEntry[]>(readCatalogSnapshot);
   const [isCatalogLoading, setIsCatalogLoading] = useState(() => readCatalogSnapshot().length === 0);
   const [installing, setInstalling] = useState<Set<string>>(new Set());
+  const [appPendingRemoval, setAppPendingRemoval] = useState<AppCatalogEntry | null>(null);
   const [categories, setCategories] = useState<AppCategoryRead[]>([]);
 
   useEffect(() => {
@@ -132,7 +135,7 @@ export default function StorePage() {
     [mergedCatalog, filter, searchQuery],
   );
 
-  const handleToggle = async (app: AppCatalogEntry) => {
+  const commitToggle = async (app: AppCatalogEntry) => {
     if (installing.has(app.id)) return;
     setInstalling((current) => new Set([...current, app.id]));
     const nextInstalled = !app.is_installed;
@@ -154,7 +157,7 @@ export default function StorePage() {
           action: {
             label: "Open",
             onClick: () => {
-              window.location.href = getStoreActionRoute(app.id);
+              navigate(getStoreActionRoute(app.id));
             },
           },
         });
@@ -168,7 +171,7 @@ export default function StorePage() {
           action: {
             label: "Upgrade",
             onClick: () => {
-              window.location.href = ROUTES.BILLING;
+              navigate(ROUTES.BILLING);
             },
           },
         });
@@ -186,6 +189,15 @@ export default function StorePage() {
         return next;
       });
     }
+  };
+
+  const handleToggle = async (app: AppCatalogEntry) => {
+    if (app.is_installed) {
+      setAppPendingRemoval(app);
+      return;
+    }
+
+    await commitToggle(app);
   };
 
   if (isCatalogLoading && catalog.length === 0) {
@@ -216,6 +228,21 @@ export default function StorePage() {
           viewMode={viewMode}
         />
       )}
+      {appPendingRemoval ? (
+        <ConfirmationModal
+          title={`Remove ${appPendingRemoval.name}?`}
+          message="This removes the app from your workspace. You can install it again later from the App Store."
+          confirmLabel="Remove App"
+          cancelLabel="Keep App"
+          onCancel={() => setAppPendingRemoval(null)}
+          onConfirm={() => {
+            const nextApp = appPendingRemoval;
+            setAppPendingRemoval(null);
+            void commitToggle(nextApp);
+          }}
+          variant="danger"
+        />
+      ) : null}
     </div>
   );
 }

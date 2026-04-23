@@ -64,4 +64,10 @@ Delete wallet:
 - Resolve "today", "yesterday", "this month", and clock times in the user's timezone from execution context.
 - Do not convert local times to UTC yourself unless a tool explicitly requires an absolute instant.
 </time_guidance>
+
+<summary_guidance>
+- For recap or "what changed" requests, prefer activity-oriented tools over current-state snapshot tools.
+- Say explicitly which finance changes are actually supported by the available tools instead of implying a full audit log.
+- Use current-state summaries only when the user also wants the present balance snapshot.
+</summary_guidance>
 """

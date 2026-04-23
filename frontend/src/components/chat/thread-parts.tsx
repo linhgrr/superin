@@ -5,11 +5,14 @@ import {
   MessagePrimitive,
   useMessage,
   useMessagePartText,
+  useThread,
 } from "@assistant-ui/react";
+import { Spinner } from "@heroui/react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import { DynamicIcon } from "@/lib/icon-resolver";
+import { useChatThinkingStore } from "@/stores/useChatThinkingStore";
 
 function TextPart() {
   const { text } = useMessagePartText();
@@ -24,6 +27,45 @@ function ThinkingDots() {
       <span />
       <span />
     </span>
+  );
+}
+
+function ThinkingStepIcon({ status }: { status: "active" | "done" }) {
+  if (status === "done") {
+    return <DynamicIcon name="Check" size={12} className="assistant-thinking-step-icon-done" />;
+  }
+
+  return <Spinner size="sm" color="current" className="assistant-thinking-spinner" />;
+}
+
+function ThinkingPanel({ compact }: { compact: boolean }) {
+  const steps = useChatThinkingStore((state) => state.steps);
+  const visibleSteps = steps.slice(-4);
+
+  if (visibleSteps.length === 0) return <ThinkingDots />;
+
+  return (
+    <div className={`assistant-thinking-panel${compact ? " assistant-thinking-panel-compact" : ""}`}>
+      <div className="assistant-thinking-header">
+        <div className="assistant-thinking-header-copy">
+          <Spinner size="sm" color="current" className="assistant-thinking-spinner" />
+          <span>Working through your workspace</span>
+        </div>
+        <span className="assistant-thinking-live-pill">Live</span>
+      </div>
+
+      <div className="assistant-thinking-steps">
+        {visibleSteps.map((step) => (
+          <div
+            key={step.id}
+            className={`assistant-thinking-step assistant-thinking-step-${step.status}`}
+          >
+            <ThinkingStepIcon status={step.status} />
+            <span>{step.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -74,11 +116,11 @@ function AssistantMessageContent() {
     (part) => part.type === "text" && typeof part.text === "string" && part.text.length > 0,
   );
   const isInProgress = message.status.type === "running";
-  const showThinking = isInProgress && !hasTextContent;
+  const showThinking = isInProgress;
 
   return (
     <>
-      {showThinking && <ThinkingDots />}
+      {showThinking && <ThinkingPanel compact={hasTextContent} />}
       <MessagePrimitive.Parts>
         {({ part }) => {
           if (part.type === "text") return <AssistantText />;
@@ -114,26 +156,26 @@ export function AssistantMessage() {
 }
 
 export function ChatComposer() {
+  const isRunning = useThread((state) => state.isRunning);
+
   return (
     <div className="chat-input-container" style={{ width: "100%" }}>
       <ComposerPrimitive.Root
         style={{ display: "flex", alignItems: "flex-end", gap: "0.5rem", width: "100%" }}
       >
         <ComposerPrimitive.Input
-          placeholder="Ask Rin-chan anything... (Enter to send, Shift+Enter for new line)"
+          placeholder="Ask Rin-chan anything… (Enter to send, Shift+Enter for new line)"
           maxRows={5}
           className="chat-input"
           style={{ flex: 1, minWidth: 0 }}
         />
-        <ComposerPrimitive.Send asChild>
-          <button
-            type="submit"
-            aria-label="Send message"
-            className="chat-send-btn"
-            style={{ flexShrink: 0 }}
-          >
-            <DynamicIcon name="Send" size={16} />
-          </button>
+        <ComposerPrimitive.Send
+          aria-label="Send message"
+          className="chat-send-btn"
+          disabled={isRunning}
+          style={{ flexShrink: 0 }}
+        >
+          <DynamicIcon name="Send" size={16} />
         </ComposerPrimitive.Send>
       </ComposerPrimitive.Root>
     </div>

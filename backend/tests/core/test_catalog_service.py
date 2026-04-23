@@ -1,23 +1,30 @@
+from __future__ import annotations
+
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
-import core.catalog_service as catalog_service
+from core.catalog import service as catalog_service
 from shared.enums import INSTALL_STATUS_ALREADY_INSTALLED
 
 
 class FakeInstallCollection:
-    def __init__(self, previous: dict | None) -> None:
+    def __init__(self, previous: dict[str, str] | None) -> None:
         self.previous = previous
-        self.calls: list[dict] = []
+        self.calls: list[dict[str, object]] = []
 
-    async def find_one_and_update(self, *args, **kwargs):
+    async def find_one_and_update(
+        self,
+        *args: object,
+        **kwargs: object,
+    ) -> dict[str, str] | None:
         self.calls.append({"args": args, "kwargs": kwargs})
         return self.previous
 
 
 class FakeDatabase:
-    def __init__(self, previous: dict | None) -> None:
+    def __init__(self, previous: dict[str, str] | None) -> None:
         self.collection = FakeInstallCollection(previous)
         self.client = FakeMongoClient()
 
@@ -27,10 +34,10 @@ class FakeDatabase:
 
 
 class FakeQuery:
-    def __init__(self, items) -> None:
+    def __init__(self, items: list[Any]) -> None:
         self.items = items
 
-    async def to_list(self):
+    async def to_list(self) -> list[Any]:
         return self.items
 
 
@@ -38,40 +45,40 @@ class FakeField:
     def __init__(self, name: str) -> None:
         self.name = name
 
-    def __eq__(self, other):
-        return (self.name, other)
+    def __eq__(self, other: object) -> bool:
+        return self.name == str(other)
 
 
 class FakeWidgetPreference:
     user_id = FakeField("user_id")
     widget_id = FakeField("widget_id")
-    inserted = None
-    existing = []
+    inserted: list[Any] | None = None
+    existing: list[Any] = []
 
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, **kwargs: object) -> None:
         self.__dict__.update(kwargs)
 
     @staticmethod
-    def find(*_args, **_kwargs):
+    def find(*_args: object, **_kwargs: object) -> FakeQuery:
         return FakeQuery(FakeWidgetPreference.existing)
 
     @staticmethod
-    async def insert_many(documents, session=None):
+    async def insert_many(documents: list[Any], session: object | None = None) -> None:
         FakeWidgetPreference.inserted = documents
 
 
 class FakeWidgetDataConfig:
     user_id = FakeField("user_id")
 
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, **kwargs: object) -> None:
         self.__dict__.update(kwargs)
 
     @staticmethod
-    def find(*_args, **_kwargs):
+    def find(*_args: object, **_kwargs: object) -> FakeQuery:
         return FakeQuery([])
 
     @staticmethod
-    async def insert_many(documents, session=None):
+    async def insert_many(documents: list[Any], session: object | None = None) -> None:
         return None
 
 
@@ -79,8 +86,8 @@ class FakeInstallationField:
     def __init__(self, name: str) -> None:
         self.name = name
 
-    def __eq__(self, other):
-        return (self.name, other)
+    def __eq__(self, other: object) -> bool:
+        return self.name == str(other)
 
 
 class FakeInstallation:
@@ -89,10 +96,10 @@ class FakeInstallation:
     status = FakeInstallationField("status")
 
     def __init__(self, status: str = "active") -> None:
-        self.status = status
+        self.__dict__["status"] = status
         self.saved = False
 
-    async def save(self, session=None) -> None:
+    async def save(self, session: object | None = None) -> None:
         self.saved = True
 
 
@@ -100,30 +107,37 @@ class FakeUserAppInstallation:
     user_id = FakeInstallationField("user_id")
     app_id = FakeInstallationField("app_id")
     status = FakeInstallationField("status")
-    installation = None
+    installation: FakeInstallation | None = None
 
     @staticmethod
-    async def find_one(*_args, **_kwargs):
+    async def find_one(*_args: object, **_kwargs: object) -> FakeInstallation | None:
         return FakeUserAppInstallation.installation
 
 
 class FakeSession:
-    async def __aenter__(self):
+    async def __aenter__(self) -> FakeSession:
         return self
 
-    async def __aexit__(self, exc_type, exc, tb):
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: object | None,
+    ) -> bool:
         return False
 
-    def start_transaction(self):
+    def start_transaction(self) -> FakeSession:
         return self
 
 
 class FakeMongoClient:
-    async def start_session(self):
+    async def start_session(self) -> FakeSession:
         return FakeSession()
 
 
-async def test_install_app_for_user_installs_and_seeds_widgets(monkeypatch) -> None:
+async def test_install_app_for_user_installs_and_seeds_widgets(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     install_calls: list[str] = []
     plugin = {
         "manifest": SimpleNamespace(
@@ -168,7 +182,9 @@ async def test_install_app_for_user_installs_and_seeds_widgets(monkeypatch) -> N
     ]
 
 
-async def test_install_app_for_user_returns_already_installed_without_hooks(monkeypatch) -> None:
+async def test_install_app_for_user_returns_already_installed_without_hooks(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     plugin = {
         "manifest": SimpleNamespace(name="Finance", widgets=[]),
         "agent": SimpleNamespace(on_install=None),
@@ -192,7 +208,9 @@ async def test_install_app_for_user_returns_already_installed_without_hooks(monk
     assert len(db.collection.calls) == 1
 
 
-async def test_install_app_for_user_rejects_unknown_app(monkeypatch) -> None:
+async def test_install_app_for_user_rejects_unknown_app(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(catalog_service, "get_plugin", lambda _app_id: None)
 
     with pytest.raises(catalog_service.UnknownAppError) as exc_info:
@@ -204,7 +222,9 @@ async def test_install_app_for_user_rejects_unknown_app(monkeypatch) -> None:
     assert exc_info.value.app_id == "missing"
 
 
-async def test_install_app_for_user_uses_effective_tier_for_paid_gate(monkeypatch) -> None:
+async def test_install_app_for_user_uses_effective_tier_for_paid_gate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     plugin = {
         "manifest": SimpleNamespace(
             name="Finance",
@@ -214,7 +234,7 @@ async def test_install_app_for_user_uses_effective_tier_for_paid_gate(monkeypatc
         "agent": SimpleNamespace(on_install=None),
     }
 
-    async def fake_get_effective_tier(_user_id: str):
+    async def fake_get_effective_tier(_user_id: str) -> str:
         return catalog_service.SubscriptionTier.FREE
 
     monkeypatch.setattr(catalog_service, "get_plugin", lambda app_id: plugin if app_id == "finance" else None)
@@ -230,7 +250,9 @@ async def test_install_app_for_user_uses_effective_tier_for_paid_gate(monkeypatc
     assert exc_info.value.required_tier == catalog_service.SubscriptionTier.PAID
 
 
-async def test_uninstall_app_for_user_disables_installation(monkeypatch) -> None:
+async def test_uninstall_app_for_user_disables_installation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     uninstall_calls: list[str] = []
     installation = FakeInstallation(status="active")
     plugin = {
@@ -262,7 +284,9 @@ async def test_uninstall_app_for_user_disables_installation(monkeypatch) -> None
     assert installation.saved is True
 
 
-async def test_uninstall_app_for_user_returns_already_uninstalled(monkeypatch) -> None:
+async def test_uninstall_app_for_user_returns_already_uninstalled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     plugin = {
         "manifest": SimpleNamespace(name="Finance"),
         "agent": SimpleNamespace(),

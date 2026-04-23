@@ -2,11 +2,18 @@
 
 from __future__ import annotations
 
-from langchain_core.runnables import RunnableConfig
+from typing import Any
+
+from langchain.tools import ToolRuntime
 from langchain_core.tools import tool
 
+from apps.calendar.schemas import CalendarEventRead
 from apps.calendar.service import calendar_service
-from shared.tool_results import run_time_aware_tool_with_user
+from core.agents.runtime_context import AppAgentContext
+from shared.tool_results import run_time_aware_tool_with_runtime
+from shared.tool_time import ToolTimeContext
+
+CalendarTaskToolResult = CalendarEventRead
 
 
 @tool("calendar_block_task_time")
@@ -14,9 +21,10 @@ async def calendar_block_task_time(
     task_id: str,
     start: str,
     duration_minutes: int,
-    config: RunnableConfig,
     calendar_id: str | None = None,
-) -> dict:
+    *,
+    runtime: ToolRuntime[AppAgentContext],
+) -> CalendarTaskToolResult:
     """
     Schedule a Todo task as a time-blocked event on the calendar.
 
@@ -25,7 +33,11 @@ async def calendar_block_task_time(
     - "Schedule my Write Report task for Friday 9am"
     - "Put 'Prepare Presentation' on my calendar tomorrow"
     """
-    async def operation(user_id: str, temporal: dict, _time_context) -> dict:
+    async def operation(
+        user_id: str,
+        temporal: dict[str, Any],
+        _time_context: ToolTimeContext,
+    ) -> CalendarEventRead:
         start_dt = temporal["start"]
         return await calendar_service.schedule_task(
             user_id=user_id,
@@ -35,9 +47,8 @@ async def calendar_block_task_time(
             calendar_id=calendar_id,
         )
 
-    return await run_time_aware_tool_with_user(
-        config,
-        action="blocking task time",
+    return await run_time_aware_tool_with_runtime(
+        runtime,
         payload={"start": start},
         temporal_fields={"start": "local_datetime"},
         operation=operation,

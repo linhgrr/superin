@@ -18,7 +18,13 @@ export const AppListPanel = memo(function AppListPanel({ catalog, enabledWidgetI
     <>
       <div className="dialog-header">
         <span className="dialog-title">Add Widget</span>
-        <button type="button" className="btn btn-ghost btn-icon" onClick={onClose} style={{ marginLeft: "auto" }}>
+        <button
+          type="button"
+          className="btn btn-ghost btn-icon"
+          onClick={onClose}
+          style={{ marginLeft: "auto" }}
+          aria-label="Close add widget dialog"
+        >
           <DynamicIcon name="X" size={18} />
         </button>
       </div>
@@ -40,7 +46,11 @@ export const AppListPanel = memo(function AppListPanel({ catalog, enabledWidgetI
                   type="button"
                   className="option-btn"
                   onClick={() => onSelectApp(app)}
-                  style={{ padding: "0.875rem 1rem", borderRadius: "12px", transition: "all 0.2s ease" }}
+                  style={{
+                    padding: "0.875rem 1rem",
+                    borderRadius: "12px",
+                    transition: "background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease",
+                  }}
                 >
                   <div
                     className="option-icon"

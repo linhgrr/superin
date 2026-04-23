@@ -1,10 +1,15 @@
 import os
 from pathlib import Path
 
+import pytest
+
 from core import config as config_module
 
 
-def test_prime_process_env_loads_langsmith_keys(tmp_path: Path, monkeypatch) -> None:
+def test_prime_process_env_loads_langsmith_keys(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     backend_dir = tmp_path / "backend"
     backend_dir.mkdir()
 

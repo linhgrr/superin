@@ -7,8 +7,9 @@
  */
 
 import { memo, useEffect, useState, type ComponentType } from "react";
+import { Link } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
-import { useNavigate, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import Construction from "lucide-react/dist/esm/icons/construction";
 import Download from "lucide-react/dist/esm/icons/download";
 import Loader2 from "lucide-react/dist/esm/icons/loader-2";
@@ -66,7 +67,6 @@ export const AppNotInstalled = memo(function AppNotInstalled({
   appId: string;
   appName: string | null;
 }) {
-  const navigate = useNavigate();
   return (
     <div
       data-testid="not-installed-screen"
@@ -119,9 +119,9 @@ export const AppNotInstalled = memo(function AppNotInstalled({
           Visit the App Store to install it.
         </p>
       </div>
-      <button
+      <Link
+        to={ROUTES.STORE}
         data-testid="not-installed-store-btn"
-        onClick={() => navigate(ROUTES.STORE)}
         style={{
           display: "inline-flex",
           alignItems: "center",
@@ -135,11 +135,12 @@ export const AppNotInstalled = memo(function AppNotInstalled({
           border: "none",
           cursor: "pointer",
           boxShadow: "0 2px 8px oklch(0 0 0 / 0.2)",
+          textDecoration: "none",
         }}
       >
         <Download size={16} />
         Browse App Store
-      </button>
+      </Link>
     </div>
   );
 });

@@ -9,7 +9,7 @@
  *   └── KeyboardSection      (shortcuts reference)
  */
 
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { DynamicIcon } from "@/lib/icon-resolver";
 import { useAuth } from "@/hooks/useAuth";
@@ -48,6 +48,7 @@ export default function SettingsPage() {
   const saveSettings = useSettingsStore(settingsSelectors.saveSettings);
   const settings = useSettingsStore(settingsSelectors.settings);
   const syncTimezoneFromUser = useSettingsStore(settingsSelectors.syncTimezoneFromUser);
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const activeTabParam = searchParams.get("tab");
   const activeTab = isSettingsTabId(activeTabParam) ? activeTabParam : DEFAULT_SETTINGS_TAB;
 
@@ -104,6 +105,42 @@ export default function SettingsPage() {
   );
 
   const isTabActive = (id: SettingsTabId) => activeTab === id;
+  const activePanelId = `settings-panel-${activeTab}`;
+
+  const focusTabByIndex = useCallback((index: number) => {
+    tabRefs.current[index]?.focus();
+  }, []);
+
+  const handleTabKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLButtonElement>, currentIndex: number) => {
+      let nextIndex: number | null = null;
+
+      switch (event.key) {
+        case "ArrowRight":
+        case "ArrowDown":
+          nextIndex = (currentIndex + 1) % TABS.length;
+          break;
+        case "ArrowLeft":
+        case "ArrowUp":
+          nextIndex = (currentIndex - 1 + TABS.length) % TABS.length;
+          break;
+        case "Home":
+          nextIndex = 0;
+          break;
+        case "End":
+          nextIndex = TABS.length - 1;
+          break;
+        default:
+          return;
+      }
+
+      event.preventDefault();
+      const nextTab = TABS[nextIndex];
+      handleTabChange(nextTab.id);
+      focusTabByIndex(nextIndex);
+    },
+    [focusTabByIndex, handleTabChange]
+  );
 
   return (
     <div style={{ maxWidth: "720px", margin: "0 auto", animation: "fadeIn 0.3s ease" }}>
@@ -127,6 +164,8 @@ export default function SettingsPage() {
 
       {/* Tabs */}
       <div
+        role="tablist"
+        aria-label="Settings sections"
         style={{
           display: "flex",
           gap: "0.25rem",
@@ -139,11 +178,22 @@ export default function SettingsPage() {
         }}
       >
         {TABS.map((tab) => {
+          const index = TABS.findIndex((item) => item.id === tab.id);
           const active = isTabActive(tab.id);
           return (
             <button
               key={tab.id}
+              id={`settings-tab-${tab.id}`}
+              ref={(element) => {
+                tabRefs.current[index] = element;
+              }}
+              type="button"
+              role="tab"
+              aria-controls={`settings-panel-${tab.id}`}
+              aria-selected={active}
+              tabIndex={active ? 0 : -1}
               onClick={() => handleTabChange(tab.id)}
+              onKeyDown={(event) => handleTabKeyDown(event, index)}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -169,16 +219,22 @@ export default function SettingsPage() {
       </div>
 
       {/* Tab content */}
-      {activeTab === "profile" && (
-        <ProfileSection settings={settings} onSave={handleSave} onLogout={handleLogout} />
-      )}
-      {activeTab === "appearance" && (
-        <AppearanceSection settings={settings} onSave={handleSave} />
-      )}
-      {activeTab === "notifications" && (
-        <NotificationsSection settings={settings} onSave={handleSave} />
-      )}
-      {activeTab === "keyboard" && <KeyboardSection />}
+      <div
+        id={activePanelId}
+        role="tabpanel"
+        aria-labelledby={`settings-tab-${activeTab}`}
+      >
+        {activeTab === "profile" && (
+          <ProfileSection settings={settings} onSave={handleSave} onLogout={handleLogout} />
+        )}
+        {activeTab === "appearance" && (
+          <AppearanceSection settings={settings} onSave={handleSave} />
+        )}
+        {activeTab === "notifications" && (
+          <NotificationsSection settings={settings} onSave={handleSave} />
+        )}
+        {activeTab === "keyboard" && <KeyboardSection />}
+      </div>
 
       {/* Saving indicator */}
       {isSaving && (
@@ -199,9 +255,9 @@ export default function SettingsPage() {
             color: "var(--color-foreground)",
             animation: "fadeInScale 0.2s ease",
           }}
-        >
-          <span className="animate-spin">⏳</span>
-          Saving...
+          >
+            <span className="animate-spin">⏳</span>
+          Saving…
         </div>
       )}
     </div>

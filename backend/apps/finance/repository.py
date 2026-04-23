@@ -3,10 +3,11 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import datetime
+from typing import cast
 
 from beanie import PydanticObjectId
+from motor.motor_asyncio import AsyncIOMotorClientSession
 from pymongo import ReturnDocument
-from pymongo.asynchronous.client_session import AsyncClientSession
 
 from apps.finance.enums import TransactionType
 from apps.finance.models import Category, Transaction, Wallet
@@ -15,7 +16,7 @@ from core.utils.timezone import normalize_name_key
 
 
 @asynccontextmanager
-async def finance_transaction() -> AsyncIterator[AsyncClientSession]:
+async def finance_transaction() -> AsyncIterator[AsyncIOMotorClientSession]:
     """Yield a Mongo session with an active transaction for finance mutations."""
     async with await get_db().client.start_session() as session:
         async with session.start_transaction():
@@ -27,7 +28,7 @@ class WalletRepository:
         self,
         user_id: str,
         *,
-        session: AsyncClientSession | None = None,
+        session: AsyncIOMotorClientSession | None = None,
     ) -> list[Wallet]:
         return await Wallet.find(
             Wallet.user_id == PydanticObjectId(user_id),
@@ -38,7 +39,7 @@ class WalletRepository:
         self,
         user_id: str,
         *,
-        session: AsyncClientSession | None = None,
+        session: AsyncIOMotorClientSession | None = None,
     ) -> int:
         return await Wallet.find(
             Wallet.user_id == PydanticObjectId(user_id),
@@ -50,7 +51,7 @@ class WalletRepository:
         wallet_id: str,
         user_id: str,
         *,
-        session: AsyncClientSession | None = None,
+        session: AsyncIOMotorClientSession | None = None,
     ) -> Wallet | None:
         return await Wallet.find_one(
             Wallet.id == PydanticObjectId(wallet_id),
@@ -63,7 +64,7 @@ class WalletRepository:
         user_id: str,
         name: str,
         *,
-        session: AsyncClientSession | None = None,
+        session: AsyncIOMotorClientSession | None = None,
     ) -> Wallet | None:
         return await Wallet.find_one(
             Wallet.user_id == PydanticObjectId(user_id),
@@ -71,13 +72,32 @@ class WalletRepository:
             session=session,
         )
 
+    async def find_created_between(
+        self,
+        user_id: str,
+        start: datetime,
+        end: datetime,
+        *,
+        limit: int | None = None,
+        session: AsyncIOMotorClientSession | None = None,
+    ) -> list[Wallet]:
+        cursor = Wallet.find(
+            Wallet.user_id == PydanticObjectId(user_id),
+            Wallet.created_at >= start,
+            Wallet.created_at <= end,
+            session=session,
+        ).sort("-created_at")
+        if limit is not None:
+            cursor = cursor.limit(limit)
+        return await cursor.to_list()
+
     async def create(
         self,
         user_id: str,
         name: str,
         currency: str = "USD",
         *,
-        session: AsyncClientSession | None = None,
+        session: AsyncIOMotorClientSession | None = None,
     ) -> Wallet:
         wallet = Wallet(
             user_id=PydanticObjectId(user_id),
@@ -94,7 +114,7 @@ class WalletRepository:
         wallet: Wallet,
         *,
         name: str,
-        session: AsyncClientSession | None = None,
+        session: AsyncIOMotorClientSession | None = None,
     ) -> Wallet:
         wallet.name = name
         wallet.name_key = normalize_name_key(name)
@@ -108,7 +128,7 @@ class WalletRepository:
         delta: float,
         *,
         min_balance: float | None = None,
-        session: AsyncClientSession | None = None,
+        session: AsyncIOMotorClientSession | None = None,
     ) -> Wallet | None:
         query: dict[str, object] = {
             "_id": PydanticObjectId(wallet_id),
@@ -136,13 +156,13 @@ class WalletRepository:
         )
         if updated is None:
             return None
-        return Wallet.model_validate(updated)
+        return cast(Wallet, Wallet.model_validate(updated))
 
     async def delete(
         self,
         wallet: Wallet,
         *,
-        session: AsyncClientSession | None = None,
+        session: AsyncIOMotorClientSession | None = None,
     ) -> None:
         await wallet.delete(session=session)
 
@@ -150,7 +170,7 @@ class WalletRepository:
         self,
         user_id: str,
         *,
-        session: AsyncClientSession | None = None,
+        session: AsyncIOMotorClientSession | None = None,
     ) -> None:
         await Wallet.find(
             Wallet.user_id == PydanticObjectId(user_id),
@@ -163,7 +183,7 @@ class CategoryRepository:
         self,
         user_id: str,
         *,
-        session: AsyncClientSession | None = None,
+        session: AsyncIOMotorClientSession | None = None,
     ) -> list[Category]:
         return await Category.find(
             Category.user_id == PydanticObjectId(user_id),
@@ -175,7 +195,7 @@ class CategoryRepository:
         category_id: str,
         user_id: str,
         *,
-        session: AsyncClientSession | None = None,
+        session: AsyncIOMotorClientSession | None = None,
     ) -> Category | None:
         return await Category.find_one(
             Category.id == PydanticObjectId(category_id),
@@ -188,13 +208,32 @@ class CategoryRepository:
         user_id: str,
         name: str,
         *,
-        session: AsyncClientSession | None = None,
+        session: AsyncIOMotorClientSession | None = None,
     ) -> Category | None:
         return await Category.find_one(
             Category.user_id == PydanticObjectId(user_id),
             Category.name_key == normalize_name_key(name),
             session=session,
         )
+
+    async def find_created_between(
+        self,
+        user_id: str,
+        start: datetime,
+        end: datetime,
+        *,
+        limit: int | None = None,
+        session: AsyncIOMotorClientSession | None = None,
+    ) -> list[Category]:
+        cursor = Category.find(
+            Category.user_id == PydanticObjectId(user_id),
+            Category.created_at >= start,
+            Category.created_at <= end,
+            session=session,
+        ).sort("-created_at")
+        if limit is not None:
+            cursor = cursor.limit(limit)
+        return await cursor.to_list()
 
     async def create(
         self,
@@ -204,7 +243,7 @@ class CategoryRepository:
         color: str = "oklch(0.65 0.21 280)",
         budget: float = 0.0,
         *,
-        session: AsyncClientSession | None = None,
+        session: AsyncIOMotorClientSession | None = None,
     ) -> Category:
         category = Category(
             user_id=PydanticObjectId(user_id),
@@ -225,7 +264,7 @@ class CategoryRepository:
         icon: str | None = None,
         color: str | None = None,
         budget: float | None = None,
-        session: AsyncClientSession | None = None,
+        session: AsyncIOMotorClientSession | None = None,
     ) -> Category:
         if name is not None:
             category.name = name
@@ -243,7 +282,7 @@ class CategoryRepository:
         self,
         category: Category,
         *,
-        session: AsyncClientSession | None = None,
+        session: AsyncIOMotorClientSession | None = None,
     ) -> None:
         await category.delete(session=session)
 
@@ -251,7 +290,7 @@ class CategoryRepository:
         self,
         user_id: str,
         *,
-        session: AsyncClientSession | None = None,
+        session: AsyncIOMotorClientSession | None = None,
     ) -> None:
         await Category.find(
             Category.user_id == PydanticObjectId(user_id),
@@ -271,7 +310,7 @@ class TransactionRepository:
         skip: int = 0,
         limit: int = 20,
         *,
-        session: AsyncClientSession | None = None,
+        session: AsyncIOMotorClientSession | None = None,
     ) -> list[Transaction]:
         query = Transaction.user_id == PydanticObjectId(user_id)
         if type_:
@@ -298,13 +337,32 @@ class TransactionRepository:
         transaction_id: str,
         user_id: str,
         *,
-        session: AsyncClientSession | None = None,
+        session: AsyncIOMotorClientSession | None = None,
     ) -> Transaction | None:
         return await Transaction.find_one(
             Transaction.id == PydanticObjectId(transaction_id),
             Transaction.user_id == PydanticObjectId(user_id),
             session=session,
         )
+
+    async def find_created_between(
+        self,
+        user_id: str,
+        start: datetime,
+        end: datetime,
+        *,
+        limit: int | None = None,
+        session: AsyncIOMotorClientSession | None = None,
+    ) -> list[Transaction]:
+        cursor = Transaction.find(
+            Transaction.user_id == PydanticObjectId(user_id),
+            Transaction.created_at >= start,
+            Transaction.created_at <= end,
+            session=session,
+        ).sort("-created_at")
+        if limit is not None:
+            cursor = cursor.limit(limit)
+        return await cursor.to_list()
 
     async def create(
         self,
@@ -316,7 +374,7 @@ class TransactionRepository:
         occurred_at: datetime,
         note: str | None = None,
         *,
-        session: AsyncClientSession | None = None,
+        session: AsyncIOMotorClientSession | None = None,
     ) -> Transaction:
         tx = Transaction(
             user_id=PydanticObjectId(user_id),
@@ -334,7 +392,7 @@ class TransactionRepository:
         self,
         transaction: Transaction,
         *,
-        session: AsyncClientSession | None = None,
+        session: AsyncIOMotorClientSession | None = None,
     ) -> Transaction:
         await transaction.save(session=session)
         return transaction
@@ -343,7 +401,7 @@ class TransactionRepository:
         self,
         transaction: Transaction,
         *,
-        session: AsyncClientSession | None = None,
+        session: AsyncIOMotorClientSession | None = None,
     ) -> None:
         await transaction.delete(session=session)
 
@@ -351,7 +409,7 @@ class TransactionRepository:
         self,
         user_id: str,
         *,
-        session: AsyncClientSession | None = None,
+        session: AsyncIOMotorClientSession | None = None,
     ) -> None:
         await Transaction.find(
             Transaction.user_id == PydanticObjectId(user_id),

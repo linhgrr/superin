@@ -1,13 +1,11 @@
 /**
  * AppShell — persistent layout wrapping the dashboard.
  *
- * 3-column grid: Sidebar | Main Content | Chat Panel
- * Handles responsive collapse.
- * Mobile: BottomTabBar + ChatFAB replace sidebar/panel.
+ * Sidebar + main content, with optional composed chat panel.
+ * Route layouts decide whether chat is present by passing a panel node.
  */
 
-import { lazy, useEffect, useMemo, useState } from "react";
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 
 import MobileChatFAB from "@/components/chat/MobileChatFAB";
@@ -18,33 +16,15 @@ import Header from "./Header";
 import { ShellChatColumn, ShellMainColumn } from "./ShellColumns";
 import Sidebar from "./sidebar/Sidebar";
 
-const ChatPanel = lazy(() => import("@/components/chat/ChatPanel"));
-
 interface AppShellProps {
   children?: ReactNode;
   title?: string;
-  showChat?: boolean;
+  chatPanel?: ReactNode;
 }
 
-const CHAT_PANEL_FALLBACK = <div className="chat-container" />;
-
-export default function AppShell({ children, title, showChat = true }: AppShellProps) {
+export default function AppShell({ children, title, chatPanel }: AppShellProps) {
   const location = useLocation();
   const installedApps = useInstalledApps();
-  const [isChatReady, setIsChatReady] = useState(false);
-
-  useEffect(() => {
-    if (!showChat) {
-      setIsChatReady(false);
-      return;
-    }
-
-    const schedule = window.requestIdleCallback ?? ((cb: IdleRequestCallback) => window.setTimeout(cb, 150));
-    const cancel = window.cancelIdleCallback ?? window.clearTimeout;
-    const handle = schedule(() => setIsChatReady(true));
-
-    return () => cancel(handle);
-  }, [showChat]);
 
   const resolvedTitle = useMemo(() => {
     return title ?? getShellRouteTitle(location.pathname, installedApps);
@@ -52,20 +32,17 @@ export default function AppShell({ children, title, showChat = true }: AppShellP
 
   return (
     <>
+      <a className="skip-link" href="#app-main-content">
+        Skip to main content
+      </a>
       <div className="dashboard-grid">
         <Sidebar />
         <ShellMainColumn header={<Header title={resolvedTitle} />}>
           {children ?? <Outlet />}
         </ShellMainColumn>
-        {showChat ? (
-          <ShellChatColumn
-            fallback={CHAT_PANEL_FALLBACK}
-            isReady={isChatReady}
-            panel={<ChatPanel />}
-          />
-        ) : null}
+        {chatPanel ? <ShellChatColumn panel={chatPanel} /> : null}
       </div>
-      <MobileChatFAB />
+      {chatPanel ? <MobileChatFAB /> : null}
     </>
   );
 }

@@ -1,39 +1,57 @@
-"""Beanie MongoDB initialization and LangGraph persistence wiring."""
+"""Beanie MongoDB initialization and connection management."""
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
+from langchain_openai import OpenAIEmbeddings
 from langgraph.checkpoint.mongodb import MongoDBSaver
-from langgraph.store.mongodb import MongoDBStore
-from motor.motor_asyncio import AsyncIOMotorClient
+from langgraph.store.mongodb import MongoDBStore, create_vector_index_config
+from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
+from pydantic import SecretStr
 from pymongo import MongoClient
 
 from core.config import settings
 from core.utils.index_contract import validate_index_contract
 
+if TYPE_CHECKING:
+    from langgraph.checkpoint.base import BaseCheckpointSaver
+
+# ─── Global clients (set during lifespan) ─────────────────────────────────────
+
 _client: AsyncIOMotorClient | None = None
-_sync_client: MongoClient | None = None
+_sync_client: MongoClient | None = None  # Required by MongoDBStore (sync pymongo)
 _store: MongoDBStore | None = None
-_checkpointer: MongoDBSaver | None = None
+_checkpointer: BaseCheckpointSaver | None = None
 
 
 async def init_db() -> None:
-    """Initialize Beanie plus LangGraph store/checkpointer using current package APIs."""
+    """Initialize Beanie with all known document models.
+
+    Call once at server startup (inside lifespan).
+    Plugin models are appended via get_plugin_models() after discovery.
+    """
     global _client, _sync_client, _store, _checkpointer
-
     _client = AsyncIOMotorClient(settings.mongodb_uri)
+
+    # Initialize LangGraph store (long-term memory)
+    # MongoDBStore requires a sync MongoClient; async ops run via thread pool.
     _sync_client = MongoClient(settings.mongodb_uri)
-
-    database = _client[settings.mongodb_database]
-    await validate_index_contract(database)
-
-    sync_database = _sync_client[settings.mongodb_database]
-    _store = MongoDBStore(sync_database["agent_store"])
-    if not hasattr(_store, "sep"):
-        # Current langgraph mongodb store only sets `sep` when vector indexing is
-        # configured, but some internal search code still reads it unconditionally.
-        _store.sep = "/"  # type: ignore[attr-defined]
+    store_collection = _sync_client[settings.mongodb_database]["agent_store"]
+    index_config = None
+    if settings.memory_semantic_search_enabled and settings.memory_embedding_model:
+        index_config = create_vector_index_config(
+            dims=settings.memory_embedding_dimensions,
+            embed=OpenAIEmbeddings(
+                api_key=SecretStr(settings.openai_api_key) if settings.openai_api_key else None,
+                base_url=settings.openai_base_url or None,
+                model=settings.memory_embedding_model,
+            ),
+            fields=["content"],
+            filters=["category"],
+            name=settings.memory_vector_index_name,
+        )
+    _store = MongoDBStore(store_collection, index_config=index_config)
 
     _checkpointer = MongoDBSaver(
         client=_sync_client,
@@ -42,6 +60,7 @@ async def init_db() -> None:
         writes_collection_name="agent_checkpoint_writes",
     )
 
+    # Import here to avoid circular imports
     from beanie import init_beanie
 
     from core.models import (
@@ -55,6 +74,9 @@ async def init_db() -> None:
     )
     from core.registry import get_plugin_models
     from core.subscriptions.model import Subscription, SubscriptionWebhookEvent
+
+    database = _client[settings.mongodb_database]
+    await validate_index_contract(database)
 
     await init_beanie(
         database=database,
@@ -76,10 +98,6 @@ async def init_db() -> None:
 async def close_db() -> None:
     """Close all MongoDB clients. Call once at server shutdown."""
     global _client, _sync_client, _store, _checkpointer
-
-    if _checkpointer is not None:
-        _checkpointer.close()
-        _checkpointer = None
     if _client is not None:
         _client.close()
         _client = None
@@ -87,24 +105,25 @@ async def close_db() -> None:
         _sync_client.close()
         _sync_client = None
     _store = None
+    _checkpointer = None
 
 
-def get_db():
-    """Return the active async MongoDB database handle."""
+def get_db() -> AsyncIOMotorDatabase[Any]:
+    """Return the active database instance. Requires init_db() to have run."""
     if _client is None:
         raise RuntimeError("Database not initialized. Call init_db() first.")
     return _client[settings.mongodb_database]
 
 
 def get_store() -> MongoDBStore:
-    """Return the LangGraph store connected to MongoDB."""
+    """Return the LangGraph Store connected to MongoDB."""
     if _store is None:
         raise RuntimeError("Store not initialized. Call init_db() first.")
     return _store
 
 
-def get_checkpointer() -> MongoDBSaver:
-    """Return the LangGraph MongoDB checkpointer."""
+def get_checkpointer() -> BaseCheckpointSaver:
+    """Return the LangGraph Checkpointer connected to MongoDB."""
     if _checkpointer is None:
         raise RuntimeError("Checkpointer not initialized. Call init_db() first.")
     return _checkpointer

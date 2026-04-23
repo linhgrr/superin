@@ -86,6 +86,10 @@ interface TimeZoneDateTimeParts extends TimeZoneDateParts {
   second: number;
 }
 
+function getCurrentDate(): Date {
+  return new Date(Date.now());
+}
+
 // ─── User timezone ─────────────────────────────────────────────────────────────
 
 /**
@@ -479,7 +483,7 @@ export function formatLongLocalDate(
  */
 export function getLocalNow(tz?: string): { date: string; time: string } {
   const activeTz = tz ?? getUserTimezone();
-  const now = new Date();
+  const now = getCurrentDate();
   const dateStr = new Intl.DateTimeFormat('en-CA', {
     timeZone: activeTz,
     year: 'numeric',
@@ -694,7 +698,7 @@ export function isToday(utcString: DateInput, tz?: string): boolean {
       month: '2-digit',
       day: '2-digit',
     }).format(d);
-  return fmt(date) === fmt(new Date());
+  return fmt(date) === fmt(getCurrentDate());
 }
 
 /**
@@ -718,7 +722,7 @@ export function isPast(utcString: DateInput, tz?: string): boolean {
       second: '2-digit',
       hour12: false,
     }).format(d);
-  return fmt(date) < fmt(new Date());
+  return fmt(date) < fmt(getCurrentDate());
 }
 
 /**
@@ -791,7 +795,7 @@ export function getDayRange(date: Date, tz?: string): { start: string; end: stri
  * Convenience wrapper around getDayRange(new Date(), tz).
  */
 export function getTodayRange(tz?: string): { start: string; end: string } {
-  return getDayRange(new Date(), tz);
+  return getDayRange(getCurrentDate(), tz);
 }
 
 /**

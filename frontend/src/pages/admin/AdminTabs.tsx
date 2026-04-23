@@ -20,9 +20,11 @@ export function AdminTabs({ tab, onTabChange, search, onSearchChange }: AdminTab
 
       {tab === "users" && (
         <input
+          aria-label="Search users by email"
+          name="user-search"
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
-          placeholder="Search by email"
+          placeholder="Search by email…"
           style={{ marginLeft: "auto", minWidth: "260px" }}
         />
       )}

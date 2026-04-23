@@ -84,8 +84,8 @@ export default function DashboardPage() {
     return (
       <div className="empty-state" style={{ height: "60vh" }}>
         <div className="empty-state-icon" style={{ background: "transparent", boxShadow: "none", width: "auto", height: "auto" }}>
-          <img src="/branding/logo.png" alt="Logo" className="theme-logo-light" style={{ width: "48px", height: "auto", opacity: 0.5 }} />
-          <img src="/branding/logo-white.png" alt="Logo" className="theme-logo-dark" style={{ width: "48px", height: "auto", opacity: 0.5 }} />
+          <img src="/branding/logo.png" alt="Logo" width="48" height="48" className="theme-logo-light" style={{ width: "48px", height: "auto", opacity: 0.5 }} />
+          <img src="/branding/logo-white.png" alt="Logo" width="48" height="48" className="theme-logo-dark" style={{ width: "48px", height: "auto", opacity: 0.5 }} />
         </div>
         <h3 className="empty-state-title">Welcome to Superin</h3>
         <p className="empty-state-description">

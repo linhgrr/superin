@@ -19,26 +19,17 @@ export default function Header({ title, showTourTrigger = true }: HeaderProps) {
 
   return (
     <header className="app-header">
-      <div
-        style={{
-          flex: 1,
-          minWidth: 0,
-          display: "flex",
-          alignItems: "center",
-        }}
-      >
+      <div className="app-header-brand">
         <img
+          aria-hidden="true"
           src={HEADER_GIF_PATH}
-          alt={title ?? "Dashboard"}
+          alt=""
+          width="220"
+          height="42"
           loading="eager"
-          style={{
-            height: "42px",
-            width: "auto",
-            maxWidth: "min(100%, 220px)",
-            objectFit: "contain",
-            borderRadius: "10px",
-          }}
+          className="app-header-brand-gif"
         />
+        {title ? <span className="app-header-route-title">{title}</span> : null}
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
@@ -46,6 +37,7 @@ export default function Header({ title, showTourTrigger = true }: HeaderProps) {
           className="btn btn-ghost btn-icon"
           onClick={openCommandPalette}
           title="Command Palette (Cmd+K)"
+          aria-label="Open command palette"
         >
           <DynamicIcon name="Command" size={16} />
         </button>

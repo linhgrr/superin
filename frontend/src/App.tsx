@@ -27,6 +27,7 @@ const AppPage = lazy(() => import("@/pages/AppPage"));
 const SettingsPage = lazy(() => import("@/pages/settings/SettingsPage"));
 const AdminPage = lazy(() => import("@/pages/admin/AdminPage"));
 const ChatPage = lazy(() => import("@/pages/ChatPage"));
+const ChatPanel = lazy(() => import("@/components/chat/ChatPanel"));
 
 function RouteFallback() {
   return (
@@ -90,12 +91,23 @@ function PublicOnly({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-function ShellLayout() {
+function StandardShellLayout() {
   return (
     <Protected>
       <ProtectedShellRuntime />
       <DiscoveryInitializer>
-        <AppShell />
+        <AppShell chatPanel={<ChatPanel />} />
+      </DiscoveryInitializer>
+    </Protected>
+  );
+}
+
+function ChatShellLayout() {
+  return (
+    <Protected>
+      <ProtectedShellRuntime />
+      <DiscoveryInitializer>
+        <AppShell title="Chat" />
       </DiscoveryInitializer>
     </Protected>
   );
@@ -120,7 +132,7 @@ export default function App() {
             />
 
             {/* Protected shell */}
-            <Route element={<ShellLayout />}>
+            <Route element={<StandardShellLayout />}>
               <Route path="/dashboard" element={<LazyRoute Component={DashboardPage} />} />
               <Route path="/store" element={<LazyRoute Component={StorePage} />} />
               <Route path="/billing" element={<LazyRoute Component={BillingPage} />} />
@@ -129,6 +141,8 @@ export default function App() {
               <Route path="/apps/:appId" element={<LazyRoute Component={AppPage} />} />
               <Route path="/settings" element={<LazyRoute Component={SettingsPage} />} />
               <Route path="/admin" element={<LazyRoute Component={AdminPage} />} />
+            </Route>
+            <Route element={<ChatShellLayout />}>
               <Route path="/chat" element={<LazyRoute Component={ChatPage} />} />
             </Route>
 

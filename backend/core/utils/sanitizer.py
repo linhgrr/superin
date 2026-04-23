@@ -83,6 +83,9 @@ _BASE64_RE = re.compile(r'[A-Za-z0-9+/]{20,}={0,2}')
 
 def _normalize_unicode(text: str) -> str:
     """Normalize unicode confusables using NFKC and confusables library."""
+    if text.isascii():
+        return text
+
     text = unicodedata.normalize('NFKC', text)
     normalized_list = confusables.normalize(text, prioritize_alpha=True)
     return normalized_list[0] if normalized_list else text

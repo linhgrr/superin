@@ -4,16 +4,33 @@ import asyncio
 from datetime import UTC, date, datetime, timedelta
 
 from beanie import PydanticObjectId
-from pymongo.asynchronous.client_session import AsyncClientSession
+from motor.motor_asyncio import AsyncIOMotorClientSession
 from pymongo.errors import DuplicateKeyError
 
 from apps.finance.enums import TransactionType
-from apps.finance.models import Category, Transaction, Wallet
+from apps.finance.mappers import category_to_read, transaction_to_read, wallet_to_read
+from apps.finance.models import Transaction, Wallet
 from apps.finance.repository import (
     CategoryRepository,
     TransactionRepository,
     WalletRepository,
     finance_transaction,
+)
+from apps.finance.schemas import (
+    FinanceActionResponse,
+    FinanceActivitySummaryResponse,
+    FinanceBudgetCategoryStatus,
+    FinanceBudgetCheckResponse,
+    FinanceBudgetOverviewResponse,
+    FinanceCategoryBreakdownItem,
+    FinanceCategoryBreakdownResponse,
+    FinanceCategoryRead,
+    FinanceMonthlyTrendItem,
+    FinanceMonthlyTrendResponse,
+    FinanceSummaryResponse,
+    FinanceTransactionRead,
+    FinanceTransferResponse,
+    FinanceWalletRead,
 )
 from core.models import User
 from core.utils.timezone import ensure_naive_utc, get_user_timezone_context
@@ -29,22 +46,22 @@ class FinanceService:
 
     # ─── Wallets ───────────────────────────────────────────────────────────────
 
-    async def list_wallets(self, user_id: str) -> list[dict]:
+    async def list_wallets(self, user_id: str) -> list[FinanceWalletRead]:
         wallets = await self.wallets.find_by_user(user_id)
-        return [_wallet_to_dict(w) for w in wallets]
+        return [wallet_to_read(w) for w in wallets]
 
-    async def create_wallet(self, user_id: str, name: str, currency: str = "USD") -> dict:
+    async def create_wallet(self, user_id: str, name: str, currency: str = "USD") -> FinanceWalletRead:
         try:
             wallet = await self.wallets.create(user_id, name, currency)
         except DuplicateKeyError as exc:
             raise ValueError(_wallet_name_exists_message(name)) from exc
-        return _wallet_to_dict(wallet)
+        return wallet_to_read(wallet)
 
-    async def get_wallet(self, wallet_id: str, user_id: str) -> dict | None:
+    async def get_wallet(self, wallet_id: str, user_id: str) -> FinanceWalletRead | None:
         wallet = await self.wallets.find_by_id(wallet_id, user_id)
-        return _wallet_to_dict(wallet) if wallet else None
+        return wallet_to_read(wallet) if wallet else None
 
-    async def update_wallet(self, wallet_id: str, user_id: str, name: str | None = None) -> dict:
+    async def update_wallet(self, wallet_id: str, user_id: str, name: str | None = None) -> FinanceWalletRead:
         """Update a wallet's name."""
         wallet = await self.wallets.find_by_id(wallet_id, user_id)
         if not wallet:
@@ -54,9 +71,9 @@ class FinanceService:
                 wallet = await self.wallets.rename(wallet, name=name)
             except DuplicateKeyError as exc:
                 raise ValueError(_wallet_name_exists_message(name)) from exc
-        return _wallet_to_dict(wallet)
+        return wallet_to_read(wallet)
 
-    async def delete_wallet(self, wallet_id: str, user_id: str) -> dict:
+    async def delete_wallet(self, wallet_id: str, user_id: str) -> FinanceActionResponse:
         """Delete a wallet if it's empty (no balance and no transactions)."""
         wallet = await self.wallets.find_by_id(wallet_id, user_id)
         if not wallet:
@@ -68,18 +85,18 @@ class FinanceService:
         if txs:
             raise ValueError("Cannot delete wallet with transactions. Delete transactions first.")
         await self.wallets.delete(wallet)
-        return {"success": True, "id": wallet_id, "message": "Wallet deleted"}
+        return FinanceActionResponse(success=True, id=wallet_id, message="Wallet deleted")
 
     # ─── Categories ─────────────────────────────────────────────────────────────
 
-    async def list_categories(self, user_id: str) -> list[dict]:
+    async def list_categories(self, user_id: str) -> list[FinanceCategoryRead]:
         categories = await self.categories.find_by_user(user_id)
-        return [_category_to_dict(c) for c in categories]
+        return [category_to_read(c) for c in categories]
 
-    async def get_category(self, category_id: str, user_id: str) -> dict | None:
+    async def get_category(self, category_id: str, user_id: str) -> FinanceCategoryRead | None:
         """Get a single category by ID."""
         category = await self.categories.find_by_id(category_id, user_id)
-        return _category_to_dict(category) if category else None
+        return category_to_read(category) if category else None
 
     async def create_category(
         self,
@@ -88,12 +105,12 @@ class FinanceService:
         icon: str = "Tag",
         color: str = "oklch(0.65 0.21 280)",
         budget: float = 0.0,
-    ) -> dict:
+    ) -> FinanceCategoryRead:
         try:
             category = await self.categories.create(user_id, name, icon, color, budget)
         except DuplicateKeyError as exc:
             raise ValueError(_category_name_exists_message(name)) from exc
-        return _category_to_dict(category)
+        return category_to_read(category)
 
     async def update_category(
         self,
@@ -103,7 +120,7 @@ class FinanceService:
         icon: str | None = None,
         color: str | None = None,
         budget: float | None = None,
-    ) -> dict:
+    ) -> FinanceCategoryRead:
         """Update a category's details."""
         category = await self.categories.find_by_id(category_id, user_id)
         if not category:
@@ -118,9 +135,9 @@ class FinanceService:
             )
         except DuplicateKeyError as exc:
             raise ValueError(_category_name_exists_message(name or category.name)) from exc
-        return _category_to_dict(category)
+        return category_to_read(category)
 
-    async def delete_category(self, category_id: str, user_id: str) -> dict:
+    async def delete_category(self, category_id: str, user_id: str) -> FinanceActionResponse:
         """Delete a category if it has no transactions."""
         category = await self.categories.find_by_id(category_id, user_id)
         if not category:
@@ -130,7 +147,7 @@ class FinanceService:
         if txs:
             raise ValueError("Cannot delete category with transactions. Delete or reassign transactions first.")
         await self.categories.delete(category)
-        return {"success": True, "id": category_id, "message": "Category deleted"}
+        return FinanceActionResponse(success=True, id=category_id, message="Category deleted")
 
     # ─── Transactions ──────────────────────────────────────────────────────────
 
@@ -142,7 +159,7 @@ class FinanceService:
         wallet_id: str | None = None,
         skip: int = 0,
         limit: int = 20,
-    ) -> list[dict]:
+    ) -> list[FinanceTransactionRead]:
         txs = await self.transactions.find_by_user(
             user_id,
             type_,
@@ -151,12 +168,12 @@ class FinanceService:
             skip=skip,
             limit=limit,
         )
-        return [_tx_to_dict(t) for t in txs]
+        return [transaction_to_read(t) for t in txs]
 
-    async def get_transaction(self, transaction_id: str, user_id: str) -> dict | None:
+    async def get_transaction(self, transaction_id: str, user_id: str) -> FinanceTransactionRead | None:
         """Get a single transaction by ID."""
         tx = await self.transactions.find_by_id(transaction_id, user_id)
-        return _tx_to_dict(tx) if tx else None
+        return transaction_to_read(tx) if tx else None
 
     async def add_transaction(
         self,
@@ -167,7 +184,7 @@ class FinanceService:
         amount: float,
         occurred_at: datetime,
         note: str | None = None,
-    ) -> dict:
+    ) -> FinanceTransactionRead:
         if amount <= 0:
             raise ValueError("Amount must be positive")
         async with finance_transaction() as session:
@@ -199,7 +216,7 @@ class FinanceService:
                 session=session,
             )
 
-        return _tx_to_dict(tx)
+        return transaction_to_read(tx)
 
     async def update_transaction(
         self,
@@ -210,7 +227,7 @@ class FinanceService:
         amount: float | None = None,
         occurred_at: datetime | None = None,
         note: str | None = None,
-    ) -> dict:
+    ) -> FinanceTransactionRead:
         """Update a transaction and adjust wallet balances if needed."""
         async with finance_transaction() as session:
             tx = await self.transactions.find_by_id(transaction_id, user_id, session=session)
@@ -280,9 +297,9 @@ class FinanceService:
                 tx.note = note
 
             await self.transactions.save(tx, session=session)
-        return _tx_to_dict(tx)
+        return transaction_to_read(tx)
 
-    async def delete_transaction(self, transaction_id: str, user_id: str) -> dict:
+    async def delete_transaction(self, transaction_id: str, user_id: str) -> FinanceActionResponse:
         """Delete a transaction and reverse its effect on wallet balance."""
         async with finance_transaction() as session:
             tx = await self.transactions.find_by_id(transaction_id, user_id, session=session)
@@ -303,7 +320,7 @@ class FinanceService:
             )
 
             await self.transactions.delete(tx, session=session)
-        return {"success": True, "id": transaction_id, "message": "Transaction deleted"}
+        return FinanceActionResponse(success=True, id=transaction_id, message="Transaction deleted")
 
     # ─── Transfer ────────────────────────────────────────────────────────────────
 
@@ -314,7 +331,7 @@ class FinanceService:
         to_wallet_id: str,
         amount: float,
         note: str | None = None,
-    ) -> dict:
+    ) -> FinanceTransferResponse:
         if amount <= 0:
             raise ValueError("Transfer amount must be positive")
         if from_wallet_id == to_wallet_id:
@@ -390,12 +407,12 @@ class FinanceService:
                 session=session,
             )
 
-        return {
-            "from_wallet": _wallet_to_dict(updated_src),
-            "to_wallet": _wallet_to_dict(updated_dst),
-            "amount": amount,
-            "note": note,
-        }
+        return FinanceTransferResponse(
+            from_wallet=wallet_to_read(updated_src),
+            to_wallet=wallet_to_read(updated_dst),
+            amount=amount,
+            note=note,
+        )
 
     async def _apply_wallet_delta_or_raise(
         self,
@@ -404,7 +421,7 @@ class FinanceService:
         delta: float,
         *,
         insufficient_message: str,
-        session: AsyncClientSession,
+        session: AsyncIOMotorClientSession,
     ) -> Wallet:
         min_balance = abs(delta) if delta < 0 else None
         updated_wallet = await self.wallets.apply_balance_delta(
@@ -420,7 +437,7 @@ class FinanceService:
 
     # ─── Summary ────────────────────────────────────────────────────────────────
 
-    async def get_summary(self, user: User) -> dict:
+    async def get_summary(self, user: User) -> FinanceSummaryResponse:
         user_id = str(user.id)
         wallets = await self.wallets.find_by_user(user_id)
         total_balance = sum(w.balance for w in wallets)
@@ -438,17 +455,75 @@ class FinanceService:
         income = sum(t.amount for t in txs if t.type == "income")
         expense = sum(t.amount for t in txs if t.type == "expense")
 
-        return {
-            "total_balance": total_balance,
-            "income_this_month": income,
-            "expense_this_month": expense,
-            "transaction_count": len(txs),
-            "wallet_count": len(wallets),
-        }
+        return FinanceSummaryResponse(
+            total_balance=total_balance,
+            income_this_month=income,
+            expense_this_month=expense,
+            transaction_count=len(txs),
+            wallet_count=len(wallets),
+        )
+
+    async def summarize_activity(
+        self,
+        user_id: str,
+        start: datetime,
+        end: datetime,
+        *,
+        limit: int = 10,
+    ) -> FinanceActivitySummaryResponse:
+        recorded_transactions = await self.transactions.find_created_between(
+            user_id,
+            start,
+            end,
+            limit=None,
+        )
+        created_wallets = await self.wallets.find_created_between(
+            user_id,
+            start,
+            end,
+            limit=None,
+        )
+        created_categories = await self.categories.find_created_between(
+            user_id,
+            start,
+            end,
+            limit=None,
+        )
+
+        income_total = sum(
+            tx.amount for tx in recorded_transactions if tx.type == "income"
+        )
+        expense_total = sum(
+            tx.amount for tx in recorded_transactions if tx.type == "expense"
+        )
+
+        return FinanceActivitySummaryResponse(
+            start_datetime=start,
+            end_datetime=end,
+            recorded_transaction_count=len(recorded_transactions),
+            created_wallet_count=len(created_wallets),
+            created_category_count=len(created_categories),
+            income_total=round(income_total, 2),
+            expense_total=round(expense_total, 2),
+            recorded_transactions=[
+                transaction_to_read(tx) for tx in recorded_transactions[:limit]
+            ],
+            created_wallets=[wallet_to_read(wallet) for wallet in created_wallets[:limit]],
+            created_categories=[
+                category_to_read(category) for category in created_categories[:limit]
+            ],
+            unsupported_activity=[
+                "transaction_updates_not_tracked",
+                "transaction_deletions_not_tracked",
+                "wallet_updates_not_tracked",
+                "category_updates_not_tracked",
+                "budget_changes_not_tracked",
+            ],
+        )
 
     # ─── Budget Monitoring ──────────────────────────────────────────────────────
 
-    async def check_budget(self, user: User, category_id: str | None = None) -> dict:
+    async def check_budget(self, user: User, category_id: str | None = None) -> FinanceBudgetCheckResponse:
         """Check spending vs budget for categories."""
         user_id = str(user.id)
         ctx = get_user_timezone_context(user)
@@ -474,20 +549,20 @@ class FinanceService:
             remaining = budget - spent if budget > 0 else None
             percentage = (spent / budget * 100) if budget > 0 else None
 
-            return {
-                "category_id": category_id,
-                "category_name": cat.name,
-                "budget": budget,
-                "spent": round(spent, 2),
-                "remaining": round(remaining, 2) if remaining is not None else None,
-                "percentage_used": round(percentage, 1) if percentage is not None else None,
-                "over_budget": spent > budget if budget > 0 else False,
-            }
+            return FinanceBudgetCategoryStatus(
+                category_id=category_id,
+                category_name=cat.name,
+                budget=budget,
+                spent=round(spent, 2),
+                remaining=round(remaining, 2) if remaining is not None else None,
+                percentage_used=round(percentage, 1) if percentage is not None else None,
+                over_budget=spent > budget if budget > 0 else False,
+            )
 
         # All categories overview
-        results = []
-        total_budget = 0
-        total_spent = 0
+        results: list[FinanceBudgetCategoryStatus] = []
+        total_budget = 0.0
+        total_spent = 0.0
 
         for cat in categories:
             cat_spent = sum(t.amount for t in txs if str(t.category_id) == str(cat.id))
@@ -495,26 +570,28 @@ class FinanceService:
             total_spent += cat_spent
 
             if cat.budget > 0:
-                results.append({
-                    "category_id": str(cat.id),
-                    "category_name": cat.name,
-                    "budget": cat.budget,
-                    "spent": round(cat_spent, 2),
-                    "remaining": round(cat.budget - cat_spent, 2),
-                    "percentage_used": round(cat_spent / cat.budget * 100, 1),
-                    "over_budget": cat_spent > cat.budget,
-                })
+                results.append(
+                    FinanceBudgetCategoryStatus(
+                        category_id=str(cat.id),
+                        category_name=cat.name,
+                        budget=cat.budget,
+                        spent=round(cat_spent, 2),
+                        remaining=round(cat.budget - cat_spent, 2),
+                        percentage_used=round(cat_spent / cat.budget * 100, 1),
+                        over_budget=cat_spent > cat.budget,
+                    )
+                )
 
         # Get current month/year from user timezone
         now_local = ctx.now_local()
 
-        return {
-            "categories": results,
-            "total_budget": total_budget,
-            "total_spent": round(total_spent, 2),
-            "month": now_local.month,
-            "year": now_local.year,
-        }
+        return FinanceBudgetOverviewResponse(
+            categories=results,
+            total_budget=total_budget,
+            total_spent=round(total_spent, 2),
+            month=now_local.month,
+            year=now_local.year,
+        )
 
     # ─── Transaction Search ─────────────────────────────────────────────────────
 
@@ -525,7 +602,7 @@ class FinanceService:
         start_date: date | None = None,
         end_date: date | None = None,
         limit: int = 20,
-    ) -> list[dict]:
+    ) -> list[FinanceTransactionRead]:
         """Search transactions by keyword or date range."""
         user = await User.get(user_id)
         ctx = get_user_timezone_context(user)
@@ -553,11 +630,13 @@ class FinanceService:
                 or query_lower in t.type
             ]
 
-        return [_tx_to_dict(t) for t in txs[:limit]]
+        return [transaction_to_read(t) for t in txs[:limit]]
 
     # ─── Statistics & Analytics ───────────────────────────────────────────────────
 
-    async def get_category_breakdown(self, user_id: str, month: int | None = None, year: int | None = None) -> dict:
+    async def get_category_breakdown(
+        self, user_id: str, month: int | None = None, year: int | None = None
+    ) -> FinanceCategoryBreakdownResponse:
         """Get spending breakdown by category for a specific month.
 
         Month/year are interpreted in the user's local timezone.
@@ -594,8 +673,8 @@ class FinanceService:
         cat_map = {str(c.id): c.name for c in categories}
 
         # Aggregate by category
-        breakdown = {}
-        total = 0
+        breakdown: dict[str, float] = {}
+        total = 0.0
         for t in txs:
             cat_name = cat_map.get(str(t.category_id), "Uncategorized")
             breakdown[cat_name] = breakdown.get(cat_name, 0) + t.amount
@@ -603,21 +682,27 @@ class FinanceService:
 
         # Sort by amount descending
         sorted_breakdown = sorted(
-            [{"category": k, "amount": round(v, 2), "percentage": round(v/total*100, 1) if total > 0 else 0}
-             for k, v in breakdown.items()],
-            key=lambda x: x["amount"],
+            [
+                FinanceCategoryBreakdownItem(
+                    category=k,
+                    amount=round(v, 2),
+                    percentage=round(v / total * 100, 1) if total > 0 else 0,
+                )
+                for k, v in breakdown.items()
+            ],
+            key=lambda item: item.amount,
             reverse=True
         )
 
-        return {
-            "month": target_month,
-            "year": target_year,
-            "total_spending": round(total, 2),
-            "breakdown": sorted_breakdown,
-            "category_count": len(breakdown),
-        }
+        return FinanceCategoryBreakdownResponse(
+            month=target_month,
+            year=target_year,
+            total_spending=round(total, 2),
+            breakdown=sorted_breakdown,
+            category_count=len(breakdown),
+        )
 
-    async def get_monthly_trend(self, user_id: str, months: int = 6) -> dict:
+    async def get_monthly_trend(self, user_id: str, months: int = 6) -> FinanceMonthlyTrendResponse:
         """Get income/expense trend over recent months using MongoDB aggregation."""
         from beanie import PydanticObjectId as _Oid
 
@@ -641,34 +726,36 @@ class FinanceService:
 
         # Get last N months
         sorted_months = sorted(monthly_data.keys(), reverse=True)[:months]
-        trend = []
+        trend: list[FinanceMonthlyTrendItem] = []
         for year, month in sorted_months:
             data = monthly_data[(year, month)]
-            trend.append({
-                "year": year,
-                "month": month,
-                "income": round(data["income"], 2),
-                "expense": round(data["expense"], 2),
-                "net": round(data["income"] - data["expense"], 2),
-            })
+            trend.append(
+                FinanceMonthlyTrendItem(
+                    year=year,
+                    month=month,
+                    income=round(data["income"], 2),
+                    expense=round(data["expense"], 2),
+                    net=round(data["income"] - data["expense"], 2),
+                )
+            )
 
         # Calculate averages
         if trend:
-            avg_income = sum(m["income"] for m in trend) / len(trend)
-            avg_expense = sum(m["expense"] for m in trend) / len(trend)
+            avg_income = sum(m.income for m in trend) / len(trend)
+            avg_expense = sum(m.expense for m in trend) / len(trend)
         else:
             avg_income = avg_expense = 0
 
-        return {
-            "trend": trend,
-            "average_income": round(avg_income, 2),
-            "average_expense": round(avg_expense, 2),
-            "average_net": round(avg_income - avg_expense, 2),
-        }
+        return FinanceMonthlyTrendResponse(
+            trend=trend,
+            average_income=round(avg_income, 2),
+            average_expense=round(avg_expense, 2),
+            average_net=round(avg_income - avg_expense, 2),
+        )
 
     # ─── Install / Uninstall hooks ──────────────────────────────────────────────
 
-    async def on_install(self, user_id: str, session: AsyncClientSession | None = None) -> None:
+    async def on_install(self, user_id: str, session: AsyncIOMotorClientSession | None = None) -> None:
         """Seed default data for a new user."""
         if session is None:
             async with finance_transaction() as tx_session:
@@ -692,7 +779,7 @@ class FinanceService:
             except DuplicateKeyError:
                 continue
 
-    async def on_uninstall(self, user_id: str, session: AsyncClientSession | None = None) -> None:
+    async def on_uninstall(self, user_id: str, session: AsyncIOMotorClientSession | None = None) -> None:
         if session is None:
             async with finance_transaction() as tx_session:
                 await self.on_uninstall(user_id, session=tx_session)
@@ -702,49 +789,12 @@ class FinanceService:
         await self.categories.delete_all_by_user(user_id, session=session)
         await self.transactions.delete_all_by_user(user_id, session=session)
 
-
-# ─── DTO helpers ───────────────────────────────────────────────────────────────
-
 def _wallet_name_exists_message(name: str) -> str:
     return f"Wallet '{name}' already exists"
 
 
 def _category_name_exists_message(name: str) -> str:
     return f"Category '{name}' already exists"
-
-
-def _wallet_to_dict(w: Wallet) -> dict:
-    return {
-        "id": str(w.id),
-        "name": w.name,
-        "currency": w.currency,
-        "balance": w.balance,
-        "created_at": w.created_at.isoformat(),
-    }
-
-
-def _category_to_dict(c: Category) -> dict:
-    return {
-        "id": str(c.id),
-        "name": c.name,
-        "icon": c.icon,
-        "color": c.color,
-        "budget": c.budget,
-        "created_at": c.created_at.isoformat(),
-    }
-
-
-def _tx_to_dict(t: Transaction) -> dict:
-    return {
-        "id": str(t.id),
-        "wallet_id": str(t.wallet_id),
-        "category_id": str(t.category_id),
-        "type": t.type,
-        "amount": t.amount,
-        "occurred_at": t.occurred_at.isoformat(),
-        "note": t.note,
-        "created_at": t.created_at.isoformat(),
-    }
 
 
 # Singleton

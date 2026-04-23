@@ -1,9 +1,9 @@
 """Todo plugin data access layer."""
 
-from datetime import date, time
+from datetime import date, datetime, time
 
 from beanie import PydanticObjectId
-from pymongo.asynchronous.client_session import AsyncClientSession
+from motor.motor_asyncio import AsyncIOMotorClientSession
 
 from apps.todo.enums import RecurrenceFrequency, TaskPriority, TaskStatus
 from apps.todo.models import RecurringRule, SubTask, Task
@@ -20,7 +20,7 @@ class TaskRepository:
         include_archived: bool = False,
         limit: int | None = 20,
         *,
-        session: AsyncClientSession | None = None,
+        session: AsyncIOMotorClientSession | None = None,
     ) -> list[Task]:
         query: dict[str, object] = {"user_id": PydanticObjectId(user_id)}
 
@@ -62,6 +62,46 @@ class TaskRepository:
 
         return await Task.find(db_query).limit(limit).to_list()
 
+    async def find_created_between(
+        self,
+        user_id: str,
+        start: datetime,
+        end: datetime,
+        *,
+        limit: int | None = None,
+        session: AsyncIOMotorClientSession | None = None,
+    ) -> list[Task]:
+        cursor = Task.find(
+            {
+                "user_id": PydanticObjectId(user_id),
+                "created_at": {"$gte": start, "$lte": end},
+            },
+            session=session,
+        ).sort("-created_at")
+        if limit is not None:
+            cursor = cursor.limit(limit)
+        return await cursor.to_list()
+
+    async def find_completed_between(
+        self,
+        user_id: str,
+        start: datetime,
+        end: datetime,
+        *,
+        limit: int | None = None,
+        session: AsyncIOMotorClientSession | None = None,
+    ) -> list[Task]:
+        cursor = Task.find(
+            {
+                "user_id": PydanticObjectId(user_id),
+                "completed_at": {"$gte": start, "$lte": end},
+            },
+            session=session,
+        ).sort("-completed_at")
+        if limit is not None:
+            cursor = cursor.limit(limit)
+        return await cursor.to_list()
+
     async def find_by_id(self, task_id: str, user_id: str) -> Task | None:
         return await Task.find_one(
             {"_id": PydanticObjectId(task_id),
@@ -87,7 +127,7 @@ class TaskRepository:
         parent_task_id: str | None = None,
         reminder_minutes: int | None = None,
         *,
-        session: AsyncClientSession | None = None,
+        session: AsyncIOMotorClientSession | None = None,
     ) -> Task:
         task = Task(
             user_id=PydanticObjectId(user_id),
@@ -95,7 +135,7 @@ class TaskRepository:
             description=description,
             due_date=due_date,
             due_time=due_time,
-            priority=priority,  # type: ignore[arg-type]
+            priority=priority,
             tags=tags or [],
             parent_task_id=PydanticObjectId(parent_task_id) if parent_task_id else None,
             reminder_minutes=reminder_minutes,
@@ -110,8 +150,8 @@ class TaskRepository:
         description: str | None = None,
         due_date: date | None = None,
         due_time: time | None = None,
-        priority: str | None = None,
-        status: str | None = None,
+        priority: TaskPriority | None = None,
+        status: TaskStatus | None = None,
         tags: list[str] | None = None,
         reminder_minutes: int | None = None,
     ) -> Task:
@@ -124,9 +164,9 @@ class TaskRepository:
         if due_time is not None:
             task.due_time = due_time
         if priority is not None:
-            task.priority = priority  # type: ignore[assignment]
+            task.priority = priority
         if status is not None:
-            task.status = status  # type: ignore[assignment]
+            task.status = status
             if status == "completed":
                 task.completed_at = utc_now()
             else:
@@ -171,7 +211,7 @@ class TaskRepository:
         self,
         user_id: str,
         *,
-        session: AsyncClientSession | None = None,
+        session: AsyncIOMotorClientSession | None = None,
     ) -> int:
         count = 0
         async for t in Task.find({"user_id": PydanticObjectId(user_id)}, session=session):

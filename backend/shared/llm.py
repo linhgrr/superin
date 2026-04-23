@@ -9,13 +9,28 @@ import importlib
 import inspect
 import logging
 import threading
-from typing import Any
+from typing import Any, Protocol, cast
+
+from pydantic import SecretStr
 
 logger = logging.getLogger(__name__)
 
 _llm: Any | None = None
 _patch_guard: bool = False
 _lock = threading.Lock()
+
+
+class _UsageMetadataFn(Protocol):
+    def __call__(
+        self,
+        oai_token_usage: dict[str, Any],
+        service_tier: str | None = None,
+    ) -> Any: ...
+
+
+class _PatchedOpenAIModule(Protocol):
+    _create_usage_metadata: _UsageMetadataFn
+    _superin_usage_patch: bool
 
 def _to_safe_int(value: Any) -> int:
     """Convert nullable/unknown token counters to a safe integer."""
@@ -40,10 +55,12 @@ def _patch_langchain_openai_usage_metadata() -> None:
     except Exception:
         return
 
-    if getattr(lc_openai_base, "_superin_usage_patch", False):
+    patched_module = cast(_PatchedOpenAIModule, lc_openai_base)
+
+    if getattr(patched_module, "_superin_usage_patch", False):
         return
 
-    original_create_usage_metadata = getattr(lc_openai_base, "_create_usage_metadata", None)
+    original_create_usage_metadata = getattr(patched_module, "_create_usage_metadata", None)
     if original_create_usage_metadata is None:
         return
     try:
@@ -71,8 +88,12 @@ def _patch_langchain_openai_usage_metadata() -> None:
             return original_create_usage_metadata(usage, service_tier)
         return original_create_usage_metadata(usage)
 
-    lc_openai_base._create_usage_metadata = _safe_create_usage_metadata
-    lc_openai_base._superin_usage_patch = True
+    patched_module._create_usage_metadata = _safe_create_usage_metadata
+    patched_module._superin_usage_patch = True
+
+
+def _build_api_key(api_key: str) -> SecretStr | None:
+    return SecretStr(api_key) if api_key else None
 
 
 def get_llm() -> Any:
@@ -102,7 +123,7 @@ def get_llm() -> Any:
             if "ngrok" in settings.openai_base_url.lower():
                 extra_headers["ngrok-skip-browser-warning"] = "1"
             _llm = ChatOpenAI(
-                api_key=settings.openai_api_key,
+                api_key=_build_api_key(settings.openai_api_key),
                 base_url=settings.openai_base_url,
                 model=settings.openai_model,
                 temperature=0,

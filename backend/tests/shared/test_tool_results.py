@@ -1,8 +1,17 @@
+from types import SimpleNamespace
+from typing import cast
+
 import pytest
 
+from core.models import User
 from core.utils.timezone import convert_utc_strings_to_local
-from shared.tool_errors import ForbiddenError
-from shared.tool_results import safe_tool_call, tool_success
+from shared.tool_results import (
+    encode_tool_result,
+    parse_tool_message_content,
+    tool_error,
+    tool_success,
+    tool_success_async,
+)
 
 
 def test_convert_utc_strings_to_local_recurses_nested_payloads() -> None:
@@ -26,35 +35,28 @@ def test_tool_success_shape_is_preserved() -> None:
     assert result["data"] == {"ok": True}
 
 
-@pytest.mark.asyncio
-async def test_safe_tool_call_maps_tool_user_error_to_structured_error() -> None:
-    async def operation():
-        raise ForbiddenError("App 'calendar' requires a paid subscription.")
+def test_encode_and_parse_tool_result_round_trip() -> None:
+    result = tool_error("bad request", code="invalid_request")
+    encoded = encode_tool_result(result)
 
-    result = await safe_tool_call(operation, action="installing app calendar", localize=False)
-
-    assert result == {
-        "ok": False,
-        "error": {
-            "message": "App 'calendar' requires a paid subscription.",
-            "code": "forbidden",
-            "retryable": False,
-        },
-    }
+    assert parse_tool_message_content(encoded) == result
 
 
 @pytest.mark.asyncio
-async def test_safe_tool_call_keeps_permission_error_as_legacy_fallback() -> None:
-    async def operation():
-        raise PermissionError("App 'calendar' requires a paid subscription.")
+async def test_tool_success_async_localizes_for_user(monkeypatch: pytest.MonkeyPatch) -> None:
+    user = cast(User, SimpleNamespace(settings={"timezone": "Asia/Ho_Chi_Minh"}))
 
-    result = await safe_tool_call(operation, action="installing app calendar", localize=False)
+    async def fake_get(_user_id: str) -> User:
+        return user
+
+    monkeypatch.setattr(User, "get", fake_get)
+
+    result = await tool_success_async(
+        {"start_datetime": "2026-04-14T02:00:00Z"},
+        user_id="507f1f77bcf86cd799439011",
+    )
 
     assert result == {
-        "ok": False,
-        "error": {
-            "message": "App 'calendar' requires a paid subscription.",
-            "code": "forbidden",
-            "retryable": False,
-        },
+        "ok": True,
+        "data": {"start_datetime": "2026-04-14 09:00"},
     }

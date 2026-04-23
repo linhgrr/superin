@@ -2,14 +2,15 @@
 
 Architecture:
   - Short-term: MongoDBSaver checkpointer (core/db.py) manages per-thread
-    conversation history; the @entrypoint root agent reads it through the
-    ``previous`` argument. No manual history rebuild is done here.
+    conversation history; the root `StateGraph` reads it from persisted graph
+    state. No manual history rebuild is done here.
   - Long-term: MongoDBStore (via get_store()) → store.aput/asearch/aget
     Provides persistent user memories across all threads and sessions.
 """
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from loguru import logger
@@ -23,18 +24,27 @@ def _namespace(user_id: str, category: str) -> tuple[str, ...]:
     return (user_id, "memories", category)
 
 
+async def sanitize_memory_content(content: str) -> str:
+    """Sanitize memory content before persisting or echoing it back."""
+    from core.utils.sanitizer import sanitize_for_memory_async
+
+    return await sanitize_for_memory_async(content)
+
+
 def _supports_semantic_search(store: BaseStore) -> bool:
     """Return whether the concrete store is configured for query-based search."""
     index_config = getattr(store, "index_config", None)
     return bool(index_config)
 
 
-async def save_memory(
+async def persist_memory(
     store: BaseStore,
     user_id: str,
     content: str,
     category: str = "general",
     key: str | None = None,
+    source_thread_id: str | None = None,
+    sanitized_content: str | None = None,
 ) -> str:
     """
     Save a memory entry for a user.
@@ -45,17 +55,16 @@ async def save_memory(
         content: Memory content to save
         category: Memory category (e.g. "preferences", "personal", "work", "goals")
         key: Optional explicit key; auto-generated if omitted
+        source_thread_id: Optional thread that produced this memory
 
     Returns:
         The key under which the memory was saved.
     """
     from uuid import uuid4
 
-    from core.utils.sanitizer import sanitize_for_memory_async
-
     ns = _namespace(user_id, category)
     key = key or f"mem_{uuid4().hex[:8]}"
-    sanitized = await sanitize_for_memory_async(content)
+    sanitized = sanitized_content if sanitized_content is not None else await sanitize_memory_content(content)
 
     await store.aput(
         ns,
@@ -63,14 +72,16 @@ async def save_memory(
         {
             "content": sanitized,
             "category": category,
+            "saved_at": datetime.now(UTC).isoformat(),
+            "source_thread_id": source_thread_id,
         },
         index=["content", "category"],
     )
-    logger.debug("save_memory  user={}  key={}  category={}", user_id, key, category)
+    logger.debug("persist_memory  user={}  key={}  category={}", user_id, key, category)
     return key
 
 
-async def recall_memories(
+async def fetch_memories(
     store: BaseStore,
     user_id: str,
     category: str | None = None,
@@ -100,11 +111,11 @@ async def recall_memories(
     ]
 
 
-async def delete_memory(store: BaseStore, user_id: str, key: str, category: str = "general") -> None:
+async def remove_memory(store: BaseStore, user_id: str, key: str, category: str = "general") -> None:
     """Delete a specific memory by key and category."""
     ns = _namespace(user_id, category)
     await store.adelete(ns, key)
-    logger.debug("delete_memory  user={}  key={}  category={}", user_id, key, category)
+    logger.debug("remove_memory  user={}  key={}  category={}", user_id, key, category)
 
 
 async def recall_memories_for_context(
@@ -120,7 +131,7 @@ async def recall_memories_for_context(
         Formatted memory string like "[memory/category] content" or "" if none.
     """
     try:
-        memories = await recall_memories(store, user_id, query=query, limit=limit)
+        memories = await fetch_memories(store, user_id, query=query, limit=limit)
     except Exception as exc:
         logger.warning("recall_memories_for_context failed: {}", exc)
         return ""

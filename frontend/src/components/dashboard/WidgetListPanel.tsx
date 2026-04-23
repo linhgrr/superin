@@ -62,7 +62,13 @@ export const WidgetListPanel = memo(function WidgetListPanel({
             {visibleCount}/{widgets.length} widgets visible
           </div>
         </div>
-        <button type="button" className="btn btn-ghost btn-icon" onClick={onClose} style={{ marginLeft: "auto" }}>
+        <button
+          type="button"
+          className="btn btn-ghost btn-icon"
+          onClick={onClose}
+          style={{ marginLeft: "auto" }}
+          aria-label="Close widget list"
+        >
           <DynamicIcon name="X" size={18} />
         </button>
       </div>

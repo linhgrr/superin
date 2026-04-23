@@ -25,7 +25,7 @@ async def list_events(
     end: datetime | None = Query(None),
     calendar_id: str | None = Query(None),
     limit: int = Query(100, le=500),
-):
+) -> list[CalendarEventRead]:
     """List events with optional filters."""
     return await calendar_service.list_events(user_id, start, end, calendar_id, limit)
 
@@ -35,13 +35,13 @@ async def search_events(
     q: str,
     user_id: str = Depends(get_current_user),
     limit: int = Query(20, le=100),
-):
+) -> list[CalendarEventRead]:
     """Search events by query."""
     return await calendar_service.search_events(user_id, q, limit)
 
 
 @router.get("/{event_id}", response_model=CalendarEventRead)
-async def get_event(event_id: str, user_id: str = Depends(get_current_user)):
+async def get_event(event_id: str, user_id: str = Depends(get_current_user)) -> CalendarEventRead:
     """Get single event."""
     event = await calendar_service.get_event(event_id, user_id)
     if not event:
@@ -53,7 +53,7 @@ async def get_event(event_id: str, user_id: str = Depends(get_current_user)):
 async def create_event(
     request: CalendarCreateEventRequest,
     user_id: str = Depends(get_current_user),
-):
+) -> CalendarEventRead:
     """Create new event."""
     try:
         return await calendar_service.create_event(
@@ -79,7 +79,7 @@ async def update_event(
     event_id: str,
     request: CalendarUpdateEventRequest,
     user_id: str = Depends(get_current_user),
-):
+) -> CalendarEventRead:
     """Update event — only fields set in the request are updated."""
     try:
         return await calendar_service.update_event(
@@ -100,7 +100,7 @@ async def update_event(
 
 
 @router.delete("/{event_id}", response_model=CalendarActionResponse)
-async def delete_event(event_id: str, user_id: str = Depends(get_current_user)):
+async def delete_event(event_id: str, user_id: str = Depends(get_current_user)) -> CalendarActionResponse:
     """Delete event."""
     try:
         return await calendar_service.delete_event(event_id, user_id)

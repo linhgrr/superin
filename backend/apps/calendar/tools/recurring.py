@@ -2,24 +2,42 @@
 
 from __future__ import annotations
 
-from langchain_core.runnables import RunnableConfig
+from typing import Any, TypedDict
+
+from langchain.tools import ToolRuntime
 from langchain_core.tools import tool
 
 from apps.calendar.enums import RecurrenceFrequency
+from apps.calendar.schemas import CalendarRecurringRuleRead
 from apps.calendar.service import calendar_service
-from shared.tool_results import run_time_aware_tool_with_user, run_tool_with_user
+from core.agents.runtime_context import AppAgentContext
+from shared.tool_results import (
+    run_time_aware_tool_with_runtime,
+    run_tool_with_runtime,
+)
+from shared.tool_time import ToolTimeContext
+
+
+class CalendarStopRecurringPayload(TypedDict):
+    success: bool
+    rule: CalendarRecurringRuleRead
+    message: str
+
+
+CalendarRecurringToolResult = CalendarRecurringRuleRead | CalendarStopRecurringPayload
 
 
 @tool("calendar_make_recurring")
 async def calendar_make_recurring(
     event_id: str,
     frequency: RecurrenceFrequency,
-    config: RunnableConfig,
     interval: int = 1,
     days_of_week: list[int] | None = None,
     end_date: str | None = None,
     max_occurrences: int | None = None,
-) -> dict:
+    *,
+    runtime: ToolRuntime[AppAgentContext],
+) -> CalendarRecurringToolResult:
     """
     Make an event repeat automatically (create recurring series).
 
@@ -28,7 +46,11 @@ async def calendar_make_recurring(
     - "Make this a weekly meeting"
     - "Repeat daily for 30 days"
     """
-    async def operation(user_id: str, temporal: dict, time_context) -> dict:
+    async def operation(
+        user_id: str,
+        temporal: dict[str, Any],
+        time_context: ToolTimeContext,
+    ) -> CalendarRecurringRuleRead:
         return await calendar_service.create_recurring_rule(
             user_id=user_id,
             event_template_id=event_id,
@@ -39,9 +61,8 @@ async def calendar_make_recurring(
             max_occurrences=max_occurrences,
         )
 
-    return await run_time_aware_tool_with_user(
-        config,
-        action="making event recurring",
+    return await run_time_aware_tool_with_runtime(
+        runtime,
         payload={"end_date": end_date},
         temporal_fields={"end_date": "local_date"},
         operation=operation,
@@ -51,17 +72,24 @@ async def calendar_make_recurring(
 @tool("calendar_stop_recurring")
 async def calendar_stop_recurring(
     rule_id: str,
-    config: RunnableConfig,
-    keep_past: bool = True,
-) -> dict:
+    *,
+    runtime: ToolRuntime[AppAgentContext],
+) -> CalendarRecurringToolResult:
     """
     Stop future occurrences of a recurring series.
 
     Use when:
     - "Stop my daily reminder"
     - "Cancel the recurring meeting"
+
+    Returns:
+    - the updated recurring rule
+    - confirmation that future occurrences were stopped
+
+    Notes:
+    - Past events remain unchanged.
     """
-    async def operation(user_id: str) -> dict:
+    async def operation(user_id: str) -> CalendarStopRecurringPayload:
         result = await calendar_service.stop_recurring_rule(rule_id, user_id)
         return {
             "success": True,
@@ -69,8 +97,7 @@ async def calendar_stop_recurring(
             "message": "Future occurrences stopped. Past events remain.",
         }
 
-    return await run_tool_with_user(
-        config,
-        action="stopping recurring rule",
+    return await run_tool_with_runtime(
+        runtime,
         operation=operation,
     )

@@ -42,8 +42,9 @@ Plugin runtime
 
 LangGraph chat orchestration
   -> RootAgent
-  -> ask_finance / ask_todo tools
-  -> FinanceAgent / TodoAgent child graphs
+  -> StateGraph root orchestrator
+  -> platform / finance / todo worker dispatch
+  -> child agent graphs
   -> domain tools
 
 MongoDB
@@ -241,11 +242,16 @@ The root chat agent lives in:
 
 Responsibilities:
 - determine which installed apps are available for the current user
-- build `ask_{app_id}` tools from installed child agents
+- route each turn into zero or more worker dispatches
 - receive structured results back from delegated child agents
-- parse assistant-ui message history into LangChain messages
-- stream root text + root tool call/result events
-- persist latest user/assistant text turns
+- parse the latest user turn into LangChain messages
+- stream root text chunks while keeping worker internals server-side
+- persist thread state through the LangGraph checkpointer
+
+Architecture note:
+- see [ADR 2026-04-22: Agent Runtime Target Architecture](/home/linh/Downloads/superin/docs/adr/2026-04-22-agent-runtime-target-architecture.md)
+- root orchestration now runs on `StateGraph + Send` in [graph.py](/home/linh/Downloads/superin/backend/core/agents/root/graph.py:1)
+- child agents still own domain execution, while the root graph owns routing, worker fan-out, reduction, and final synthesis
 
 ### Child app agents
 
@@ -257,7 +263,9 @@ Contract:
 - `tools()` returns app domain tools
 - `build_prompt()` returns app-specific prompt text
 - `delegate(question, thread_id)` returns a structured result envelope for the root agent
-- app tools must use `safe_tool_call()` so domain failures become structured tool results
+- child agents currently use `create_agent`
+- tools now receive typed runtime context via `ToolRuntime + context_schema`
+- tool execution policy is centralized in middleware rather than repeated per-tool wrappers
 
 ## Timezone Architecture
 
@@ -278,23 +286,22 @@ Current child agents:
 ### Streaming rule
 
 The frontend should only receive root-level orchestration:
-- `ask_finance`
-- `ask_todo`
-- root assistant text
+- root assistant text chunks
+- final thread snapshot updates
 
 Child-agent internals such as `finance_list_wallets` are not streamed to the UI.
 
 ### assistant-ui route
 
 The SSE route is:
-- [chat.py](/home/linh/Downloads/superin/backend/apps/chat.py)
+- [routes.py](/home/linh/Downloads/superin/backend/core/chat/routes.py)
 
 The runtime is created in:
 - [AppProviders.tsx](/home/linh/Downloads/superin/frontend/src/components/providers/AppProviders.tsx)
 
 Important behavior:
-- frontend sends full message history each turn
-- backend route uses `skip_db_load=True`
+- frontend may send full message history each turn, but the backend only uses the latest non-empty user message for the new turn
+- conversation history comes from the LangGraph checkpointer, not request replay
 - backend ignores `tools` in request body
 - frontend does not own server-side tool schemas
 
@@ -330,5 +337,5 @@ python scripts/superin.py codegen
 python scripts/superin.py manifests validate
 ruff check backend
 npm run build:frontend
-python -m py_compile backend/apps/chat.py backend/core/agents/root/agent.py backend/core/agents/base_app.py
+python -m py_compile backend/core/chat/routes.py backend/core/agents/root/agent.py backend/core/agents/base_app.py
 ```

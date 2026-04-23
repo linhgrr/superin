@@ -104,6 +104,16 @@ class TodoSummaryResponse(BaseModel):
     tag_list: list[str] = Field(default_factory=list)
 
 
+class TodoActivitySummaryResponse(BaseModel):
+    start_datetime: datetime
+    end_datetime: datetime
+    created_count: int
+    completed_count: int
+    created_tasks: list[TodoTaskRead] = Field(default_factory=list)
+    completed_tasks: list[TodoTaskRead] = Field(default_factory=list)
+    unsupported_activity: list[str] = Field(default_factory=list)
+
+
 class TodoActionResponse(BaseModel):
     success: bool
     id: str

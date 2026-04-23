@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import { useOnboarding } from "@/components/providers/onboarding/OnboardingProvider";
 import { ROUTES } from "@/constants/routes";
@@ -54,7 +54,13 @@ export function TourMenu() {
 
   return (
     <div ref={dropdownRef} style={{ position: "relative" }}>
-      <button className="btn btn-ghost btn-icon" onClick={() => setIsOpen((value) => !value)} title="Start Tour">
+      <button
+        type="button"
+        className="btn btn-ghost btn-icon"
+        onClick={() => setIsOpen((value) => !value)}
+        title="Start Tour"
+        aria-label="Start guided tour"
+      >
         <DynamicIcon name="HelpCircle" size={16} />
       </button>
 
@@ -138,11 +144,6 @@ export function UserMenu() {
       .toUpperCase() ?? "";
   const showAvatarImage = Boolean(avatarUrl && !avatarLoadFailed);
 
-  const handleNavigate = (route: string) => {
-    navigate(route);
-    setShowUserMenu(false);
-  };
-
   const handleLogout = async () => {
     await logout();
     navigate(ROUTES.LOGIN);
@@ -151,14 +152,18 @@ export function UserMenu() {
   return (
     <div ref={userMenuRef} style={{ position: "relative" }}>
       <button
+        type="button"
         className="btn btn-ghost btn-icon"
         onClick={() => setShowUserMenu((value) => !value)}
         title={user.name ?? "User"}
+        aria-label={showUserMenu ? "Close user menu" : "Open user menu"}
       >
         {showAvatarImage ? (
           <img
             src={avatarUrl!}
             alt={`${user.name ?? "User"} avatar`}
+            width="32"
+            height="32"
             onError={() => setAvatarLoadFailed(true)}
             style={{
               width: "32px",
@@ -211,15 +216,26 @@ export function UserMenu() {
               {user.email}
             </div>
           </div>
-          <button className="btn" onClick={() => handleNavigate(ROUTES.SETTINGS)} style={{ ...menuButtonStyles, marginBottom: "0.25rem" }}>
+          <Link
+            className="btn"
+            to={ROUTES.SETTINGS}
+            onClick={() => setShowUserMenu(false)}
+            style={{ ...menuButtonStyles, marginBottom: "0.25rem", textDecoration: "none" }}
+          >
             <DynamicIcon name="Settings" size={14} />
             Settings
-          </button>
-          <button className="btn" onClick={() => handleNavigate(ROUTES.BILLING)} style={{ ...menuButtonStyles, marginBottom: "0.25rem" }}>
+          </Link>
+          <Link
+            className="btn"
+            to={ROUTES.BILLING}
+            onClick={() => setShowUserMenu(false)}
+            style={{ ...menuButtonStyles, marginBottom: "0.25rem", textDecoration: "none" }}
+          >
             <DynamicIcon name="CreditCard" size={14} />
             Billing
-          </button>
+          </Link>
           <button
+            type="button"
             className="btn"
             onClick={handleLogout}
             style={{

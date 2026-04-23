@@ -81,7 +81,14 @@ class Settings(BaseSettings):
     openai_base_url: str = ""
     openai_model: str = ""
     llm_request_timeout_seconds: float = 60.0
+    child_agent_timeout_seconds: float = 60.0
+    root_agent_max_dispatch_rounds: int = 3
+    root_agent_max_app_attempts_per_turn: int = 2
     llm_stream_idle_timeout_seconds: float = 120.0
+    memory_semantic_search_enabled: bool = False
+    memory_embedding_model: str = ""
+    memory_embedding_dimensions: int = 1536
+    memory_vector_index_name: str = "superin_memory_index"
 
     # ─── Object Storage (S3-compatible) ───────────────────────────────────────
     object_storage_access_key: str | None = None
@@ -116,4 +123,4 @@ class Settings(BaseSettings):
 
 
 # Global singleton — imported everywhere in backend
-settings = Settings()
+settings: Settings = Settings()  # type: ignore[call-arg]

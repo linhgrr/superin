@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 
+import pytest
+
 from core.registry import get_task_finder
 
 
@@ -13,7 +15,9 @@ class _StubTodoAgent:
         return self._finder
 
 
-def test_get_task_finder_returns_none_when_todo_not_installed(monkeypatch) -> None:
+def test_get_task_finder_returns_none_when_todo_not_installed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     finder = object()
 
     async def _list_installed_app_ids(_user_id: str) -> list[str]:
@@ -33,7 +37,9 @@ def test_get_task_finder_returns_none_when_todo_not_installed(monkeypatch) -> No
     assert result is None
 
 
-def test_get_task_finder_returns_finder_when_todo_installed(monkeypatch) -> None:
+def test_get_task_finder_returns_finder_when_todo_installed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     finder = object()
 
     async def _list_installed_app_ids(_user_id: str) -> list[str]:

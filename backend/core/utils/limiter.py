@@ -135,10 +135,15 @@ class TieredRateLimiter:
         limits: list[tuple[int, int]],
     ) -> tuple[bool, str]:
         """Redis sliding window implementation using sorted sets + pipelining."""
+        redis_client = self._redis
+        if redis_client is None:
+            self._redis_available = False
+            return self._fallback.check_and_record(key, limits)
+
         now_ms = int(time.time() * 1000)
 
         try:
-            async with self._redis.pipeline(transaction=True) as pipe:
+            async with redis_client.pipeline(transaction=True) as pipe:
                 for limit, window in limits:
                     redis_key = f"rl:{key}:{window}"
                     cutoff = now_ms - (window * 1000)

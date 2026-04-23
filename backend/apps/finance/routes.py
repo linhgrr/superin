@@ -1,6 +1,7 @@
 """Finance plugin FastAPI routes — thin layer calling finance_service."""
 
 from datetime import date
+from typing import cast
 
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -10,6 +11,7 @@ from apps.finance.schemas import (
     BudgetOverviewWidgetData,
     FinanceActionResponse,
     FinanceBudgetCheckResponse,
+    FinanceBudgetOverviewResponse,
     FinanceCategoryBreakdownResponse,
     FinanceCategoryRead,
     FinanceCreateCategoryRequest,
@@ -74,7 +76,7 @@ async def _resolve_widget_options(
             if wallet_options is None:
                 wallets = await finance_service.list_wallets(user_id)
                 wallet_options = [
-                    SelectOption(label=wallet["name"], value=wallet["id"])
+                    SelectOption(label=wallet.name, value=wallet.id)
                     for wallet in wallets
                 ]
             next_field.options = wallet_options
@@ -88,19 +90,19 @@ async def get_total_balance_widget_data(
 ) -> TotalBalanceWidgetData:
     wallets = await finance_service.list_wallets(user_id)
     if config.account_id:
-        wallet = next((item for item in wallets if item["id"] == config.account_id), None)
+        wallet = next((item for item in wallets if item.id == config.account_id), None)
         if wallet is None:
             raise HTTPException(status_code=404, detail="Configured wallet not found")
         return TotalBalanceWidgetData(
-            total_balance=wallet["balance"],
-            wallet_name=wallet["name"],
-            currency=wallet["currency"],
+            total_balance=wallet.balance,
+            wallet_name=wallet.name,
+            currency=wallet.currency,
             wallet_count=1,
         )
 
-    currency = wallets[0]["currency"] if wallets else None
+    currency = wallets[0].currency if wallets else None
     return TotalBalanceWidgetData(
-        total_balance=sum(wallet["balance"] for wallet in wallets),
+        total_balance=sum(wallet.balance for wallet in wallets),
         wallet_name=None,
         currency=currency,
         wallet_count=len(wallets),
@@ -112,26 +114,28 @@ async def get_budget_overview_widget_data(
     config: BudgetOverviewWidgetConfig,
 ) -> BudgetOverviewWidgetData:
     user = await User.get(user_id)
-    if user is None:
+    if not isinstance(user, User):
         raise HTTPException(status_code=404, detail="User not found")
 
     budget = await finance_service.check_budget(user, None)
-    categories = budget.get("categories", [])
+    if not isinstance(budget, FinanceBudgetOverviewResponse):
+        raise HTTPException(status_code=500, detail="Unexpected budget response shape")
+    categories = budget.categories
     if not config.include_categories_without_budget:
-        categories = [item for item in categories if item.get("budget", 0) > 0]
+        categories = [item for item in categories if item.budget > 0]
 
-    total_budget = sum(item.get("budget", 0) for item in categories)
-    total_spent = sum(item.get("spent", 0) for item in categories)
+    total_budget = sum(item.budget for item in categories)
+    total_spent = sum(item.spent for item in categories)
     remaining_budget = total_budget - total_spent if total_budget > 0 else None
-    over_budget_count = sum(1 for item in categories if item.get("over_budget"))
+    over_budget_count = sum(1 for item in categories if item.over_budget)
     return BudgetOverviewWidgetData(
         total_budget=round(total_budget, 2),
         total_spent=round(total_spent, 2),
         remaining_budget=round(remaining_budget, 2) if remaining_budget is not None else None,
         category_count=len(categories),
         over_budget_count=over_budget_count,
-        month=budget["month"],
-        year=budget["year"],
+        month=budget.month,
+        year=budget.year,
     )
 
 
@@ -140,7 +144,7 @@ async def get_recent_transactions_widget_data(
     config: RecentTransactionsWidgetConfig,
 ) -> RecentTransactionsWidgetData:
     user = await User.get(user_id)
-    if user is None:
+    if not isinstance(user, User):
         raise HTTPException(status_code=404, detail="User not found")
 
     summary = await finance_service.get_summary(user)
@@ -154,8 +158,8 @@ async def get_recent_transactions_widget_data(
     )
     return RecentTransactionsWidgetData(
         items=items,
-        income_this_month=summary["income_this_month"],
-        expense_this_month=summary["expense_this_month"],
+        income_this_month=summary.income_this_month,
+        expense_this_month=summary.expense_this_month,
         scope="single-wallet" if config.wallet_id else "all-wallets",
     )
 
@@ -178,7 +182,7 @@ async def get_widget_data(
     if handler is None:
         raise HTTPException(status_code=404, detail=f"Widget '{widget_id}' is not registered")
     config = await resolve_widget_config(user_id, widget_id)
-    return await handler(user_id, config)
+    return cast(FinanceWidgetDataResponse, await handler(user_id, config))
 
 
 @router.put("/widgets/{widget_id}/config", response_model=WidgetDataConfigSchema)
@@ -193,7 +197,7 @@ async def update_widget_config(
 
     doc = await upsert_widget_config(user_id, widget_id, update.config)
     return WidgetDataConfigSchema(
-        id=str(doc.id),
+        _id=str(doc.id),
         user_id=str(doc.user_id),
         widget_id=doc.widget_id,
         config=doc.config,
@@ -212,7 +216,7 @@ async def get_widget_options(
 # ─── Wallets ─────────────────────────────────────────────────────────────────
 
 @router.get("/wallets", response_model=list[FinanceWalletRead])
-async def list_wallets(user_id: str = Depends(get_current_user)):
+async def list_wallets(user_id: str = Depends(get_current_user)) -> list[FinanceWalletRead]:
     return await finance_service.list_wallets(user_id)
 
 
@@ -220,7 +224,7 @@ async def list_wallets(user_id: str = Depends(get_current_user)):
 async def get_wallet(
     wallet_id: str,
     user_id: str = Depends(get_current_user),
-):
+) -> FinanceWalletRead:
     wallet = await finance_service.get_wallet(wallet_id, user_id)
     if not wallet:
         raise HTTPException(status_code=404, detail="Wallet not found")
@@ -231,7 +235,7 @@ async def get_wallet(
 async def create_wallet(
     request: FinanceCreateWalletRequest,
     user_id: str = Depends(get_current_user),
-):
+) -> FinanceWalletRead:
     try:
         return await finance_service.create_wallet(user_id, request.name, request.currency)
     except ValueError as e:
@@ -243,7 +247,7 @@ async def update_wallet(
     wallet_id: str,
     request: FinanceUpdateWalletRequest,
     user_id: str = Depends(get_current_user),
-):
+) -> FinanceWalletRead:
     """Update wallet name."""
     try:
         return await finance_service.update_wallet(wallet_id, user_id, request.name)
@@ -255,7 +259,7 @@ async def update_wallet(
 async def delete_wallet(
     wallet_id: str,
     user_id: str = Depends(get_current_user),
-):
+) -> FinanceActionResponse:
     """Delete a wallet if empty."""
     try:
         return await finance_service.delete_wallet(wallet_id, user_id)
@@ -266,7 +270,7 @@ async def delete_wallet(
 # ─── Categories ────────────────────────────────────────────────────────────────
 
 @router.get("/categories", response_model=list[FinanceCategoryRead])
-async def list_categories(user_id: str = Depends(get_current_user)):
+async def list_categories(user_id: str = Depends(get_current_user)) -> list[FinanceCategoryRead]:
     return await finance_service.list_categories(user_id)
 
 
@@ -274,7 +278,7 @@ async def list_categories(user_id: str = Depends(get_current_user)):
 async def get_category(
     category_id: str,
     user_id: str = Depends(get_current_user),
-):
+) -> FinanceCategoryRead:
     """Get a single category by ID."""
     category = await finance_service.get_category(category_id, user_id)
     if not category:
@@ -286,7 +290,7 @@ async def get_category(
 async def create_category(
     request: FinanceCreateCategoryRequest,
     user_id: str = Depends(get_current_user),
-):
+) -> FinanceCategoryRead:
     return await finance_service.create_category(
         user_id,
         request.name,
@@ -301,7 +305,7 @@ async def update_category(
     category_id: str,
     request: FinanceUpdateCategoryRequest,
     user_id: str = Depends(get_current_user),
-):
+) -> FinanceCategoryRead:
     """Update a category."""
     try:
         return await finance_service.update_category(
@@ -316,7 +320,7 @@ async def update_category(
 async def delete_category(
     category_id: str,
     user_id: str = Depends(get_current_user),
-):
+) -> FinanceActionResponse:
     """Delete a category if it has no transactions."""
     try:
         return await finance_service.delete_category(category_id, user_id)
@@ -334,7 +338,7 @@ async def list_transactions(
     wallet_id: str | None = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(20, le=100),
-):
+) -> list[FinanceTransactionRead]:
     return await finance_service.list_transactions(
         user_id, type_, category_id, wallet_id, skip, limit
     )
@@ -344,7 +348,7 @@ async def list_transactions(
 async def get_transaction(
     transaction_id: str,
     user_id: str = Depends(get_current_user),
-):
+) -> FinanceTransactionRead:
     """Get a single transaction by ID."""
     tx = await finance_service.get_transaction(transaction_id, user_id)
     if not tx:
@@ -356,7 +360,7 @@ async def get_transaction(
 async def create_transaction(
     request: FinanceCreateTransactionRequest,
     user_id: str = Depends(get_current_user),
-):
+) -> FinanceTransactionRead:
     try:
         return await finance_service.add_transaction(
             user_id,
@@ -376,7 +380,7 @@ async def update_transaction(
     transaction_id: str,
     request: FinanceUpdateTransactionRequest,
     user_id: str = Depends(get_current_user),
-):
+) -> FinanceTransactionRead:
     """Update a transaction."""
     try:
         return await finance_service.update_transaction(
@@ -395,7 +399,7 @@ async def update_transaction(
 async def delete_transaction(
     transaction_id: str,
     user_id: str = Depends(get_current_user),
-):
+) -> FinanceActionResponse:
     """Delete a transaction and reverse its effect on wallet balance."""
     try:
         return await finance_service.delete_transaction(transaction_id, user_id)
@@ -412,7 +416,7 @@ async def search_transactions(
     end_date: date | None = None,
     limit: int = Query(20, le=100),
     user_id: str = Depends(get_current_user),
-):
+) -> list[FinanceTransactionRead]:
     """Search transactions by keyword or date range."""
     return await finance_service.search_transactions(user_id, query, start_date, end_date, limit)
 
@@ -423,11 +427,13 @@ async def search_transactions(
 async def check_budget(
     category_id: str | None = None,
     user_id: str = Depends(get_current_user),
-):
+) -> FinanceBudgetCheckResponse:
     """Check spending vs budget for categories."""
     try:
         # Fetch user to pass to service for timezone-aware calculations
         user = await User.get(user_id)
+        if not isinstance(user, User):
+            raise HTTPException(status_code=404, detail="User not found")
         return await finance_service.check_budget(user, category_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -438,7 +444,7 @@ async def get_category_breakdown(
     month: int | None = Query(None, ge=1, le=12),
     year: int | None = Query(None, ge=2020, le=2100),
     user_id: str = Depends(get_current_user),
-):
+) -> FinanceCategoryBreakdownResponse:
     """Get spending breakdown by category."""
     return await finance_service.get_category_breakdown(user_id, month, year)
 
@@ -447,7 +453,7 @@ async def get_category_breakdown(
 async def get_monthly_trend(
     months: int = Query(6, ge=1, le=12),
     user_id: str = Depends(get_current_user),
-):
+) -> FinanceMonthlyTrendResponse:
     """Get income/expense trend over recent months."""
     return await finance_service.get_monthly_trend(user_id, months)
 
@@ -483,7 +489,7 @@ async def update_preferences(
 async def transfer_funds(
     request: FinanceTransferRequest,
     user_id: str = Depends(get_current_user),
-):
+) -> FinanceTransferResponse:
     try:
         return await finance_service.transfer(
             user_id,
@@ -499,7 +505,9 @@ async def transfer_funds(
 # ─── Summary ────────────────────────────────────────────────────────────────────
 
 @router.get("/summary", response_model=FinanceSummaryResponse)
-async def finance_summary(user_id: str = Depends(get_current_user)):
+async def finance_summary(user_id: str = Depends(get_current_user)) -> FinanceSummaryResponse:
     # Fetch user to pass to service for timezone-aware calculations
     user = await User.get(user_id)
+    if not isinstance(user, User):
+        raise HTTPException(status_code=404, detail="User not found")
     return await finance_service.get_summary(user)

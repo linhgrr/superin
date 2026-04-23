@@ -1,4 +1,7 @@
+from collections.abc import Callable
+from contextlib import AbstractAsyncContextManager
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
@@ -12,16 +15,23 @@ class FakeSession:
         self.transaction_entered = False
         self.transaction_exited = False
 
-    def start_transaction(self):
+    def start_transaction(self) -> Any:
         self.transaction_started = True
         outer = self
 
         class TransactionWrapper:
-            async def __aenter__(self):
+            async def __aenter__(self) -> FakeSession:
                 outer.transaction_entered = True
                 return outer
-            async def __aexit__(self, exc_type, exc_val, exc_tb):
+
+            async def __aexit__(
+                self,
+                exc_type: type[BaseException] | None,
+                exc_val: BaseException | None,
+                exc_tb: object | None,
+            ) -> bool:
                 outer.transaction_exited = True
+                return False
 
         return TransactionWrapper()
 
@@ -32,15 +42,22 @@ class FakeClient:
         self.session_entered = False
         self.session_exited = False
 
-    async def start_session(self):
+    async def start_session(self) -> Any:
         outer = self
 
         class SessionWrapper:
-            async def __aenter__(self):
+            async def __aenter__(self) -> FakeSession:
                 outer.session_entered = True
                 return outer._session
-            async def __aexit__(self, exc_type, exc_val, exc_tb):
+
+            async def __aexit__(
+                self,
+                exc_type: type[BaseException] | None,
+                exc_val: BaseException | None,
+                exc_tb: object | None,
+            ) -> bool:
                 outer.session_exited = True
+                return False
 
         return SessionWrapper()
 
@@ -55,7 +72,7 @@ class FakeClient:
 async def test_transaction_helpers_await_start_transaction(
     monkeypatch: pytest.MonkeyPatch,
     target: str,
-    transaction_helper,
+    transaction_helper: Callable[[], AbstractAsyncContextManager[FakeSession]],
 ) -> None:
     session = FakeSession()
     client = FakeClient(session)

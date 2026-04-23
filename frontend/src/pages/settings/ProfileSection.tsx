@@ -10,6 +10,7 @@ import User from "lucide-react/dist/esm/icons/user";
 import { uploadProfileAvatar } from "@/api/auth";
 import { useToast } from "@/components/providers/ToastProvider";
 import { useAuth } from "@/hooks/useAuth";
+import { ConfirmationModal } from "@/shared/components/ConfirmationModal";
 import Section from "./Section";
 import { TIMEZONES, type SettingsState } from "./settings-constants";
 
@@ -28,6 +29,7 @@ export default function ProfileSection({
   const toast = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const initials = useMemo(() => {
     if (!user?.name) return "U";
@@ -142,7 +144,7 @@ export default function ProfileSection({
             style={{ marginTop: "0.625rem", display: "inline-flex", alignItems: "center", gap: "0.375rem" }}
           >
             <Camera size={14} />
-            {isUploadingAvatar ? "Uploading..." : "Change photo"}
+            {isUploadingAvatar ? "Uploading…" : "Change photo"}
           </button>
           <div
             style={{
@@ -174,6 +176,7 @@ export default function ProfileSection({
         {/* Timezone */}
         <div style={{ marginBottom: "1.25rem" }}>
           <label
+            htmlFor="settings-timezone"
             style={{
               display: "block",
               fontSize: "0.8125rem",
@@ -203,6 +206,7 @@ export default function ProfileSection({
               <Globe size={20} />
             </div>
             <select
+              id="settings-timezone"
               value={settings.timezone}
               onChange={(e) => onSave({ timezone: e.target.value })}
               style={{
@@ -214,7 +218,6 @@ export default function ProfileSection({
                 color: "var(--color-foreground)",
                 fontSize: "0.875rem",
                 cursor: "pointer",
-                outline: "none",
               }}
             >
               {TIMEZONES.map((tz) => (
@@ -230,7 +233,8 @@ export default function ProfileSection({
         </div>
 
         <button
-          onClick={onLogout}
+          type="button"
+          onClick={() => setShowLogoutConfirm(true)}
           className="btn btn-danger"
           style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
         >
@@ -238,6 +242,20 @@ export default function ProfileSection({
           Sign Out
         </button>
       </div>
+      {showLogoutConfirm ? (
+        <ConfirmationModal
+          title="Sign Out"
+          message="You will be signed out of this workspace on this device."
+          confirmLabel="Sign Out"
+          cancelLabel="Stay Signed In"
+          variant="danger"
+          onCancel={() => setShowLogoutConfirm(false)}
+          onConfirm={() => {
+            setShowLogoutConfirm(false);
+            onLogout();
+          }}
+        />
+      ) : null}
     </Section>
   );
 }

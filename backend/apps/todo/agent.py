@@ -5,8 +5,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from langchain_core.tools import BaseTool
-from pymongo.asynchronous.client_session import AsyncClientSession
+from motor.motor_asyncio import AsyncIOMotorClientSession
 
+from apps.todo.enums import TaskPriority, TaskStatus
 from apps.todo.prompts import get_todo_prompt
 from apps.todo.service import task_service
 from apps.todo.tools import (
@@ -28,7 +29,7 @@ from apps.todo.tools import (
     todo_restore_task,
     todo_search_tasks,
     todo_stop_recurring_task,
-    todo_toggle_task,
+    todo_summarize_activity,
     todo_uncomplete_subtask,
     todo_update_task,
 )
@@ -48,12 +49,12 @@ class TodoAgent(BaseAppAgent):
             todo_search_tasks,
             todo_get_task,
             todo_update_task,
-            todo_toggle_task,
             todo_complete_task,
             todo_archive_task,
             todo_restore_task,
             todo_delete_task,
             todo_list_archived,
+            todo_summarize_activity,
             todo_get_summary,
             # Tag tools
             todo_add_tag,
@@ -72,10 +73,10 @@ class TodoAgent(BaseAppAgent):
     def build_prompt(self) -> str:
         return get_todo_prompt()
 
-    async def on_install(self, user_id: str, session: AsyncClientSession | None = None) -> None:
+    async def on_install(self, user_id: str, session: AsyncIOMotorClientSession | None = None) -> None:
         await task_service.on_install(user_id, session=session)
 
-    async def on_uninstall(self, user_id: str, session: AsyncClientSession | None = None) -> None:
+    async def on_uninstall(self, user_id: str, session: AsyncIOMotorClientSession | None = None) -> None:
         await task_service.on_uninstall(user_id, session=session)
 
     def get_task_finder(self) -> TodoTaskFinder:
@@ -98,13 +99,13 @@ class TodoTaskFinder:
     async def find_by_user(
         self,
         user_id: str,
-        status: str | None = None,
-        priority: str | None = None,
+        status: TaskStatus | None = None,
+        priority: TaskPriority | None = None,
         tag: str | None = None,
         include_archived: bool = False,
         limit: int = 20,
     ) -> list[Task]:
-        return await task_service.list_tasks(
+        return await task_service.repo.find_by_user(
             user_id=user_id,
             status=status,
             priority=priority,

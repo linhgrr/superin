@@ -4,13 +4,19 @@ Provides common functions for updating widget preferences without code duplicati
 across multiple app routes.
 """
 
+from __future__ import annotations
+
+from typing import TypeVar, cast
+
 from beanie import PydanticObjectId
 from beanie.operators import In
 from pymongo import ReturnDocument, UpdateOne
 
 from core.db import get_document_collection
 from core.models import WidgetPreference
-from shared.schemas import PreferenceUpdate
+from shared.schemas import PreferenceUpdate, WidgetPreferenceSchema
+
+PreferenceSchemaT = TypeVar("PreferenceSchemaT", bound=WidgetPreferenceSchema)
 
 
 def _apply_update_to_preference(
@@ -103,7 +109,7 @@ async def update_widget_preference(
     )
     if updated is None:
         return None
-    return WidgetPreference.model_validate(updated)
+    return cast(WidgetPreference, WidgetPreference.model_validate(updated))
 
 
 async def update_multiple_preferences(
@@ -159,8 +165,8 @@ async def update_multiple_preferences(
 
 def preference_to_schema(
     pref: WidgetPreference,
-    schema_class: type = None,
-) -> dict:
+    schema_class: type[PreferenceSchemaT] | None = None,
+) -> PreferenceSchemaT:
     """Convert a WidgetPreference document to a schema dict.
 
     Args:
@@ -168,15 +174,13 @@ def preference_to_schema(
         schema_class: Optional schema class to instantiate
 
     Returns:
-        Dict representation of the preference
+        Schema representation of the preference
     """
-    from shared.schemas import WidgetPreferenceSchema
-
     if schema_class is None:
-        schema_class = WidgetPreferenceSchema
+        schema_class = cast(type[PreferenceSchemaT], WidgetPreferenceSchema)
 
     return schema_class(
-        id=str(pref.id),
+        _id=str(pref.id),
         user_id=str(pref.user_id),
         widget_id=pref.widget_id,
         app_id=pref.app_id,

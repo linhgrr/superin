@@ -115,6 +115,18 @@ class CalendarActionResponse(BaseModel):
     message: str | None = None
 
 
+class CalendarActivitySummaryResponse(BaseModel):
+    start_datetime: datetime
+    end_datetime: datetime
+    created_count: int
+    updated_count: int
+    scheduled_count: int
+    created_events: list[CalendarEventRead] = Field(default_factory=list)
+    updated_events: list[CalendarEventRead] = Field(default_factory=list)
+    scheduled_events: list[CalendarEventRead] = Field(default_factory=list)
+    unsupported_activity: list[str] = Field(default_factory=list)
+
+
 class MonthViewWidgetConfig(BaseModel):
     default_calendar: str | None = None
     show_time_blocked_tasks: bool = True

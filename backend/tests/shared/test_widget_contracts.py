@@ -46,7 +46,10 @@ def test_preference_update_uses_grid_fields() -> None:
 
 def test_preference_update_rejects_legacy_config_field() -> None:
     try:
-        PreferenceUpdate(widget_id="finance.total-balance", config={"gridX": 1})
+        PreferenceUpdate.model_validate({
+            "widget_id": "finance.total-balance",
+            "config": {"gridX": 1},
+        })
     except ValidationError:
         return
 

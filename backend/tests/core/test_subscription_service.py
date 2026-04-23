@@ -60,11 +60,13 @@ def test_verify_payos_signature_roundtrip() -> None:
     )
 
 
-async def test_mark_webhook_event_received_is_idempotent(monkeypatch) -> None:
+async def test_mark_webhook_event_received_is_idempotent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     class FakeEvent:
         calls = 0
 
-        def __init__(self, **_kwargs) -> None:
+        def __init__(self, **_kwargs: object) -> None:
             pass
 
         async def insert(self) -> None:
@@ -87,7 +89,9 @@ async def test_mark_webhook_event_received_is_idempotent(monkeypatch) -> None:
     assert second is False
 
 
-async def test_create_checkout_requires_provider_when_default_missing(monkeypatch) -> None:
+async def test_create_checkout_requires_provider_when_default_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(subscription_service.settings, "payment_default_provider", None)
 
     with pytest.raises(HTTPException) as exc_info:
@@ -100,7 +104,9 @@ async def test_create_checkout_requires_provider_when_default_missing(monkeypatc
     assert "Missing provider" in str(exc_info.value.detail)
 
 
-async def test_process_payos_webhook_skips_duplicate_event(monkeypatch) -> None:
+async def test_process_payos_webhook_skips_duplicate_event(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     checksum_key = "top-secret"
     data = {
         "orderCode": 123,
@@ -120,7 +126,7 @@ async def test_process_payos_webhook_skips_duplicate_event(monkeypatch) -> None:
 
     monkeypatch.setattr(subscription_service.settings, "payos_checksum_key", checksum_key)
 
-    async def fake_mark(_provider, _event_id: str) -> bool:
+    async def fake_mark(_provider: PaymentProvider, _event_id: str) -> bool:
         return False
 
     monkeypatch.setattr(subscription_service, "_mark_webhook_event_received", fake_mark)
@@ -156,7 +162,9 @@ def test_verify_stripe_signature_enforces_timestamp_tolerance() -> None:
     )
 
 
-async def test_cancel_current_subscription_cancels_stripe_provider(monkeypatch) -> None:
+async def test_cancel_current_subscription_cancels_stripe_provider(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     cancelled_references: list[str] = []
 
     class FakeSubscriptionDoc:
@@ -178,7 +186,7 @@ async def test_cancel_current_subscription_cancels_stripe_provider(monkeypatch) 
         user_id = object()
 
         @staticmethod
-        async def find_one(*_args, **_kwargs):
+        async def find_one(*_args: object, **_kwargs: object) -> FakeSubscriptionDoc:
             return fake_sub
 
     async def fake_cancel(provider_subscription_id: str) -> None:
@@ -196,7 +204,9 @@ async def test_cancel_current_subscription_cancels_stripe_provider(monkeypatch) 
     assert result.status == SubscriptionStatus.CANCELLED
 
 
-async def test_get_or_default_subscription_downgrades_expired_payos(monkeypatch) -> None:
+async def test_get_or_default_subscription_downgrades_expired_payos(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     class FakeSubscriptionDoc:
         provider = PaymentProvider.PAYOS
         provider_subscription_id = "order_123"
@@ -216,7 +226,7 @@ async def test_get_or_default_subscription_downgrades_expired_payos(monkeypatch)
         user_id = object()
 
         @staticmethod
-        async def find_one(*_args, **_kwargs):
+        async def find_one(*_args: object, **_kwargs: object) -> FakeSubscriptionDoc:
             return fake_sub
 
     monkeypatch.setattr(subscription_service, "Subscription", FakeSubscriptionModel)

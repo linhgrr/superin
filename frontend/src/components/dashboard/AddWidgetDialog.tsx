@@ -34,7 +34,13 @@ export default function AddWidgetDialog({
   useEffect(() => { panelRef.current?.focus(); }, []);
 
   return (
-    <div className="dialog-backdrop" onClick={onClose}>
+    <div className="dialog-backdrop">
+      <button
+        type="button"
+        className="dialog-backdrop-dismiss"
+        aria-label="Close add widget dialog"
+        onClick={onClose}
+      />
       <div
         className="dialog-panel"
         ref={panelRef}
@@ -42,7 +48,6 @@ export default function AddWidgetDialog({
         role="dialog"
         aria-modal="true"
         aria-label={selectedApp ? `${selectedApp.name} widgets` : "Add Widget"}
-        onClick={(e) => e.stopPropagation()}
         style={{ maxWidth: selectedApp ? "480px" : "420px" }}
       >
         {selectedApp ? (

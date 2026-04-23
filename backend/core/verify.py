@@ -5,6 +5,9 @@ warnings → server starts but logs to console.
 """
 
 import re
+from typing import cast
+
+from starlette.routing import Route
 
 from core.constants import API_ROOT
 from core.registry import PLUGIN_REGISTRY
@@ -25,6 +28,7 @@ def verify_plugins() -> tuple[list[str], list[str]]:
     warnings: list[str] = []
 
     seen_widget_ids: dict[str, str] = {}
+    seen_tool_ids: dict[str, str] = {}
     seen_collection_names: set[str] = set()
     seen_app_ids: list[str] = []
 
@@ -45,8 +49,6 @@ def verify_plugins() -> tuple[list[str], list[str]]:
                 f"[{app_id}] manifest.agent_description is empty — "
                 "RootAgent will skip this app"
             )
-        if not m.tools:
-            warnings.append(f"[{app_id}] manifest.tools is empty — no agent tools available")
         if not m.widgets:
             warnings.append(f"[{app_id}] has no widgets")
 
@@ -95,18 +97,35 @@ def verify_plugins() -> tuple[list[str], list[str]]:
                     )
 
         # ── Tool name checks ────────────────────────────────────────────────
-        manifest_tools = set(m.tools)
         agent_tools = plugin["agent"].tools()
-        registered_tools = {t.name for t in agent_tools}
-        for tool_name in manifest_tools - registered_tools:
-            errors.append(
-                f"[{app_id}] tool '{tool_name}' in manifest but not registered in agent"
-            )
-        for tool_name in registered_tools - manifest_tools:
+        if not agent_tools:
             warnings.append(
-                f"[{app_id}] tool '{tool_name}' registered in agent but not in manifest "
-                "(will be hidden from LLM)"
+                f"[{app_id}] agent registers no tools — child agent has no callable capabilities"
             )
+
+        registered_tools: set[str] = set()
+        for tool in agent_tools:
+            tool_name = getattr(tool, "name", None)
+            if not isinstance(tool_name, str) or not tool_name:
+                errors.append(f"[{app_id}] agent registered a tool without a valid name")
+                continue
+            if tool_name in registered_tools:
+                errors.append(f"[{app_id}] duplicate tool '{tool_name}' registered in agent")
+                continue
+            if tool_name in seen_tool_ids and seen_tool_ids[tool_name] != app_id:
+                errors.append(
+                    f"[{app_id}] tool '{tool_name}' conflicts with tool registered by "
+                    f"'{seen_tool_ids[tool_name]}'"
+                )
+            seen_tool_ids[tool_name] = app_id
+            registered_tools.add(tool_name)
+
+            tool_description = getattr(tool, "description", None)
+            if not isinstance(tool_description, str) or not tool_description.strip():
+                warnings.append(
+                    f"[{app_id}] tool '{tool_name}' has empty description — "
+                    "LLM tool selection quality may degrade"
+                )
 
         # Tool name format: {app_id}_{action}
         for tool_name in registered_tools:
@@ -129,7 +148,8 @@ def verify_plugins() -> tuple[list[str], list[str]]:
             )
 
         for model in plugin["models"]:
-            coll_name = getattr(model, "Settings", None) and getattr(model.Settings, "name", None)
+            settings_cls = getattr(model, "Settings", None)
+            coll_name = getattr(settings_cls, "name", None)
             if not coll_name:
                 coll_name = model.__name__.lower()
             if coll_name in seen_collection_names:
@@ -151,8 +171,10 @@ def verify_plugins() -> tuple[list[str], list[str]]:
     seen_routes: dict[str, str] = {}  # (method, path) -> app_id
     for app_id, plugin in PLUGIN_REGISTRY.items():
         for route in plugin["router"].routes:
-            path = f"{API_ROOT}/apps/{app_id}{route.path}"
-            methods = getattr(route, "methods", None) or {"GET"}
+            if not isinstance(route, Route):
+                continue
+            path = f"{API_ROOT}/apps/{app_id}{cast(Route, route).path}"
+            methods = route.methods or {"GET"}
             for method in methods:
                 key = f"{method.upper()} {path}"
                 if key in seen_routes and seen_routes[key] != app_id:

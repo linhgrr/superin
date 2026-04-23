@@ -9,7 +9,11 @@
  *   components   — all UI component styles (widgets, cards, forms, chat, etc.)
  */
 
+@layer theme, base, components, utilities;
+
 @import "tailwindcss";
+@import "@heroui/styles/themes/shared/theme.css" layer(theme);
+@import "@heroui/styles/components/spinner.css" layer(components);
 @import "./tokens.css";
 @import "./animations.css";
 @import "./layout.css";

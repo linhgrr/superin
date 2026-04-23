@@ -174,8 +174,19 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
         backdropFilter: "blur(8px)",
         animation: "fadeIn 0.15s ease",
       }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
+      <button
+        type="button"
+        aria-label="Close command palette"
+        onClick={onClose}
+        style={{
+          position: "absolute",
+          inset: 0,
+          border: "none",
+          background: "transparent",
+          cursor: "pointer",
+        }}
+      />
       <div
         style={{
           width: "100%",
@@ -189,6 +200,8 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
           flexDirection: "column",
           maxHeight: "60vh",
           animation: "fadeInScale 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+          position: "relative",
+          zIndex: 1,
         }}
       >
         {/* Search input */}
@@ -205,14 +218,15 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
           <input
             ref={inputRef}
             type="text"
-            placeholder="Search commands..."
+            name="command-search"
+            aria-label="Search commands"
+            placeholder="Search commands…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             style={{
               flex: 1,
               background: "transparent",
               border: "none",
-              outline: "none",
               color: "var(--color-foreground)",
               fontSize: "1.0625rem",
               fontFamily: "var(--font-sans)",

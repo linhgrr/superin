@@ -1,15 +1,9 @@
-"""
-Plug-n-play parallel app workers using LangGraph v2 @task decorator.
-
-Each @task function is a closure over its app_id. Workers are registered
-dynamically from PLUGIN_REGISTRY at discovery time (startup), so new apps
-automatically get parallel execution support without code changes.
-"""
+"""Plug-n-play worker registry for the root orchestration graph."""
 
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING, Any
+from collections.abc import Awaitable, Callable
 
 from langchain_core.runnables.config import RunnableConfig
 from loguru import logger
@@ -18,19 +12,14 @@ from core.agents.base_app import BaseAppAgent
 from core.registry import PLUGIN_REGISTRY
 
 from .platform_agent import platform_agent
+from .schemas import WorkerOutcome
 
-if TYPE_CHECKING:
-    from langgraph.func import _TaskFunction
-
-# Module-level task registry: app_id → @task decorated function
-TASK_REGISTRY: dict[str, _TaskFunction] = {}
+WorkerRunner = Callable[[str, str, str, RunnableConfig], Awaitable[WorkerOutcome]]
+WORKER_REGISTRY: dict[str, WorkerRunner] = {}
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Shared worker body
 # ─────────────────────────────────────────────────────────────────────────────
-
-
-
 
 async def _run_app_delegate(
     subtask: str,
@@ -39,23 +28,22 @@ async def _run_app_delegate(
     app_id: str,
     agent: BaseAppAgent,
     config: RunnableConfig,
-) -> dict[str, Any]:
+) -> WorkerOutcome:
     """Execute BaseAppAgent.delegate() with timing and error shaping."""
     start = time.monotonic()
     try:
         result = await agent.delegate(
-            question=subtask,
+            subtask=subtask,
             thread_id=thread_id,
             user_id=user_id,
             config=config,
         )
-        result.setdefault("subtask", subtask)
         elapsed = time.monotonic() - start
         logger.info(
             "PARALLEL_WORKER_DONE  app={}  user={}  status={}  elapsed={:.2f}s",
             app_id,
             user_id,
-            result.get("status", "?"),
+            result["status"],
             elapsed,
         )
         return result
@@ -82,38 +70,18 @@ async def _run_app_delegate(
         }
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Worker registration
-# ─────────────────────────────────────────────────────────────────────────────
-
-# Defer langgraph import to avoid side effects before app discovery.
-_langgraph_task: Any = None
-
-
-def _get_task_decorator():
-    global _langgraph_task
-    if _langgraph_task is None:
-        from langgraph.func import task as _t
-
-        _langgraph_task = _t
-    return _langgraph_task
-
-
 def refresh_workers() -> None:
     """Clear registry and re-register workers for ALL current PLUGIN_REGISTRY apps.
 
     This is called on every plugin discovery pass (including startup) so that
     newly added plugins get workers and the graph singleton picks them up.
     """
-    task_decorator = _get_task_decorator()
-
-    global TASK_REGISTRY
+    global WORKER_REGISTRY
 
     # Clear existing state so previously-removed plugins are dropped
-    TASK_REGISTRY.clear()
+    WORKER_REGISTRY.clear()
 
     def register_worker(app_id: str, agent: BaseAppAgent) -> None:
-        @task_decorator
         async def app_worker(
             subtask: str,
             user_id: str,
@@ -121,17 +89,19 @@ def refresh_workers() -> None:
             config: RunnableConfig,
             _app_id: str = app_id,
             _agent: BaseAppAgent = agent,
-        ) -> dict[str, Any]:
+        ) -> WorkerOutcome:
             return await _run_app_delegate(subtask, user_id, thread_id, _app_id, _agent, config)
 
-        TASK_REGISTRY[app_id] = app_worker
-        logger.info("Registered parallel worker for app={}", app_id)
+        WORKER_REGISTRY[app_id] = app_worker
+        logger.info("Registered root worker for app={}", app_id)
 
     register_worker("platform", platform_agent)
 
     for app_id, plugin in PLUGIN_REGISTRY.items():
         agent: BaseAppAgent = plugin["agent"]
         register_worker(app_id, agent)
-def get_task(app_id: str) -> _TaskFunction | None:
-    """Return the @task worker for a given app_id, or None if not registered."""
-    return TASK_REGISTRY.get(app_id)
+
+
+def get_worker_runner(app_id: str) -> WorkerRunner | None:
+    """Return the worker runner for a given app_id, or None if not registered."""
+    return WORKER_REGISTRY.get(app_id)

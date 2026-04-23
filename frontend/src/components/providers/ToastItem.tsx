@@ -143,7 +143,7 @@ function ToastItem({ toast, onDismiss, index }: ToastItemProps) {
               border: "none",
               borderRadius: "6px",
               cursor: "pointer",
-              transition: "all 0.2s ease",
+              transition: "background-color 0.2s ease, color 0.2s ease",
             }}
           >
             {toast.action.label}
@@ -152,9 +152,11 @@ function ToastItem({ toast, onDismiss, index }: ToastItemProps) {
       </div>
 
       <button
+        type="button"
         onClick={handleDismiss}
         onMouseEnter={() => setIsCloseHovered(true)}
         onMouseLeave={() => setIsCloseHovered(false)}
+        aria-label="Dismiss notification"
         style={{
           flexShrink: 0,
           width: "28px",
@@ -167,7 +169,7 @@ function ToastItem({ toast, onDismiss, index }: ToastItemProps) {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          transition: "all 0.2s ease",
+          transition: "background-color 0.2s ease, color 0.2s ease",
         }}
       >
         <DynamicIcon name="X" size={16} />

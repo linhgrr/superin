@@ -5,7 +5,7 @@ The platform reads PLUGIN_REGISTRY at startup to mount routers, expose catalog, 
 """
 
 from collections.abc import Awaitable, Callable
-from typing import TYPE_CHECKING, Any, TypedDict
+from typing import TYPE_CHECKING, Any, TypedDict, TypeVar, cast
 
 from fastapi import APIRouter
 from pydantic import BaseModel
@@ -47,7 +47,9 @@ class CategoryEntry(TypedDict):
 
 CATEGORY_REGISTRY: dict[str, CategoryEntry] = {}
 WIDGET_CONFIG_MODELS: dict[str, type[BaseModel]] = {}
-WIDGET_DATA_HANDLERS: dict[str, Callable[[str, BaseModel], Awaitable[Any]]] = {}
+WIDGET_DATA_HANDLERS: dict[str, Callable[..., Awaitable[Any]]] = {}
+
+SchemaT = TypeVar("SchemaT", bound=BaseModel)
 
 
 def register_category(
@@ -85,7 +87,7 @@ def register_widget_config_model(widget_id: str, model: type[BaseModel]) -> None
 
 def register_widget_data_handler(
     widget_id: str,
-    handler: Callable[[str, BaseModel], Awaitable[Any]],
+    handler: Callable[..., Awaitable[Any]],
 ) -> None:
     """Register the async data handler for a widget."""
     WIDGET_DATA_HANDLERS[widget_id] = handler
@@ -154,7 +156,7 @@ async def get_task_finder(user_id: str) -> "TaskFinder | None":
         return None
     agent = todo_entry["agent"]
     if hasattr(agent, "get_task_finder"):
-        return agent.get_task_finder()  # type: ignore[return-value]
+        return cast("TaskFinder | None", agent.get_task_finder())
     return None
 
 

@@ -13,13 +13,11 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@assistant-ui/react": "^0.12.21",
-    "@assistant-ui/react-data-stream": "latest",
-    "@assistant-ui/react-langgraph": "^0.12.5",
-    "@assistant-ui/react-markdown": "^0.12.7",
+    "@assistant-ui/react": "^0.12.25",
+    "@assistant-ui/react-langgraph": "^0.13.10",
+    "@assistant-ui/react-markdown": "^0.12.9",
     "@heroui/react": "^3.0.1",
     "@tailwindcss/typography": "^0.5.19",
-    "assistant-stream": "latest",
     "axios": "^1.14.0",
     "driver.js": "^1.4.0",
     "jwt-decode": "^4.0.0",

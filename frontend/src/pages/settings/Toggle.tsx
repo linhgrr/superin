@@ -42,7 +42,11 @@ export default function Toggle({ checked, onChange, label, description }: Toggle
         )}
       </div>
       <button
+        type="button"
         onClick={() => onChange(!checked)}
+        aria-label={label}
+        role="switch"
+        aria-checked={checked}
         style={{
           width: "48px",
           height: "26px",
@@ -53,7 +57,6 @@ export default function Toggle({ checked, onChange, label, description }: Toggle
           cursor: "pointer",
           transition: "background 0.2s ease",
         }}
-        aria-pressed={checked}
       >
         <div
           style={{

@@ -6,9 +6,10 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import date, datetime
+from typing import Any
 
 from beanie import PydanticObjectId
-from pymongo.asynchronous.client_session import AsyncClientSession
+from motor.motor_asyncio import AsyncIOMotorClientSession
 
 from apps.calendar.enums import EventType, RecurrenceFrequency
 from apps.calendar.models import Calendar, Event, RecurringRule
@@ -21,7 +22,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_CALENDAR_COLOR = "oklch(0.70 0.18 250)"  # Blue-ish
 
 @asynccontextmanager
-async def calendar_transaction() -> AsyncIterator[AsyncClientSession]:
+async def calendar_transaction() -> AsyncIterator[AsyncIOMotorClientSession]:
     """Yield a Mongo session with an active transaction for calendar mutations."""
     async with await get_db().client.start_session() as session:
         async with session.start_transaction():
@@ -37,7 +38,7 @@ class EventRepository:
         calendar_id: str | None = None,
         limit: int = 100,
         *,
-        session: AsyncClientSession | None = None,
+        session: AsyncIOMotorClientSession | None = None,
     ) -> list[Event]:
         """List events with time range filter."""
         conditions = [Event.user_id == PydanticObjectId(user_id)]
@@ -45,15 +46,16 @@ class EventRepository:
         if calendar_id:
             conditions.append(Event.calendar_id == PydanticObjectId(calendar_id))
 
-        start_naive = ensure_naive_utc(start)
-        end_naive = ensure_naive_utc(end)
-
-        if start_naive and end_naive:
+        if start is not None and end is not None:
+            start_naive = ensure_naive_utc(start)
+            end_naive = ensure_naive_utc(end)
             conditions.append(Event.start_datetime < end_naive)
             conditions.append(Event.end_datetime > start_naive)
-        elif start_naive:
+        elif start is not None:
+            start_naive = ensure_naive_utc(start)
             conditions.append(Event.end_datetime > start_naive)
-        elif end_naive:
+        elif end is not None:
+            end_naive = ensure_naive_utc(end)
             conditions.append(Event.start_datetime < end_naive)
 
         return (
@@ -68,7 +70,7 @@ class EventRepository:
         event_id: str,
         user_id: str,
         *,
-        session: AsyncClientSession | None = None,
+        session: AsyncIOMotorClientSession | None = None,
     ) -> Event | None:
         return await Event.find_one(
             Event.id == PydanticObjectId(event_id),
@@ -80,12 +82,15 @@ class EventRepository:
         self,
         user_id: str,
         query: str,
+        start: datetime | None = None,
+        end: datetime | None = None,
+        calendar_id: str | None = None,
         limit: int = 20,
         *,
-        session: AsyncClientSession | None = None,
+        session: AsyncIOMotorClientSession | None = None,
     ) -> list[Event]:
         """Search events by title, description, or location using MongoDB $regex."""
-        return await Event.find(
+        conditions: list[object] = [
             Event.user_id == PydanticObjectId(user_id),
             {
                 "$or": [
@@ -94,8 +99,65 @@ class EventRepository:
                     {"location": {"$regex": query, "$options": "i"}},
                 ]
             },
+        ]
+
+        if calendar_id:
+            conditions.append(Event.calendar_id == PydanticObjectId(calendar_id))
+
+        if start is not None and end is not None:
+            start_naive = ensure_naive_utc(start)
+            end_naive = ensure_naive_utc(end)
+            conditions.append(Event.start_datetime < end_naive)
+            conditions.append(Event.end_datetime > start_naive)
+        elif start is not None:
+            start_naive = ensure_naive_utc(start)
+            conditions.append(Event.end_datetime > start_naive)
+        elif end is not None:
+            end_naive = ensure_naive_utc(end)
+            conditions.append(Event.start_datetime < end_naive)
+
+        return await Event.find(
+            *conditions,
             session=session,
-        ).limit(limit).to_list()
+        ).sort("start_datetime").limit(limit).to_list()
+
+    async def find_created_between(
+        self,
+        user_id: str,
+        start: datetime,
+        end: datetime,
+        *,
+        limit: int | None = None,
+        session: AsyncIOMotorClientSession | None = None,
+    ) -> list[Event]:
+        cursor = Event.find(
+            Event.user_id == PydanticObjectId(user_id),
+            Event.created_at >= start,
+            Event.created_at <= end,
+            session=session,
+        ).sort("-created_at")
+        if limit is not None:
+            cursor = cursor.limit(limit)
+        return await cursor.to_list()
+
+    async def find_updated_between(
+        self,
+        user_id: str,
+        start: datetime,
+        end: datetime,
+        *,
+        limit: int | None = None,
+        session: AsyncIOMotorClientSession | None = None,
+    ) -> list[Event]:
+        cursor = Event.find(
+            Event.user_id == PydanticObjectId(user_id),
+            Event.updated_at >= start,
+            Event.updated_at <= end,
+            session=session,
+        ).sort("-updated_at")
+        if limit is not None:
+            cursor = cursor.limit(limit)
+        return await cursor.to_list()
 
     async def find_conflicts(
         self,
@@ -104,7 +166,7 @@ class EventRepository:
         end: datetime,
         exclude_event_id: str | None = None,
         *,
-        session: AsyncClientSession | None = None,
+        session: AsyncIOMotorClientSession | None = None,
     ) -> list[Event]:
         """Find events overlapping with given time range."""
         start_naive = ensure_naive_utc(start)
@@ -136,7 +198,7 @@ class EventRepository:
         color: str | None = None,
         reminders: list[int] | None = None,
         *,
-        session: AsyncClientSession | None = None,
+        session: AsyncIOMotorClientSession | None = None,
     ) -> Event:
         event = Event(
             user_id=PydanticObjectId(user_id),
@@ -168,8 +230,8 @@ class EventRepository:
         self,
         event: Event,
         *,
-        session: AsyncClientSession | None = None,
-        **kwargs,
+        session: AsyncIOMotorClientSession | None = None,
+        **kwargs: Any,
     ) -> Event:
         for key, value in kwargs.items():
             if key in self._ALLOWED_UPDATE_FIELDS and value is not None:
@@ -182,7 +244,7 @@ class EventRepository:
         self,
         event: Event,
         *,
-        session: AsyncClientSession | None = None,
+        session: AsyncIOMotorClientSession | None = None,
     ) -> None:
         await event.delete(session=session)
 
@@ -190,7 +252,7 @@ class EventRepository:
         self,
         calendar_id: str,
         *,
-        session: AsyncClientSession | None = None,
+        session: AsyncIOMotorClientSession | None = None,
     ) -> int:
         """Delete all events in a calendar."""
         result = await Event.find(
@@ -205,7 +267,7 @@ class CalendarRepository:
         self,
         user_id: str,
         *,
-        session: AsyncClientSession | None = None,
+        session: AsyncIOMotorClientSession | None = None,
     ) -> list[Calendar]:
         return await Calendar.find(
             Calendar.user_id == PydanticObjectId(user_id),
@@ -216,7 +278,7 @@ class CalendarRepository:
         self,
         user_id: str,
         *,
-        session: AsyncClientSession | None = None,
+        session: AsyncIOMotorClientSession | None = None,
     ) -> int:
         """Count calendars for a user."""
         return await Calendar.find(
@@ -229,7 +291,7 @@ class CalendarRepository:
         calendar_id: str,
         user_id: str,
         *,
-        session: AsyncClientSession | None = None,
+        session: AsyncIOMotorClientSession | None = None,
     ) -> Calendar | None:
         return await Calendar.find_one(
             Calendar.id == PydanticObjectId(calendar_id),
@@ -242,7 +304,7 @@ class CalendarRepository:
         user_id: str,
         name: str,
         *,
-        session: AsyncClientSession | None = None,
+        session: AsyncIOMotorClientSession | None = None,
     ) -> Calendar | None:
         return await Calendar.find_one(
             Calendar.user_id == PydanticObjectId(user_id),
@@ -254,7 +316,7 @@ class CalendarRepository:
         self,
         user_id: str,
         *,
-        session: AsyncClientSession | None = None,
+        session: AsyncIOMotorClientSession | None = None,
     ) -> Calendar | None:
         return await Calendar.find_one(
             {
@@ -269,7 +331,7 @@ class CalendarRepository:
         user_id: str,
         excluded_calendar_id: str,
         *,
-        session: AsyncClientSession | None = None,
+        session: AsyncIOMotorClientSession | None = None,
     ) -> Calendar | None:
         return await Calendar.find_one(
             Calendar.user_id == PydanticObjectId(user_id),
@@ -284,7 +346,7 @@ class CalendarRepository:
         color: str | None = None,
         is_default: bool = False,
         *,
-        session: AsyncClientSession | None = None,
+        session: AsyncIOMotorClientSession | None = None,
     ) -> Calendar:
         calendar = Calendar(
             user_id=PydanticObjectId(user_id),
@@ -305,8 +367,8 @@ class CalendarRepository:
         self,
         calendar: Calendar,
         *,
-        session: AsyncClientSession | None = None,
-        **kwargs,
+        session: AsyncIOMotorClientSession | None = None,
+        **kwargs: Any,
     ) -> Calendar:
         for key, value in kwargs.items():
             if key in self._ALLOWED_UPDATE_FIELDS and value is not None:
@@ -321,7 +383,7 @@ class CalendarRepository:
         user_id: str,
         *,
         exclude_calendar_id: str | None = None,
-        session: AsyncClientSession | None = None,
+        session: AsyncIOMotorClientSession | None = None,
     ) -> None:
         query: dict[str, object] = {
             "user_id": PydanticObjectId(user_id),
@@ -339,7 +401,7 @@ class CalendarRepository:
         self,
         calendar: Calendar,
         *,
-        session: AsyncClientSession | None = None,
+        session: AsyncIOMotorClientSession | None = None,
     ) -> None:
         await calendar.delete(session=session)
 
@@ -349,7 +411,7 @@ class RecurringRuleRepository:
         self,
         user_id: str,
         *,
-        session: AsyncClientSession | None = None,
+        session: AsyncIOMotorClientSession | None = None,
     ) -> list[RecurringRule]:
         return await RecurringRule.find(
             RecurringRule.user_id == PydanticObjectId(user_id),
@@ -361,7 +423,7 @@ class RecurringRuleRepository:
         rule_id: str,
         user_id: str,
         *,
-        session: AsyncClientSession | None = None,
+        session: AsyncIOMotorClientSession | None = None,
     ) -> RecurringRule | None:
         return await RecurringRule.find_one(
             RecurringRule.id == PydanticObjectId(rule_id),
@@ -379,7 +441,7 @@ class RecurringRuleRepository:
         end_date: date | None = None,
         max_occurrences: int | None = None,
         *,
-        session: AsyncClientSession | None = None,
+        session: AsyncIOMotorClientSession | None = None,
     ) -> RecurringRule:
         rule = RecurringRule(
             user_id=PydanticObjectId(user_id),
@@ -397,7 +459,7 @@ class RecurringRuleRepository:
         self,
         rule: RecurringRule,
         *,
-        session: AsyncClientSession | None = None,
+        session: AsyncIOMotorClientSession | None = None,
     ) -> RecurringRule:
         """Increment occurrence count and update last generated date atomically."""
         now = utc_now()
@@ -418,7 +480,7 @@ class RecurringRuleRepository:
         self,
         rule: RecurringRule,
         *,
-        session: AsyncClientSession | None = None,
+        session: AsyncIOMotorClientSession | None = None,
     ) -> RecurringRule:
         rule.is_active = False
         await rule.save(session=session)
@@ -428,6 +490,6 @@ class RecurringRuleRepository:
         self,
         rule: RecurringRule,
         *,
-        session: AsyncClientSession | None = None,
+        session: AsyncIOMotorClientSession | None = None,
     ) -> None:
         await rule.delete(session=session)

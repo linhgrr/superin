@@ -220,9 +220,6 @@ class AppManifestSchema(BaseModel):
     agent_description: str = Field(
         description="Natural language description of agent capabilities, used by RootAgent for routing",
     )
-    tools: list[str] = Field(
-        description="List of LangChain/LangGraph tool names this app exposes",
-    )
     models: list[str] = Field(
         description="Beanie model class names (as strings) this app owns",
     )

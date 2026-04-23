@@ -51,7 +51,10 @@ export default function StoreFilters({
           />
           <input
             type="text"
-            placeholder="Search apps..."
+            name="store-search"
+            aria-label="Search apps"
+            autoComplete="off"
+            placeholder="Search apps…"
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             style={{
@@ -64,16 +67,20 @@ export default function StoreFilters({
 
         <div style={{ display: "flex", gap: "0.25rem" }}>
           <button
+            type="button"
             className={`btn btn-icon ${viewMode === "grid" ? "btn-secondary" : "btn-ghost"}`}
             onClick={() => onViewModeChange("grid")}
             title="Grid view"
+            aria-label="Grid view"
           >
             <DynamicIcon name="Grid3X3" size={18} />
           </button>
           <button
+            type="button"
             className={`btn btn-icon ${viewMode === "list" ? "btn-secondary" : "btn-ghost"}`}
             onClick={() => onViewModeChange("list")}
             title="List view"
+            aria-label="List view"
           >
             <DynamicIcon name="List" size={18} />
           </button>
@@ -89,6 +96,7 @@ export default function StoreFilters({
           return (
             <button
               key={catId}
+              type="button"
               onClick={() => onFilterChange(catId)}
               className={`badge ${isSelected ? "badge-primary" : "badge-neutral"}`}
               style={{
@@ -98,7 +106,7 @@ export default function StoreFilters({
                 display: "flex",
                 alignItems: "center",
                 gap: "0.375rem",
-                transition: "all 0.2s ease",
+                transition: "background-color 0.2s ease, color 0.2s ease, transform 0.2s ease",
                 transform: isSelected ? "scale(1.02)" : "scale(1)",
               }}
             >

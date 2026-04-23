@@ -1,6 +1,9 @@
 from datetime import UTC, datetime
 from types import SimpleNamespace
+from typing import Any
 from zoneinfo import ZoneInfo
+
+import pytest
 
 from apps.calendar.routes.widgets import get_month_view_widget_data
 from apps.calendar.schemas import MonthViewWidgetConfig
@@ -23,18 +26,20 @@ class _FixedTimezoneContext:
         return dt.astimezone(self.tz)
 
 
-async def test_month_view_widget_groups_events_by_user_local_day(monkeypatch) -> None:
-    async def fake_get(user_id: str):
+async def test_month_view_widget_groups_events_by_user_local_day(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_get(user_id: str) -> object:
         assert user_id == "user-1"
         return SimpleNamespace(settings={"timezone": "Asia/Ho_Chi_Minh"})
 
-    async def fake_list_events(*_args, **_kwargs):
+    async def fake_list_events(*_args: object, **_kwargs: object) -> list[dict[str, str]]:
         return [
             {"title": "Morning sync", "type": "event", "start_datetime": "2026-04-01T02:00:00Z"},
             {"title": "Late call", "type": "event", "start_datetime": "2026-04-01T18:30:00Z"},
         ]
 
-    async def fake_list_calendars(user_id: str):
+    async def fake_list_calendars(user_id: str) -> list[Any]:
         assert user_id == "user-1"
         return []
 

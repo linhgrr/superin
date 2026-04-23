@@ -106,6 +106,20 @@ class FinanceSummaryResponse(BaseModel):
     wallet_count: int
 
 
+class FinanceActivitySummaryResponse(BaseModel):
+    start_datetime: datetime
+    end_datetime: datetime
+    recorded_transaction_count: int
+    created_wallet_count: int
+    created_category_count: int
+    income_total: float
+    expense_total: float
+    recorded_transactions: list[FinanceTransactionRead] = Field(default_factory=list)
+    created_wallets: list[FinanceWalletRead] = Field(default_factory=list)
+    created_categories: list[FinanceCategoryRead] = Field(default_factory=list)
+    unsupported_activity: list[str] = Field(default_factory=list)
+
+
 class FinanceBudgetCategoryStatus(BaseModel):
     category_id: str
     category_name: str

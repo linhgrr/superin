@@ -107,7 +107,6 @@ example_manifest = AppManifestSchema(
     color="oklch(0.65 0.21 280)",
     widgets=[example_widget],
     agent_description="Handles example-related user requests",
-    tools=["example_list_items", "example_create_item"],
     models=["ExampleItem"],
     category="other",
 )
@@ -156,11 +155,10 @@ Rules:
 - prompts belong in `prompts.py`, not inline in `agent.py`
 - child agents are invoked by the root agent through `delegate(question, thread_id)`
 - `delegate(...)` should return a structured result envelope, not only plain text
-- every LLM-facing app tool must wrap its domain execution with `safe_tool_call()`
-- app tools should convert domain failures into structured `{ ok, data/error }` results
+- LLM-facing app tools should return raw domain objects and raise user-facing errors normally; child-agent tool middleware converts them into structured `{ ok, data/error }` results for the runtime transcript
 - app-specific tools must enforce user scoping
 - public tool names must be pinned explicitly with `@tool("...")`; do not rely on function-name inference
-- startup verification fails if an app tool does not use `safe_tool_call()`
+- tool context should come from `ToolRuntime[AppAgentContext]`, not per-tool `RunnableConfig` plumbing
 
 ### Registration
 
@@ -233,17 +231,17 @@ The chat system is root-orchestrated:
 
 ```text
 RootAgent
-  -> ask_example(question)
+  -> dispatch worker for example
   -> ExampleAgent child graph
   -> example_* domain tools
 ```
 
 Rules:
 - frontend does not send server tool schemas
-- backend decides which `ask_{app_id}` tools exist based on installed apps
-- frontend should only see root-level tool events such as `ask_finance`
+- backend decides which child agents can be dispatched based on installed apps
+- frontend should only see root assistant text and final thread updates
 - child-agent internal tool calls must stay hidden from the UI
-- root-level `ask_{app_id}` results should be structured so the root agent can tell `success`, `partial`, and `failed`
+- child-agent results must be structured so the root graph can tell `success`, `partial`, and `failed`
 
 See:
 - [ASSISTANT_UI_INTEGRATION.md](/home/linh/Downloads/superin/docs/ASSISTANT_UI_INTEGRATION.md)
@@ -302,7 +300,7 @@ Behavior:
    - sidebar install state
    - dashboard widget visibility
    - full app page
-   - chat delegation through `ask_{app_id}`
+   - chat delegation through the root worker-dispatch path
 
 ## Checklist
 

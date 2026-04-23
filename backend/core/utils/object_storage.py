@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import socket
 from functools import lru_cache
+from typing import Any
 from urllib.parse import quote, urlparse
 
 import boto3
@@ -107,7 +108,7 @@ def build_public_object_url(*, bucket: str, object_key: str) -> str:
     return f"{get_public_base_url()}/{bucket}/{encoded_key}"
 
 
-def get_s3_client():
+def get_s3_client() -> Any:
     """Return a cached S3 client singleton.
 
     H5: Reuses the boto3 connection pool across requests.
@@ -134,7 +135,7 @@ def _get_s3_client_cached(
     aws_access_key_id: str,
     aws_secret_access_key: str,
     addressing_style: str,
-):
+) -> Any:
     return boto3.client(
         "s3",
         endpoint_url=endpoint_url,

@@ -4,7 +4,7 @@
  * Tabs: Login / Register with refined animations.
  */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { ApiError } from "@/api/axios";
@@ -62,12 +62,36 @@ export default function LoginPage() {
   const [errors, setErrors] = useState<FieldErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const emailInputRef = useRef<HTMLInputElement>(null);
+  const passwordInputRef = useRef<HTMLInputElement>(null);
+  const globalErrorRef = useRef<HTMLDivElement>(null);
 
   function setField(field: keyof FormState) {
     return (value: string) => {
       setForm((f) => ({ ...f, [field]: value }));
       setErrors((e) => ({ ...e, [field]: undefined, global: undefined }));
     };
+  }
+
+  useEffect(() => {
+    if (errors.global) {
+      globalErrorRef.current?.focus();
+    }
+  }, [errors.global]);
+
+  function focusFirstInvalidField(nextErrors: FieldErrors) {
+    if (nextErrors.name && mode === "register") {
+      nameInputRef.current?.focus();
+      return;
+    }
+    if (nextErrors.email) {
+      emailInputRef.current?.focus();
+      return;
+    }
+    if (nextErrors.password) {
+      passwordInputRef.current?.focus();
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -78,6 +102,7 @@ export default function LoginPage() {
         : validateRegisterForm(form);
     if (Object.keys(errs).length > 0) {
       setErrors(errs);
+      focusFirstInvalidField(errs);
       return;
     }
 
@@ -112,8 +137,8 @@ export default function LoginPage() {
         {/* Brand */}
         <div className="login-brand">
           <div className="login-brand-icon" style={{ background: "transparent", boxShadow: "none" }}>
-            <img src="/branding/logo.png" alt="Logo" className="theme-logo-light" style={{ width: "36px", height: "auto" }} />
-            <img src="/branding/logo-white.png" alt="Logo" className="theme-logo-dark" style={{ width: "36px", height: "auto" }} />
+            <img src="/branding/logo.png" alt="Logo" width="36" height="36" className="theme-logo-light" style={{ width: "36px", height: "auto" }} />
+            <img src="/branding/logo-white.png" alt="Logo" width="36" height="36" className="theme-logo-dark" style={{ width: "36px", height: "auto" }} />
           </div>
           <h1 className="login-brand-title">{APP_NAME}</h1>
           <p className="login-brand-subtitle">
@@ -140,7 +165,12 @@ export default function LoginPage() {
 
         {/* Global error */}
         {errors.global && (
-          <div className="login-global-error animate-fade-in">
+          <div
+            ref={globalErrorRef}
+            className="login-global-error animate-fade-in"
+            aria-live="polite"
+            tabIndex={-1}
+          >
             {errors.global}
           </div>
         )}
@@ -150,42 +180,58 @@ export default function LoginPage() {
           <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
             {mode === "register" && (
               <div className="login-form-group">
-                <label className="login-label">Full Name</label>
+                <label className="login-label" htmlFor="register-name">Full Name</label>
                 <input
+                  id="register-name"
                   type="text"
+                  name="name"
+                  ref={nameInputRef}
                   value={form.name ?? ""}
                   onChange={(e) => setField("name")(e.target.value)}
-                  placeholder="John Doe"
+                  placeholder="e.g. John Doe…"
                   autoComplete="name"
                   className="login-input"
+                  aria-describedby={errors.name ? "register-name-error" : undefined}
+                  aria-invalid={errors.name ? "true" : "false"}
                 />
-                {errors.name && <span className="login-error">{errors.name}</span>}
+                {errors.name && <span id="register-name-error" className="login-error">{errors.name}</span>}
               </div>
             )}
 
             <div className="login-form-group">
-              <label className="login-label">Email Address</label>
+              <label className="login-label" htmlFor="auth-email">Email Address</label>
               <input
+                id="auth-email"
                 type="email"
+                name="email"
+                ref={emailInputRef}
                 value={form.email}
                 onChange={(e) => setField("email")(e.target.value)}
-                placeholder="you@example.com"
+                placeholder="e.g. you@example.com…"
                 autoComplete="email"
+                spellCheck={false}
                 className="login-input"
+                aria-describedby={errors.email ? "auth-email-error" : undefined}
+                aria-invalid={errors.email ? "true" : "false"}
               />
-              {errors.email && <span className="login-error">{errors.email}</span>}
+              {errors.email && <span id="auth-email-error" className="login-error">{errors.email}</span>}
             </div>
 
             <div className="login-form-group">
-              <label className="login-label">Password</label>
+              <label className="login-label" htmlFor="auth-password">Password</label>
               <div className="login-password-wrap">
                 <input
+                  id="auth-password"
                   type={showPassword ? "text" : "password"}
+                  name="password"
+                  ref={passwordInputRef}
                   value={form.password}
                   onChange={(e) => setField("password")(e.target.value)}
-                  placeholder={mode === "register" ? "At least 8 characters" : "Enter your password"}
+                  placeholder={mode === "register" ? "At least 8 characters…" : "Enter your password…"}
                   autoComplete={mode === "login" ? "current-password" : "new-password"}
                   className="login-input login-input-password"
+                  aria-describedby={errors.password ? "auth-password-error" : undefined}
+                  aria-invalid={errors.password ? "true" : "false"}
                 />
                 <button
                   type="button"
@@ -196,7 +242,7 @@ export default function LoginPage() {
                   {showPassword ? <DynamicIcon name="EyeOff" size={18} /> : <DynamicIcon name="Eye" size={18} />}
                 </button>
               </div>
-              {errors.password && <span className="login-error">{errors.password}</span>}
+              {errors.password && <span id="auth-password-error" className="login-error">{errors.password}</span>}
             </div>
 
             <button

@@ -142,9 +142,6 @@ class AppManifestSchema(BaseModel):
     agent_description: str = Field(
         description="Natural language description of agent capabilities, used by RootAgent for routing"
     )
-    tools: list[str] = Field(
-        description="List of LangChain/LangGraph tool names this app exposes"
-    )
     models: list[str] = Field(
         description="Beanie model class names (as strings) this app owns, e.g. ['Wallet', 'Transaction']"
     )
@@ -168,11 +165,6 @@ class AppManifestSchema(BaseModel):
                 "color": "oklch(0.72 0.19 145)",
                 "widgets": [...],
                 "agent_description": "Helps users track expenses, manage budgets, and analyze spending patterns.",
-                "tools": [
-                    "finance_add_transaction",
-                    "finance_query_spending",
-                    "finance_analyze_budget",
-                ],
                 "models": ["Wallet", "Transaction", "Category"],
             }
         }
@@ -352,7 +344,6 @@ export interface AppManifestSchema {
   color: string;
   widgets: WidgetManifestSchema[];
   agent_description: string;
-  tools: string[];
   models: string[];
   category: string;
   tags: string[];
@@ -542,11 +533,6 @@ finance_manifest = AppManifestSchema(
     color="oklch(0.72 0.19 145)",
     widgets=[wallet_widget, budget_widget, recent_tx_widget],
     agent_description="...",
-    tools=[
-        "finance_add_transaction",
-        "finance_query_spending",
-        "finance_analyze_budget",
-    ],
     models=["Wallet", "Transaction", "Category"],
 )
 ```

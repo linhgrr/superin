@@ -2,7 +2,7 @@
 
 import asyncio
 from collections.abc import Callable
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from beanie import PydanticObjectId
 from beanie.operators import In
@@ -18,6 +18,7 @@ from shared.preference_utils import preference_to_schema
 from shared.schemas import (
     AppRuntimeEntry,
     WidgetDataConfigSchema,
+    WidgetManifestSchema,
     WidgetPreferenceSchema,
     WorkspaceBootstrap,
 )
@@ -40,7 +41,7 @@ async def get_installed_app_id_set(user_id: str, request: Request) -> set[str]:
     cache_key = "_installed_app_ids"
     cached = getattr(request.state, cache_key, None)
     if cached is not None:
-        return cached
+        return cast(set[str], cached)
 
     installed_app_ids = set(await list_installed_app_ids(user_id))
     setattr(request.state, cache_key, installed_app_ids)
@@ -102,7 +103,7 @@ async def build_workspace_bootstrap(user_id: str) -> WorkspaceBootstrap:
     ).to_list()
     widget_data_config_schemas = [
         WidgetDataConfigSchema(
-            id=str(doc.id),
+            _id=str(doc.id),
             user_id=str(doc.user_id),
             widget_id=doc.widget_id,
             config=doc.config,
@@ -124,7 +125,7 @@ async def build_workspace_bootstrap(user_id: str) -> WorkspaceBootstrap:
     )
 
 
-def _is_widget_enabled(widget, preference: WidgetPreferenceSchema | None) -> bool:
+def _is_widget_enabled(widget: WidgetManifestSchema, preference: WidgetPreferenceSchema | None) -> bool:
     return preference.enabled if preference is not None else not widget.requires_auth
 
 
@@ -154,7 +155,7 @@ async def build_initial_widget_data(
             config_by_widget_id.get(widget_id),
         )
         try:
-            return widget_id, await handler(user_id, config)
+            return widget_id, await handler(user_id, cast(Any, config))
         except Exception:
             return None
 

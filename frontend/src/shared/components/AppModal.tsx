@@ -1,3 +1,4 @@
+import { useId } from "react";
 import type { CSSProperties, ReactNode } from "react";
 
 import { DynamicIcon } from "@/lib/icon-resolver";
@@ -23,6 +24,9 @@ export function AppModal({
   onClose,
   title,
 }: AppModalProps) {
+  const titleId = useId();
+  const descriptionId = useId();
+
   function handleClose() {
     if (!closeDisabled) {
       onClose();
@@ -42,13 +46,27 @@ export function AppModal({
         zIndex: 1000,
         padding: "1.5rem",
       }}
-      onClick={(event) => {
-        if (closeOnBackdropClick && event.target === event.currentTarget) {
-          handleClose();
-        }
-      }}
     >
+      {closeOnBackdropClick ? (
+        <button
+          type="button"
+          aria-label="Close dialog"
+          onClick={handleClose}
+          style={{
+            position: "absolute",
+            inset: 0,
+            border: "none",
+            background: "transparent",
+            cursor: closeDisabled ? "default" : "pointer",
+          }}
+          disabled={closeDisabled}
+        />
+      ) : null}
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={description ? descriptionId : undefined}
         style={{
           width: "100%",
           maxWidth,
@@ -59,9 +77,10 @@ export function AppModal({
           borderRadius: "12px",
           boxShadow: "rgba(0, 0, 0, 0.45) 0px 18px 48px",
           padding: "1.5rem",
+          position: "relative",
+          zIndex: 1,
           ...contentStyle,
         }}
-        onClick={(event) => event.stopPropagation()}
       >
         <div
           style={{
@@ -74,6 +93,7 @@ export function AppModal({
         >
           <div style={{ minWidth: 0 }}>
             <h2
+              id={titleId}
               style={{
                 margin: 0,
                 fontSize: "1.125rem",
@@ -85,6 +105,7 @@ export function AppModal({
             </h2>
             {description ? (
               <p
+                id={descriptionId}
                 style={{
                   margin: "0.375rem 0 0",
                   fontSize: "0.875rem",

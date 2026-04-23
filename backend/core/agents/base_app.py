@@ -1,85 +1,50 @@
-"""Reusable base class for installed app child agents."""
+"""Reusable base class for tool-using child agents under the root graph."""
 
 from __future__ import annotations
 
 import asyncio
-import json
-from typing import Any, Literal
+import time
+from typing import Any
 
-from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
+from langchain.agents import create_agent
+from langchain.agents.middleware import ModelRequest, dynamic_prompt
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import BaseTool
 from langgraph.errors import GraphRecursionError
-from langgraph.graph.state import CompiledStateGraph
-from langgraph.prebuilt import create_react_agent
 from loguru import logger
 
+from core.agents.app_state import AppAgentResponse, AppAgentState
+from core.agents.root.schemas import DelegationStatus, ToolResult, WorkerOutcome
+from core.agents.runtime_context import AppAgentContext
+from core.agents.tool_middleware import StructuredToolResultMiddleware
 from core.config import settings
 from core.constants import AGENT_RECURSION_LIMIT
-from core.models import User
-from core.utils.timezone import get_user_timezone_context
+from core.db import get_store
+from core.utils.timezone import get_local_now_for_timezone
 from shared.llm import get_llm
-
-# Type definitions for consistent status/error codes
-DelegationStatus = Literal["success", "no_action", "failed", "partial", "awaiting_confirmation"]
-ToolErrorCode = Literal[
-    "domain_error",
-    "invalid_request",
-    "internal_error",
-    "too_many_tool_calls",
-]
-
-
-def _content_to_text(content: Any) -> str:
-    if isinstance(content, str):
-        return content.strip()
-
-    if isinstance(content, list):
-        text_parts: list[str] = []
-        for part in content:
-            if isinstance(part, str):
-                text_parts.append(part)
-            elif isinstance(part, dict):
-                if part.get("type") == "text":
-                    text_parts.append(str(part.get("text", "")))
-                elif "text" in part:
-                    text_parts.append(str(part["text"]))
-        return "\n".join(part for part in text_parts if part).strip()
-
-    return str(content).strip()
-
-
-def _parse_tool_message_content(content: Any) -> Any:
-    if isinstance(content, str):
-        try:
-            return json.loads(content)
-        except Exception:
-            return content
-    return content
 
 
 class BaseAppAgent:
-    """Shared implementation for child app agents invoked by the root agent.
+    """Shared implementation for child agents invoked by the root graph.
 
-    Safety features:
-    - Recursion limit (configurable) prevents infinite loops
-    - Tool call tracking detects runaway execution
-    - All tool results are sanitized before returning to LLM
+    Covers both domain app agents and the platform agent.
     """
 
     app_id: str
 
     def __init__(self) -> None:
-        self._graph: CompiledStateGraph | None = None
+        self._graph: Any = None
 
     @property
-    def graph(self) -> CompiledStateGraph:
+    def graph(self) -> Any:
         """Return or build the compiled child agent graph.
 
-        H1 DESIGN NOTE: Child agents intentionally have NO checkpointer or store.
+        H1 DESIGN NOTE: Child agents intentionally have NO checkpointer.
         - They are stateless per-delegation: each `delegate()` call passes a fresh
           single-message input, so there is no multi-turn state to persist.
         - Canonical cross-turn persistence is handled by the root chat layer.
+        - A shared store is attached so tools can use ``ToolRuntime.store`` for
+          long-term memory or cross-thread lookups without reaching for globals.
         - This graph is a SINGLETON shared across all users (no user data stored here).
 
         WARNING: If you add a checkpointer here in the future, you MUST also add
@@ -87,10 +52,17 @@ class BaseAppAgent:
         between users. See RootAgent.astream() for the correct pattern.
         """
         if self._graph is None:
-            self._graph = create_react_agent(
+            self._graph = create_agent(
                 model=get_llm(),
                 tools=self.tools(),
-                prompt=self.build_prompt(),
+                middleware=[
+                    self._make_dynamic_prompt_middleware(),
+                    StructuredToolResultMiddleware(),
+                ],
+                response_format=AppAgentResponse,
+                state_schema=AppAgentState,
+                context_schema=AppAgentContext,
+                store=get_store(),
                 name=f"{self.app_id}_agent",
             )
         return self._graph
@@ -101,101 +73,204 @@ class BaseAppAgent:
     def build_prompt(self) -> str:
         raise NotImplementedError
 
+    def _make_dynamic_prompt_middleware(self) -> Any:
+        """Inject execution context into the system prompt for each child-agent run."""
+
+        @dynamic_prompt
+        def prompt(request: ModelRequest[AppAgentContext]) -> str:
+            user_tz, now_local = get_local_now_for_timezone(request.runtime.context.user_tz)
+            return (
+                f"{self.build_prompt()}\n\n"
+                "<timezone_rules>\n"
+                "- Interpret all relative or ambiguous time expressions such as 'today', 'tomorrow', 'this week', '9am', or 'next Monday' in the user's timezone.\n"
+                "- When a tool expects `local_date`, send `YYYY-MM-DD` in the user's local calendar.\n"
+                "- When a tool expects `local_datetime`, send a local wall-clock datetime without timezone offset.\n"
+                "- When a tool expects `instant`, send an offset-aware ISO datetime.\n"
+                "- Do not assume naive datetimes are UTC.\n"
+                "</timezone_rules>\n\n"
+                "<response_contract>\n"
+                "- Always finish with a concise, user-facing summary of what happened.\n"
+                "- If no action was needed, say that clearly in the final response.\n"
+                "- The final response must be non-empty.\n"
+                "- Set `followup_useful=true` only when another round against this same app is likely to reveal materially new evidence.\n"
+                "- Set `followup_hint` only when `followup_useful=true`, and make it narrower than the current attempt.\n"
+                "- If the current tools cannot fully answer because they only expose current state or lack audit/history detail, set `capability_limit` to a short label like `no_history_support` and keep `followup_useful=false`.\n"
+                "</response_contract>\n\n"
+                "<efficiency_rules>\n"
+                "- Prefer the smallest number of tool calls needed to answer correctly.\n"
+                "- For recap, digest, or summary requests, stop once you have enough evidence to answer; do not explore exhaustively.\n"
+                "- If the available tools expose current state but not a true history or audit log, say that explicitly instead of trying to infer created, updated, or deleted changes.\n"
+                "- Never repeat the same tool call with materially identical arguments after it already succeeded; use the previous result or change strategy.\n"
+                "</efficiency_rules>\n\n"
+                "Execution context:\n"
+                f"- User timezone: {user_tz}\n"
+                f"- Current local datetime: {now_local.isoformat()}\n"
+                f"- User ID: {request.runtime.context.user_id}\n"
+                f"- Thread ID: {request.runtime.context.thread_id}\n"
+            )
+
+        return prompt
 
     async def delegate(
         self,
-        question: str,
+        subtask: str,
         thread_id: str,
         user_id: str,
-        config: RunnableConfig | None = None,
-        **_kwargs: Any,
-    ) -> dict[str, Any]:
-        if not user_id:
-            raise RuntimeError(f"{self.app_id} agent invoked without user context")
-        logger.info("BaseAppAgent.delegate START  app={}  user={}  thread={}  question={}", self.app_id, user_id, thread_id, question[:80])
+        config: RunnableConfig,
+        **_kwargs: object,
+    ) -> WorkerOutcome:
+        """Run the child agent graph for a single domain-specific subtask.
 
-        child_thread_id = f"{thread_id}:{self.app_id}"
-
-        # Inject current date/time so child agent knows "today" in user's timezone
-        user_obj = await User.find_one(User.id == user_id) if user_id else None
-        tz_ctx = get_user_timezone_context(user_obj)
-        date_str, time_str = tz_ctx.get_date_time_tuple()
-        prefixed_question = (
-            f"Current date: {date_str}, current time: {time_str}.\n\n{question}"
+        Context propagation:
+            user_id / thread_id are injected into a fresh ``RunnableConfig`` and
+            passed into ``graph.ainvoke``. The typed ``context_schema`` then
+            becomes ``ToolRuntime.context`` for downstream tools, so tools read
+            execution context from ``runtime.context`` instead of per-tool config
+            plumbing.
+        """
+        logger.info(
+            "BaseAppAgent.delegate START  app={}  user={}  thread={}  subtask={}",
+            self.app_id,
+            user_id,
+            thread_id,
+            subtask[:80],
         )
 
+        # Child thread ids are namespaced under the parent thread id to keep
+        # sub-agent checkpoints distinct while preserving one frontend-owned
+        # root thread identity end-to-end.
+        child_thread_id = f"{thread_id}:{self.app_id}"
+
+        child_config = self._build_child_config(config, user_id, child_thread_id)
         final_status = "failed"
+        started_at = time.perf_counter()
+        child_timeout_seconds = settings.child_agent_timeout_seconds
 
         try:
-            result = await asyncio.wait_for(
+            result: AppAgentState = await asyncio.wait_for(
                 self.graph.ainvoke(
-                    {"messages": [{"role": "user", "content": prefixed_question}]},
-                    config={
-                        **(config or {}),
-                        "configurable": {
-                            **((config or {}).get("configurable") or {}),
-                            "user_id": user_id,
-                            "thread_id": child_thread_id,
-                        },
-                        "recursion_limit": AGENT_RECURSION_LIMIT,
-                    },
+                    {"messages": [{"role": "user", "content": subtask}]},
+                    config=child_config,
+                    context=self._build_agent_context(child_config),
                 ),
-                timeout=settings.llm_request_timeout_seconds,
+                timeout=child_timeout_seconds,
             )
-            final_status = str(result.get("status", "success"))
-            messages = result.get("messages", [])
-            return self._build_delegate_result(question, messages)
+            delegate_result = self._build_delegate_result(
+                subtask=subtask,
+                response=self._require_structured_response(result),
+                tool_results=result.get("tool_results", []),
+            )
+            final_status = delegate_result["status"]
+            return delegate_result
         except TimeoutError:
             logger.error(
-                "{} child agent timed out after {}s",
+                "{} child agent timed out after {}s while completing delegated task",
                 self.app_id,
-                settings.llm_request_timeout_seconds,
+                child_timeout_seconds,
             )
             return self._failed_result(
-                question,
-                f"The {self.app_id} assistant timed out while waiting for the language model. "
+                subtask,
+                f"The {self.app_id} assistant timed out while completing that request. "
                 "Please try again.",
+                retryable=True,
+                failure_kind="timeout",
             )
         except GraphRecursionError:
             logger.warning(
-                "%s child agent exceeded recursion limit (%d)",
+                "{} child agent exceeded recursion limit ({})",
                 self.app_id,
                 AGENT_RECURSION_LIMIT,
             )
             return self._failed_result(
-                question,
+                subtask,
                 f"The {self.app_id} assistant needed too many steps to complete this request. "
                 "Please try a simpler query.",
+                retryable=True,
+                failure_kind="recursion_limit",
             )
         except (AttributeError, TypeError, ValueError) as exc:
-            # Programming / domain errors — surface to caller with a clear message
-            logger.error("%s child agent encountered an error: %s", self.app_id, exc)
+            logger.error("{} child agent encountered an error: {}", self.app_id, exc)
             return self._failed_result(
-                question,
+                subtask,
                 f"The {self.app_id} assistant hit an internal error while handling that request. "
                 "Please try again.",
+                retryable=False,
+                failure_kind="internal_error",
             )
         finally:
-            logger.info("BaseAppAgent.delegate END  app={}  user={}  status={}", self.app_id, user_id, final_status)
+            logger.info(
+                "BaseAppAgent.delegate END  app={}  user={}  status={}  elapsed={:.2f}s  timeout={:.2f}s",
+                self.app_id,
+                user_id,
+                final_status,
+                time.perf_counter() - started_at,
+                child_timeout_seconds,
+            )
 
-    def _failed_result(self, question: str, message: str) -> dict[str, Any]:
+    def _build_child_config(
+        self,
+        parent_config: RunnableConfig,
+        user_id: str,
+        child_thread_id: str,
+    ) -> RunnableConfig:
+        """Merge parent config with child-scoped identifiers.
+
+        Produces a new RunnableConfig whose ``configurable`` section carries
+        the parent config's values, plus the child-scoped ``user_id`` and
+        ``thread_id`` that every downstream tool reads.
+        """
+        parent_configurable = dict(parent_config.get("configurable") or {})
+
+        configurable = {
+            **parent_configurable,
+            "user_id": user_id,
+            "thread_id": child_thread_id,
+        }
+        return {
+            "configurable": configurable,
+            "recursion_limit": AGENT_RECURSION_LIMIT,
+        }
+
+    def _build_agent_context(self, config: RunnableConfig) -> AppAgentContext:
+        configurable = config.get("configurable") or {}
+        return AppAgentContext(
+            user_id=str(configurable["user_id"]),
+            thread_id=str(configurable["thread_id"]),
+            user_tz=str(configurable.get("user_tz", "UTC")),
+        )
+
+    def _failed_result(
+        self,
+        subtask: str,
+        message: str,
+        *,
+        retryable: bool,
+        failure_kind: str,
+    ) -> WorkerOutcome:
         """Build a standardized failure result dict."""
         return {
             "app": self.app_id,
             "status": "failed",
             "ok": False,
             "message": message,
-            "question": question,
+            "subtask": subtask,
             "tool_results": [],
+            "error": message,
+            "retryable": retryable,
+            "failure_kind": failure_kind,
+            "followup_useful": retryable,
+            "followup_hint": "",
+            "capability_limit": "",
         }
 
     def _build_delegate_result(
         self,
-        question: str,
-        messages: list[BaseMessage],
-    ) -> dict[str, Any]:
-        tool_results = self._extract_tool_results(messages)
-        reply = self._extract_reply(messages)
+        *,
+        subtask: str,
+        response: AppAgentResponse,
+        tool_results: list[ToolResult],
+    ) -> WorkerOutcome:
+        reply = response.message.strip()
         status = self._derive_status(tool_results, reply)
         ok = status in {"success", "no_action"}
 
@@ -203,58 +278,26 @@ class BaseAppAgent:
             "app": self.app_id,
             "status": status,
             "ok": ok,
-            "message": reply or self._summarize_results(tool_results),
-            "question": question,
+            "message": reply,
+            "subtask": subtask,
             "tool_results": tool_results,
+            "error": "",
+            "followup_useful": response.followup_useful,
+            "followup_hint": response.followup_hint.strip(),
+            "capability_limit": response.capability_limit.strip(),
         }
 
-    def _extract_reply(self, messages: list[BaseMessage]) -> str:
-        for message in reversed(messages):
-            if isinstance(message, AIMessage):
-                text = _content_to_text(message.content)
-                if text:
-                    return text
-
-        if messages:
-            return _content_to_text(getattr(messages[-1], "content", ""))
-
-        return ""
-
-    def _extract_tool_results(self, messages: list[BaseMessage]) -> list[dict[str, Any]]:
-        """Extract tool results from messages.
-
-        Note: Manual tool call counting (MAX_TOOL_CALLS_PER_DELEGATION) has been
-        removed — recursion_limit + GraphRecursionError handling is sufficient.
-        """
-        results: list[dict[str, Any]] = []
-
-        for message in messages:
-            if not isinstance(message, ToolMessage):
-                continue
-
-            payload = _parse_tool_message_content(message.content)
-            if isinstance(payload, dict) and "ok" in payload:
-                results.append({
-                    "tool_name": message.name or "unknown",
-                    "tool_call_id": message.tool_call_id,
-                    "ok": bool(payload.get("ok")),
-                    "data": payload.get("data"),
-                    "error": payload.get("error"),
-                })
-            else:
-                results.append({
-                    "tool_name": message.name or "unknown",
-                    "tool_call_id": message.tool_call_id,
-                    "ok": True,
-                    "data": payload,
-                    "error": None,
-                })
-
-        return results
+    def _require_structured_response(self, state: AppAgentState) -> AppAgentResponse:
+        response = state.get("structured_response")
+        if not isinstance(response, AppAgentResponse):
+            raise ValueError(
+                f"{self.app_id} child agent returned without a valid structured_response.",
+            )
+        return response
 
     def _derive_status(
         self,
-        tool_results: list[dict[str, Any]],
+        tool_results: list[ToolResult],
         reply: str,
     ) -> DelegationStatus:
         if not tool_results:
@@ -268,15 +311,3 @@ class BaseAppAgent:
         if failures:
             return "failed"
         return "success"
-
-    def _summarize_results(self, tool_results: list[dict[str, Any]]) -> str:
-        if not tool_results:
-            return ""
-
-        failures = [result for result in tool_results if not result.get("ok")]
-        if failures:
-            first_error = failures[0].get("error") or {}
-            message = first_error.get("message") if isinstance(first_error, dict) else str(first_error)
-            return message or f"The {self.app_id} assistant could not complete that request."
-
-        return f"The {self.app_id} assistant completed the requested action."

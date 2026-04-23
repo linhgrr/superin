@@ -8,6 +8,8 @@ Provides protection against common web vulnerabilities:
 - Referrer control
 """
 
+from collections.abc import Awaitable, Callable
+
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
@@ -59,7 +61,11 @@ HSTS_HEADER = "max-age=31536000; includeSubDomains; preload"
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """Add security headers to all responses."""
 
-    async def dispatch(self, request: Request, call_next):
+    async def dispatch(
+        self,
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
+    ) -> Response:
         response: Response = await call_next(request)
 
         # Add standard security headers

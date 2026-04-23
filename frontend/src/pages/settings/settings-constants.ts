@@ -54,28 +54,22 @@ export const TIMEZONES = [
 
 export const KEYBOARD_SHORTCUTS = [
   {
-    category: "Navigation",
+    category: "Global",
     shortcuts: [
       { key: "G D", description: "Go to Dashboard" },
       { key: "G S", description: "Go to App Store" },
-      { key: "↑ ↓", description: "Navigate items" },
-      { key: "↵", description: "Select / Open" },
-    ],
-  },
-  {
-    category: "Actions",
-    shortcuts: [
-      { key: "⌘ K / Ctrl K", description: "Open Command Palette" },
-      { key: "A W", description: "Add Widget" },
+      { key: "A W", description: "Open Add Widget from anywhere" },
       { key: "T T", description: "Toggle Theme" },
+      { key: "⌘ K / Ctrl K", description: "Open Command Palette" },
       { key: "?", description: "Show Keyboard Shortcuts" },
     ],
   },
   {
-    category: "System",
+    category: "Command Palette",
     shortcuts: [
-      { key: "ESC", description: "Close modal / Cancel" },
-      { key: "⌘ Enter / Ctrl ↵", description: "Save / Confirm" },
+      { key: "↑ ↓", description: "Navigate command results" },
+      { key: "↵", description: "Run selected command" },
+      { key: "ESC", description: "Close command palette or modal" },
     ],
   },
 ] as const;

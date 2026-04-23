@@ -55,7 +55,7 @@ function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <div style={TOAST_CONTAINER_STYLE}>
+      <div style={TOAST_CONTAINER_STYLE} aria-live="polite" aria-atomic="false">
         {toasts.map((toast, index) => (
           <div key={toast.id} style={{ pointerEvents: "auto" }}>
             <ToastItem toast={toast} onDismiss={dismiss} index={index} />

@@ -1,7 +1,7 @@
 """Finance plugin LangGraph agent."""
 
 from langchain_core.tools import BaseTool
-from pymongo.asynchronous.client_session import AsyncClientSession
+from motor.motor_asyncio import AsyncIOMotorClientSession
 
 from apps.finance.prompts import get_finance_prompt
 from apps.finance.service import finance_service
@@ -23,6 +23,7 @@ from apps.finance.tools import (
     finance_list_transactions,
     finance_list_wallets,
     finance_search_transactions,
+    finance_summarize_activity,
     finance_transfer,
     finance_update_category,
     finance_update_transaction,
@@ -51,6 +52,7 @@ class FinanceAgent(BaseAppAgent):
             finance_list_transactions,
             finance_get_transaction,
             finance_search_transactions,
+            finance_summarize_activity,
             finance_add_transaction,
             finance_update_transaction,
             finance_delete_transaction,
@@ -64,8 +66,8 @@ class FinanceAgent(BaseAppAgent):
     def build_prompt(self) -> str:
         return get_finance_prompt()
 
-    async def on_install(self, user_id: str, session: AsyncClientSession | None = None) -> None:
+    async def on_install(self, user_id: str, session: AsyncIOMotorClientSession | None = None) -> None:
         await finance_service.on_install(user_id, session=session)
 
-    async def on_uninstall(self, user_id: str, session: AsyncClientSession | None = None) -> None:
+    async def on_uninstall(self, user_id: str, session: AsyncIOMotorClientSession | None = None) -> None:
         await finance_service.on_uninstall(user_id, session=session)

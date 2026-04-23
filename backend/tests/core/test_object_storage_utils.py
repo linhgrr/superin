@@ -1,9 +1,12 @@
+import pytest
 from fastapi import HTTPException
 
 import core.utils.object_storage as object_storage
 
 
-def test_get_upload_endpoint_prefers_external_on_hf_space(monkeypatch) -> None:
+def test_get_upload_endpoint_prefers_external_on_hf_space(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(object_storage.settings, "hf_space", True)
     monkeypatch.setattr(
         object_storage.settings,
@@ -22,7 +25,9 @@ def test_get_upload_endpoint_prefers_external_on_hf_space(monkeypatch) -> None:
     assert endpoint == "https://objectstorageapi.ap-southeast-1.clawcloudrun.com"
 
 
-def test_get_upload_endpoint_falls_back_when_preferred_is_not_resolvable(monkeypatch) -> None:
+def test_get_upload_endpoint_falls_back_when_preferred_is_not_resolvable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(object_storage.settings, "hf_space", False)
     monkeypatch.setattr(object_storage, "is_running_in_kubernetes", lambda: True)
     monkeypatch.setattr(
@@ -46,7 +51,7 @@ def test_get_upload_endpoint_falls_back_when_preferred_is_not_resolvable(monkeyp
     assert endpoint == "https://objectstorageapi.ap-southeast-1.clawcloudrun.com"
 
 
-def test_get_upload_endpoint_requires_config(monkeypatch) -> None:
+def test_get_upload_endpoint_requires_config(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(object_storage.settings, "hf_space", False)
     monkeypatch.setattr(object_storage, "is_running_in_kubernetes", lambda: False)
     monkeypatch.setattr(object_storage.settings, "object_storage_endpoint_internal", None)

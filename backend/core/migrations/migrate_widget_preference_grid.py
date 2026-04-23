@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from typing import Any
 
 from motor.motor_asyncio import AsyncIOMotorClient
 
@@ -10,7 +11,7 @@ from core.config import settings
 
 
 async def migrate() -> int:
-    client = AsyncIOMotorClient(settings.mongodb_uri)
+    client: AsyncIOMotorClient[dict[str, Any]] = AsyncIOMotorClient(settings.mongodb_uri)
     try:
         database = client[settings.mongodb_database]
         collection = database["widget_preferences"]

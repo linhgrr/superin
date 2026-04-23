@@ -122,6 +122,19 @@ def _get_zone(tz_name: str) -> ZoneInfo:
         return ZoneInfo("UTC")
 
 
+def normalize_timezone_name(tz_name: str | None) -> str:
+    """Normalize an arbitrary timezone name to a valid IANA timezone string."""
+    zone = _get_zone(tz_name or DEFAULT_TIMEZONE)
+    return getattr(zone, "key", DEFAULT_TIMEZONE)
+
+
+def get_local_now_for_timezone(tz_name: str | None) -> tuple[str, datetime]:
+    """Get the current local datetime for a timezone name with UTC fallback."""
+    normalized_name = normalize_timezone_name(tz_name)
+    local_now = utc_now().astimezone(_get_zone(normalized_name))
+    return normalized_name, local_now
+
+
 # ─── Day range ─────────────────────────────────────────────────────────────────
 
 class DayRange(NamedTuple):
@@ -277,6 +290,8 @@ class UserTimezoneContext:
         if utc_dt is None:
             return False
         local_dt = self.utc_to_local(utc_dt)
+        if local_dt is None:
+            return False
         now_local = self.now_local()
         local_dt_naive = local_dt.replace(tzinfo=None)
         now_local_naive = now_local.replace(tzinfo=None)
@@ -287,6 +302,8 @@ class UserTimezoneContext:
         if utc_dt is None:
             return ""
         local_dt = self.utc_to_local(utc_dt)
+        if local_dt is None:
+            return ""
         return local_dt.strftime(format_str)
 
     def format_time(self, utc_dt: datetime | None, format_str: str = "%H:%M") -> str:
@@ -294,6 +311,8 @@ class UserTimezoneContext:
         if utc_dt is None:
             return ""
         local_dt = self.utc_to_local(utc_dt)
+        if local_dt is None:
+            return ""
         return local_dt.strftime(format_str)
 
     def format_datetime(self, utc_dt: datetime | None, format_str: str = "%Y-%m-%d %H:%M") -> str:
@@ -301,6 +320,8 @@ class UserTimezoneContext:
         if utc_dt is None:
             return ""
         local_dt = self.utc_to_local(utc_dt)
+        if local_dt is None:
+            return ""
         return local_dt.strftime(format_str)
 
     def get_date_time_tuple(self) -> tuple[str, str]:

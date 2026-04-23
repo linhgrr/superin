@@ -102,8 +102,9 @@ export default function AppListItem({
             margin: "0.25rem 0 0 0",
             lineHeight: 1.4,
             overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
+            display: "-webkit-box",
+            WebkitBoxOrient: "vertical",
+            WebkitLineClamp: 2,
           }}
         >
           {app.description}

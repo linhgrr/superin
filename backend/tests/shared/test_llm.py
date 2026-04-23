@@ -1,13 +1,18 @@
 from types import SimpleNamespace
+from typing import Any
+
+import pytest
 
 import shared.llm as llm_module
 
 
-def test_get_llm_disables_stream_usage_and_preserves_ngrok_headers(monkeypatch) -> None:
+def test_get_llm_disables_stream_usage_and_preserves_ngrok_headers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     captured: dict[str, object] = {}
 
     class FakeChatOpenAI:
-        def __init__(self, **kwargs) -> None:
+        def __init__(self, **kwargs: Any) -> None:
             captured.update(kwargs)
 
     fake_settings = SimpleNamespace(
@@ -42,16 +47,21 @@ def test_get_llm_disables_stream_usage_and_preserves_ngrok_headers(monkeypatch) 
     }
 
 
-def test_patch_langchain_usage_metadata_handles_null_completion_tokens(monkeypatch) -> None:
+def test_patch_langchain_usage_metadata_handles_null_completion_tokens(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     captured: dict[str, object] = {}
 
-    def original_create_usage_metadata(usage: dict[str, object], _service_tier=None) -> dict[str, object]:
+    def original_create_usage_metadata(
+        usage: dict[str, object],
+        _service_tier: object | None = None,
+    ) -> dict[str, object]:
         captured["usage"] = usage
         return {"usage": usage}
 
     fake_module = SimpleNamespace(_create_usage_metadata=original_create_usage_metadata)
 
-    def fake_import_module(name: str):
+    def fake_import_module(name: str) -> object:
         assert name == "langchain_openai.chat_models.base"
         return fake_module
 
@@ -74,7 +84,9 @@ def test_patch_langchain_usage_metadata_handles_null_completion_tokens(monkeypat
     }
 
 
-def test_patch_langchain_usage_metadata_supports_single_argument_signature(monkeypatch) -> None:
+def test_patch_langchain_usage_metadata_supports_single_argument_signature(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     captured: dict[str, object] = {}
 
     def original_create_usage_metadata(usage: dict[str, object]) -> dict[str, object]:
@@ -83,7 +95,7 @@ def test_patch_langchain_usage_metadata_supports_single_argument_signature(monke
 
     fake_module = SimpleNamespace(_create_usage_metadata=original_create_usage_metadata)
 
-    def fake_import_module(name: str):
+    def fake_import_module(name: str) -> Any:
         assert name == "langchain_openai.chat_models.base"
         return fake_module
 

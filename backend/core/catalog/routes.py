@@ -67,14 +67,14 @@ async def list_categories() -> list[AppCategoryRead]:
         cat_id = cat.name.lower()
         merged[cat_id] = _cat_to_read(cat)
 
-    for cat in registry_cats:
-        cat_id = cat["id"].lower()
+    for registry_cat in registry_cats:
+        cat_id = registry_cat["id"].lower()
         if cat_id not in merged:
             merged[cat_id] = AppCategoryRead(
-                id=cat["id"],
-                name=cat["name"],
-                icon=cat["icon"],
-                color=cat["color"],
+                id=registry_cat["id"],
+                name=registry_cat["name"],
+                icon=registry_cat["icon"],
+                color=registry_cat["color"],
                 order=999,
                 auto_discovered=True,
             )

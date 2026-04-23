@@ -71,21 +71,6 @@ calendar_manifest = AppManifestSchema(
     color="oklch(0.70 0.18 250)",  # Blue-ish
     widgets=[month_view_widget, upcoming_widget, day_summary_widget],
     agent_description="Helps users create events, check availability, schedule recurring events, and time-block Todo tasks.",
-    tools=[
-        # Event lifecycle - consolidated design
-        "calendar_schedule_event",    # Create + auto conflict check
-        "calendar_reschedule_event",  # Move to new time
-        "calendar_edit_event",        # Edit metadata only
-        "calendar_cancel_event",      # Delete/cancel
-        "calendar_find_events",       # Search + list + get
-        # Calendar management
-        "calendar_list_calendars",
-        # Recurring events
-        "calendar_make_recurring",
-        "calendar_stop_recurring",
-        # Todo integration
-        "calendar_block_task_time",
-    ],
     models=["Event", "Calendar", "RecurringRule"],
     category="productivity",
     tags=["calendar", "events", "schedule", "time-blocking", "recurring"],

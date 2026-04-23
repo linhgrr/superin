@@ -12,8 +12,8 @@ The backend is the source of truth for:
 - SSE event shape
 
 The frontend is responsible for:
-- sending message history for the active thread
-- rendering streamed text/tool-call/tool-result parts
+- sending the active thread payload assistant-ui produces
+- rendering streamed text plus the final server thread snapshot
 - maintaining thread-local UI state
 
 The frontend does **not** define or forward tool schemas for the backend to use.
@@ -32,18 +32,21 @@ frontend/AppProviders
        - unstable_assistantMessageId
        - tools: {}   # may still be emitted by assistant-ui runtime; backend ignores it
 
-backend/apps/chat.py
+backend/core/chat/routes.py
   -> authenticated FastAPI route
-  -> calls root_agent.astream(..., skip_db_load=True)
-  -> converts root events to assistant-stream data stream
+  -> extracts the latest non-empty user message from the request payload
+  -> calls root_agent.astream(...)
+  -> converts root text into assistant-stream chunks
+  -> emits a final thread snapshot from persisted LangGraph state
 
 backend/core/agents/root/agent.py
-  -> builds tools from installed apps only
-  -> wraps each installed child app as ask_{app_id}
-  -> streams:
-       - root assistant text
-       - root tool call/result events
-  -> hides child-agent internal tool calls/tokens from the UI
+  -> loads installed apps and runtime context
+  -> runs the root StateGraph orchestrator
+  -> emits internal orchestration events such as:
+       - app_result
+       - merged_context
+       - token
+       - done
 
 backend/core/agents/base_app.py
   -> each child app is a compiled LangGraph agent
@@ -62,31 +65,6 @@ Relevant shapes:
     {
       "role": "user",
       "content": [{ "type": "text", "text": "check các ví hiện có" }]
-    },
-    {
-      "role": "assistant",
-      "content": [
-        {
-          "type": "tool-call",
-          "toolCallId": "call_1",
-          "toolName": "ask_finance",
-          "input": { "question": "check các ví hiện có" }
-        }
-      ]
-    },
-    {
-      "role": "tool",
-      "content": [
-        {
-          "type": "tool-result",
-          "toolCallId": "call_1",
-          "toolName": "ask_finance",
-          "output": {
-            "type": "json",
-            "value": { "wallets": [] }
-          }
-        }
-      ]
     }
   ],
   "threadId": "__LOCALID_xxx",
@@ -98,55 +76,46 @@ Relevant shapes:
 
 Notes:
 - `tools: {}` is harmless. The backend ignores it.
-- `input` is the correct tool-call argument field from assistant-ui.
-- `output.value` is the correct tool-result payload field.
+- assistant and tool messages may be present in the payload, but the backend chat route currently extracts only the latest non-empty user message for the new turn.
+- canonical history comes from LangGraph checkpoint state keyed by `threadId`.
 
 ## Backend Parsing Rules
 
-`RootAgent.astream()` parses incoming message history into LangChain messages:
+`RootAgent.astream()` only needs the latest user turn:
 
 - user text -> `HumanMessage`
-- assistant tool call -> `AIMessage.tool_calls[*].args` from `input`
-- tool result -> `ToolMessage.content` from `output.value`
-
-This avoids the previous bug where `args=None` caused:
-
-```text
-2 validation errors for AIMessage
-tool_calls.0.args
-```
+- assistant/tool payloads are ignored for root turn input because prior context is loaded from the checkpointer
 
 ## Streaming Rules
 
-The route `POST /api/chat/stream` uses assistant-stream `DataStreamResponse`.
+The route `POST /api/chat/stream` uses SSE data-stream responses.
 
 Root agent emits internal events in this normalized shape:
 
 ```python
+{"type": "app_result", "app_id": "...", "status": "success", "ok": True}
+{"type": "merged_context", "content": "..."}
 {"type": "token", "content": "..."}
-{"type": "tool_call", "toolName": "ask_finance", "toolCallId": "run_id", "args": {...}}
-{"type": "tool_result", "toolCallId": "run_id", "result": ...}
 {"type": "done"}
 ```
 
-The FastAPI route converts them into assistant-ui stream parts:
-- text -> `append_text(...)`
-- tool call -> `add_tool_call(...)`
-- tool result -> `set_response(...)` or `add_tool_result(...)`
+The FastAPI route currently forwards only:
+- `token` -> `messages/partial`
+- final persisted history -> `updates`
+- errors -> `error`
 
 Important:
-- only root-level tool events are streamed to assistant-ui
-- child-internal domain tools such as `finance_add_transaction` must stay hidden from the frontend
-- every streamed tool result must correspond to a previously streamed root-level tool call id
-- app-domain tools should use `safe_tool_call()` so business errors become structured tool results instead of aborting the run
+- child-internal domain tools such as `finance_add_transaction` stay hidden from the frontend
+- root orchestration metadata such as `app_result` and `merged_context` is currently server-internal, even though the root graph can emit it
+- child-agent tool results are normalized centrally via tool middleware and carried in child-agent state, so app-domain tools can return raw domain objects and raise user-facing errors directly
 
 ## Parent / Child-Agent Boundary
 
-This project uses the LangGraph pattern where the outer/root agent wraps each
-child app agent as a tool:
+This project uses a root orchestrator-worker pattern:
 
-- `ask_finance(question)`
-- `ask_todo(question)`
+- root `StateGraph` plans dispatch
+- worker runners invoke `platform`, `finance`, `todo`, `calendar`, or other installed child agents
+- child agents may call domain tools internally
 
 The child agent may call domain tools like:
 - `finance_list_wallets`
@@ -155,24 +124,22 @@ The child agent may call domain tools like:
 
 But those child-internal events are **not** streamed to the frontend.
 The UI should only see:
-- the root tool call `ask_finance`
-- the root tool result for `ask_finance`
-- the root assistant's final text
+- root assistant text chunks
+- the final normalized thread history snapshot
 
 This prevents duplicated messages and avoids exposing child-agent internals.
-`ask_{app_id}` results are structured objects, not plain text strings.
 
 ## Threading and Memory
 
-- Frontend callers send the full active-thread history each turn.
-- Therefore the chat route uses `skip_db_load=True`.
-- Root agent still persists the latest user/assistant text turns to MongoDB after streaming.
+- Frontend callers may send the full active-thread history each turn.
+- The backend uses `threadId` to load canonical thread state from the LangGraph checkpointer.
+- Root agent persists conversation state through the checkpointer and the route updates thread metadata after streaming.
 - Child app agents are currently stateless per invocation.
 
 Important:
 - MongoDB persistence currently stores user/assistant text turns, not the full
-  structured tool-call/tool-result history.
-- assistant-ui sessions work correctly because the frontend sends full history.
+  structured internal orchestration history.
+- assistant-ui sessions work correctly because thread replay comes from persisted server state.
 
 ## Frontend Runtime
 
@@ -193,25 +160,25 @@ const runtime = useDataStreamRuntime({
 ```
 
 Current rendering:
-- `text` parts render as markdown bubbles
-- `tool-call` parts render as compact badges
+- `messages/partial` chunks render the assistant text stream
+- `updates` replaces the visible thread with the persisted server snapshot
 - error states render via `MessagePrimitive.Error` / `ErrorPrimitive`
 - no frontend-side `execute` handlers
 
 ## Verification Checklist
 
-- `backend/apps/chat.py` returns `DataStreamResponse`
+- `backend/core/chat/routes.py` returns the SSE stream
 - `frontend` uses `useDataStreamRuntime`
-- root agent parses `input` and `output.value`
-- root agent does not stream child-agent internals
+- backend turn input is derived from the latest user message
+- root agent does not stream child-agent internals to the UI
 - frontend does not send tool schemas as backend authority
 - `threadId` is forwarded from frontend to backend
 
 ## Files
 
-- [chat.py](/home/linh/Downloads/superin/backend/apps/chat.py)
+- [routes.py](/home/linh/Downloads/superin/backend/core/chat/routes.py)
 - [agent.py](/home/linh/Downloads/superin/backend/core/agents/root/agent.py)
 - [base_app.py](/home/linh/Downloads/superin/backend/core/agents/base_app.py)
-- [tools.py](/home/linh/Downloads/superin/backend/core/agents/root/tools.py)
+- [graph.py](/home/linh/Downloads/superin/backend/core/agents/root/graph.py)
 - [AppProviders.tsx](/home/linh/Downloads/superin/frontend/src/components/providers/AppProviders.tsx)
 - [ChatThread.tsx](/home/linh/Downloads/superin/frontend/src/components/chat/ChatThread.tsx)

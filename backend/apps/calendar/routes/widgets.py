@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import calendar
 from calendar import month_name
+from collections.abc import Callable
 from datetime import datetime
+from typing import cast
 
 from fastapi import APIRouter, Depends, HTTPException
 
 from apps.calendar.schemas import (
+    CalendarEventRead,
     CalendarMonthDaySummary,
     CalendarWidgetDataResponse,
     DaySummaryWidgetConfig,
@@ -57,7 +60,7 @@ def _get_event_local_day(
     *,
     user_id: str,
     widget_id: str,
-    formatter,
+    formatter: Callable[[datetime | None], datetime | None],
 ) -> int:
     """Resolve an event start instant into the user's local calendar day."""
     if isinstance(start_datetime, datetime):
@@ -71,7 +74,12 @@ def _get_event_local_day(
                 detail=f"Invalid event start_datetime in {widget_id} payload for user {user_id}",
             ) from exc
     local_start = formatter(parsed)
-    return local_start.day
+    if not isinstance(local_start, datetime):
+        raise HTTPException(
+            status_code=500,
+            detail=f"Could not convert event start_datetime in {widget_id} payload for user {user_id}",
+        )
+    return cast(int, local_start.day)
 
 
 async def _resolve_widget_options(
@@ -80,7 +88,7 @@ async def _resolve_widget_options(
 ) -> list[ConfigFieldSchema]:
     calendars = await calendar_service.list_calendars(user_id)
     calendar_options = [
-        SelectOption(label=c["name"], value=c["id"])
+        SelectOption(label=c.name, value=c.id)
         for c in calendars
     ]
 
@@ -102,7 +110,7 @@ async def get_month_view_widget_data(
     month_offset: int = 0,
 ) -> MonthViewWidgetData:
     user = await User.get(user_id)
-    if user is None:
+    if not isinstance(user, User):
         raise HTTPException(status_code=404, detail="User not found")
 
     ctx = get_user_timezone_context(user)
@@ -120,12 +128,12 @@ async def get_month_view_widget_data(
         200,
     )
     if not config.show_time_blocked_tasks:
-        events = [e for e in events if e["type"] != "time_blocked_task"]
+        events = [event for event in events if event.type != "time_blocked_task"]
 
-    day_map: dict[int, list[dict]] = {}
+    day_map: dict[int, list[CalendarEventRead]] = {}
     for event in events:
         event_day = _get_event_local_day(
-            event["start_datetime"],
+            event.start_datetime,
             user_id=user_id,
             widget_id="calendar.month-view",
             formatter=ctx.utc_to_local,
@@ -144,7 +152,7 @@ async def get_month_view_widget_data(
             CalendarMonthDaySummary(
                 day=day,
                 event_count=len(day_map.get(day, [])),
-                event_titles=[e["title"] for e in day_map.get(day, [])[:3]],
+                event_titles=[event.title for event in day_map.get(day, [])[:3]],
             )
             for day in range(1, days_in_month + 1)
         ],
@@ -159,7 +167,7 @@ async def get_upcoming_widget_data(
     from datetime import timedelta
 
     user = await User.get(user_id)
-    if user is None:
+    if not isinstance(user, User):
         raise HTTPException(status_code=404, detail="User not found")
 
     ctx = get_user_timezone_context(user)
@@ -172,7 +180,9 @@ async def get_upcoming_widget_data(
         config.calendar_filter,
         config.max_items,
     )
-    return UpcomingWidgetData(items=items[: config.max_items])
+    return UpcomingWidgetData(
+        items=items[: config.max_items],
+    )
 
 
 async def get_day_summary_widget_data(
@@ -182,7 +192,7 @@ async def get_day_summary_widget_data(
     from datetime import timedelta
 
     user = await User.get(user_id)
-    if user is None:
+    if not isinstance(user, User):
         raise HTTPException(status_code=404, detail="User not found")
 
     ctx = get_user_timezone_context(user)
@@ -219,7 +229,7 @@ async def get_widget_data(
     kwargs = {}
     if widget_id == "calendar.month-view":
         kwargs["month_offset"] = month_offset
-    return await handler(user_id, config, **kwargs)
+    return cast(CalendarWidgetDataResponse, await handler(user_id, config, **kwargs))
 
 
 @router.put("/{widget_id}/config", response_model=WidgetDataConfigSchema)
@@ -234,7 +244,7 @@ async def update_widget_config(
 
     doc = await upsert_widget_config(user_id, widget_id, update.config)
     return WidgetDataConfigSchema(
-        id=str(doc.id),
+        _id=str(doc.id),
         user_id=str(doc.user_id),
         widget_id=doc.widget_id,
         config=doc.config,

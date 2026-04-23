@@ -25,6 +25,7 @@ from core.auth.dependencies import (
 )
 from core.auth.schemas import LoginRequest, RegisterRequest, UpdateUserSettingsRequest
 from core.constants import AUTH_COOKIE_MAX_AGE_SECONDS, AUTH_COOKIE_NAME, RATE_LIMIT_LOGIN
+from core.http_utils import should_use_secure_cookie
 from core.models import TokenBlacklist, User
 from core.security import get_password_hash, verify_password
 from core.utils.limiter import check_login_rate
@@ -55,14 +56,14 @@ def _token_response(user: User) -> TokenResponse:
     )
 
 
-def _set_refresh_cookie(response: Response, token: str) -> None:
+def _set_refresh_cookie(request: Request, response: Response, token: str) -> None:
     response.set_cookie(
         key=AUTH_COOKIE_NAME,
         value=token,
         max_age=AUTH_COOKIE_MAX_AGE_SECONDS,
         httponly=True,
         samesite="lax",
-        secure=True,
+        secure=should_use_secure_cookie(request),
     )
 
 
@@ -78,7 +79,11 @@ def _blacklist_token(payload: dict) -> TokenBlacklist | None:
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
-async def register(request: RegisterRequest, response: Response) -> TokenResponse:
+async def register(
+    request: RegisterRequest,
+    http_request: Request,
+    response: Response,
+) -> TokenResponse:
     existing = await User.find_one(User.email == request.email)
     if existing:
         raise HTTPException(
@@ -94,7 +99,7 @@ async def register(request: RegisterRequest, response: Response) -> TokenRespons
     await user.insert()
 
     resp = _token_response(user)
-    _set_refresh_cookie(response, resp.refresh_token)
+    _set_refresh_cookie(http_request, response, resp.refresh_token)
     return resp
 
 
@@ -125,12 +130,13 @@ async def login(request: LoginRequest, http_request: Request, response: Response
         )
 
     resp = _token_response(user)
-    _set_refresh_cookie(response, resp.refresh_token)
+    _set_refresh_cookie(http_request, response, resp.refresh_token)
     return resp
 
 
 @router.post("/refresh")
 async def refresh_tokens(
+    request: Request,
     response: Response,
     refresh_token: str | None = Cookie(None, alias=AUTH_COOKIE_NAME),
 ) -> TokenResponse:
@@ -164,12 +170,13 @@ async def refresh_tokens(
             await blacklist_entry.insert()
 
     resp = _token_response(user)
-    _set_refresh_cookie(response, resp.refresh_token)
+    _set_refresh_cookie(request, response, resp.refresh_token)
     return resp
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 async def logout(
+    request: Request,
     response: Response,
     refresh_token: str | None = Cookie(None, alias=AUTH_COOKIE_NAME),
 ) -> None:
@@ -185,7 +192,11 @@ async def logout(
                 exc_info=True,
             )
 
-    response.delete_cookie(key=AUTH_COOKIE_NAME, secure=True)
+    response.delete_cookie(
+        key=AUTH_COOKIE_NAME,
+        secure=should_use_secure_cookie(request),
+        samesite="lax",
+    )
 
 
 @router.get("/me")

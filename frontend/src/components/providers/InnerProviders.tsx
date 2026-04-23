@@ -13,6 +13,7 @@ import type { RemoteThreadListAdapter } from "@assistant-ui/react";
 import { useLangGraphRuntime } from "@assistant-ui/react-langgraph";
 
 import { chatApi } from "@/api/chat";
+import { useChatThinkingStore } from "@/stores/useChatThinkingStore";
 
 function useBackendThreadListAdapter(): RemoteThreadListAdapter {
   return useMemo(
@@ -62,21 +63,37 @@ function useBackendThreadListAdapter(): RemoteThreadListAdapter {
 }
 
 function useChatThreadRuntime() {
+  const beginRun = useChatThinkingStore((state) => state.beginRun);
+  const endRun = useChatThinkingStore((state) => state.endRun);
+  const clearThinking = useChatThinkingStore((state) => state.clear);
+  const applyThinkingEvent = useChatThinkingStore((state) => state.applyThinkingEvent);
+
   return useLangGraphRuntime({
-    load: async (externalId) => chatApi.loadLangGraphThread(externalId),
+    load: async (externalId) => {
+      clearThinking();
+      return chatApi.loadLangGraphThread(externalId);
+    },
     stream: async function* (messages, { abortSignal, initialize }) {
+      beginRun();
       const { externalId, remoteId } = await initialize();
       const threadId = externalId ?? remoteId;
 
-      yield* chatApi.streamLangGraph({
-        threadId,
-        messages,
-        abortSignal,
-      });
+      try {
+        yield* chatApi.streamLangGraph({
+          threadId,
+          messages,
+          abortSignal,
+        });
+      } finally {
+        endRun();
+      }
     },
     eventHandlers: {
       onError: (error) => {
         console.error("[ChatRuntime]", error);
+      },
+      onCustomEvent: (eventType, data) => {
+        applyThinkingEvent(eventType, data);
       },
     },
   });

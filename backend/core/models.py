@@ -19,7 +19,7 @@ from shared.enums import InstallationStatus, UserRole
 class _UnitTestFriendlyDocument(Document):
     """Allow plain model construction in unit tests before Beanie init."""
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: object, **kwargs: object) -> None:
         try:
             super().__init__(*args, **kwargs)
         except CollectionWasNotInitialized:
