@@ -129,6 +129,11 @@ def get_checkpointer() -> BaseCheckpointSaver:
     return _checkpointer
 
 
+def get_child_checkpointer() -> BaseCheckpointSaver:
+    """Return the checkpointer used for child agents."""
+    return get_checkpointer()
+
+
 def get_document_collection(document_model: Any) -> Any:
     """Return the underlying collection for a Beanie document model."""
     if hasattr(document_model, "get_motor_collection"):

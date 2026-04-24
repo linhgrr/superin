@@ -22,8 +22,23 @@ def merge_app_results(results: list[WorkerOutcome]) -> str:
         error = result.get("error")
         failure_kind = result.get("failure_kind")
         retryable = result.get("retryable")
+        answer_state = result.get("answer_state")
+        evidence_summary = result.get("evidence_summary")
+        capability_limit = result.get("capability_limit")
+        stop_reason = result.get("stop_reason")
+        contained_mutation = result.get("contained_mutation")
 
         section = f"[{app_name}] (task: {subtask[:80]})\n[status: {status}]\n{message}"
+        if answer_state:
+            section += f"\n[answer_state] {answer_state}"
+        if evidence_summary:
+            section += f"\n[evidence] {evidence_summary}"
+        if stop_reason:
+            section += f"\n[stop_reason] {stop_reason}"
+        if capability_limit:
+            section += f"\n[capability_limit] {capability_limit}"
+        if contained_mutation:
+            section += "\n[contains_mutation] yes"
         if status == "failed" and error and str(error) not in message:
             section += f"\n[failure_reason] {error}"
         if failure_kind:

@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
+
 from beanie import PydanticObjectId
 
+from core.config import settings
 from core.constants import CHAT_THREADS_PAGE_SIZE, THREAD_PREVIEW_MAX_LENGTH
-from core.models import ThreadMeta
+from core.models import PendingQuestion, ThreadMeta
 from core.utils.timezone import utc_now
+
+_UNSET = object()
 
 
 def normalize_thread_id(_user_id: str, thread_id: str | None) -> str:
@@ -40,6 +45,7 @@ async def upsert_thread_meta(
     preview: str | None = None,
     message_count: int | None = None,
     status: str | None = None,
+    pending_question: PendingQuestion | None | object = _UNSET,
 ) -> ThreadMeta:
     """Create or update ThreadMeta from LangGraph thread state."""
     existing = await get_thread_meta(user_id, thread_id)
@@ -53,6 +59,8 @@ async def upsert_thread_meta(
             update_fields["message_count"] = message_count
         if status is not None:
             update_fields["status"] = status
+        if pending_question is not _UNSET:
+            update_fields["pending_question"] = pending_question
         await existing.set(update_fields)
         return existing
 
@@ -63,9 +71,44 @@ async def upsert_thread_meta(
         title=title or "New conversation",
         preview=preview[:THREAD_PREVIEW_MAX_LENGTH] if preview else "",
         message_count=max(message_count or 0, 0),
+        pending_question=None if pending_question is _UNSET else pending_question,
     )
     await meta.insert()
     return meta
+
+
+async def set_thread_pending_question(
+    user_id: str,
+    thread_id: str,
+    pending_question: PendingQuestion | None,
+) -> ThreadMeta | None:
+    """Persist or clear the pending clarification state for a thread."""
+    thread = await get_thread_meta(user_id, thread_id)
+    if thread is None:
+        return None
+
+    await thread.set({
+        "pending_question": pending_question,
+        "updated_at": utc_now(),
+    })
+    return thread
+
+
+async def get_live_pending_question(
+    user_id: str,
+    thread_id: str,
+) -> PendingQuestion | None:
+    """Return a non-stale pending question, clearing it if it expired."""
+    thread = await get_thread_meta(user_id, thread_id)
+    if thread is None or thread.pending_question is None:
+        return None
+
+    ttl_deadline = utc_now() - timedelta(minutes=settings.pending_question_ttl_minutes)
+    if thread.pending_question.asked_at_utc < ttl_deadline:
+        await set_thread_pending_question(user_id, thread_id, None)
+        return None
+
+    return thread.pending_question
 
 
 async def list_user_threads(

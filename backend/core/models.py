@@ -9,7 +9,7 @@ from typing import Literal
 
 from beanie import Document, PydanticObjectId
 from beanie.exceptions import CollectionWasNotInitialized
-from pydantic import Field
+from pydantic import BaseModel, Field
 from pymongo import IndexModel
 
 from core.utils.timezone import utc_now
@@ -147,6 +147,15 @@ class AppCategory(Document):
         ]
 
 
+class PendingQuestion(BaseModel):
+    """Resume metadata for a thread waiting on user clarification."""
+
+    round: int
+    app_ids_in_scope: list[str] = Field(default_factory=list)
+    missing_information: list[str] = Field(default_factory=list)
+    asked_at_utc: datetime = Field(default_factory=utc_now)
+
+
 class ThreadMeta(Document):
     """Metadata for a user-created chat thread.
 
@@ -160,6 +169,7 @@ class ThreadMeta(Document):
     title: str = "New conversation"
     preview: str = ""  # first user message snippet (max 100 chars)
     message_count: int = 0
+    pending_question: PendingQuestion | None = None
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 

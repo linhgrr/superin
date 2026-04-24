@@ -15,6 +15,7 @@ Production: set env vars directly in your deployment platform.
 from pathlib import Path
 
 from dotenv import load_dotenv
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from shared.enums import PaymentProvider
@@ -82,13 +83,21 @@ class Settings(BaseSettings):
     openai_model: str = ""
     llm_request_timeout_seconds: float = 60.0
     child_agent_timeout_seconds: float = 60.0
-    root_agent_max_dispatch_rounds: int = 3
-    root_agent_max_app_attempts_per_turn: int = 2
+    child_agent_tool_call_soft_limit: int = 4
+    child_agent_tool_call_hard_limit: int = 6
+    child_agent_recursion_limit: int = 25
+    child_agent_checkpoint_enabled: bool = False
     llm_stream_idle_timeout_seconds: float = 120.0
     memory_semantic_search_enabled: bool = False
     memory_embedding_model: str = ""
     memory_embedding_dimensions: int = 1536
     memory_vector_index_name: str = "superin_memory_index"
+    root_agent_max_dispatch_rounds: int = 2
+    root_agent_max_app_attempts_per_turn: int = 2
+    root_agent_max_total_workers_per_turn: int = 8
+    root_agent_max_turn_wall_seconds: float = 90.0
+    root_agent_per_worker_timeout_seconds: float = 30.0
+    pending_question_ttl_minutes: int = 30
 
     # ─── Object Storage (S3-compatible) ───────────────────────────────────────
     object_storage_access_key: str | None = None
@@ -120,6 +129,29 @@ class Settings(BaseSettings):
     payos_amount_vnd: int | None = None
     payos_paid_duration_days: int | None = None
     payos_payment_link_expire_seconds: int | None = None
+
+    @model_validator(mode="after")
+    def validate_agent_timeouts(self) -> "Settings":
+        if not (
+            self.child_agent_tool_call_soft_limit
+            < self.child_agent_tool_call_hard_limit
+            < self.child_agent_recursion_limit
+        ):
+            raise ValueError(
+                "child agent limits must satisfy soft_limit < hard_limit < recursion_limit"
+            )
+
+        max_rounds = max(self.root_agent_max_dispatch_rounds, 1)
+        if (
+            self.root_agent_per_worker_timeout_seconds * max_rounds
+            > self.root_agent_max_turn_wall_seconds * 1.2
+        ):
+            raise ValueError(
+                "root agent timeout settings violate per_worker_timeout * max_rounds <= "
+                "max_turn_wall_seconds * 1.2"
+            )
+
+        return self
 
 
 # Global singleton — imported everywhere in backend

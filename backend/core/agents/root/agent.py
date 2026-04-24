@@ -3,17 +3,20 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from collections.abc import AsyncGenerator
-from typing import Literal, TypedDict
+from typing import Literal
+from uuid import uuid4
 
 from beanie import PydanticObjectId
 from langchain_core.messages import BaseMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
 from loguru import logger
+from typing_extensions import TypedDict
 
 from core.config import settings
 from core.models import User
-from core.utils.timezone import get_user_timezone_context
+from core.utils.timezone import get_user_timezone_context, utc_now
 from core.workspace.service import list_installed_app_ids
 
 from .graph import get_root_agent_graph
@@ -36,9 +39,9 @@ FrontendStreamEvent = TextStreamEvent | ThinkingEvent | DoneEvent
 
 
 def _compute_root_recursion_limit(installed_app_count: int) -> int:
-    """Size the root graph recursion budget to its bounded multi-round flow."""
-    per_round_budget = max(1, installed_app_count) + 4
-    return max(25, 8 + settings.root_agent_max_dispatch_rounds * per_round_budget)
+    """Size the root graph recursion budget for the configured max rounds."""
+    per_round_steps = max(1, installed_app_count) + 4
+    return max(25, 8 + settings.root_agent_max_dispatch_rounds * per_round_steps)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # RootAgent
@@ -71,10 +74,12 @@ class RootAgent:
           - {type: "thinking", ...}   — structured progress update
           - {type: "done"}            — final answer complete
         """
-        from core.chat.service import normalize_thread_id
+        from core.chat.service import get_live_pending_question, normalize_thread_id
 
         thread = normalize_thread_id(user_id, thread_id)
         installed_app_ids = await _load_installed_app_ids(user_id)
+        pending_question = await get_live_pending_question(user_id, thread)
+        turn_id = assistant_message_id or f"turn_{uuid4().hex}"
 
         user = await User.find_one(User.id == PydanticObjectId(user_id))
         tz_name = get_user_timezone_context(user).tz_name if user else "UTC"
@@ -95,7 +100,11 @@ class RootAgent:
             user_tz=tz_name,
             installed_app_ids=sorted(installed_app_ids),
             assistant_message_id=assistant_message_id,
+            turn_id=turn_id,
             worker_semaphore=asyncio.Semaphore(ROOT_WORKER_PARALLELISM_LIMIT),
+            deadline_monotonic=time.monotonic() + settings.root_agent_max_turn_wall_seconds,
+            turn_started_at_utc=utc_now(),
+            pending_question=pending_question,
         )
 
         # Only new user messages — history comes from checkpointer via previous

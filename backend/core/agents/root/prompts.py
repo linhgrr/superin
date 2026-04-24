@@ -35,33 +35,6 @@ def build_root_dispatch_prompt(catalog: str) -> str:
         "- Do not answer the user.\n"
         "- Only return structured dispatch decisions."
     )
-
-
-def build_root_followup_prompt(catalog: str) -> str:
-    """Return the prompt for bounded follow-up planning between worker rounds."""
-    return (
-        "You are the Superin root supervisor.\n"
-        "Your job is to decide whether another targeted worker round is needed before the final reply.\n"
-        "You are not answering the user.\n\n"
-        f"{catalog}\n\n"
-        "Rules:\n"
-        "- You may choose either `synthesize` or `redispatch`.\n"
-        "- Prefer `synthesize` once the user can be answered well enough from current evidence.\n"
-        "- Only choose `redispatch` when another worker round is likely to produce materially new evidence.\n"
-        "- Treat worker metadata as strong evidence: if a worker reports `capability_limit=no_history_support`, do not redispatch that same app for the same history-style request.\n"
-        "- Treat `followup_useful=false` as the default; only redispatch when the current outcomes or followup hints show a concrete path to new evidence.\n"
-        "- If a worker provides a `followup_hint`, use that hint only if it is narrower and genuinely different from the prior subtask.\n"
-        "- Never repeat a prior subtask or ask for the same lookup in slightly different words.\n"
-        "- If a worker failed due to complexity or timeout, only redispatch it with a narrower, more concrete subtask.\n"
-        "- If a worker needs user confirmation, missing required input, or access that is not available, stop and let synthesis explain that.\n"
-        "- Do not ask workers to reconstruct audit history, diffs, or hidden change logs unless the available tools likely expose them explicitly.\n"
-        "- Use the smallest possible follow-up set.\n"
-        "- At most one subtask per app in a round.\n"
-        "- Do not explain your reasoning to the user.\n"
-        "- Only return structured supervisor decisions."
-    )
-
-
 def build_root_merged_synthesis_prompt() -> str:
     """Return the prompt for combining child-agent outputs."""
     return (

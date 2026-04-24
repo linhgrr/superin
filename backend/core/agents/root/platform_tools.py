@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING
 
 from langchain.tools import ToolRuntime
 from langchain_core.tools import tool
+from typing_extensions import TypedDict
 
 from core.agents.runtime_context import AppAgentContext
 from core.catalog.service import install_app_for_user, uninstall_app_for_user
@@ -100,7 +101,7 @@ async def _list_available_apps() -> AvailableAppsPayload:
     }
 
 
-@tool("platform_install_app")
+@tool("platform_install_app", extras={"is_mutating": True})
 async def platform_install_app(
     app_id: str,
     *,
@@ -111,7 +112,7 @@ async def platform_install_app(
     return {"status": result["status"], "app_id": result["app_id"]}
 
 
-@tool("platform_uninstall_app")
+@tool("platform_uninstall_app", extras={"is_mutating": True})
 async def platform_uninstall_app(
     app_id: str,
     *,
@@ -122,7 +123,7 @@ async def platform_uninstall_app(
     return {"status": result["status"], "app_id": result["app_id"]}
 
 
-@tool("platform_save_memory")
+@tool("platform_save_memory", extras={"is_mutating": True})
 async def platform_save_memory(
     content: str,
     category: str = "general",
@@ -207,7 +208,7 @@ async def recall_memories_tool_impl(
     return {"memories": memories, "count": len(memories)}
 
 
-@tool("platform_delete_memory")
+@tool("platform_delete_memory", extras={"is_mutating": True})
 async def platform_delete_memory(
     key: str,
     category: str = "general",

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import sys
+import time
 import types
 from collections.abc import AsyncIterator, Sequence
 from types import SimpleNamespace
@@ -17,21 +18,20 @@ from langgraph.store.memory import InMemoryStore
 
 from core.agents.root.context import build_dispatch_catalog, extract_question
 from core.agents.root.graph import (
-    _blocked_followup_apps,
+    _build_followup_candidates,
     _build_synthesis_context,
-    _plan_followups,
-    _round_has_followup_signal,
+    _round_has_useful_new_evidence,
 )
 from core.agents.root.merged_response import merge_app_results
 from core.agents.root.prompts import (
     build_root_direct_synthesis_prompt,
     build_root_dispatch_prompt,
-    build_root_followup_prompt,
 )
-from core.agents.root.routing import plan_followups, route_and_craft
+from core.agents.root.routing import route_and_craft
 from core.agents.root.runtime_context import RootGraphContext
 from core.agents.root.schemas import NewTurnInput, RootGraphEvent, RootState
 from core.agents.root.synthesis import synthesize
+from core.utils.timezone import utc_now
 from shared.schemas import AppManifestSchema
 
 
@@ -83,13 +83,6 @@ class TestSchemaTypes:
         assert "must not draft generic messages" in prompt
         assert "recommend installing that app instead" in prompt
         assert "prefer aggregating the relevant installed apps" in prompt
-
-    def test_root_followup_prompt_is_supervisor_only(self) -> None:
-        prompt = build_root_followup_prompt("<catalog />")
-        assert "root supervisor" in prompt
-        assert "another targeted worker round" in prompt
-        assert "Never repeat a prior subtask" in prompt
-        assert "Only return structured supervisor decisions." in prompt
 
     def test_root_merged_prompt_handles_failure_judgment(self) -> None:
         from core.agents.root.prompts import build_root_merged_synthesis_prompt
@@ -234,6 +227,135 @@ class TestMergeAppResults:
         assert "[todo]" in merged
 
 
+class TestSupervisorHelpers:
+    def test_round_has_useful_new_evidence_detects_new_tool_shape(self) -> None:
+        state = {
+            "turn_worker_start_index": 0,
+            "worker_outcomes": [
+                {
+                    "app": "finance",
+                    "status": "success",
+                    "ok": True,
+                    "subtask": "Summarize finance.",
+                    "message": "Checked balance.",
+                    "tool_results": [],
+                    "error": "",
+                    "answer_state": "answered",
+                    "evidence_summary": "",
+                    "missing_information": [],
+                    "followup_useful": False,
+                    "followup_hint": "",
+                    "capability_limit": "",
+                    "stop_reason": "complete",
+                    "contained_mutation": False,
+                },
+                {
+                    "app": "finance",
+                    "status": "partial",
+                    "ok": False,
+                    "subtask": "Check uncategorized transactions.",
+                    "message": "Found one uncategorized transaction.",
+                    "tool_results": [
+                        {
+                            "tool_name": "finance_list_transactions",
+                            "tool_call_id": "call_1",
+                            "ok": True,
+                            "data": [{"id": "t1"}],
+                            "error": None,
+                        }
+                    ],
+                    "error": "",
+                    "answer_state": "partial",
+                    "evidence_summary": "Found one uncategorized transaction.",
+                    "missing_information": [],
+                    "followup_useful": True,
+                    "followup_hint": "Check only today transactions.",
+                    "capability_limit": "",
+                    "stop_reason": "tool_budget",
+                    "contained_mutation": False,
+                },
+            ],
+            "current_round_outcomes": [
+                {
+                    "app": "finance",
+                    "status": "partial",
+                    "ok": False,
+                    "subtask": "Check uncategorized transactions.",
+                    "message": "Found one uncategorized transaction.",
+                    "tool_results": [
+                        {
+                            "tool_name": "finance_list_transactions",
+                            "tool_call_id": "call_1",
+                            "ok": True,
+                            "data": [{"id": "t1"}],
+                            "error": None,
+                        }
+                    ],
+                    "error": "",
+                    "answer_state": "partial",
+                    "evidence_summary": "Found one uncategorized transaction.",
+                    "missing_information": [],
+                    "followup_useful": True,
+                    "followup_hint": "Check only today transactions.",
+                    "capability_limit": "",
+                    "stop_reason": "tool_budget",
+                    "contained_mutation": False,
+                }
+            ],
+        }
+
+        assert _round_has_useful_new_evidence(state) is True
+
+    def test_followup_candidates_skip_mutations(self) -> None:
+        runtime = SimpleNamespace(
+            context=RootGraphContext(
+                user_id="u1",
+                thread_id="thread-1",
+                user_tz="Asia/Ho_Chi_Minh",
+                installed_app_ids=["platform"],
+                assistant_message_id="msg-1",
+                turn_id="turn-1",
+                worker_semaphore=asyncio.Semaphore(1),
+                deadline_monotonic=time.monotonic() + 30,
+                turn_started_at_utc=utc_now(),
+                pending_question=None,
+            )
+        )
+        state = {
+            "dispatch_history": [
+                {
+                    "app_id": "platform",
+                    "subtask": "Install todo",
+                    "fingerprint": "platform::install todo",
+                }
+            ],
+            "current_round_outcomes": [
+                {
+                    "app": "platform",
+                    "status": "partial",
+                    "ok": False,
+                    "subtask": "Install todo",
+                    "message": "The install partially completed.",
+                    "tool_results": [],
+                    "error": "",
+                    "answer_state": "partial",
+                    "evidence_summary": "Install started but did not complete.",
+                    "missing_information": [],
+                    "followup_useful": True,
+                    "followup_hint": "Retry installing todo.",
+                    "capability_limit": "",
+                    "stop_reason": "timeout",
+                    "contained_mutation": True,
+                    "retryable": True,
+                }
+            ],
+        }
+
+        followups, reason = _build_followup_candidates(state, runtime)
+        assert followups == []
+        assert reason == "invalid_followup"
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # decide_target_apps
 # ─────────────────────────────────────────────────────────────────────────────
@@ -353,47 +475,6 @@ class _MockWorkspaceSummaryDispatchLLM:
 
     async def ainvoke(self, messages: Sequence[Any], **kwargs: object) -> Any:
         return _workspace_summary_decision()
-
-
-class _MockFollowupRedispatchLLM:
-    def with_structured_output(
-        self,
-        schema: object,
-        **kwargs: object,
-    ) -> _MockFollowupRedispatchLLM:
-        return self
-
-    async def ainvoke(self, messages: Sequence[Any], **kwargs: object) -> Any:
-        from core.agents.root.schemas import AppDecision, FollowupDecision
-
-        return FollowupDecision(
-            action="redispatch",
-            rationale="Need a narrower todo lookup.",
-            app_decisions=[
-                AppDecision(
-                    app_id="todo",
-                    subtask="Use a narrower todo summary for tasks due today only.",
-                )
-            ],
-        )
-
-
-class _MockFollowupStopLLM:
-    def with_structured_output(
-        self,
-        schema: object,
-        **kwargs: object,
-    ) -> _MockFollowupStopLLM:
-        return self
-
-    async def ainvoke(self, messages: Sequence[Any], **kwargs: object) -> Any:
-        from core.agents.root.schemas import FollowupDecision
-
-        return FollowupDecision(
-            action="synthesize",
-            rationale="Current evidence is sufficient.",
-            app_decisions=[],
-        )
 
 
 def _workspace_summary_decision() -> Any:
@@ -542,216 +623,6 @@ class TestRouteAndCraft:
             raise AssertionError("route_and_craft should raise so task-level retry can run")
 
 
-class TestPlanFollowups:
-    def test_can_request_another_targeted_round(
-        self,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        monkeypatch.setattr("core.agents.root.routing.get_llm", lambda: _MockFollowupRedispatchLLM())
-
-        decision = asyncio.run(
-            plan_followups(
-                [HumanMessage(content="summarize what changed across my workspace today")],
-                ["todo"],
-                current_round_outcomes=[
-                    {
-                        "app": "todo",
-                        "status": "failed",
-                        "ok": False,
-                        "subtask": "Summarize all todo list changes that occurred today.",
-                        "message": "The todo assistant needed too many steps to complete this request. Please try a simpler query.",
-                        "tool_results": [],
-                        "error": "The todo assistant needed too many steps to complete this request. Please try a simpler query.",
-                        "retryable": True,
-                        "failure_kind": "recursion_limit",
-                    }
-                ],
-                all_worker_outcomes=[
-                    {
-                        "app": "todo",
-                        "status": "failed",
-                        "ok": False,
-                        "subtask": "Summarize all todo list changes that occurred today.",
-                        "message": "The todo assistant needed too many steps to complete this request. Please try a simpler query.",
-                        "tool_results": [],
-                        "error": "The todo assistant needed too many steps to complete this request. Please try a simpler query.",
-                        "retryable": True,
-                        "failure_kind": "recursion_limit",
-                    }
-                ],
-                blocked_app_ids=set(),
-                dispatch_round=1,
-                max_rounds=3,
-            )
-        )
-
-        assert decision.action == "redispatch"
-        assert [item.app_id for item in decision.app_decisions] == ["todo"]
-
-    def test_can_stop_when_current_evidence_is_enough(
-        self,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        monkeypatch.setattr("core.agents.root.routing.get_llm", lambda: _MockFollowupStopLLM())
-
-        decision = asyncio.run(
-            plan_followups(
-                [HumanMessage(content="what changed today?")],
-                ["finance"],
-                current_round_outcomes=[
-                    {
-                        "app": "finance",
-                        "status": "success",
-                        "ok": True,
-                        "subtask": "Summarize finance activity today.",
-                        "message": "No finance changes occurred today.",
-                        "tool_results": [],
-                        "error": "",
-                    }
-                ],
-                all_worker_outcomes=[
-                    {
-                        "app": "finance",
-                        "status": "success",
-                        "ok": True,
-                        "subtask": "Summarize finance activity today.",
-                        "message": "No finance changes occurred today.",
-                        "tool_results": [],
-                        "error": "",
-                    }
-                ],
-                blocked_app_ids=set(),
-                dispatch_round=1,
-                max_rounds=3,
-            )
-        )
-
-        assert decision.action == "synthesize"
-        assert decision.app_decisions == []
-
-
-class TestGraphFollowupSignals:
-    def test_round_has_no_followup_signal_for_plain_success(self) -> None:
-        assert _round_has_followup_signal(
-            [
-                {
-                    "app": "finance",
-                    "status": "success",
-                    "ok": True,
-                    "subtask": "Summarize finance activity today.",
-                    "message": "No finance changes occurred today.",
-                    "tool_results": [],
-                    "error": "",
-                }
-            ]
-        ) is False
-
-    def test_round_has_followup_signal_for_retryable_failure(self) -> None:
-        assert _round_has_followup_signal(
-            [
-                {
-                    "app": "calendar",
-                    "status": "failed",
-                    "ok": False,
-                    "subtask": "Summarize calendar changes today.",
-                    "message": "The calendar assistant timed out.",
-                    "tool_results": [],
-                    "error": "The calendar assistant timed out.",
-                    "retryable": True,
-                    "failure_kind": "timeout",
-                }
-            ]
-        ) is True
-
-    def test_blocks_capability_limited_apps_from_same_turn_followups(self) -> None:
-        blocked = _blocked_followup_apps(
-            [
-                {
-                    "app": "todo",
-                    "status": "success",
-                    "ok": True,
-                    "subtask": "Summarize todo changes today.",
-                    "message": "Current summary is available, but detailed history is not.",
-                    "tool_results": [],
-                    "error": "",
-                    "followup_useful": False,
-                    "capability_limit": "no_history_support",
-                }
-            ]
-        )
-
-        assert blocked == {"todo"}
-
-    def test_plan_followups_stops_before_planner_without_signal(
-        self,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        emitted: list[dict[str, object]] = []
-
-        def _unexpected_followup_planner(*_args: object, **_kwargs: object) -> object:
-            raise AssertionError("follow-up planner should not run when no signal exists")
-
-        monkeypatch.setattr(
-            "core.agents.root.graph.get_stream_writer",
-            lambda: lambda event: emitted.append(cast(dict[str, object], event)),
-        )
-        monkeypatch.setattr(
-            "core.agents.root.graph.plan_followups",
-            _unexpected_followup_planner,
-        )
-
-        runtime = SimpleNamespace(
-            context=RootGraphContext(
-                user_id="u1",
-                thread_id="thread-1",
-                user_tz="Asia/Ho_Chi_Minh",
-                installed_app_ids=["calendar"],
-                assistant_message_id=None,
-                worker_semaphore=asyncio.Semaphore(1),
-            )
-        )
-
-        result = asyncio.run(
-            _plan_followups(
-                {
-                    "messages": [HumanMessage(content="what changed today?")],
-                    "worker_outcomes": [
-                        {
-                            "app": "calendar",
-                            "status": "success",
-                            "ok": True,
-                            "subtask": "Summarize calendar activity today.",
-                            "message": "No calendar changes occurred today.",
-                            "tool_results": [],
-                            "error": "",
-                        }
-                    ],
-                    "current_round_outcomes": [
-                        {
-                            "app": "calendar",
-                            "status": "success",
-                            "ok": True,
-                            "subtask": "Summarize calendar activity today.",
-                            "message": "No calendar changes occurred today.",
-                            "tool_results": [],
-                            "error": "",
-                        }
-                    ],
-                    "dispatch_round": 1,
-                },
-                runtime,
-            )
-        )
-
-        assert result == {"dispatches": [], "current_round_outcomes": []}
-        assert emitted[-1] == {
-            "type": "thinking",
-            "step_id": "followup",
-            "label": "Current app results are already sufficient",
-            "status": "done",
-        }
-
-
 # ─────────────────────────────────────────────────────────────────────────────
 # direct_synthesize
 # ─────────────────────────────────────────────────────────────────────────────
@@ -886,7 +757,11 @@ class TestGraphSynthesisContext:
                 user_tz="Asia/Ho_Chi_Minh",
                 installed_app_ids=["calendar"],
                 assistant_message_id="msg_stream_123",
+                turn_id="turn-1",
                 worker_semaphore=Semaphore(1),
+                deadline_monotonic=time.monotonic() + 30,
+                turn_started_at_utc=utc_now(),
+                pending_question=None,
             )
         )
 
@@ -895,64 +770,11 @@ class TestGraphSynthesisContext:
         assert message.text == "Hello"
 
 
-class TestFollowupGuards:
-    def test_filter_followup_dispatches_skips_duplicate_subtasks(self) -> None:
-        from core.agents.root.graph import _filter_followup_dispatches
-
-        dispatches = [
-            {
-                "app_id": "calendar",
-                "subtask": "Summarize calendar activity today.",
-            }
-        ]
-        worker_outcomes = [
-            {
-                "app": "calendar",
-                "status": "failed",
-                "ok": False,
-                "subtask": "Summarize calendar activity today.",
-                "message": "Timed out.",
-                "tool_results": [],
-                "error": "Timed out.",
-                "retryable": True,
-                "failure_kind": "timeout",
-            }
-        ]
-
-        assert _filter_followup_dispatches(dispatches, worker_outcomes) == []
-
-    def test_filter_followup_dispatches_blocks_non_retryable_apps(self) -> None:
-        from core.agents.root.graph import _filter_followup_dispatches
-
-        dispatches = [
-            {
-                "app_id": "finance",
-                "subtask": "Retry finance lookup with the same wallet scope.",
-            }
-        ]
-        worker_outcomes = [
-            {
-                "app": "finance",
-                "status": "failed",
-                "ok": False,
-                "subtask": "Summarize finance activity today.",
-                "message": "Internal error.",
-                "tool_results": [],
-                "error": "Internal error.",
-                "retryable": False,
-                "failure_kind": "internal_error",
-            }
-        ]
-
-        assert _filter_followup_dispatches(dispatches, worker_outcomes) == []
-
+class TestRootRecursionBudget:
     def test_root_recursion_limit_scales_with_installed_apps(
         self,
-        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         from core.agents.root.agent import _compute_root_recursion_limit
-
-        monkeypatch.setattr("core.agents.root.agent.settings.root_agent_max_dispatch_rounds", 3)
 
         assert _compute_root_recursion_limit(0) >= 25
         assert _compute_root_recursion_limit(10) > _compute_root_recursion_limit(1)

@@ -76,6 +76,14 @@ async def synthesize(
                 writer({"type": "token", "content": content})
     except Exception as exc:
         logger.error("synthesize failed: {}", exc)
-        tokens.append(f"[Synthesis error: {exc}]")
+        if not tokens:
+            fallback = (
+                "I ran into a response-generation error, but I can still continue from the "
+                "results already gathered. Please try again if you need a fuller summary."
+                if merged_context
+                else "I ran into a response-generation error. Please try again."
+            )
+            tokens.append(fallback)
+            writer({"type": "token", "content": fallback})
 
     return "".join(tokens)

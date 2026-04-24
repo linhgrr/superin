@@ -67,6 +67,16 @@ async def _run_app_delegate(
             "subtask": subtask,
             "tool_results": [],
             "error": str(exc),
+            "answer_state": "blocked",
+            "evidence_summary": "",
+            "missing_information": [],
+            "followup_useful": False,
+            "followup_hint": "",
+            "capability_limit": "",
+            "stop_reason": "internal_error",
+            "contained_mutation": False,
+            "retryable": False,
+            "failure_kind": "worker_error",
         }
 
 

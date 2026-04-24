@@ -1,8 +1,14 @@
+import asyncio
+from datetime import timedelta
+from types import SimpleNamespace
+
 import pytest
 from fastapi import HTTPException
 
 from core.chat.routes import _extract_latest_user_message
-from core.chat.service import normalize_thread_id
+from core.chat.service import get_live_pending_question, normalize_thread_id
+from core.models import PendingQuestion
+from core.utils.timezone import utc_now
 
 
 def test_normalize_thread_id_preserves_frontend_thread_id() -> None:
@@ -47,3 +53,65 @@ def test_extract_latest_user_message_rejects_missing_user_text() -> None:
         return
 
     raise AssertionError("Expected HTTPException for missing user message")
+
+
+def test_get_live_pending_question_returns_fresh_pending_question(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pending = PendingQuestion(
+        round=1,
+        app_ids_in_scope=["todo"],
+        missing_information=["task id"],
+        asked_at_utc=utc_now(),
+    )
+
+    async def _fake_get_thread_meta(user_id: str, thread_id: str) -> object:
+        return SimpleNamespace(pending_question=pending)
+
+    async def _fake_set_thread_pending_question(
+        user_id: str,
+        thread_id: str,
+        value: PendingQuestion | None,
+    ) -> None:
+        raise AssertionError("Fresh pending questions should not be cleared")
+
+    monkeypatch.setattr("core.chat.service.get_thread_meta", _fake_get_thread_meta)
+    monkeypatch.setattr(
+        "core.chat.service.set_thread_pending_question",
+        _fake_set_thread_pending_question,
+    )
+
+    result = asyncio.run(get_live_pending_question("user-1", "thread-1"))
+    assert result == pending
+
+
+def test_get_live_pending_question_clears_stale_pending_question(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pending = PendingQuestion(
+        round=1,
+        app_ids_in_scope=["todo"],
+        missing_information=["task id"],
+        asked_at_utc=utc_now() - timedelta(days=1),
+    )
+    cleared: list[PendingQuestion | None] = []
+
+    async def _fake_get_thread_meta(user_id: str, thread_id: str) -> object:
+        return SimpleNamespace(pending_question=pending)
+
+    async def _fake_set_thread_pending_question(
+        user_id: str,
+        thread_id: str,
+        value: PendingQuestion | None,
+    ) -> None:
+        cleared.append(value)
+
+    monkeypatch.setattr("core.chat.service.get_thread_meta", _fake_get_thread_meta)
+    monkeypatch.setattr(
+        "core.chat.service.set_thread_pending_question",
+        _fake_set_thread_pending_question,
+    )
+
+    result = asyncio.run(get_live_pending_question("user-1", "thread-1"))
+    assert result is None
+    assert cleared == [None]

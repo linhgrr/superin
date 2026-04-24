@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import asyncio
-from collections import Counter
+import time
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, Literal, TypeAlias
 
 from langchain_core.messages import AIMessage, BaseMessage
+from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.config import get_config, get_stream_writer
 from langgraph.graph import END, START, StateGraph
@@ -16,15 +17,19 @@ from langgraph.runtime import Runtime
 from langgraph.types import Send
 from loguru import logger
 
+from core.chat.service import set_thread_pending_question
 from core.config import settings
+from core.models import PendingQuestion
 
 from .merged_response import merge_app_results
-from .routing import plan_followups, route_and_craft
+from .routing import route_and_craft
 from .runtime_context import RootGraphContext
 from .schemas import (
     NewTurnInput,
     RootGraphState,
     RootState,
+    SupervisorDecision,
+    SupervisorFollowup,
     ThinkingStatus,
     WorkerDispatch,
     WorkerOutcome,
@@ -36,7 +41,6 @@ if TYPE_CHECKING:
     from langgraph.store.base import BaseStore
 
 
-_TURN_TIMEOUT_SECONDS = 120.0
 RootCompiledGraph: TypeAlias = CompiledStateGraph[
     RootGraphState,
     RootGraphContext,
@@ -45,12 +49,38 @@ RootCompiledGraph: TypeAlias = CompiledStateGraph[
 ]
 
 
-def _build_final_ai_message(answer: str, runtime: Runtime[RootGraphContext]) -> AIMessage:
-    """Persist the assistant reply under the same id used during streaming."""
-    return AIMessage(
-        content=answer,
-        id=runtime.context.assistant_message_id,
+def normalize_subtask(value: str) -> str:
+    return " ".join(value.lower().split())
+
+
+def dispatch_fingerprint(app_id: str, subtask: str) -> str:
+    return f"{app_id}::{normalize_subtask(subtask)}"
+
+
+def evidence_fingerprint(outcome: WorkerOutcome) -> str:
+    tool_results = outcome.get("tool_results", [])
+    if tool_results:
+        parts = []
+        for result in tool_results:
+            data = result.get("data")
+            if isinstance(data, dict):
+                shape = ",".join(sorted(data.keys()))
+            elif isinstance(data, list):
+                shape = f"list:{len(data)}"
+            elif data is None:
+                shape = "none"
+            else:
+                shape = type(data).__name__
+            parts.append(f"{result.get('tool_name')}:{result.get('ok')}:{shape}")
+        return "|".join(parts)
+    return (
+        f"{outcome.get('answer_state')}:{outcome.get('stop_reason')}:"
+        f"{outcome.get('message', '')[:120]}"
     )
+
+
+def _build_final_ai_message(answer: str, runtime: Runtime[RootGraphContext]) -> AIMessage:
+    return AIMessage(content=answer, id=runtime.context.assistant_message_id)
 
 
 async def _synthesize_answer(
@@ -59,10 +89,9 @@ async def _synthesize_answer(
     *,
     merged_context: str,
 ) -> str:
-    writer = get_stream_writer()
     return await synthesize(
         messages=messages,
-        writer=writer,
+        writer=get_stream_writer(),
         user_id=runtime.context.user_id,
         store=runtime.store,
         user_tz=runtime.context.user_tz,
@@ -80,6 +109,14 @@ def _failed_worker_dict(app_id_: str, subtask: str, err: str) -> WorkerOutcome:
         "subtask": subtask,
         "tool_results": [],
         "error": err,
+        "answer_state": "blocked",
+        "evidence_summary": "",
+        "missing_information": [],
+        "followup_useful": False,
+        "followup_hint": "",
+        "capability_limit": "",
+        "stop_reason": "internal_error",
+        "contained_mutation": False,
         "retryable": False,
         "failure_kind": "worker_error",
     }
@@ -102,115 +139,37 @@ def _emit_thinking(step_id: str, label: str, status: ThinkingStatus) -> None:
     )
 
 
+def _emit_done_once(state: RootGraphState, answer: str) -> bool:
+    if state.get("done_emitted"):
+        logger.error("ROOT_DONE_ALREADY_EMITTED")
+        return True
+    get_stream_writer()({"type": "done", "content": answer})
+    return True
+
+
+def _stream_text(answer: str) -> None:
+    if answer:
+        get_stream_writer()({"type": "token", "content": answer})
+
+
 def _build_synthesis_context(worker_outcomes: list[WorkerOutcome]) -> str:
-    """Build synthesis context from all worker outcomes, including failures."""
     return merge_app_results(worker_outcomes)
 
 
 def _count_failed_outcomes(worker_outcomes: list[WorkerOutcome]) -> int:
-    """Count worker outcomes that ended in failure."""
     return sum(1 for outcome in worker_outcomes if outcome["status"] == "failed")
 
 
-def _normalize_subtask(subtask: str) -> str:
-    return " ".join(subtask.lower().split())
-
-
-def _dispatch_fingerprint(app_id: str, subtask: str) -> str:
-    return f"{app_id}::{_normalize_subtask(subtask)}"
-
-
-def _known_dispatch_fingerprints(worker_outcomes: list[WorkerOutcome]) -> set[str]:
-    return {
-        _dispatch_fingerprint(outcome["app"], outcome["subtask"])
-        for outcome in worker_outcomes
-    }
-
-
-def _count_app_attempts(worker_outcomes: list[WorkerOutcome]) -> Counter[str]:
-    attempts: Counter[str] = Counter()
-    for outcome in worker_outcomes:
-        attempts[outcome["app"]] += 1
-    return attempts
-
-
-def _blocked_followup_apps(worker_outcomes: list[WorkerOutcome]) -> set[str]:
-    blocked_apps: set[str] = set()
-    for outcome in worker_outcomes:
-        if outcome["status"] == "awaiting_confirmation":
-            blocked_apps.add(outcome["app"])
-            continue
-        if outcome["status"] == "failed" and not outcome.get("retryable", False):
-            blocked_apps.add(outcome["app"])
-            continue
-        if outcome.get("capability_limit") and not outcome.get("followup_useful", False):
-            blocked_apps.add(outcome["app"])
-    return blocked_apps
-
-
-def _round_has_followup_signal(current_round_outcomes: list[WorkerOutcome]) -> bool:
-    for outcome in current_round_outcomes:
-        if outcome["status"] == "failed" and outcome.get("retryable", False):
-            return True
-        if outcome["status"] == "partial":
-            return True
-        if outcome.get("followup_useful", False):
-            return True
-    return False
-
-
-def _filter_followup_dispatches(
-    dispatches: list[WorkerDispatch],
-    worker_outcomes: list[WorkerOutcome],
-) -> list[WorkerDispatch]:
-    seen_fingerprints = _known_dispatch_fingerprints(worker_outcomes)
-    attempt_counts = _count_app_attempts(worker_outcomes)
-    blocked_apps = _blocked_followup_apps(worker_outcomes)
-
-    filtered: list[WorkerDispatch] = []
-    for dispatch in dispatches:
-        app_id = dispatch["app_id"]
-        subtask = dispatch["subtask"]
-        fingerprint = _dispatch_fingerprint(app_id, subtask)
-
-        if fingerprint in seen_fingerprints:
-            logger.info(
-                "PARALLEL_ROOT_FOLLOWUP_DROP  app={}  reason=duplicate_subtask",
-                app_id,
-            )
-            continue
-
-        if app_id in blocked_apps:
-            logger.info(
-                "PARALLEL_ROOT_FOLLOWUP_DROP  app={}  reason=blocked_app",
-                app_id,
-            )
-            continue
-
-        if attempt_counts[app_id] >= settings.root_agent_max_app_attempts_per_turn:
-            logger.info(
-                "PARALLEL_ROOT_FOLLOWUP_DROP  app={}  reason=attempt_cap  attempts={}  cap={}",
-                app_id,
-                attempt_counts[app_id],
-                settings.root_agent_max_app_attempts_per_turn,
-            )
-            continue
-
-        filtered.append(dispatch)
-
-    return filtered
+def _dispatches_from_followups(followups: Sequence[SupervisorFollowup]) -> list[WorkerDispatch]:
+    return [{"app_id": item.app_id, "subtask": item.subtask} for item in followups]
 
 
 def _build_worker_sends(state: RootGraphState) -> list[Send]:
     sends: list[Send] = []
     for dispatch in state.get("dispatches", []):
         if get_worker_runner(dispatch["app_id"]) is None:
-            logger.warning(
-                "PARALLEL_ROOT_SKIP  app_id={} not in worker registry",
-                dispatch["app_id"],
-            )
+            logger.warning("PARALLEL_ROOT_SKIP  app_id={} not in worker registry", dispatch["app_id"])
             continue
-
         sends.append(Send("run_worker", {"dispatch": dispatch}))
     return sends
 
@@ -229,6 +188,162 @@ def _log_turn_start(state: RootGraphState, runtime: Runtime[RootGraphContext]) -
     )
 
 
+def _count_attempts_for_app(history: list[WorkerDispatch], app_id: str) -> int:
+    return sum(1 for item in history if item["app_id"] == app_id)
+
+
+def _remaining_turn_seconds(runtime: Runtime[RootGraphContext]) -> float:
+    return max(0.0, runtime.context.deadline_monotonic - time.monotonic())
+
+
+def _build_worker_config(
+    *,
+    config: RunnableConfig,
+    runtime: Runtime[RootGraphContext],
+    app_id: str,
+    round_index: int,
+    attempt_index: int,
+) -> RunnableConfig:
+    return {
+        **config,
+        "configurable": {
+            **dict(config.get("configurable") or {}),
+            "parent_thread_id": runtime.context.thread_id,
+            "turn_id": runtime.context.turn_id,
+            "round_index": round_index,
+            "attempt_index": attempt_index,
+            "app_id": app_id,
+        },
+        "metadata": {
+            **dict(config.get("metadata") or {}),
+            "turn_id": runtime.context.turn_id,
+            "dispatch_round": round_index,
+            "attempt_index": attempt_index,
+            "app_id": app_id,
+        },
+        "run_name": f"worker:{app_id}:r{round_index}:a{attempt_index}",
+    }
+
+
+def _finish_decision(
+    *,
+    stop_reason: str,
+    rationale: str,
+) -> SupervisorDecision:
+    return SupervisorDecision(
+        action="finish",
+        rationale=rationale,
+        stop_reason=stop_reason,
+    )
+
+
+def _build_terminal_state(
+    *,
+    state: RootGraphState,
+    runtime: Runtime[RootGraphContext],
+    answer: str,
+) -> RootGraphState:
+    return {
+        "messages": [_build_final_ai_message(answer, runtime)],
+        "new_messages": [],
+        "done_emitted": _emit_done_once(state, answer),
+    }
+
+
+def _round_has_useful_new_evidence(state: RootGraphState) -> bool:
+    current_round = state.get("current_round_outcomes", [])
+    if not current_round:
+        return False
+
+    all_outcomes = state.get("worker_outcomes", [])
+    turn_start = state.get("turn_worker_start_index", 0)
+    current_count = len(current_round)
+    turn_outcomes = all_outcomes[turn_start:]
+    previous_outcomes = turn_outcomes[:-current_count] if current_count <= len(turn_outcomes) else []
+    previous_fingerprints = {evidence_fingerprint(outcome) for outcome in previous_outcomes}
+    return any(evidence_fingerprint(outcome) not in previous_fingerprints for outcome in current_round)
+
+
+def _build_pending_question(decision: SupervisorDecision, state: RootGraphState) -> PendingQuestion:
+    app_ids = []
+    for outcome in state.get("current_round_outcomes", []):
+        if outcome["status"] == "awaiting_confirmation":
+            app_ids.append(outcome["app"])
+    return PendingQuestion(
+        round=state.get("dispatch_round", 1),
+        app_ids_in_scope=sorted(set(app_ids)),
+        missing_information=decision.missing_information,
+    )
+
+
+def _build_user_question(outcomes: list[WorkerOutcome]) -> tuple[str, list[str]]:
+    missing_information: list[str] = []
+    for outcome in outcomes:
+        if outcome["status"] != "awaiting_confirmation":
+            continue
+        missing_information.extend(outcome.get("missing_information", []))
+        message = outcome.get("message", "").strip()
+        if message:
+            return message, missing_information
+
+    if missing_information:
+        joined = ", ".join(dict.fromkeys(item for item in missing_information if item))
+        return f"I need a bit more information before I continue: {joined}.", missing_information
+
+    return "I need a bit more information before I continue.", missing_information
+
+
+def _build_followup_candidates(
+    state: RootGraphState,
+    runtime: Runtime[RootGraphContext],
+) -> tuple[list[SupervisorFollowup], str]:
+    history = state.get("dispatch_history", [])
+    used_fingerprints = {item["fingerprint"] for item in history if item.get("fingerprint")}
+    current_round = state.get("current_round_outcomes", [])
+    total_workers = len(history)
+    followups: list[SupervisorFollowup] = []
+
+    if total_workers >= settings.root_agent_max_total_workers_per_turn:
+        return [], "max_workers"
+    if _remaining_turn_seconds(runtime) <= 0:
+        return [], "time_budget"
+
+    for outcome in current_round:
+        if not outcome.get("followup_useful"):
+            continue
+        if outcome.get("contained_mutation"):
+            continue
+        if outcome.get("capability_limit"):
+            continue
+
+        followup_hint = outcome.get("followup_hint", "").strip()
+        if not followup_hint:
+            continue
+
+        app_id = outcome["app"]
+        if _count_attempts_for_app(history, app_id) >= settings.root_agent_max_app_attempts_per_turn:
+            continue
+
+        fingerprint = dispatch_fingerprint(app_id, followup_hint)
+        if fingerprint in used_fingerprints:
+            continue
+
+        missing_question = ", ".join(outcome.get("missing_information", []))
+        expected_new_evidence = outcome.get("evidence_summary", "") or outcome.get("message", "")
+        followups.append(
+            SupervisorFollowup(
+                app_id=app_id,
+                subtask=followup_hint,
+                missing_question=missing_question,
+                expected_new_evidence=expected_new_evidence[:200],
+            )
+        )
+
+    if followups:
+        return followups, "follow_up"
+    return [], "invalid_followup"
+
+
 async def _load_turn_context(
     state: RootGraphState,
     runtime: Runtime[RootGraphContext],
@@ -238,10 +353,14 @@ async def _load_turn_context(
     return {
         "messages": state.get("new_messages", []),
         "dispatches": [],
-        "worker_outcomes": [],
         "current_round_outcomes": [],
         "merged_context": "",
         "dispatch_round": 0,
+        "turn_worker_start_index": len(state.get("worker_outcomes", [])),
+        "round_start_worker_index": len(state.get("worker_outcomes", [])),
+        "dispatch_history": [],
+        "started_at_monotonic": time.monotonic(),
+        "done_emitted": False,
     }
 
 
@@ -251,17 +370,18 @@ async def _plan_dispatch(
 ) -> RootGraphState:
     messages = state.get("messages", [])
     try:
-        decision = await route_and_craft(messages, runtime.context.installed_app_ids)
+        decision = await route_and_craft(
+            messages,
+            runtime.context.installed_app_ids,
+            pending_question=runtime.context.pending_question,
+        )
     except Exception as exc:
         logger.warning(
             "PARALLEL_ROOT_ROUTING_FAILED  user={}  error={}  -> direct synthesize",
             runtime.context.user_id,
             exc,
         )
-        return {
-            "dispatches": [],
-            "current_round_outcomes": [],
-        }
+        return {"dispatches": []}
 
     dispatches: list[WorkerDispatch] = [
         {
@@ -277,43 +397,59 @@ async def _plan_dispatch(
             f"Found {len(dispatches)} workspace source{'s' if len(dispatches) != 1 else ''} to check",
             "done",
         )
-        logger.info(
-            "PARALLEL_ROOT_DISPATCH  user={}  decisions={}",
-            runtime.context.user_id,
-            [(item["app_id"], item["subtask"][:60]) for item in dispatches],
-        )
     else:
         _emit_thinking("routing", "No app lookup needed for this reply", "done")
-        logger.info(
-            "PARALLEL_ROOT_NO_APPS  user={}  -> direct synthesize",
-            runtime.context.user_id,
-        )
+
+    logger.info(
+        "PARALLEL_ROOT_DISPATCH  user={}  decisions={}",
+        runtime.context.user_id,
+        [(item["app_id"], item["subtask"][:60]) for item in dispatches],
+    )
+    return {"dispatches": dispatches}
+
+
+async def _prepare_round(
+    state: RootGraphState,
+    runtime: Runtime[RootGraphContext],
+) -> RootGraphState:
+    dispatches = state.get("dispatches", [])
+    history = list(state.get("dispatch_history", []))
+    round_index = state.get("dispatch_round", 0) + 1
+    prepared: list[WorkerDispatch] = []
+
+    for dispatch in dispatches:
+        app_id = dispatch["app_id"]
+        subtask = dispatch["subtask"]
+        fingerprint = dispatch_fingerprint(app_id, subtask)
+        attempt_index = _count_attempts_for_app(history, app_id) + 1
+        prepared_dispatch: WorkerDispatch = {
+            "app_id": app_id,
+            "subtask": subtask,
+            "round_index": round_index,
+            "attempt_index": attempt_index,
+            "fingerprint": fingerprint,
+        }
+        prepared.append(prepared_dispatch)
+        history.append(prepared_dispatch)
 
     return {
-        "dispatches": dispatches,
+        "dispatch_round": round_index,
+        "dispatches": prepared,
+        "dispatch_history": history,
         "current_round_outcomes": [],
-        "dispatch_round": 1 if dispatches else 0,
+        "round_start_worker_index": len(state.get("worker_outcomes", [])),
     }
 
 
-def _dispatch_initial_workers(
+def _route_dispatches(
     state: RootGraphState,
-) -> Sequence[Send] | Literal["synthesize_direct"]:
+) -> Sequence[Send] | Literal["synthesize_direct", "synthesize_final"]:
     sends = _build_worker_sends(state)
     if sends:
         return sends
-
+    if state.get("worker_outcomes"):
+        return "synthesize_final"
     return "synthesize_direct"
-
-
-def _dispatch_followup_workers(
-    state: RootGraphState,
-) -> Sequence[Send] | Literal["synthesize_final"]:
-    sends = _build_worker_sends(state)
-    if sends:
-        return sends
-
-    return "synthesize_final"
 
 
 async def _run_worker(
@@ -323,155 +459,165 @@ async def _run_worker(
     dispatch = state["dispatch"]
     app_id = dispatch["app_id"]
     subtask = dispatch["subtask"]
+    round_index = dispatch.get("round_index", state.get("dispatch_round", 1))
+    attempt_index = dispatch.get("attempt_index", 1)
     runner = get_worker_runner(app_id)
     config = get_config()
+    worker_config = _build_worker_config(
+        config=config,
+        runtime=runtime,
+        app_id=app_id,
+        round_index=round_index,
+        attempt_index=attempt_index,
+    )
     worker_name = _humanize_worker_name(app_id)
+    step_id = f"worker:{app_id}:r{round_index}:a{attempt_index}"
 
-    _emit_thinking(f"worker:{app_id}", f"Checking {worker_name}", "active")
+    _emit_thinking(step_id, f"Checking {worker_name}", "active")
 
     if runner is None:
         outcome = _failed_worker_dict(app_id, subtask, "Worker not registered")
     else:
-        try:
-            async with runtime.context.worker_semaphore:
-                outcome = await asyncio.wait_for(
-                    runner(
-                        subtask,
-                        runtime.context.user_id,
-                        runtime.context.thread_id,
-                        config,
-                    ),
-                    timeout=_TURN_TIMEOUT_SECONDS,
+        remaining_turn_seconds = _remaining_turn_seconds(runtime)
+        if remaining_turn_seconds <= 0:
+            outcome = _failed_worker_dict(app_id, subtask, "Turn exceeded time budget")
+            outcome["failure_kind"] = "time_budget"
+            outcome["stop_reason"] = "time_budget"
+            outcome["retryable"] = False
+        else:
+            timeout_seconds = min(settings.root_agent_per_worker_timeout_seconds, remaining_turn_seconds)
+            try:
+                async with runtime.context.worker_semaphore:
+                    outcome = await asyncio.wait_for(
+                        runner(
+                            subtask,
+                            runtime.context.user_id,
+                            runtime.context.thread_id,
+                            worker_config,
+                        ),
+                        timeout=timeout_seconds,
+                    )
+            except TimeoutError:
+                logger.error(
+                    "PARALLEL_ROOT_TIMEOUT  user={}  app={}  exceeded {:.2f}s",
+                    runtime.context.user_id,
+                    app_id,
+                    timeout_seconds,
                 )
-        except TimeoutError:
-            logger.error(
-                "PARALLEL_ROOT_TIMEOUT  user={}  app={}  exceeded {}s",
-                runtime.context.user_id,
-                app_id,
-                _TURN_TIMEOUT_SECONDS,
-            )
-            outcome = _failed_worker_dict(
-                app_id,
-                subtask,
-                f"Turn timed out after {_TURN_TIMEOUT_SECONDS}s",
-            )
-            outcome["failure_kind"] = "root_timeout"
-        except Exception as exc:
-            logger.error("worker_failed  app={}  error={}", app_id, exc)
-            outcome = _failed_worker_dict(app_id, subtask, str(exc))
+                outcome = _failed_worker_dict(
+                    app_id,
+                    subtask,
+                    f"Turn timed out after {timeout_seconds:.2f}s",
+                )
+                outcome["failure_kind"] = "time_budget"
+                outcome["stop_reason"] = "time_budget"
+            except Exception as exc:
+                logger.error("worker_failed  app={}  error={}", app_id, exc)
+                outcome = _failed_worker_dict(app_id, subtask, str(exc))
 
     if outcome["status"] == "failed":
-        _emit_thinking(f"worker:{app_id}", f"Finished {worker_name} with an issue", "done")
+        _emit_thinking(step_id, f"Finished {worker_name} with an issue", "done")
     else:
-        _emit_thinking(f"worker:{app_id}", f"Finished checking {worker_name}", "done")
+        _emit_thinking(step_id, f"Finished checking {worker_name}", "done")
 
-    return {
-        "worker_outcomes": [outcome],
-        "current_round_outcomes": [outcome],
-    }
+    return {"worker_outcomes": [outcome]}
 
 
 async def _merge_results(state: RootGraphState) -> RootGraphState:
-    merged = _build_synthesis_context(state.get("worker_outcomes", []))
-    return {"merged_context": merged}
+    start_index = state.get("round_start_worker_index", 0)
+    turn_start = state.get("turn_worker_start_index", 0)
+    worker_outcomes = state.get("worker_outcomes", [])
+    current_round_outcomes = worker_outcomes[start_index:]
+    merged = _build_synthesis_context(worker_outcomes[turn_start:])
+    return {
+        "current_round_outcomes": current_round_outcomes,
+        "merged_context": merged,
+    }
 
 
-async def _plan_followups(
+async def _supervisor_decide(
     state: RootGraphState,
     runtime: Runtime[RootGraphContext],
 ) -> RootGraphState:
-    current_round_outcomes = state.get("current_round_outcomes", [])
-    worker_outcomes = state.get("worker_outcomes", [])
-    dispatch_round = state.get("dispatch_round", 0)
-    max_rounds = settings.root_agent_max_dispatch_rounds
+    round_index = state.get("dispatch_round", 1)
+    _emit_thinking(f"supervisor:r{round_index}", "Reviewing the gathered evidence", "active")
 
-    _emit_thinking("followup", "Evaluating whether another lookup is needed", "active")
-
-    if not current_round_outcomes:
-        _emit_thinking("followup", "No further lookup needed", "done")
-        return {"dispatches": [], "current_round_outcomes": []}
-
-    if not _round_has_followup_signal(current_round_outcomes):
-        logger.info(
-            "PARALLEL_ROOT_FOLLOWUP_STOP  user={}  round={}  reason=no_followup_signal",
-            runtime.context.user_id,
-            dispatch_round,
+    current_round = state.get("current_round_outcomes", [])
+    waiting_for_user = [outcome for outcome in current_round if outcome["status"] == "awaiting_confirmation"]
+    if waiting_for_user:
+        user_question, missing_information = _build_user_question(waiting_for_user)
+        decision = SupervisorDecision(
+            action="ask_user",
+            rationale="A child agent needs specific user input before continuing.",
+            stop_reason="needs_user_input",
+            user_question=user_question,
+            missing_information=missing_information,
         )
-        _emit_thinking("followup", "Current app results are already sufficient", "done")
-        return {"dispatches": [], "current_round_outcomes": []}
+        _emit_thinking("ask_user", "Waiting for your answer", "done")
+        _emit_thinking(f"supervisor:r{round_index}", "Need clarification from you", "done")
+        return {"supervisor_decision": decision, "stop_reason": "needs_user_input"}
 
-    if dispatch_round >= max_rounds:
-        logger.info(
-            "PARALLEL_ROOT_FOLLOWUP_STOP  user={}  round={}  reason=max_rounds",
-            runtime.context.user_id,
-            dispatch_round,
+    if not _round_has_useful_new_evidence(state):
+        decision = _finish_decision(
+            stop_reason="no_new_evidence",
+            rationale="Latest round did not add materially new evidence.",
         )
-        _emit_thinking("followup", "Reached the lookup limit for this turn", "done")
-        return {"dispatches": [], "current_round_outcomes": []}
+        _emit_thinking(f"supervisor:r{round_index}", "Stopping after no new evidence", "done")
+        return {"supervisor_decision": decision, "stop_reason": "no_new_evidence"}
 
-    blocked_apps = _blocked_followup_apps(worker_outcomes)
-    try:
-        decision = await plan_followups(
-            state.get("messages", []),
-            runtime.context.installed_app_ids,
-            current_round_outcomes=current_round_outcomes,
-            all_worker_outcomes=worker_outcomes,
-            blocked_app_ids=blocked_apps,
-            dispatch_round=dispatch_round,
-            max_rounds=max_rounds,
+    if state.get("dispatch_round", 1) >= settings.root_agent_max_dispatch_rounds:
+        decision = _finish_decision(
+            stop_reason="max_rounds",
+            rationale="Reached the max dispatch rounds for this turn.",
         )
-    except Exception as exc:
-        logger.warning(
-            "PARALLEL_ROOT_FOLLOWUP_FAILED  user={}  round={}  error={}  -> synthesize",
-            runtime.context.user_id,
-            dispatch_round,
-            exc,
-        )
-        _emit_thinking("followup", "Continuing with the current results", "done")
-        return {"dispatches": [], "current_round_outcomes": []}
+        _emit_thinking(f"supervisor:r{round_index}", "Stopping at round limit", "done")
+        return {"supervisor_decision": decision, "stop_reason": "max_rounds"}
 
-    if decision.action != "redispatch":
-        logger.info(
-            "PARALLEL_ROOT_FOLLOWUP_STOP  user={}  round={}  reason=planner_stop",
-            runtime.context.user_id,
-            dispatch_round,
+    if _remaining_turn_seconds(runtime) <= 0:
+        decision = _finish_decision(
+            stop_reason="time_budget",
+            rationale="Turn exceeded the wall-clock budget.",
         )
-        _emit_thinking("followup", "Enough context gathered", "done")
-        return {"dispatches": [], "current_round_outcomes": []}
+        _emit_thinking(f"supervisor:r{round_index}", "Stopping at time budget", "done")
+        return {"supervisor_decision": decision, "stop_reason": "time_budget"}
 
-    proposed_dispatches: list[WorkerDispatch] = [
-        {
-            "app_id": item.app_id,
-            "subtask": item.subtask,
+    followups, reason = _build_followup_candidates(state, runtime)
+    if followups:
+        decision = SupervisorDecision(
+            action="follow_up",
+            rationale="A narrower follow-up could add new evidence.",
+            stop_reason="follow_up",
+            followups=followups,
+        )
+        _emit_thinking(f"supervisor:r{round_index}", "Running one more targeted check", "done")
+        return {
+            "supervisor_decision": decision,
+            "dispatches": _dispatches_from_followups(followups),
+            "stop_reason": "follow_up",
         }
-        for item in decision.app_decisions
-    ]
-    dispatches = _filter_followup_dispatches(proposed_dispatches, worker_outcomes)
-    if not dispatches:
-        logger.info(
-            "PARALLEL_ROOT_FOLLOWUP_STOP  user={}  round={}  reason=no_valid_followups",
-            runtime.context.user_id,
-            dispatch_round,
-        )
-        _emit_thinking("followup", "Enough context gathered", "done")
-        return {"dispatches": [], "current_round_outcomes": []}
 
-    logger.info(
-        "PARALLEL_ROOT_REDISPATCH  user={}  round={}  decisions={}",
-        runtime.context.user_id,
-        dispatch_round + 1,
-        [(item["app_id"], item["subtask"][:60]) for item in dispatches],
+    decision = _finish_decision(
+        stop_reason=reason,
+        rationale="No valid follow-up remained after deterministic guardrails.",
     )
-    _emit_thinking(
-        "followup",
-        f"Doing {len(dispatches)} more targeted lookup{'s' if len(dispatches) != 1 else ''}",
-        "done",
-    )
-    return {
-        "dispatches": dispatches,
-        "current_round_outcomes": [],
-        "dispatch_round": dispatch_round + 1,
-    }
+    _emit_thinking(f"supervisor:r{round_index}", "Enough evidence to reply", "done")
+    return {"supervisor_decision": decision, "stop_reason": reason}
+
+
+def _route_after_supervisor(
+    state: RootGraphState,
+) -> Literal["prepare_followups", "synthesize_final", "synthesize_user_question"]:
+    decision = state["supervisor_decision"]
+    if decision.action == "follow_up":
+        return "prepare_followups"
+    if decision.action == "ask_user":
+        return "synthesize_user_question"
+    return "synthesize_final"
+
+
+async def _prepare_followups(state: RootGraphState) -> RootGraphState:
+    decision = state["supervisor_decision"]
+    return {"dispatches": _dispatches_from_followups(decision.followups)}
 
 
 async def _synthesize_direct(
@@ -479,23 +625,17 @@ async def _synthesize_direct(
     runtime: Runtime[RootGraphContext],
 ) -> RootGraphState:
     _emit_thinking("synthesis", "Drafting the reply", "active")
-    answer = await _synthesize_answer(
-        state.get("messages", []),
-        runtime,
-        merged_context="",
-    )
-    get_stream_writer()({"type": "done", "content": answer})
-    return {
-        "messages": [_build_final_ai_message(answer, runtime)],
-        "new_messages": [],
-    }
+    answer = await _synthesize_answer(state.get("messages", []), runtime, merged_context="")
+    await set_thread_pending_question(runtime.context.user_id, runtime.context.thread_id, None)
+    return _build_terminal_state(state=state, runtime=runtime, answer=answer)
 
 
 async def _synthesize_final(
     state: RootGraphState,
     runtime: Runtime[RootGraphContext],
 ) -> RootGraphState:
-    worker_outcomes = state.get("worker_outcomes", [])
+    turn_start = state.get("turn_worker_start_index", 0)
+    worker_outcomes = state.get("worker_outcomes", [])[turn_start:]
     _emit_thinking("synthesis", "Combining the results into one reply", "active")
     answer = await _synthesize_answer(
         state.get("messages", []),
@@ -512,11 +652,23 @@ async def _synthesize_final(
         len(state.get("messages", [])) + 1,
     )
 
-    get_stream_writer()({"type": "done", "content": answer})
-    return {
-        "messages": [_build_final_ai_message(answer, runtime)],
-        "new_messages": [],
-    }
+    await set_thread_pending_question(runtime.context.user_id, runtime.context.thread_id, None)
+    return _build_terminal_state(state=state, runtime=runtime, answer=answer)
+
+
+async def _synthesize_user_question(
+    state: RootGraphState,
+    runtime: Runtime[RootGraphContext],
+) -> RootGraphState:
+    decision = state["supervisor_decision"]
+    answer = decision.user_question.strip() or "I need a bit more information before I continue."
+    _stream_text(answer)
+    await set_thread_pending_question(
+        runtime.context.user_id,
+        runtime.context.thread_id,
+        _build_pending_question(decision, state),
+    )
+    return _build_terminal_state(state=state, runtime=runtime, answer=answer)
 
 
 def _build_graph(
@@ -531,19 +683,27 @@ def _build_graph(
     )
     builder.add_node("load_turn_context", _load_turn_context)
     builder.add_node("plan_dispatch", _plan_dispatch)
+    builder.add_node("prepare_round", _prepare_round)
     builder.add_node("run_worker", _run_worker)
     builder.add_node("merge_results", _merge_results)
-    builder.add_node("plan_followups", _plan_followups)
+    builder.add_node("supervisor_decide", _supervisor_decide)
+    builder.add_node("prepare_followups", _prepare_followups)
     builder.add_node("synthesize_direct", _synthesize_direct)
     builder.add_node("synthesize_final", _synthesize_final)
+    builder.add_node("synthesize_user_question", _synthesize_user_question)
+
     builder.add_edge(START, "load_turn_context")
     builder.add_edge("load_turn_context", "plan_dispatch")
-    builder.add_conditional_edges("plan_dispatch", _dispatch_initial_workers)
+    builder.add_edge("plan_dispatch", "prepare_round")
+    builder.add_conditional_edges("prepare_round", _route_dispatches)
     builder.add_edge("run_worker", "merge_results")
-    builder.add_edge("merge_results", "plan_followups")
-    builder.add_conditional_edges("plan_followups", _dispatch_followup_workers)
+    builder.add_edge("merge_results", "supervisor_decide")
+    builder.add_conditional_edges("supervisor_decide", _route_after_supervisor)
+    builder.add_edge("prepare_followups", "prepare_round")
     builder.add_edge("synthesize_direct", END)
     builder.add_edge("synthesize_final", END)
+    builder.add_edge("synthesize_user_question", END)
+
     return builder.compile(
         checkpointer=checkpointer,
         store=store,
@@ -551,12 +711,10 @@ def _build_graph(
     )
 
 
-# Lazy singleton — compiled graph
 _root_agent_graph: RootCompiledGraph | None = None
 
 
 def get_root_agent_graph() -> RootCompiledGraph:
-    """Get or create the singleton compiled root StateGraph."""
     global _root_agent_graph
     if _root_agent_graph is None:
         from core.db import get_checkpointer, get_store
@@ -567,7 +725,6 @@ def get_root_agent_graph() -> RootCompiledGraph:
 
 
 def refresh_graph() -> None:
-    """Invalidate the cached graph (call after plugin discovery changes)."""
     global _root_agent_graph
     _root_agent_graph = None
     refresh_workers()
