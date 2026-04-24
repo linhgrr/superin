@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
 from langchain.agents.middleware.types import AgentMiddleware, ContextT, ResponseT
@@ -102,6 +103,12 @@ class StructuredToolResultMiddleware(AgentMiddleware[AppAgentState, ContextT, Re
             update["contained_mutation"] = True
         return Command(update=update)
 
+    def _is_mutating_tool(self, tool: object) -> bool:
+        extras = getattr(tool, "extras", None)
+        if not isinstance(extras, Mapping):
+            return False
+        return bool(extras.get("is_mutating", False))
+
     async def awrap_tool_call(
         self,
         request: ToolCallRequest,
@@ -110,7 +117,7 @@ class StructuredToolResultMiddleware(AgentMiddleware[AppAgentState, ContextT, Re
         tool_name = request.tool_call["name"]
         tool_call_id = request.tool_call.get("id") or "unknown_tool_call"
         user_id = getattr(request.runtime.context, "user_id", "") or None
-        is_mutating = bool(getattr(request.tool, "extras", {}).get("is_mutating", False))
+        is_mutating = self._is_mutating_tool(request.tool)
         started_at = time.perf_counter()
 
         try:
@@ -246,6 +253,12 @@ class ChildBudgetMiddleware(AgentMiddleware[AppAgentState, ContextT, ResponseT])
         self.soft_limit = soft_limit
         self.hard_limit = hard_limit
 
+    def _is_mutating_tool(self, tool: object) -> bool:
+        extras = getattr(tool, "extras", None)
+        if not isinstance(extras, Mapping):
+            return False
+        return bool(extras.get("is_mutating", False))
+
     async def abefore_model(
         self,
         state: AppAgentState,
@@ -284,7 +297,7 @@ class ChildBudgetMiddleware(AgentMiddleware[AppAgentState, ContextT, ResponseT])
         next_count = current_count + 1
         tool_name = request.tool_call["name"]
         tool_call_id = request.tool_call.get("id") or "unknown_tool_call"
-        is_mutating = bool(getattr(request.tool, "extras", {}).get("is_mutating", False))
+        is_mutating = self._is_mutating_tool(request.tool)
 
         if current_count >= self.hard_limit:
             logger.warning(
